@@ -1,0 +1,37 @@
+---
+description: Taille max des fonctions (25–40 lignes)
+globs: backend/**/*.py,frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Taille des fonctions : 25–40 lignes max
+
+Une fonction = une responsabilité. Si elle dépasse ~40 lignes, extraire des helpers privés ou des sous-fonctions.
+
+## Quand découper
+
+- Validation, mapping, filtrage → helper ou méthode privée `_validate_*`, `_to_api`
+- Plusieurs branches `if/elif` → early return ou petites fonctions nommées
+- Controller > 15 lignes → déplacer la logique dans le service
+
+```python
+# ✅ service orchestrateur court
+def complete_task(self, actor_id: str, task_id: str) -> dict:
+    task = self._repo.find_by_id(task_id)
+    self._ensure_can_complete(actor_id, task)
+    return self._repo.mark_completed(task_id)
+
+# ❌ une seule fonction de 80 lignes avec validation + SQL + mapping
+```
+
+```tsx
+// ✅ hook ou utilitaire extrait
+function useTaskFilters() { /* ≤ 40 lignes */ }
+
+// ❌ composant page de 200 lignes avec fetch + filtres + rendu
+```
+
+## Exceptions rares
+
+- Fichiers de config/thème (`theme.ts`, migrations Alembic) : OK si structure déclarative.
+- En cas de dépassement : commenter brièvement pourquoi (ex. schéma OpenAPI généré).

@@ -1,0 +1,50 @@
+---
+description: Architecture modulaire standard backend et frontend Super
+alwaysApply: true
+---
+
+# Architecture modulaire (back + front séparés)
+
+Ne pas mélanger les responsabilités entre couches ou dossiers.
+
+## Backend (`backend/app/`)
+
+```
+controllers/   → HTTP, session, appelle un service
+services/      → logique métier, périmètre rôle
+repositories/  → SQLAlchemy uniquement
+models/        → dataclasses domaine
+db/models.py   → ORM + mappers.py pour conversion
+domain/        → règles pures sans I/O
+```
+
+- Un module métier = controller + service + repository (+ model domaine).
+- Pas de SQL dans les controllers. Pas de logique métier dans les repositories.
+
+```python
+# ✅ controller mince
+@router.get("")
+def list_snifim(request: Request, service: SnifService = Depends(get_snif_service)):
+    return service.list_for_user(require_user_id(request), session_user_role(request))
+
+# ❌ requête SQL directement dans le controller
+```
+
+## Frontend (`frontend/src/`)
+
+```
+pages/         → écrans par rôle (admin/, manager/, employee/)
+components/    → UI réutilisable
+services/      → appels API (axios)
+context/       → état global (auth)
+i18n/he.ts     → toutes les chaînes UI en hébreu
+hooks/         → logique UI réutilisable
+```
+
+- Pas d'appel API direct dans les pages : passer par `services/`.
+- Pas de texte UI en dur dans les composants : utiliser `he.*`.
+
+## Références
+
+- Back : `Digestic/digestic-projet1`
+- Front RTL : `exam` (`DashboardLayout`, `i18n/he.ts`)

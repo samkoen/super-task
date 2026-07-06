@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.log
+node_modules/
+frontend/dist/
+backend/uploads/
+.idea/
+.vscode/

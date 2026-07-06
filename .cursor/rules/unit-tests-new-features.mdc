@@ -1,0 +1,39 @@
+---
+description: Tests unitaires obligatoires pour toute nouvelle fonctionnalité
+alwaysApply: true
+---
+
+# Tests unitaires sur les nouvelles fonctionnalités
+
+Chaque **nouvelle fonctionnalité demandée** doit inclure des tests unitaires dans la même livraison (pas en « phase ultérieure »).
+
+## Backend (pytest)
+
+- Emplacement : `backend/tests/` (miroir des modules : `tests/services/`, `tests/domain/`).
+- Cibler : services, règles `domain/`, helpers de mapping — pas les controllers HTTP entiers sauf cas critique.
+- DB : session de test ou mocks repository ; pas de dépendance à PostgreSQL pour les tests unitaires.
+
+```python
+# tests/services/test_task_service.py
+def test_oved_cannot_see_other_user_tasks(task_service, oved_user, other_task):
+    with pytest.raises(PermissionError):
+        task_service.get_for_user(oved_user.id, other_task.id)
+```
+
+## Frontend (Vitest + Testing Library)
+
+- Emplacement : à côté du module ou `frontend/src/**/*.test.tsx`.
+- Cibler : hooks, utils, composants avec logique (filtres, permissions, formatage).
+- Mock `services/` pour les pages ; tester le comportement visible, pas l'implémentation MUI.
+
+```tsx
+// services/taskService.test.ts — mock axios
+// hooks/useTaskList.test.ts — logique de tri/filtre
+```
+
+## Definition of done
+
+- [ ] Code module standard (controller/service/page)
+- [ ] Fonctions ≤ 40 lignes
+- [ ] Tests ajoutés et passants (`pytest`, `npm test`)
+- [ ] Cas nominal + au moins un cas limite (permission, entrée invalide, liste vide)
