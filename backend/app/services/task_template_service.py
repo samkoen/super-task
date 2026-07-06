@@ -49,6 +49,7 @@ class TaskTemplateService:
         recurrence: str = task_recurrence.ONCE,
         due_time: str = "23:59",
         weekly_days: str | None = None,
+        monthly_day: int | None = None,
         assignee_user_id: str | None = None,
         department_id: str | None = None,
         due_at: str | None = None,
@@ -60,11 +61,17 @@ class TaskTemplateService:
         if not (title or "").strip():
             raise ValueError("נדרש כותרת משימה")
         if recurrence not in task_recurrence.RECURRING:
-            raise ValueError("משימה קבועה דורשת חזרה יומית/שבועית/דו-שבועית")
+            raise ValueError("משימה קבועה דורשת חזרה יומית/שבועית/דו-שבועית/חודשית")
         if not assignee_user_id:
             raise ValueError("נדרש שיוך לעובד למשימה קבועה")
         if recurrence in {task_recurrence.WEEKLY, task_recurrence.BIWEEKLY} and not (weekly_days or "").strip():
             raise ValueError("נדרש יום בשבוע למשימה שבועית")
+        parsed_monthly_day: int | None = None
+        if recurrence == task_recurrence.MONTHLY:
+            raw_day = monthly_day if monthly_day is not None else 1
+            if not 1 <= int(raw_day) <= 31:
+                raise ValueError("יום בחודש חייב להיות בין 1 ל-31")
+            parsed_monthly_day = int(raw_day)
 
         anchor = datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None
 
@@ -75,6 +82,7 @@ class TaskTemplateService:
             recurrence=recurrence,
             due_time=due_time,
             weekly_days=weekly_days,
+            monthly_day=parsed_monthly_day,
             assignee_user_id=assignee_user_id,
             department_id=department_id,
             created_by_id=actor.user_id,

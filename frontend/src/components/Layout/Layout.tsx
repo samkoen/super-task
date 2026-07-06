@@ -24,6 +24,7 @@ import InventoryIcon from "@mui/icons-material/Inventory";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
@@ -101,12 +102,17 @@ function Layout() {
       }}
     >
       <Box sx={{ ...sidebarHeaderSx, borderBottomColor: alpha("#fff", 0.12) }}>
-        <Typography variant="subtitle1" fontWeight={800} noWrap>
-          {he.appName}
-        </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.8 }} noWrap>
-          {user?.full_name}
-        </Typography>
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+          <Box minWidth={0}>
+            <Typography variant="subtitle1" fontWeight={800} noWrap>
+              {he.appName}
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.8 }} noWrap>
+              {user?.full_name}
+            </Typography>
+          </Box>
+          <NotificationBell />
+        </Box>
       </Box>
 
       <List sx={{ flex: 1, px: 1.5, py: 2 }}>
@@ -175,7 +181,9 @@ function Layout() {
           }}
         >
           <Typography variant="subtitle1" fontWeight={800}>{he.appName}</Typography>
-          <Button
+          <Box display="flex" alignItems="center" gap={0.5}>
+            <NotificationBell />
+            <Button
             type="button"
             color="inherit"
             size="small"
@@ -185,6 +193,7 @@ function Layout() {
           >
             {he.logout}
           </Button>
+          </Box>
         </Box>
         <Box sx={{ px: { xs: 1.5, sm: 2 }, py: 2 }}>
           <Outlet />

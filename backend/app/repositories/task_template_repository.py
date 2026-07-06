@@ -43,7 +43,7 @@ class TaskTemplateRepository:
             select(orm.TaskTemplate)
             .where(orm.TaskTemplate.is_active.is_(True))
             .where(orm.TaskTemplate.task_kind == "fixed")
-            .where(orm.TaskTemplate.recurrence.in_(["daily", "weekly", "biweekly"]))
+            .where(orm.TaskTemplate.recurrence.in_(["daily", "weekly", "biweekly", "monthly"]))
         )
         rows = self._db.execute(q).scalars().all()
         return [t for row in rows if (t := mp.task_template_orm_to_domain(row))]
@@ -57,6 +57,7 @@ class TaskTemplateRepository:
         recurrence: str,
         due_time: str,
         weekly_days: str | None,
+        monthly_day: int | None,
         assignee_user_id: str | None,
         department_id: str | None,
         created_by_id: str,
@@ -74,6 +75,7 @@ class TaskTemplateRepository:
             recurrence=recurrence,
             due_time=due_time,
             weekly_days=weekly_days,
+            monthly_day=monthly_day,
             assignee_user_id=mp.parse_uuid(assignee_user_id) if assignee_user_id else None,
             department_id=mp.parse_uuid(department_id) if department_id else None,
             task_kind=task_kind,

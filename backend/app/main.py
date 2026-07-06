@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,11 +17,12 @@ from app.controllers import (
     events_controller,
     invitation_controller,
     network_controller,
+    notification_controller,
     product_controller,
     task_controller,
     user_controller,
 )
-from app.core.config import FRONTEND_URL, SECRET_KEY
+from app.core.config import COOKIE_SECURE, FRONTEND_URL, SECRET_KEY, UPLOADS_DIR
 from app.realtime.sse_hub import sse_hub
 
 
@@ -47,18 +47,17 @@ def create_app() -> FastAPI:
         secret_key=SECRET_KEY,
         max_age=60 * 60 * 24 * 31,
         same_site="lax",
-        https_only=False,
+        https_only=COOKIE_SECURE,
     )
 
-    backend_dir = Path(__file__).resolve().parent.parent
-    uploads_dir = backend_dir / "uploads"
-    uploads_dir.mkdir(exist_ok=True)
-    (uploads_dir / "task_photos").mkdir(exist_ok=True)
-    (uploads_dir / "task_videos").mkdir(exist_ok=True)
-    (uploads_dir / "task_audio").mkdir(exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    (UPLOADS_DIR / "task_photos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "task_videos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "task_audio").mkdir(exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
     @app.get("/health", tags=["health"])
+    @app.get("/api/health", tags=["health"])
     def health_check():
         return {"status": "ok", "app": "super"}
 
@@ -72,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(task_controller.router, prefix="/api/tasks", tags=["tasks"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(events_controller.router, prefix="/api/events", tags=["events"])
+    app.include_router(notification_controller.router, prefix="/api/notifications", tags=["notifications"])
 
     return app
 

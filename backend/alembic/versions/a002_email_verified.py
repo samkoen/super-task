@@ -12,6 +12,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    cols = {c["name"] for c in insp.get_columns("users")}
+    if "email_verified" in cols:
+        return
     op.add_column(
         "users",
         sa.Column("email_verified", sa.Boolean(), nullable=False, server_default=sa.false()),

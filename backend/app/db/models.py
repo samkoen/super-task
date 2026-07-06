@@ -161,6 +161,7 @@ class TaskTemplate(Base):
     recurrence: Mapped[str] = mapped_column(String(20), nullable=False, default="once")
     due_time: Mapped[str] = mapped_column(String(8), nullable=False, default="23:59")
     weekly_days: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    monthly_day: Mapped[int | None] = mapped_column(nullable=True)
     assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
@@ -243,5 +244,29 @@ class TaskCompletion(Base):
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class UserNotification(Base):
+    __tablename__ = "user_notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    occurrence_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("task_occurrences.id"), nullable=True
+    )
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

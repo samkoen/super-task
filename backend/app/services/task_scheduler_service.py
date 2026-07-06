@@ -31,7 +31,11 @@ class TaskSchedulerService:
         if template.biweekly_anchor:
             anchor = datetime.fromisoformat(template.biweekly_anchor).date()
         if not task_recurrence.should_generate_on_date(
-            template.recurrence, template.weekly_days, on_date, anchor_date=anchor
+            template.recurrence,
+            template.weekly_days,
+            on_date,
+            anchor_date=anchor,
+            monthly_day=template.monthly_day,
         ):
             return False
         if self._occurrences.exists_for_template_on_date(template.id, on_date):

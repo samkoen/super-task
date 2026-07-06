@@ -11,6 +11,7 @@ backend_dir = Path(__file__).resolve().parents[1]
 load_dotenv(backend_dir / ".env")
 sys.path.insert(0, str(backend_dir))
 
+from app.core.config import prepare_database_url
 from app.db.base import Base  # noqa: E402
 from app.db import models  # noqa: F401, E402
 
@@ -28,7 +29,7 @@ def get_url() -> str:
             "DATABASE_URL manquant. Crée backend/.env avec "
             "DATABASE_URL=postgresql://USER:MDP@localhost:5432/super_db"
         )
-    return url
+    return prepare_database_url(url)
 
 
 def run_migrations_offline() -> None:

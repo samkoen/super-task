@@ -15,16 +15,18 @@ from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
 from app.realtime.task_events import notify_task_change
+from app.repositories.notification_repository import NotificationRepository
+from app.services.notification_service import NotificationService
 from app.services.task_occurrence_service import TaskOccurrenceService
 from app.services.task_scheduler_service import TaskSchedulerService
+from app.core.config import UPLOADS_DIR
 from app.services.task_template_service import TaskTemplateService
 
 router = APIRouter()
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-TASK_PHOTO_DIR = BACKEND_DIR / "uploads" / "task_photos"
-TASK_VIDEO_DIR = BACKEND_DIR / "uploads" / "task_videos"
-TASK_AUDIO_DIR = BACKEND_DIR / "uploads" / "task_audio"
+TASK_PHOTO_DIR = UPLOADS_DIR / "task_photos"
+TASK_VIDEO_DIR = UPLOADS_DIR / "task_videos"
+TASK_AUDIO_DIR = UPLOADS_DIR / "task_audio"
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
 VIDEO_MAX_BYTES = 50 * 1024 * 1024
 AUDIO_MAX_BYTES = 20 * 1024 * 1024
@@ -46,6 +48,21 @@ def _notify_occurrence(event_type: str, item: dict) -> None:
         occurrence_id=item.get("id"),
         status=item.get("status"),
     )
+
+
+def _emit_task_event(db: Session, event_type: str, item: dict) -> None:
+    """Commit DB changes before SSE so refetching clients see fresh data."""
+    svc = NotificationService(NotificationRepository(db), UserRepository(db))
+    pending_notifications = svc.publish_task_event(
+        event_type=event_type,
+        branch_id=str(item.get("branch_id") or ""),
+        assignee_user_id=item.get("assignee_user_id"),
+        occurrence_id=item.get("id"),
+        task_title=item.get("title"),
+    )
+    db.commit()
+    _notify_occurrence(event_type, item)
+    NotificationService.push_task_event_sse(pending_notifications)
 
 
 def get_template_service(db: Session = Depends(get_db)) -> TaskTemplateService:
@@ -105,14 +122,19 @@ def create_template(
         recurrence=str(payload.get("recurrence") or "daily"),
         due_time=str(payload.get("due_time") or "23:59"),
         weekly_days=payload.get("weekly_days"),
+        monthly_day=payload.get("monthly_day"),
         assignee_user_id=payload.get("assignee_user_id"),
         department_id=payload.get("department_id"),
         due_at=payload.get("due_at"),
     )
-    notify_task_change(
-        event_type="task_created",
-        branch_id=str(item.get("branch_id") or ""),
-        assignee_user_id=item.get("assignee_user_id"),
+    _emit_task_event(
+        db,
+        "task_created",
+        {
+            "branch_id": item.get("branch_id"),
+            "assignee_user_id": item.get("assignee_user_id"),
+            "title": item.get("title"),
+        },
     )
     return {"message": "משימה קבועה נוצרה", "template": item}
 
@@ -161,7 +183,7 @@ def create_ad_hoc_task(
         assignee_user_id=payload.get("assignee_user_id"),
         photo_required=bool(payload.get("photo_required", True)),
     )
-    _notify_occurrence("task_created", item)
+    _emit_task_event(db, "task_created", item)
     return {"message": "משימה מזדמנת נוצרה", "occurrence": item}
 
 
@@ -210,7 +232,7 @@ def start_occurrence(
 ):
     actor = load_actor(request, UserRepository(db))
     item = service.start_occurrence(actor, occurrence_id)
-    _notify_occurrence("task_started", item)
+    _emit_task_event(db, "task_started", item)
     return {"message": "המשימה התחילה", "occurrence": item}
 
 
@@ -228,7 +250,7 @@ def delegate_occurrence(
     item = service.delegate_occurrence(
         actor, occurrence_id, assignee_user_id=str(payload.get("assignee_user_id") or "")
     )
-    _notify_occurrence("task_delegated", item)
+    _emit_task_event(db, "task_delegated", item)
     return {"message": "המשימה שויכה לעובד", "occurrence": item}
 
 
@@ -253,7 +275,7 @@ def complete_occurrence(
         audio_path=payload.get("audio_path"),
         not_completed_reason=payload.get("not_completed_reason"),
     )
-    _notify_occurrence("task_completed", item)
+    _emit_task_event(db, "task_completed", item)
     return {"message": "המשימה עודכנה", "occurrence": item}
 
 
@@ -267,7 +289,7 @@ def cancel_occurrence(
 ):
     actor = load_actor(request, UserRepository(db))
     item = service.cancel_occurrence(actor, occurrence_id)
-    _notify_occurrence("task_cancelled", item)
+    _emit_task_event(db, "task_cancelled", item)
     return {"message": "המשימה בוטלה", "occurrence": item}
 
 

@@ -10,6 +10,7 @@ class TaskTemplate:
     recurrence: str
     due_time: str
     weekly_days: str | None
+    monthly_day: int | None
     assignee_user_id: str | None
     department_id: str | None
     task_kind: str
@@ -29,6 +30,7 @@ class TaskTemplate:
             "recurrence": self.recurrence,
             "due_time": self.due_time,
             "weekly_days": self.weekly_days,
+            "monthly_day": self.monthly_day,
             "assignee_user_id": self.assignee_user_id,
             "department_id": self.department_id,
             "task_kind": self.task_kind,

@@ -1,6 +1,6 @@
 import api from "./api";
 
-export type TaskRecurrence = "daily" | "weekly" | "biweekly";
+export type TaskRecurrence = "daily" | "weekly" | "biweekly" | "monthly";
 export type TaskKind = "fixed" | "ad_hoc";
 export type TaskStatus = "pending" | "in_progress" | "completed" | "overdue" | "cancelled";
 export type CompletionStatus = "completed" | "not_completed";
@@ -13,6 +13,7 @@ export interface TaskTemplate {
   recurrence: TaskRecurrence;
   due_time: string;
   weekly_days: string | null;
+  monthly_day: number | null;
   assignee_user_id: string | null;
   department_id: string | null;
   task_kind: TaskKind;
@@ -69,6 +70,7 @@ export interface CreateTaskTemplatePayload {
   recurrence: TaskRecurrence;
   due_time?: string;
   weekly_days?: string;
+  monthly_day?: number;
   assignee_user_id: string;
 }
 

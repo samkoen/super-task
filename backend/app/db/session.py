@@ -4,6 +4,9 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
+
+from app.core.config import IS_SERVERLESS, prepare_database_url
 
 _engine = None
 SessionLocal: sessionmaker[Session] | None = None
@@ -21,9 +24,11 @@ def get_engine():
     global _engine, SessionLocal
     if _engine is not None:
         return _engine
-    url = os.environ.get("DATABASE_URL")
-    if not url:
+    raw_url = os.environ.get("DATABASE_URL")
+    if not raw_url:
         raise RuntimeError("DATABASE_URL is not set (e.g. in backend/.env)")
+    url = prepare_database_url(raw_url)
+
     connect_args: dict = {}
     try:
         u = make_url(url)
@@ -31,6 +36,9 @@ def get_engine():
             connect_args["connect_timeout"] = int(
                 os.environ.get("PG_CONNECT_TIMEOUT", "10")
             )
+            host = (u.host or "").lower()
+            if host.endswith(".neon.tech") and "sslmode" not in (u.query or ""):
+                connect_args["sslmode"] = "require"
     except Exception:
         pass
 
@@ -40,6 +48,10 @@ def get_engine():
     }
     if connect_args:
         eng_kw["connect_args"] = connect_args
+    if IS_SERVERLESS:
+        eng_kw["poolclass"] = NullPool
+    else:
+        eng_kw["pool_recycle"] = 280
 
     _engine = create_engine(url, **eng_kw)
     SessionLocal = sessionmaker(

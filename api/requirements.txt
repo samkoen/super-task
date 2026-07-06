@@ -1,0 +1,13 @@
+# Dépendances API Vercel (garder aligné avec backend/requirements.txt)
+fastapi==0.115.6
+python-multipart==0.0.20
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+python-dotenv==1.0.1
+bcrypt==4.2.1
+itsdangerous==2.2.0
+python-jose[cryptography]==3.3.0
+mangum>=0.19.0
+tzdata>=2024.1

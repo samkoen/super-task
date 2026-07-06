@@ -1,6 +1,7 @@
 """Règles de récurrence des tâches (sans I/O)."""
 from __future__ import annotations
 
+import calendar
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
@@ -13,7 +14,7 @@ BIWEEKLY = "biweekly"
 MONTHLY = "monthly"
 
 ALL = {ONCE, DAILY, WEEKLY, BIWEEKLY, MONTHLY}
-RECURRING = {DAILY, WEEKLY, BIWEEKLY}
+RECURRING = {DAILY, WEEKLY, BIWEEKLY, MONTHLY}
 
 
 def parse_due_time(value: str | None, *, default: time = time(23, 59)) -> time:
@@ -57,6 +58,7 @@ def should_generate_on_date(
     day: date,
     *,
     anchor_date: date | None = None,
+    monthly_day: int | None = None,
 ) -> bool:
     if recurrence == DAILY:
         return True
@@ -68,4 +70,12 @@ def should_generate_on_date(
         anchor = anchor_date or day
         weeks = (day - anchor).days // 7
         return weeks >= 0 and weeks % 2 == 0
+    if recurrence == MONTHLY:
+        target = monthly_day or 1
+        if target < 1:
+            target = 1
+        if target > 31:
+            target = 31
+        last_day = calendar.monthrange(day.year, day.month)[1]
+        return day.day == min(target, last_day)
     return False

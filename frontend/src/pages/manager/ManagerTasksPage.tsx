@@ -18,6 +18,8 @@ import AddIcon from "@mui/icons-material/Add";
 import { ApiError, type User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
+import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
+import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStorage";
 import {
   taskService,
   type TaskOccurrence,
@@ -28,7 +30,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
 
-const RECURRENCES: TaskRecurrence[] = ["daily", "weekly", "biweekly"];
+const RECURRENCES: TaskRecurrence[] = ["daily", "weekly", "biweekly", "monthly"];
+const SAVED_FILTERS_EXPANDED_KEY = "super:saved-filters:manager_tasks:expanded";
 const WEEKDAYS = [
   { value: "0", label: he.weekdayMon },
   { value: "1", label: he.weekdayTue },
@@ -38,6 +41,11 @@ const WEEKDAYS = [
   { value: "5", label: he.weekdaySat },
   { value: "6", label: he.weekdaySun },
 ];
+
+function formatDatetimeLocal(value = new Date()) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
 
 export default function ManagerTasksPage() {
   const { user } = useAuth();
@@ -56,6 +64,7 @@ export default function ManagerTasksPage() {
   const [saving, setSaving] = useState(false);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("");
+  const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
 
   const [fixedForm, setFixedForm] = useState({
     branch_id: "",
@@ -64,6 +73,7 @@ export default function ManagerTasksPage() {
     recurrence: "daily" as TaskRecurrence,
     due_time: "09:00",
     weekly_days: "0",
+    monthly_day: 1,
     assignee_user_id: "",
   });
 
@@ -151,12 +161,27 @@ export default function ManagerTasksPage() {
     }
   }, [filterEmployee, filterEmployees]);
 
+  const currentFilters = useMemo(
+    () => ({ filterBranch, filterEmployee }),
+    [filterBranch, filterEmployee]
+  );
+
+  const handleSelectSavedFilter = (item: { id: string; filters: Record<string, string | number> }) => {
+    setFilterBranch(String(item.filters.filterBranch ?? ""));
+    setFilterEmployee(String(item.filters.filterEmployee ?? ""));
+    setActiveSavedFilterId(item.id);
+  };
+
   const handleCreateFixed = async () => {
     setSaving(true);
     try {
       const res = await taskService.createTemplate({
         ...fixedForm,
-        weekly_days: fixedForm.recurrence !== "daily" ? fixedForm.weekly_days : undefined,
+        weekly_days:
+          fixedForm.recurrence === "weekly" || fixedForm.recurrence === "biweekly"
+            ? fixedForm.weekly_days
+            : undefined,
+        monthly_day: fixedForm.recurrence === "monthly" ? fixedForm.monthly_day : undefined,
       });
       setOpenFixed(false);
       setSuccess(res.message);
@@ -166,6 +191,17 @@ export default function ManagerTasksPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenAdHoc = () => {
+    setAdHocForm({
+      branch_id: filterBranch || user?.branch_id || "",
+      title: "",
+      description: "",
+      due_at: formatDatetimeLocal(),
+      assignee_user_id: isBranchManager && filterEmployee ? filterEmployee : "",
+    });
+    setOpenAdHoc(true);
   };
 
   const handleCreateAdHoc = async () => {
@@ -222,23 +258,32 @@ export default function ManagerTasksPage() {
           <Typography variant="body2" color="text.secondary">{he.managerTasksSubtitle}</Typography>
         </Box>
         <Box display="flex" gap={1} flexWrap="wrap">
-          <TextField select size="small" label={he.branch} value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} sx={{ minWidth: 160 }}>
+          <TextField select size="small" label={he.branch} value={filterBranch} onChange={(e) => { setFilterBranch(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 160 }}>
             <MenuItem value="">{he.all}</MenuItem>
             {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
-          <TextField select size="small" label={he.filterByEmployee} value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)} sx={{ minWidth: 180 }}>
+          <TextField select size="small" label={he.filterByEmployee} value={filterEmployee} onChange={(e) => { setFilterEmployee(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 180 }}>
             <MenuItem value="">{he.all}</MenuItem>
             {filterEmployees.map((u) => <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>)}
           </TextField>
           {isBranchManager && (
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenFixed(true)}>{he.newFixedTask}</Button>
           )}
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setOpenAdHoc(true)}>{he.newAdHocTask}</Button>
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenAdHoc}>{he.newAdHocTask}</Button>
         </Box>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
+
+      <SavedFiltersBar
+        filterClient={managerTasksSavedFiltersClient}
+        storageKeyExpanded={SAVED_FILTERS_EXPANDED_KEY}
+        filters={currentFilters}
+        activeSavedFilterId={activeSavedFilterId}
+        onSelectSaved={handleSelectSavedFilter}
+        onActiveFilterRemoved={() => setActiveSavedFilterId(null)}
+      />
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={`${he.allTasks} (${displayedOccurrences.length})`} />
@@ -277,9 +322,22 @@ export default function ManagerTasksPage() {
             {RECURRENCES.map((r) => <MenuItem key={r} value={r}>{he.recurrenceLabels[r]}</MenuItem>)}
           </TextField>
           <TextField label={he.dueTime} type="time" value={fixedForm.due_time} onChange={(e) => setFixedForm({ ...fixedForm, due_time: e.target.value })} InputLabelProps={{ shrink: true }} fullWidth dir="ltr" />
-          {fixedForm.recurrence !== "daily" && (
+          {(fixedForm.recurrence === "weekly" || fixedForm.recurrence === "biweekly") && (
             <TextField select label={he.weekday} value={fixedForm.weekly_days} onChange={(e) => setFixedForm({ ...fixedForm, weekly_days: e.target.value })} fullWidth>
               {WEEKDAYS.map((d) => <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>)}
+            </TextField>
+          )}
+          {fixedForm.recurrence === "monthly" && (
+            <TextField
+              select
+              label={he.monthlyDay}
+              value={String(fixedForm.monthly_day)}
+              onChange={(e) => setFixedForm({ ...fixedForm, monthly_day: Number(e.target.value) })}
+              fullWidth
+            >
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                <MenuItem key={day} value={String(day)}>{day}</MenuItem>
+              ))}
             </TextField>
           )}
         </DialogContent>

@@ -24,11 +24,17 @@ class SSEHub:
         self._subscribers[channel].discard(queue)
 
     def publish_sync(self, channel: str, event: dict[str, Any]) -> None:
-        if not self._loop or not self._loop.is_running():
+        loop = self._loop
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                return
+        if not loop.is_running():
             return
         payload = json.dumps(event, ensure_ascii=False)
         for queue in list(self._subscribers.get(channel, ())):
-            self._loop.call_soon_threadsafe(self._enqueue, queue, payload)
+            loop.call_soon_threadsafe(self._enqueue, queue, payload)
 
     def publish_many_sync(self, channels: list[str], event: dict[str, Any]) -> None:
         for channel in set(channels):

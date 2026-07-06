@@ -195,6 +195,7 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         recurrence=row.recurrence,
         due_time=row.due_time,
         weekly_days=row.weekly_days,
+        monthly_day=row.monthly_day,
         assignee_user_id=str(row.assignee_user_id) if row.assignee_user_id else None,
         department_id=str(row.department_id) if row.department_id else None,
         task_kind=row.task_kind,
