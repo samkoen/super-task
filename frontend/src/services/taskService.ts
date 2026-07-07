@@ -128,6 +128,8 @@ export const taskService = {
     branch_id?: string;
     status?: TaskStatus;
     due_on?: string;
+    due_from?: string;
+    due_to?: string;
     pending_delegation?: boolean;
     task_kind?: TaskKind;
   }) => {
@@ -135,8 +137,7 @@ export const taskService = {
     return response.data;
   },
 
-  listMine: async (dueOn?: string) => {
-    const params = dueOn ? { due_on: dueOn } : undefined;
+  listMine: async (params?: { due_on?: string; due_from?: string; due_to?: string }) => {
     const response = await api.get<TaskOccurrence[]>("/tasks/mine", { params });
     return response.data;
   },
@@ -167,6 +168,23 @@ export const taskService = {
   cancel: async (occurrenceId: string) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/cancel`
+    );
+    return response.data;
+  },
+
+  updateOccurrence: async (
+    occurrenceId: string,
+    payload: {
+      title: string;
+      description?: string;
+      due_at: string;
+      assignee_user_id?: string;
+      photo_required?: boolean;
+    }
+  ) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/update`,
+      payload
     );
     return response.data;
   },

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.auth.actor import load_actor
-from app.db.session import SessionLocal, get_engine
+from app.db import session as db_session
 from app.realtime.sse_hub import sse_hub
 from app.realtime.task_events import channels_for_actor
 from app.repositories.branch_repository import BranchRepository
@@ -34,10 +34,10 @@ async def _next_event(queues: list[asyncio.Queue[str]]) -> str | None:
 
 def _resolve_stream_channels(request: Request) -> list[str]:
     """Short-lived DB session — do not hold a connection for the whole SSE stream."""
-    get_engine()
-    if SessionLocal is None:
+    db_session.get_engine()
+    if db_session.SessionLocal is None:
         raise HTTPException(status_code=503, detail="מסד הנתונים לא זמין")
-    db = SessionLocal()
+    db = db_session.SessionLocal()
     try:
         actor = load_actor(request, UserRepository(db))
         branch_repo = BranchRepository(db)

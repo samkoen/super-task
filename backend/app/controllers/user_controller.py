@@ -49,6 +49,105 @@ def list_team(
     return service.list_team(actor, role=role)
 
 
+@router.post("/team", status_code=201)
+@handle_controller_errors
+def create_team_employee(
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    if not data:
+        return JSONResponse({"error": "חסרים נתונים"}, status_code=400)
+    user = service.create_team_employee(
+        actor,
+        email=str(data.get("email") or "").strip(),
+        password=str(data.get("password") or ""),
+        first_name=str(data.get("first_name") or "").strip(),
+        last_name=str(data.get("last_name") or "").strip(),
+        phone=(str(data.get("phone")).strip() if data.get("phone") else None),
+        job_function=(str(data.get("job_function")).strip() if data.get("job_function") else None),
+        branch_id=(str(data.get("branch_id")).strip() if data.get("branch_id") else None),
+    )
+    return {"message": "העובד נוצר — נשלח קישור אימות", "user": user}
+
+
+@router.patch("/team/{user_id}")
+@handle_controller_errors
+def update_team_employee(
+    user_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    user = service.update_team_employee(
+        actor,
+        user_id,
+        email=str(payload.get("email") or "").strip(),
+        first_name=str(payload.get("first_name") or "").strip(),
+        last_name=str(payload.get("last_name") or "").strip(),
+        phone=(str(payload.get("phone")).strip() if payload.get("phone") else None),
+        job_function=(str(payload.get("job_function")).strip() if payload.get("job_function") else None),
+        password=(str(payload.get("password")) if payload.get("password") else None),
+    )
+    return {"message": "פרטי העובד עודכנו", "user": user}
+
+
+@router.delete("/team/{user_id}")
+@handle_controller_errors
+def deactivate_team_employee(
+    user_id: str,
+    request: Request,
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    user = service.deactivate_team_employee(actor, user_id)
+    return {"message": "העובד הושבת", "user": user}
+
+
+@router.patch("/team/{user_id}/access")
+@handle_controller_errors
+def set_team_employee_access(
+    user_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    is_active = payload.get("is_active")
+    if not isinstance(is_active, bool):
+        return JSONResponse({"error": "חסר סטטוס גישה"}, status_code=400)
+    user = service.set_team_employee_access(actor, user_id, is_active=is_active)
+    message = "הגישה לאפליקציה הופעלה" if is_active else "הגישה לאפליקציה הושבתה"
+    return {"message": message, "user": user}
+
+
+@router.post("/team/{user_id}/reset-password")
+@handle_controller_errors
+def reset_team_employee_password(
+    user_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    user = service.reset_team_employee_password(
+        actor,
+        user_id,
+        password=str(payload.get("password") or ""),
+    )
+    return {"message": "סיסמת העובד עודכנה", "user": user}
+
+
 @router.post("", status_code=201)
 @handle_controller_errors
 def create_user(

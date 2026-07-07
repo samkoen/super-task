@@ -165,3 +165,52 @@ class UserRepository:
         row.branch_id = mp.parse_uuid(branch_id) if branch_id else None
         self._db.flush()
         return mp.user_orm_to_domain(row)
+
+    def update_employee(
+        self,
+        user_id: str,
+        *,
+        first_name: str,
+        last_name: str,
+        email: str,
+        phone: str | None = None,
+        job_function: str | None = None,
+        password: str | None = None,
+    ) -> User | None:
+        try:
+            row = self._db.get(orm.User, mp.parse_uuid(user_id))
+        except ValueError:
+            return None
+        if not row:
+            return None
+        row.first_name = first_name
+        row.last_name = last_name
+        row.email = email.lower().strip()
+        row.phone = phone
+        row.job_function = job_function
+        if password:
+            row.password_hash = hash_password(password)
+        self._db.flush()
+        return mp.user_orm_to_domain(row)
+
+    def set_active(self, user_id: str, is_active: bool) -> User | None:
+        try:
+            row = self._db.get(orm.User, mp.parse_uuid(user_id))
+        except ValueError:
+            return None
+        if not row:
+            return None
+        row.is_active = is_active
+        self._db.flush()
+        return mp.user_orm_to_domain(row)
+
+    def update_password(self, user_id: str, password: str) -> User | None:
+        try:
+            row = self._db.get(orm.User, mp.parse_uuid(user_id))
+        except ValueError:
+            return None
+        if not row:
+            return None
+        row.password_hash = hash_password(password)
+        self._db.flush()
+        return mp.user_orm_to_domain(row)

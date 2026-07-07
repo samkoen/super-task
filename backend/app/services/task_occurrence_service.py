@@ -39,6 +39,8 @@ class TaskOccurrenceService:
         branch_id: str | None = None,
         status: str | None = None,
         due_on: str | None = None,
+        due_from: str | None = None,
+        due_to: str | None = None,
         pending_delegation: bool | None = None,
         task_kind: str | None = None,
     ) -> list[dict]:
@@ -46,11 +48,15 @@ class TaskOccurrenceService:
             raise PermissionError("אין הרשאה לצפות במשימות")
         branch_ids = visible_branch_ids_for_tasks(actor, self._branch)
         day = date.fromisoformat(due_on) if due_on else None
+        day_from = date.fromisoformat(due_from) if due_from else None
+        day_to = date.fromisoformat(due_to) if due_to else None
         items = self._occurrences.list_occurrences(
             branch_ids=branch_ids,
             branch_id=branch_id,
             status=status,
             due_on=day,
+            due_from=day_from if not day else None,
+            due_to=day_to if not day else None,
             pending_delegation=pending_delegation,
             task_kind=task_kind,
             manager_user_id=actor.user_id
@@ -59,14 +65,27 @@ class TaskOccurrenceService:
         )
         return [self._to_api(o) for o in items]
 
-    def list_mine(self, actor: ActorContext, *, due_on: str | None = None) -> list[dict]:
+    def list_mine(
+        self,
+        actor: ActorContext,
+        *,
+        due_on: str | None = None,
+        due_from: str | None = None,
+        due_to: str | None = None,
+    ) -> list[dict]:
         if actor.role != roles.EMPLOYEE:
             raise PermissionError("רק עובדים יכולים לראות את המשימות שלהם")
-        day = date.fromisoformat(due_on) if due_on else datetime.now(TZ).date()
+        day = date.fromisoformat(due_on) if due_on else None
+        if not day and not due_from and not due_to:
+            day = datetime.now(TZ).date()
+        day_from = date.fromisoformat(due_from) if due_from else None
+        day_to = date.fromisoformat(due_to) if due_to else None
         items = self._occurrences.list_occurrences(
             branch_id=actor.branch_id,
             for_employee_user_id=actor.user_id,
             due_on=day,
+            due_from=day_from if not day else None,
+            due_to=day_to if not day else None,
         )
         return [self._to_api(o) for o in items]
 
@@ -220,6 +239,55 @@ class TaskOccurrenceService:
         if occurrence.status in task_status.TERMINAL:
             raise ValueError("המשימה כבר נסגרה")
         updated = self._occurrences.update_status(occurrence_id, task_status.CANCELLED)
+        assert updated is not None
+        return self._to_api(updated)
+
+    def update_occurrence(
+        self,
+        actor: ActorContext,
+        occurrence_id: str,
+        *,
+        title: str,
+        description: str = "",
+        due_at: str,
+        assignee_user_id: str | None = None,
+        photo_required: bool | None = None,
+    ) -> dict:
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לערוך משימות")
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_branch_access(actor, occurrence.branch_id)
+        if occurrence.status in task_status.TERMINAL:
+            raise ValueError("לא ניתן לערוך משימה שנסגרה")
+        if not (title or "").strip():
+            raise ValueError("נדרש כותרת משימה")
+
+        parsed = datetime.fromisoformat(due_at)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=TZ)
+
+        if occurrence.pending_delegation:
+            if assignee_user_id:
+                self._validate_employee(occurrence.branch_id, assignee_user_id)
+            final_assignee = assignee_user_id
+        elif assignee_user_id:
+            self._validate_employee(occurrence.branch_id, assignee_user_id)
+            final_assignee = assignee_user_id
+        elif occurrence.task_kind == AD_HOC and actor.role == roles.BRANCH_MANAGER:
+            raise ValueError("נדרש שיוך לעובד")
+        else:
+            final_assignee = occurrence.assignee_user_id
+
+        updated = self._occurrences.update_details(
+            occurrence_id,
+            title=title,
+            description=description,
+            due_at=parsed,
+            assignee_user_id=final_assignee,
+            photo_required=photo_required,
+        )
         assert updated is not None
         return self._to_api(updated)
 

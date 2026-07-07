@@ -194,6 +194,8 @@ def list_occurrences(
     branch_id: str | None = Query(None),
     status: str | None = Query(None),
     due_on: str | None = Query(None),
+    due_from: str | None = Query(None),
+    due_to: str | None = Query(None),
     pending_delegation: bool | None = Query(None),
     task_kind: str | None = Query(None),
     service: TaskOccurrenceService = Depends(get_occurrence_service),
@@ -205,6 +207,8 @@ def list_occurrences(
         branch_id=branch_id,
         status=status,
         due_on=due_on,
+        due_from=due_from,
+        due_to=due_to,
         pending_delegation=pending_delegation,
         task_kind=task_kind,
     )
@@ -215,11 +219,13 @@ def list_occurrences(
 def list_my_tasks(
     request: Request,
     due_on: str | None = Query(None),
+    due_from: str | None = Query(None),
+    due_to: str | None = Query(None),
     service: TaskOccurrenceService = Depends(get_occurrence_service),
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
-    return service.list_mine(actor, due_on=due_on)
+    return service.list_mine(actor, due_on=due_on, due_from=due_from, due_to=due_to)
 
 
 @router.post("/occurrences/{occurrence_id}/start")
@@ -276,6 +282,31 @@ def complete_occurrence(
         not_completed_reason=payload.get("not_completed_reason"),
     )
     _emit_task_event(db, "task_completed", item)
+    return {"message": "המשימה עודכנה", "occurrence": item}
+
+
+@router.post("/occurrences/{occurrence_id}/update")
+@handle_controller_errors
+def update_occurrence(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    item = service.update_occurrence(
+        actor,
+        occurrence_id,
+        title=str(payload.get("title") or ""),
+        description=str(payload.get("description") or ""),
+        due_at=str(payload.get("due_at") or ""),
+        assignee_user_id=payload.get("assignee_user_id"),
+        photo_required=payload.get("photo_required"),
+    )
+    event_type = "task_delegated" if item.get("assignee_user_id") else "task_updated"
+    _emit_task_event(db, event_type, item)
     return {"message": "המשימה עודכנה", "occurrence": item}
 
 

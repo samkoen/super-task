@@ -12,6 +12,7 @@ _TASK_LABELS = {
     "task_started": ("משימה התחילה", "עובד התחיל לטפל במשימה"),
     "task_completed": ("משימה הושלמה", "משימה הושלמה על ידי עובד"),
     "task_cancelled": ("משימה בוטלה", "משימה בוטלה"),
+    "task_updated": ("משימה עודכנה", "פרטי המשימה עודכנו"),
 }
 
 
@@ -73,12 +74,12 @@ class NotificationService:
         self, event_type: str, branch_id: str, assignee_user_id: str | None
     ) -> set[str]:
         recipients: set[str] = set()
-        if event_type in {"task_created", "task_delegated"} and assignee_user_id:
+        if event_type in {"task_created", "task_delegated", "task_updated"} and assignee_user_id:
             recipients.add(assignee_user_id)
         elif event_type == "task_created":
             for mgr in self._users.list_users(role=roles.BRANCH_MANAGER, branch_ids=[branch_id]):
                 recipients.add(mgr.id)
-        if event_type in {"task_started", "task_completed", "task_cancelled"}:
+        if event_type in {"task_started", "task_completed", "task_cancelled", "task_updated"}:
             for mgr in self._users.list_users(role=roles.BRANCH_MANAGER, branch_ids=[branch_id]):
                 recipients.add(mgr.id)
         return recipients

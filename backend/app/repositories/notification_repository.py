@@ -20,6 +20,7 @@ class NotificationRepository:
         title: str,
         message: str,
         occurrence_id: str | None = None,
+        issue_report_id: str | None = None,
         branch_id: str | None = None,
     ) -> UserNotification:
         import uuid
@@ -31,6 +32,7 @@ class NotificationRepository:
             title=title.strip(),
             message=message.strip(),
             occurrence_id=mp.parse_uuid(occurrence_id) if occurrence_id else None,
+            issue_report_id=mp.parse_uuid(issue_report_id) if issue_report_id else None,
             branch_id=mp.parse_uuid(branch_id) if branch_id else None,
         )
         self._db.add(row)
@@ -93,6 +95,7 @@ class NotificationRepository:
             title=row.title,
             message=row.message,
             occurrence_id=str(row.occurrence_id) if row.occurrence_id else None,
+            issue_report_id=str(row.issue_report_id) if row.issue_report_id else None,
             branch_id=str(row.branch_id) if row.branch_id else None,
             read_at=mp.parse_datetime_iso(row.read_at) if row.read_at else None,
             created_at=mp.parse_datetime_iso(row.created_at),

@@ -1,7 +1,8 @@
-"""Données de démo — שפע ברכת השם / בבא סאלי."""
+"""Seed production — réseau démo שפע ברכת השם / בבא סאלי."""
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -25,14 +26,30 @@ from app.repositories.user_repository import UserRepository  # noqa: E402
 from app.services.task_scheduler_service import TaskSchedulerService  # noqa: E402
 
 TZ = ZoneInfo("Asia/Jerusalem")
-DEMO_PASSWORD = "SuperDemo123!"
-EMAIL_BASE = "skoen7665210"
+EMAIL_BASE = "super.nihul26"
 EMAIL_DOMAIN = "gmail.com"
-SEED_TAG = "shefa-baba-sali"
+SEED_TAG = "shefa-baba-sali-prod"
+MARKER_EMAIL_SUFFIX = 100
+DEFAULT_PASSWORD = os.environ.get("SEED_DEFAULT_PASSWORD", "SuperDemo123!")
 
 
-def demo_email(suffix: int) -> str:
+def seed_email(suffix: int) -> str:
     return f"{EMAIL_BASE}+{suffix}@{EMAIL_DOMAIN}"
+
+
+def is_production_target() -> bool:
+    if os.environ.get("ENVIRONMENT", "").strip().lower() == "production":
+        return True
+    db_url = os.environ.get("DATABASE_URL", "").lower()
+    return ".neon.tech" in db_url or "vercel" in db_url
+
+
+def require_confirmation(force: bool) -> None:
+    if force or not is_production_target():
+        return
+    print("Cible production detectee (Neon/Vercel ou ENVIRONMENT=production).")
+    print("Relancez avec --confirm pour appliquer le seed.")
+    sys.exit(1)
 
 
 def split_name(full: str) -> tuple[str, str]:
@@ -59,7 +76,7 @@ def ensure_user(
         return existing.id
     user = repo.create_user(
         email=email,
-        password=DEMO_PASSWORD,
+        password=DEFAULT_PASSWORD,
         first_name=first_name,
         last_name=last_name,
         role=role,
@@ -72,10 +89,173 @@ def ensure_user(
     return user.id
 
 
+def seed_network_and_branch(
+    network_repo: NetworkRepository,
+    branch_repo: BranchRepository,
+) -> tuple:
+    existing = [r for r in network_repo.list_all() if r.name == "שפע ברכת השם"]
+    network = existing[0] if existing else network_repo.create(name="שפע ברכת השם")
+    branches = branch_repo.list_branches(network_id=network.id, name="בבא סאלי")
+    branch = branches[0] if branches else branch_repo.create(
+        network_id=network.id,
+        name="בבא סאלי",
+        address="",
+        city="",
+        postal_code="",
+    )
+    print(f"  network: {network.name} ({network.id})")
+    print(f"  branch: {branch.name} ({branch.id})")
+    return network, branch
+
+
+def seed_departments(department_repo: DepartmentRepository, branch_id: str) -> None:
+    for order, name in enumerate(("סדרנים", "מחסן", "קופות"), start=1):
+        department_repo.create(branch_id=branch_id, name=name, sort_order=order)
+
+
+def seed_users(
+    user_repo: UserRepository,
+    *,
+    network_id: str,
+    branch_id: str,
+) -> tuple[str, str, dict[str, str]]:
+    vp_id = ensure_user(
+        user_repo,
+        email=seed_email(100),
+        first_name="ניר",
+        last_name="תפעול",
+        role=roles.NETWORK_MANAGER,
+        network_id=network_id,
+    )
+    branch_manager_id = ensure_user(
+        user_repo,
+        email=seed_email(101),
+        first_name="מתן",
+        last_name="ניסים",
+        role=roles.BRANCH_MANAGER,
+        network_id=network_id,
+        branch_id=branch_id,
+    )
+
+    stockers = [
+        "מונאדל",
+        "חאמד",
+        "יזיד",
+        "מולוד",
+        "איברהים",
+        "מאיר הולצמן",
+        "איהב",
+        "משה עדי",
+    ]
+    employee_ids: dict[str, str] = {}
+    email_suffix = 102
+    for name in stockers:
+        fn, ln = split_name(name)
+        employee_ids[name] = ensure_user(
+            user_repo,
+            email=seed_email(email_suffix),
+            first_name=fn,
+            last_name=ln,
+            role=roles.EMPLOYEE,
+            network_id=network_id,
+            branch_id=branch_id,
+            job_function=job_functions.STOCKERS,
+        )
+        email_suffix += 1
+
+    employee_ids["אוראל"] = ensure_user(
+        user_repo,
+        email=seed_email(110),
+        first_name="אוראל",
+        last_name="אוראל",
+        role=roles.EMPLOYEE,
+        network_id=network_id,
+        branch_id=branch_id,
+        job_function=job_functions.WAREHOUSE_WORKER,
+    )
+    employee_ids["שירה"] = ensure_user(
+        user_repo,
+        email=seed_email(111),
+        first_name="שירה",
+        last_name="שירה",
+        role=roles.EMPLOYEE,
+        network_id=network_id,
+        branch_id=branch_id,
+        job_function=job_functions.HEAD_CASHIER,
+    )
+    return vp_id, branch_manager_id, employee_ids
+
+
+def seed_tasks(
+    *,
+    template_repo: TaskTemplateRepository,
+    occurrence_repo: TaskOccurrenceRepository,
+    scheduler: TaskSchedulerService,
+    branch_id: str,
+    branch_manager_id: str,
+    vp_id: str,
+    employee_ids: dict[str, str],
+) -> None:
+    fixed_samples = [
+        ("מונאדל", "סידור מדפים — מחלקה ראשית", task_recurrence.DAILY, "09:00", None),
+        ("חאמד", "בדיקת מחירים", task_recurrence.WEEKLY, "10:00", "0"),
+        ("יזיד", "ניקוי אזור כניסה", task_recurrence.BIWEEKLY, "08:00", "0"),
+        ("אוראל", "ספירת מלאי מחסן", task_recurrence.DAILY, "07:30", None),
+        ("שירה", "פתיחת קופה ראשית", task_recurrence.DAILY, "08:00", None),
+    ]
+    for employee_name, title, recurrence, due_time, weekly_days in fixed_samples:
+        assignee = employee_ids[employee_name]
+        template = template_repo.create(
+            branch_id=branch_id,
+            title=title,
+            description=f"משימה קבועה — {employee_name}",
+            recurrence=recurrence,
+            due_time=due_time,
+            weekly_days=weekly_days,
+            assignee_user_id=assignee,
+            department_id=None,
+            created_by_id=branch_manager_id,
+            task_kind="fixed",
+            biweekly_anchor=datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None,
+        )
+        scheduler.generate_from_template(template, on_date=datetime.now(TZ).date())
+        print(f"  fixed: {title} -> {employee_name}")
+
+    due = datetime.now(TZ) + timedelta(days=1)
+    occurrence_repo.create(
+        template_id=None,
+        branch_id=branch_id,
+        title="צילום ותיעוד — ביקורת פתאומית",
+        description="מטלה מזדמנת מהנהלת הרשת — יש להעביר לעובד ולתעד בצילום",
+        due_at=due,
+        assignee_user_id=None,
+        department_id=None,
+        task_kind="ad_hoc",
+        manager_user_id=branch_manager_id,
+        photo_required=True,
+        created_by_id=vp_id,
+    )
+    print("  ad_hoc: en attente d'assignation au manager de succursale")
+
+
+def print_accounts() -> None:
+    print("\n=== Comptes seed (production) ===")
+    print(f"Manager reseau:  {seed_email(100)} / {DEFAULT_PASSWORD}")
+    print(f"Manager succ.:   {seed_email(101)} / {DEFAULT_PASSWORD}")
+    print(f"Employe demo:    {seed_email(102)} / {DEFAULT_PASSWORD}")
+    print(f"Tag: {SEED_TAG}")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Seed demo Super — שפע ברכת השם")
-    parser.add_argument("--force", action="store_true", help="Recreate tasks even if network exists")
+    parser = argparse.ArgumentParser(description="Seed production Super — שפע ברכת השם")
+    parser.add_argument("--force", action="store_true", help="Recree les taches meme si le seed existe")
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Requis sur Neon/Vercel (ENVIRONMENT=production)",
+    )
     args = parser.parse_args()
+    require_confirmation(args.confirm)
 
     db_session.get_engine()
     if db_session.SessionLocal is None:
@@ -84,160 +264,49 @@ def main() -> None:
 
     db = db_session.SessionLocal()
     try:
+        user_repo = UserRepository(db)
+        if user_repo.find_by_email(seed_email(MARKER_EMAIL_SUFFIX)) and not args.force:
+            print("Seed deja applique. Utilisez --force pour recreer les taches.")
+            print_accounts()
+            return
+
         network_repo = NetworkRepository(db)
         branch_repo = BranchRepository(db)
         department_repo = DepartmentRepository(db)
-        user_repo = UserRepository(db)
-        if user_repo.find_by_email(demo_email(101)) and not args.force:
-            print("Seed deja applique. Utilisez --force pour recreer les taches.")
-            print(f"מנהל סניף: {demo_email(101)} / {DEMO_PASSWORD}")
-            print(f"מנהל איזור: {demo_email(100)} / {DEMO_PASSWORD}")
-            return
-
         template_repo = TaskTemplateRepository(db)
         occurrence_repo = TaskOccurrenceRepository(db)
         scheduler = TaskSchedulerService(template_repo, occurrence_repo)
 
         print("=== Network & Branch ===")
-        existing = [r for r in network_repo.list_all() if r.name == "שפע ברכת השם"]
-        network = existing[0] if existing else network_repo.create(name="שפע ברכת השם")
-        branches = branch_repo.list_branches(network_id=network.id, name="בבא סאלי")
-        branch = branches[0] if branches else branch_repo.create(
-            network_id=network.id,
-            name="בבא סאלי",
-            address="",
-            city="",
-            postal_code="",
-        )
-        print(f"  network: {network.name} ({network.id})")
-        print(f"  branch: {branch.name} ({branch.id})")
+        network, branch = seed_network_and_branch(network_repo, branch_repo)
 
         print("=== Departments ===")
-        department_repo.create(branch_id=branch.id, name="סדרנים", sort_order=1)
-        department_repo.create(branch_id=branch.id, name="מחסן", sort_order=2)
-        department_repo.create(branch_id=branch.id, name="קופות", sort_order=3)
+        seed_departments(department_repo, branch.id)
 
         print("=== Utilisateurs ===")
-        vp_id = ensure_user(
+        vp_id, branch_manager_id, employee_ids = seed_users(
             user_repo,
-            email=demo_email(100),
-            first_name="ניר",
-            last_name="תפעול",
-            role=roles.NETWORK_MANAGER,
-            network_id=network.id,
-        )
-        branch_manager_id = ensure_user(
-            user_repo,
-            email=demo_email(101),
-            first_name="מתן",
-            last_name="ניסים",
-            role=roles.BRANCH_MANAGER,
             network_id=network.id,
             branch_id=branch.id,
         )
 
-        stockers = [
-            "מונאדל",
-            "חאמד",
-            "יזיד",
-            "מולוד",
-            "איברהים",
-            "מאיר הולצמן",
-            "איהב",
-            "משה עדי",
-        ]
-        employee_ids: dict[str, str] = {}
-        email_suffix = 102
-        for name in stockers:
-            fn, ln = split_name(name)
-            uid = ensure_user(
-                user_repo,
-                email=demo_email(email_suffix),
-                first_name=fn,
-                last_name=ln,
-                role=roles.EMPLOYEE,
-                network_id=network.id,
-                branch_id=branch.id,
-                job_function=job_functions.STOCKERS,
-            )
-            employee_ids[name] = uid
-            email_suffix += 1
-
-        employee_ids["אוראל"] = ensure_user(
-            user_repo,
-            email=demo_email(110),
-            first_name="אוראל",
-            last_name="אוראל",
-            role=roles.EMPLOYEE,
-            network_id=network.id,
+        print("=== Taches ===")
+        seed_tasks(
+            template_repo=template_repo,
+            occurrence_repo=occurrence_repo,
+            scheduler=scheduler,
             branch_id=branch.id,
-            job_function=job_functions.WAREHOUSE_WORKER,
+            branch_manager_id=branch_manager_id,
+            vp_id=vp_id,
+            employee_ids=employee_ids,
         )
-        employee_ids["שירה"] = ensure_user(
-            user_repo,
-            email=demo_email(111),
-            first_name="שירה",
-            last_name="שירה",
-            role=roles.EMPLOYEE,
-            network_id=network.id,
-            branch_id=branch.id,
-            job_function=job_functions.HEAD_CASHIER,
-        )
-
-        print("=== משימות קבועות ===")
-        fixed_samples = [
-            ("מונאדל", "סידור מדפים — מחלקה ראשית", task_recurrence.DAILY, "09:00", None),
-            ("חאמד", "בדיקת מחירים", task_recurrence.WEEKLY, "10:00", "0"),
-            ("יזיד", "ניקוי אזור כניסה", task_recurrence.BIWEEKLY, "08:00", "0"),
-            ("אוראל", "ספירת מלאי מחסן", task_recurrence.DAILY, "07:30", None),
-            ("שירה", "פתיחת קופה ראשית", task_recurrence.DAILY, "08:00", None),
-        ]
-        for employee_name, title, recurrence, due_time, weekly_days in fixed_samples:
-            assignee = employee_ids[employee_name]
-            template = template_repo.create(
-                branch_id=branch.id,
-                title=title,
-                description=f"משימה קבועה — {employee_name}",
-                recurrence=recurrence,
-                due_time=due_time,
-                weekly_days=weekly_days,
-                assignee_user_id=assignee,
-                department_id=None,
-                created_by_id=branch_manager_id,
-                task_kind="fixed",
-                biweekly_anchor=datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None,
-            )
-            scheduler.generate_from_template(template, on_date=datetime.now(TZ).date())
-            print(f"  fixed: {title} -> {employee_name}")
-
-        print("=== משימה מזדמנת (מנהל איזור -> מנהל סניף) ===")
-        due = datetime.now(TZ) + timedelta(days=1)
-        occurrence_repo.create(
-            template_id=None,
-            branch_id=branch.id,
-            title="צילום ותיעוד — ביקורת פתאומית",
-            description="מטלה מזדמנת מהנהלת הרשת — יש להעביר לעובד ולתעד בצילום",
-            due_at=due,
-            assignee_user_id=None,
-            department_id=None,
-            task_kind="ad_hoc",
-            manager_user_id=branch_manager_id,
-            photo_required=True,
-            created_by_id=vp_id,
-        )
-        print("  ad_hoc: ממתין להעברה ל-מתן ניסים")
 
         scheduler.run_for_date()
         db.commit()
-
-        print("\n=== חשבונות דמו ===")
-        print(f"VP / מנהל איזור:  {demo_email(100)} / {DEMO_PASSWORD}")
-        print(f"מנהל סניף:        {demo_email(101)} / {DEMO_PASSWORD}")
-        print(f"עובד (מונאדל):    {demo_email(102)} / {DEMO_PASSWORD}")
-        print(f"Tag: {SEED_TAG}")
-    except Exception as exc:
+        print_accounts()
+    except Exception:
         db.rollback()
-        raise exc
+        raise
     finally:
         db.close()
 

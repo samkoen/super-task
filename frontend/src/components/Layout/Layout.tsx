@@ -22,6 +22,7 @@ import BusinessIcon from "@mui/icons-material/Business";
 import CategoryIcon from "@mui/icons-material/Category";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import NotificationBell from "../notifications/NotificationBell";
@@ -70,14 +71,21 @@ function Layout() {
       ];
     }
     if (user.role === "network_manager" || user.role === "branch_manager") {
-      return [
+      const items = [
         { text: he.managerArea, icon: <DashboardIcon />, path: "/manager" },
-        { text: he.adminBranches, icon: <StoreIcon />, path: "/manager/branches" },
+      ];
+      if (user.role === "network_manager") {
+        items.push({ text: he.adminBranches, icon: <StoreIcon />, path: "/manager/branches" });
+      }
+      items.push(
+        { text: he.managerEmployees, icon: <PeopleIcon />, path: "/manager/employees" },
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/manager/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/manager/products" },
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/manager/tasks" },
+        { text: he.managerIssues, icon: <ReportProblemIcon />, path: "/manager/issues" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
-      ];
+      );
+      return items;
     }
     return [{ text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" }];
   }, [user]);

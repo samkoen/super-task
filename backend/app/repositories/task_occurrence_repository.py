@@ -42,6 +42,8 @@ class TaskOccurrenceRepository:
         pending_delegation: bool | None = None,
         task_kind: str | None = None,
         due_on: date | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskOccurrence]:
         q = select(orm.TaskOccurrence).order_by(orm.TaskOccurrence.due_at.asc())
         if branch_id:
@@ -63,6 +65,11 @@ class TaskOccurrenceRepository:
             q = q.where(orm.TaskOccurrence.task_kind == task_kind)
         if due_on:
             q = q.where(func.date(orm.TaskOccurrence.due_at) == due_on)
+        else:
+            if due_from:
+                q = q.where(func.date(orm.TaskOccurrence.due_at) >= due_from)
+            if due_to:
+                q = q.where(func.date(orm.TaskOccurrence.due_at) <= due_to)
         rows = self._db.execute(q).scalars().all()
         return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
 
@@ -128,6 +135,28 @@ class TaskOccurrenceRepository:
         if not row:
             return None
         row.assignee_user_id = mp.parse_uuid(assignee_user_id)
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def update_details(
+        self,
+        id_: str,
+        *,
+        title: str,
+        description: str,
+        due_at: datetime,
+        assignee_user_id: str | None,
+        photo_required: bool | None = None,
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.title = title.strip()
+        row.description = description.strip()
+        row.due_at = due_at
+        row.assignee_user_id = mp.parse_uuid(assignee_user_id) if assignee_user_id else None
+        if photo_required is not None:
+            row.photo_required = photo_required
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

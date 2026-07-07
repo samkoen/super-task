@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -11,7 +11,6 @@ import {
   CardContent,
   Chip,
   CircularProgress,
-  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -36,9 +35,20 @@ import {
   type EmployeeTaskCard,
 } from "../../services/dashboardService";
 import { taskService, type TaskStatus } from "../../services/taskService";
+import { issueReportService } from "../../services/issueReportService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
+import {
+  defaultRangeFrom,
+  formatHebrewDay,
+  groupTasksByDay,
+  isToday,
+  todayIso,
+  type TaskDateViewMode,
+} from "../../utils/dateView";
 import { he } from "../../i18n/he";
+import type { TaskOccurrence } from "../../services/taskService";
 
 const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error"> = {
   pending: "warning",
@@ -119,6 +129,20 @@ function TaskCard({
   );
 }
 
+function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    due_at: task.due_at,
+    status: task.status,
+    task_kind: task.task_kind,
+    photo_required: task.photo_required,
+    department_name: task.department_name ?? null,
+    started_at: task.started_at,
+  };
+}
+
 export default function EmployeeTasksPage() {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState<EmployeeDashboard | null>(null);
@@ -134,12 +158,26 @@ export default function EmployeeTasksPage() {
   const [uploadingKind, setUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [showReportHint, setShowReportHint] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportPhotoUrl, setReportPhotoUrl] = useState("");
+  const [reportVideoUrl, setReportVideoUrl] = useState("");
+  const [reportAudioUrl, setReportAudioUrl] = useState("");
+  const [reportUploadingKind, setReportUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
+  const [reportSaving, setReportSaving] = useState(false);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
+  const [filterDay, setFilterDay] = useState(todayIso);
+  const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
+  const [filterFrom, setFilterFrom] = useState(todayIso);
+  const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
+  const [rangeTasks, setRangeTasks] = useState<EmployeeTaskCard[]>([]);
   const photoRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLInputElement>(null);
+  const reportPhotoRef = useRef<HTMLInputElement>(null);
+  const reportVideoRef = useRef<HTMLInputElement>(null);
+  const reportAudioRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) {
@@ -147,13 +185,20 @@ export default function EmployeeTasksPage() {
       setError("");
     }
     try {
-      setDashboard(await dashboardService.getEmployee());
+      if (dateViewMode === "day") {
+        setDashboard(await dashboardService.getEmployee(filterDay));
+        setRangeTasks([]);
+      } else {
+        const items = await taskService.listMine({ due_from: filterFrom, due_to: filterTo });
+        setRangeTasks(items.map(toEmployeeCard));
+        setDashboard(null);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [filterDay, filterFrom, filterTo, dateViewMode]);
 
   useEffect(() => {
     load();
@@ -228,6 +273,58 @@ export default function EmployeeTasksPage() {
   const requiresMedia = Boolean(selected?.photo_required && done);
   const canSubmitDone = !requiresMedia || hasMedia;
 
+  const openReport = () => {
+    setReportText("");
+    setReportPhotoUrl("");
+    setReportVideoUrl("");
+    setReportAudioUrl("");
+    setReportOpen(true);
+  };
+
+  const handleReportUpload = async (file: File, kind: "photo" | "video" | "audio") => {
+    setReportUploadingKind(kind);
+    setError("");
+    try {
+      const res =
+        kind === "photo"
+          ? await issueReportService.uploadPhoto(file)
+          : kind === "video"
+            ? await issueReportService.uploadVideo(file)
+            : await issueReportService.uploadAudio(file);
+      if (kind === "photo") setReportPhotoUrl(res.url);
+      if (kind === "video") setReportVideoUrl(res.url);
+      if (kind === "audio") setReportAudioUrl(res.url);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setReportUploadingKind(null);
+    }
+  };
+
+  const hasReportContent = Boolean(
+    reportText.trim() || reportPhotoUrl || reportVideoUrl || reportAudioUrl
+  );
+
+  const handleReportSubmit = async () => {
+    if (!hasReportContent) return;
+    setReportSaving(true);
+    setError("");
+    try {
+      await issueReportService.createReport({
+        text: reportText.trim() || undefined,
+        photo_url: reportPhotoUrl || undefined,
+        video_url: reportVideoUrl || undefined,
+        audio_url: reportAudioUrl || undefined,
+      });
+      setReportOpen(false);
+      setSuccess(he.issueReportSuccess);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setReportSaving(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selected) return;
     setSaving(true);
@@ -257,23 +354,51 @@ export default function EmployeeTasksPage() {
 
   const progress = dashboard?.progress_percent ?? 0;
   const openCount = urgentTasks.length + todayTasks.length + inProgressTasks.length;
+  const dayTasksLabel = isToday(filterDay)
+    ? he.employeeTodayTasks
+    : `${he.tasksForSelectedDay} · ${formatHebrewDay(filterDay)}`;
+
+  const rangeGroups = useMemo(() => groupTasksByDay(rangeTasks), [rangeTasks]);
+  const rangeInProgress = useMemo(
+    () => rangeTasks.filter((t) => t.status === "in_progress"),
+    [rangeTasks]
+  );
+
+  const headerName = dashboard?.employee?.full_name ?? user?.full_name;
+  const headerBranch = dashboard?.employee?.branch_name;
+  const headerJob = dashboard?.employee?.job_function;
+  const onShift = dateViewMode === "day" ? dashboard?.on_shift : rangeInProgress.length > 0;
 
   return (
     <Box sx={{ maxWidth: 480, mx: "auto", pb: 12 }}>
       <Box mb={2}>
-        <Typography variant="h5" fontWeight={800}>{dashboard?.employee?.full_name ?? user?.full_name}</Typography>
+        <Typography variant="h5" fontWeight={800}>{headerName}</Typography>
         <Typography variant="body2" color="text.secondary">
-          {dashboard?.employee?.branch_name ? `${he.branch}: ${dashboard.employee.branch_name}` : ""}
-          {dashboard?.employee?.job_function ? ` · ${jobLabel(dashboard.employee.job_function)}` : ""}
+          {headerBranch ? `${he.branch}: ${headerBranch}` : ""}
+          {headerJob ? ` · ${jobLabel(headerJob)}` : ""}
         </Typography>
         <Chip
           size="small"
-          color={dashboard?.on_shift ? "success" : "default"}
-          label={dashboard?.on_shift ? he.employeeOnShift : he.employeeOffShift}
+          color={onShift ? "success" : "default"}
+          label={onShift ? he.employeeOnShift : he.employeeOffShift}
           sx={{ mt: 1 }}
         />
       </Box>
 
+      <TaskDateViewBar
+        mode={dateViewMode}
+        onModeChange={setDateViewMode}
+        day={filterDay}
+        onDayChange={setFilterDay}
+        rangeFrom={filterFrom}
+        rangeTo={filterTo}
+        onRangeChange={(from, to) => {
+          setFilterFrom(from);
+          setFilterTo(to);
+        }}
+      />
+
+      {dateViewMode === "day" && (
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="body2" color="text.secondary" mb={1}>{he.employeeDailyProgress}</Typography>
         <Box display="flex" alignItems="center" gap={2}>
@@ -281,12 +406,68 @@ export default function EmployeeTasksPage() {
           <Typography fontWeight={800}>{progress}%</Typography>
         </Box>
       </Paper>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
 
       {loading ? (
         <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>
+      ) : dateViewMode === "range" ? (
+        <>
+          {rangeInProgress.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.tasksInProgress}</Typography>
+              {rangeInProgress.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  starting={startingId === task.id}
+                  onStart={handleStart}
+                  onComplete={openComplete}
+                />
+              ))}
+            </Box>
+          )}
+          {rangeGroups.length === 0 ? (
+            <Alert severity="success">{he.noTasks}</Alert>
+          ) : (
+            rangeGroups.map(([day, dayTasks]) => {
+              const open = dayTasks.filter(
+                (t) => t.status !== "completed" && t.status !== "cancelled" && t.status !== "in_progress"
+              );
+              const done = dayTasks.filter((t) => t.status === "completed");
+              return (
+                <Box key={day} mb={3}>
+                  <Typography variant="subtitle1" fontWeight={800} mb={1}>
+                    {isToday(day) ? he.tasksTodayLabel : formatHebrewDay(day)}
+                  </Typography>
+                  {open.length === 0 && done.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" mb={1}>{he.noTasks}</Typography>
+                  ) : (
+                    open.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        starting={startingId === task.id}
+                        onStart={handleStart}
+                        onComplete={openComplete}
+                      />
+                    ))
+                  )}
+                  {done.map((task) => (
+                    <Card key={task.id} variant="outlined" sx={{ mb: 1, opacity: 0.85 }}>
+                      <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                        <Typography fontWeight={600}>{task.title}</Typography>
+                        <Chip label={he.taskCompleted} color="success" size="small" sx={{ mt: 0.5 }} />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              );
+            })
+          )}
+        </>
       ) : (
         <>
           {urgentTasks.length > 0 && (
@@ -322,7 +503,7 @@ export default function EmployeeTasksPage() {
             </Box>
           )}
 
-          <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.employeeTodayTasks}</Typography>
+          <Typography variant="subtitle1" fontWeight={800} mb={1}>{dayTasksLabel}</Typography>
           {openCount === 0 && completedTasks.length > 0 ? (
             <Alert severity="success" sx={{ mb: 2 }}>{he.noTasksToday}</Alert>
           ) : openCount === 0 ? (
@@ -361,21 +542,56 @@ export default function EmployeeTasksPage() {
         </>
       )}
 
-      <Collapse in={showReportHint}>
-        <Alert severity="info" sx={{ mt: 2 }} onClose={() => setShowReportHint(false)}>
-          {he.employeeReportIssueHint}
-        </Alert>
-      </Collapse>
-
       <Fab
         color="secondary"
         variant="extended"
         sx={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)" }}
-        onClick={() => setShowReportHint(true)}
+        onClick={openReport}
       >
         <ReportProblemIcon sx={{ ml: 1 }} />
         {he.employeeReportIssue}
       </Fab>
+
+      <Dialog open={reportOpen} onClose={() => setReportOpen(false)} fullWidth maxWidth="xs" dir="rtl">
+        <DialogTitle>{he.issueReportTitle}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          <TextField
+            label={he.issueReportText}
+            value={reportText}
+            onChange={(e) => setReportText(e.target.value)}
+            fullWidth
+            multiline
+            rows={4}
+            placeholder={he.completionMediaHint}
+          />
+          <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
+          <input ref={reportPhotoRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReportUpload(f, "photo"); e.target.value = ""; }} />
+          <input ref={reportVideoRef} type="file" accept="video/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReportUpload(f, "video"); e.target.value = ""; }} />
+          <input ref={reportAudioRef} type="file" accept="audio/*" capture="user" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReportUpload(f, "audio"); e.target.value = ""; }} />
+          <Button startIcon={<PhotoCameraIcon />} variant={reportPhotoUrl ? "contained" : "outlined"} onClick={() => reportPhotoRef.current?.click()} disabled={reportUploadingKind !== null}>
+            {reportUploadingKind === "photo" ? he.loading : reportPhotoUrl ? he.photoAdded : he.addPhoto}
+          </Button>
+          <Button startIcon={<VideocamIcon />} variant={reportVideoUrl ? "contained" : "outlined"} onClick={() => reportVideoRef.current?.click()} disabled={reportUploadingKind !== null}>
+            {reportUploadingKind === "video" ? he.loading : reportVideoUrl ? he.videoAdded : he.addVideo}
+          </Button>
+          <Button startIcon={<MicIcon />} variant={reportAudioUrl ? "contained" : "outlined"} onClick={() => reportAudioRef.current?.click()} disabled={reportUploadingKind !== null}>
+            {reportUploadingKind === "audio" ? he.loading : reportAudioUrl ? he.audioAdded : he.addAudio}
+          </Button>
+          {!hasReportContent && (
+            <Typography variant="caption" color="warning.main">{he.issueReportRequired}</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setReportOpen(false)} disabled={reportSaving}>{he.cancel}</Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleReportSubmit()}
+            disabled={reportSaving || reportUploadingKind !== null || !hasReportContent}
+          >
+            {reportSaving ? <CircularProgress size={22} color="inherit" /> : he.issueReportSubmit}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
         <DialogTitle>{selected?.title}</DialogTitle>

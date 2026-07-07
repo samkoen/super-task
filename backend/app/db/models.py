@@ -248,6 +248,27 @@ class TaskCompletion(Base):
     )
 
 
+class IssueReport(Base):
+    __tablename__ = "issue_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    reporter_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=False, index=True
+    )
+    text: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    video_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class UserNotification(Base):
     __tablename__ = "user_notifications"
 
@@ -262,6 +283,9 @@ class UserNotification(Base):
     message: Mapped[str] = mapped_column(String(500), nullable=False)
     occurrence_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("task_occurrences.id"), nullable=True
+    )
+    issue_report_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("issue_reports.id"), nullable=True
     )
     branch_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True

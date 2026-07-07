@@ -10,6 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
+import EditIcon from "@mui/icons-material/Edit";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { cardColor } from "../../constants/cardColors";
@@ -29,6 +30,7 @@ export interface TaskOccurrenceCardProps {
   index: number;
   isBranchManager?: boolean;
   onDelegate?: (task: TaskOccurrence) => void;
+  onEdit?: (task: TaskOccurrence) => void;
   onCancel?: (task: TaskOccurrence) => void;
 }
 
@@ -37,6 +39,7 @@ export default function TaskOccurrenceCard({
   index,
   isBranchManager,
   onDelegate,
+  onEdit,
   onCancel,
 }: TaskOccurrenceCardProps) {
   const { bg, accent } = cardColor(index);
@@ -45,6 +48,7 @@ export default function TaskOccurrenceCard({
     ?? (task.pending_delegation ? he.pendingDelegation : he.allDepartment);
   const canCancel = !["completed", "cancelled"].includes(task.status) && !task.pending_delegation;
   const canDelegate = Boolean(task.pending_delegation && isBranchManager);
+  const canEdit = !["completed", "cancelled"].includes(task.status) && Boolean(onEdit);
 
   return (
     <Card
@@ -85,6 +89,13 @@ export default function TaskOccurrenceCard({
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 0.25, flexShrink: 0 }}>
+            {canEdit && onEdit && (
+              <Tooltip title={he.editTask}>
+                <IconButton size="small" color="primary" onClick={() => onEdit(task)}>
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             {canDelegate && onDelegate && (
               <Tooltip title={he.delegateTask}>
                 <IconButton size="small" color="primary" onClick={() => onDelegate(task)}>

@@ -16,6 +16,7 @@ import {
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import { notificationService, type AppNotification } from "../../services/notificationService";
 import { NOTIFICATION_EVENT } from "../../constants/events";
+import IssueReportDetailDialog from "../issues/IssueReportDetailDialog";
 import { he } from "../../i18n/he";
 
 function formatWhen(iso: string) {
@@ -36,6 +37,7 @@ export default function NotificationBell() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [issueReportId, setIssueReportId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -77,6 +79,16 @@ export default function NotificationBell() {
     await refresh();
   };
 
+  const handleItemClick = async (item: AppNotification) => {
+    if (!item.read_at) {
+      await handleMarkRead(item.id);
+    }
+    if (item.kind === "issue_reported" && item.issue_report_id) {
+      setOpen(false);
+      setIssueReportId(item.issue_report_id);
+    }
+  };
+
   return (
     <>
       <IconButton color="inherit" aria-label={he.notificationsTitle} onClick={handleOpen} size="small">
@@ -105,7 +117,7 @@ export default function NotificationBell() {
               {items.map((item) => (
                 <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton
-                    onClick={() => !item.read_at && void handleMarkRead(item.id)}
+                    onClick={() => void handleItemClick(item)}
                     sx={{
                       borderRadius: 1,
                       bgcolor: item.read_at ? "transparent" : "action.hover",
@@ -128,6 +140,11 @@ export default function NotificationBell() {
           )}
         </Box>
       </Drawer>
+
+      <IssueReportDetailDialog
+        reportId={issueReportId}
+        onClose={() => setIssueReportId(null)}
+      />
     </>
   );
 }

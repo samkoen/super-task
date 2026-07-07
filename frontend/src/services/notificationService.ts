@@ -7,6 +7,7 @@ export interface AppNotification {
   title: string;
   message: string;
   occurrence_id: string | null;
+  issue_report_id: string | null;
   branch_id: string | null;
   read_at: string | null;
   created_at: string;

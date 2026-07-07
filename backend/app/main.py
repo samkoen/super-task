@@ -16,6 +16,7 @@ from app.controllers import (
     department_controller,
     events_controller,
     invitation_controller,
+    issue_report_controller,
     network_controller,
     notification_controller,
     product_controller,
@@ -54,6 +55,9 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "task_photos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "task_videos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "task_audio").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "issue_photos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "issue_videos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "issue_audio").mkdir(exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
     @app.get("/health", tags=["health"])
@@ -69,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(department_controller.router, prefix="/api/departments", tags=["departments"])
     app.include_router(product_controller.router, prefix="/api/products", tags=["products"])
     app.include_router(task_controller.router, prefix="/api/tasks", tags=["tasks"])
+    app.include_router(issue_report_controller.router, prefix="/api/issue-reports", tags=["issue-reports"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(events_controller.router, prefix="/api/events", tags=["events"])
     app.include_router(notification_controller.router, prefix="/api/notifications", tags=["notifications"])

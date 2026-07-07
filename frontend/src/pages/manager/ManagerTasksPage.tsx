@@ -7,8 +7,10 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  FormControlLabel,
   DialogTitle,
   MenuItem,
+  Switch,
   Tab,
   Tabs,
   TextField,
@@ -18,8 +20,17 @@ import AddIcon from "@mui/icons-material/Add";
 import { ApiError, type User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
+import TaskOccurrenceGridByDay from "../../components/tasks/TaskOccurrenceGridByDay";
 import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
+import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStorage";
+import {
+  datetimeLocalForDay,
+  defaultRangeFrom,
+  todayIso,
+  toDatetimeLocal,
+  type TaskDateViewMode,
+} from "../../utils/dateView";
 import {
   taskService,
   type TaskOccurrence,
@@ -42,11 +53,6 @@ const WEEKDAYS = [
   { value: "6", label: he.weekdaySun },
 ];
 
-function formatDatetimeLocal(value = new Date()) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
-}
-
 export default function ManagerTasksPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState(0);
@@ -61,9 +67,21 @@ export default function ManagerTasksPage() {
   const [openAdHoc, setOpenAdHoc] = useState(false);
   const [delegateTarget, setDelegateTarget] = useState<TaskOccurrence | null>(null);
   const [delegateAssignee, setDelegateAssignee] = useState("");
+  const [editTarget, setEditTarget] = useState<TaskOccurrence | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    due_at: "",
+    assignee_user_id: "",
+    photo_required: true,
+  });
   const [saving, setSaving] = useState(false);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("");
+  const [filterDay, setFilterDay] = useState(todayIso);
+  const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
+  const [filterFrom, setFilterFrom] = useState(todayIso);
+  const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
   const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
 
   const [fixedForm, setFixedForm] = useState({
@@ -87,10 +105,17 @@ export default function ManagerTasksPage() {
 
   const isBranchManager = user?.role === "branch_manager";
   const isNetworkManager = user?.role === "network_manager";
+  const canManageTasks = isBranchManager || isNetworkManager || user?.role === "admin";
+  const canPickBranch = isNetworkManager || user?.role === "admin";
+
+  const scopeBranchId = useMemo(() => {
+    if (canPickBranch) return filterBranch;
+    return user?.branch_id ?? "";
+  }, [canPickBranch, filterBranch, user?.branch_id]);
 
   const filterEmployees = useMemo(
-    () => (filterBranch ? employees.filter((u) => u.branch_id === filterBranch) : employees),
-    [employees, filterBranch]
+    () => (scopeBranchId ? employees.filter((u) => u.branch_id === scopeBranchId) : employees),
+    [employees, scopeBranchId]
   );
 
   const filteredEmployees = useMemo(
@@ -122,10 +147,14 @@ export default function ManagerTasksPage() {
       setError("");
     }
     try {
-      const branchId = filterBranch || undefined;
+      const branchId = scopeBranchId || undefined;
+      const dateParams =
+        dateViewMode === "day"
+          ? { due_on: filterDay }
+          : { due_from: filterFrom, due_to: filterTo };
       const [occ, pend, branchList, team] = await Promise.all([
-        taskService.listOccurrences(branchId ? { branch_id: branchId } : undefined),
-        isBranchManager ? taskService.listOccurrences({ pending_delegation: true }) : Promise.resolve([]),
+        taskService.listOccurrences({ branch_id: branchId, ...dateParams }),
+        isBranchManager ? taskService.listOccurrences({ pending_delegation: true, branch_id: branchId }) : Promise.resolve([]),
         branchService.list(),
         userService.listTeam("employee"),
       ]);
@@ -138,7 +167,7 @@ export default function ManagerTasksPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filterBranch, isBranchManager]);
+  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, isBranchManager]);
 
   useEffect(() => {
     load();
@@ -162,15 +191,30 @@ export default function ManagerTasksPage() {
   }, [filterEmployee, filterEmployees]);
 
   const currentFilters = useMemo(
-    () => ({ filterBranch, filterEmployee }),
-    [filterBranch, filterEmployee]
+    () => ({
+      ...(canPickBranch ? { filterBranch } : {}),
+      filterEmployee,
+      filterDay,
+      dateViewMode,
+      filterFrom,
+      filterTo,
+    }),
+    [canPickBranch, filterBranch, filterEmployee, filterDay, dateViewMode, filterFrom, filterTo]
   );
 
   const handleSelectSavedFilter = (item: { id: string; filters: Record<string, string | number> }) => {
-    setFilterBranch(String(item.filters.filterBranch ?? ""));
+    if (canPickBranch) {
+      setFilterBranch(String(item.filters.filterBranch ?? ""));
+    }
     setFilterEmployee(String(item.filters.filterEmployee ?? ""));
+    setFilterDay(String(item.filters.filterDay ?? todayIso()));
+    setDateViewMode((item.filters.dateViewMode as TaskDateViewMode) ?? "day");
+    setFilterFrom(String(item.filters.filterFrom ?? todayIso()));
+    setFilterTo(String(item.filters.filterTo ?? defaultRangeFrom(todayIso(), 7).to));
     setActiveSavedFilterId(item.id);
   };
+
+  const resetSavedFilterActive = () => setActiveSavedFilterId(null);
 
   const handleCreateFixed = async () => {
     setSaving(true);
@@ -195,10 +239,10 @@ export default function ManagerTasksPage() {
 
   const handleOpenAdHoc = () => {
     setAdHocForm({
-      branch_id: filterBranch || user?.branch_id || "",
+      branch_id: scopeBranchId || user?.branch_id || "",
       title: "",
       description: "",
-      due_at: formatDatetimeLocal(),
+      due_at: datetimeLocalForDay(dateViewMode === "day" ? filterDay : filterFrom),
       assignee_user_id: isBranchManager && filterEmployee ? filterEmployee : "",
     });
     setOpenAdHoc(true);
@@ -250,18 +294,62 @@ export default function ManagerTasksPage() {
     }
   };
 
+  const handleOpenEdit = (task: TaskOccurrence) => {
+    setEditTarget(task);
+    setEditForm({
+      title: task.title,
+      description: task.description,
+      due_at: toDatetimeLocal(task.due_at),
+      assignee_user_id: task.assignee_user_id ?? "",
+      photo_required: task.photo_required,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await taskService.updateOccurrence(editTarget.id, {
+        title: editForm.title.trim(),
+        description: editForm.description,
+        due_at: new Date(editForm.due_at).toISOString(),
+        assignee_user_id: editForm.assignee_user_id || undefined,
+        photo_required: editTarget.task_kind === "ad_hoc" ? editForm.photo_required : undefined,
+      });
+      setEditTarget(null);
+      setSuccess(res.message);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editEmployees = useMemo(
+    () => (editTarget ? employees.filter((u) => u.branch_id === editTarget.branch_id) : employees),
+    [employees, editTarget]
+  );
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2} flexWrap="wrap">
         <Box>
           <Typography variant="h5" fontWeight={700}>{he.managerTasks}</Typography>
-          <Typography variant="body2" color="text.secondary">{he.managerTasksSubtitle}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {isBranchManager && user?.branch_name
+              ? `${he.branch}: ${user.branch_name}`
+              : he.managerTasksSubtitle}
+          </Typography>
         </Box>
         <Box display="flex" gap={1} flexWrap="wrap">
-          <TextField select size="small" label={he.branch} value={filterBranch} onChange={(e) => { setFilterBranch(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 160 }}>
-            <MenuItem value="">{he.all}</MenuItem>
-            {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-          </TextField>
+          {canPickBranch && (
+            <TextField select size="small" label={he.branch} value={filterBranch} onChange={(e) => { setFilterBranch(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 160 }}>
+              <MenuItem value="">{he.all}</MenuItem>
+              {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+            </TextField>
+          )}
           <TextField select size="small" label={he.filterByEmployee} value={filterEmployee} onChange={(e) => { setFilterEmployee(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 180 }}>
             <MenuItem value="">{he.all}</MenuItem>
             {filterEmployees.map((u) => <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>)}
@@ -275,6 +363,26 @@ export default function ManagerTasksPage() {
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
+
+      <TaskDateViewBar
+        mode={dateViewMode}
+        onModeChange={(mode) => {
+          setDateViewMode(mode);
+          resetSavedFilterActive();
+        }}
+        day={filterDay}
+        onDayChange={(day) => {
+          setFilterDay(day);
+          resetSavedFilterActive();
+        }}
+        rangeFrom={filterFrom}
+        rangeTo={filterTo}
+        onRangeChange={(from, to) => {
+          setFilterFrom(from);
+          setFilterTo(to);
+          resetSavedFilterActive();
+        }}
+      />
 
       <SavedFiltersBar
         filterClient={managerTasksSavedFiltersClient}
@@ -293,25 +401,37 @@ export default function ManagerTasksPage() {
       {loading ? (
         <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>
       ) : tab === 0 ? (
-        <TaskOccurrenceGrid
-          tasks={displayedOccurrences}
-          isBranchManager={isBranchManager}
-          onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
-          onCancel={handleCancel}
-        />
+        dateViewMode === "range" ? (
+          <TaskOccurrenceGridByDay
+            tasks={displayedOccurrences}
+            isBranchManager={isBranchManager}
+            onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
+            onEdit={canManageTasks ? handleOpenEdit : undefined}
+            onCancel={handleCancel}
+          />
+        ) : (
+          <TaskOccurrenceGrid
+            tasks={displayedOccurrences}
+            isBranchManager={isBranchManager}
+            onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
+            onEdit={canManageTasks ? handleOpenEdit : undefined}
+            onCancel={handleCancel}
+          />
+        )
       ) : (
         <TaskOccurrenceGrid
           tasks={displayedPending}
           emptyMessage={filterEmployee ? he.noTasks : he.noTasks}
           isBranchManager={isBranchManager}
           onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
+          onEdit={canManageTasks ? handleOpenEdit : undefined}
         />
       )}
 
       <Dialog open={openFixed} onClose={() => setOpenFixed(false)} fullWidth maxWidth="sm" dir="rtl">
         <DialogTitle>{he.newFixedTask}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-          <TextField select label={he.branch} value={fixedForm.branch_id} onChange={(e) => setFixedForm({ ...fixedForm, branch_id: e.target.value })} required fullWidth>
+          <TextField select label={he.branch} value={fixedForm.branch_id} onChange={(e) => setFixedForm({ ...fixedForm, branch_id: e.target.value })} required fullWidth disabled={isBranchManager}>
             {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
           <TextField label={he.taskTitle} value={fixedForm.title} onChange={(e) => setFixedForm({ ...fixedForm, title: e.target.value })} required fullWidth />
@@ -370,6 +490,73 @@ export default function ManagerTasksPage() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpenAdHoc(false)} disabled={saving}>{he.cancel}</Button>
           <Button variant="contained" onClick={handleCreateAdHoc} disabled={saving}>{saving ? <CircularProgress size={22} /> : he.submit}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!editTarget} onClose={() => !saving && setEditTarget(null)} fullWidth maxWidth="sm" dir="rtl">
+        <DialogTitle>{he.editTask}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          <TextField
+            label={he.taskTitle}
+            value={editForm.title}
+            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+            required
+            fullWidth
+          />
+          <TextField
+            label={he.description}
+            value={editForm.description}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+            multiline
+            rows={2}
+            fullWidth
+          />
+          <TextField
+            label={he.dueAt}
+            type="datetime-local"
+            value={editForm.due_at}
+            onChange={(e) => setEditForm({ ...editForm, due_at: e.target.value })}
+            InputLabelProps={{ shrink: true }}
+            required
+            fullWidth
+            dir="ltr"
+          />
+          {(isBranchManager || Boolean(editForm.assignee_user_id)) && (
+            <TextField
+              select
+              label={he.assignee}
+              value={editForm.assignee_user_id}
+              onChange={(e) => setEditForm({ ...editForm, assignee_user_id: e.target.value })}
+              required={isBranchManager && editTarget?.task_kind === "ad_hoc" && !editTarget.pending_delegation}
+              fullWidth
+            >
+              <MenuItem value="">{he.noAssignee}</MenuItem>
+              {editEmployees.map((u) => (
+                <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+              ))}
+            </TextField>
+          )}
+          {editTarget?.task_kind === "ad_hoc" && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editForm.photo_required}
+                  onChange={(e) => setEditForm({ ...editForm, photo_required: e.target.checked })}
+                />
+              }
+              label={he.photoRequired}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditTarget(null)} disabled={saving}>{he.cancel}</Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleSaveEdit()}
+            disabled={saving || !editForm.title.trim() || !editForm.due_at}
+          >
+            {saving ? <CircularProgress size={22} /> : he.submit}
+          </Button>
         </DialogActions>
       </Dialog>
 

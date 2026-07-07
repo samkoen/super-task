@@ -8,6 +8,7 @@ export interface TaskOccurrenceGridProps {
   emptyMessage?: string;
   isBranchManager?: boolean;
   onDelegate?: TaskOccurrenceCardProps["onDelegate"];
+  onEdit?: TaskOccurrenceCardProps["onEdit"];
   onCancel?: TaskOccurrenceCardProps["onCancel"];
 }
 
@@ -16,6 +17,7 @@ export default function TaskOccurrenceGrid({
   emptyMessage = he.noTasks,
   isBranchManager,
   onDelegate,
+  onEdit,
   onCancel,
 }: TaskOccurrenceGridProps) {
   if (tasks.length === 0) {
@@ -35,6 +37,7 @@ export default function TaskOccurrenceGrid({
             index={index}
             isBranchManager={isBranchManager}
             onDelegate={onDelegate}
+            onEdit={onEdit}
             onCancel={onCancel}
           />
         </Grid>

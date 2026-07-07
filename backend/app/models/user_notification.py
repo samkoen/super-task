@@ -9,6 +9,7 @@ class UserNotification:
     title: str
     message: str
     occurrence_id: str | None
+    issue_report_id: str | None
     branch_id: str | None
     read_at: str | None
     created_at: str
@@ -21,6 +22,7 @@ class UserNotification:
             "title": self.title,
             "message": self.message,
             "occurrence_id": self.occurrence_id,
+            "issue_report_id": self.issue_report_id,
             "branch_id": self.branch_id,
             "read_at": self.read_at,
             "created_at": self.created_at,

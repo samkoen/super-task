@@ -109,8 +109,9 @@ export const dashboardService = {
     return response.data;
   },
 
-  getEmployee: async () => {
-    const response = await api.get<EmployeeDashboard>("/dashboard/employee");
+  getEmployee: async (dueOn?: string) => {
+    const params = dueOn ? { due_on: dueOn } : undefined;
+    const response = await api.get<EmployeeDashboard>("/dashboard/employee", { params });
     const data = response.data;
     return {
       ...data,
