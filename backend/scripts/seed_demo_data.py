@@ -212,6 +212,7 @@ def seed_tasks(
             recurrence=recurrence,
             due_time=due_time,
             weekly_days=weekly_days,
+            monthly_day=None,
             assignee_user_id=assignee,
             department_id=None,
             created_by_id=branch_manager_id,
