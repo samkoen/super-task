@@ -1,12 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "destination": "https://httpstat.us/503",
-      "permanent": false
-    }
-  ],
   "services": {
     "frontend": {
       "root": "frontend",
