@@ -69,6 +69,8 @@ export default defineConfig({
         target: apiTarget,
         changeOrigin: true,
         secure: false,
+        timeout: 0,
+        proxyTimeout: 0,
       },
       "/uploads": {
         target: apiTarget,

@@ -60,6 +60,13 @@ export function groupTasksByDay<T extends { due_at: string }>(tasks: T[]): [stri
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
+export function formatDueAt(isoDateTime: string | null | undefined): string {
+  if (!isoDateTime?.trim()) return "—";
+  const value = new Date(isoDateTime);
+  if (Number.isNaN(value.getTime())) return "—";
+  return value.toLocaleString("he-IL");
+}
+
 export type TaskDateViewMode = "day" | "range";
 
 export function datetimeLocalForDay(dayIso: string, reference = new Date()): string {

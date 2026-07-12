@@ -47,10 +47,11 @@ def test_branch_manager_can_create_employee_in_own_branch():
     )
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("app.services.user_service.send_verification_email", lambda *a, **k: True)
+        send_mock = MagicMock(return_value=True)
+        mp.setattr("app.services.user_service.send_verification_email", send_mock)
         service.create_team_employee(
             actor,
-            email="new@test.com",
+            email="0501234567",
             password="123456",
             first_name="New",
             last_name="Emp",
@@ -61,6 +62,8 @@ def test_branch_manager_can_create_employee_in_own_branch():
     assert call_kw["role"] == roles.EMPLOYEE
     assert call_kw["branch_id"] == "s1"
     assert call_kw["network_id"] == "r1"
+    assert call_kw["email_verified"] is True
+    send_mock.assert_not_called()
 
 
 def test_branch_manager_create_uses_own_branch_even_if_other_specified():
@@ -74,7 +77,8 @@ def test_branch_manager_create_uses_own_branch_even_if_other_specified():
     )
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("app.services.user_service.send_verification_email", lambda *a, **k: True)
+        send_mock = MagicMock(return_value=True)
+        mp.setattr("app.services.user_service.send_verification_email", send_mock)
         service.create_team_employee(
             actor,
             email="new@test.com",
@@ -86,6 +90,23 @@ def test_branch_manager_create_uses_own_branch_even_if_other_specified():
         )
 
     assert repo.create_user.call_args.kwargs["branch_id"] == "s1"
+
+
+def test_team_employee_requires_identifier():
+    service, _ = _service()
+    service._repo = MagicMock()
+    actor = ActorContext(
+        user_id="bm1", role=roles.BRANCH_MANAGER, network_id="r1", branch_id="s1"
+    )
+    with pytest.raises(ValueError, match="נדרש מזהה"):
+        service.create_team_employee(
+            actor,
+            email="  ",
+            password="123456",
+            first_name="New",
+            last_name="Emp",
+            job_function=job_functions.STOCKERS,
+        )
 
 
 def test_branch_manager_cannot_update_employee_in_other_branch():

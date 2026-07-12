@@ -73,13 +73,13 @@ export default function LoginPage() {
       )}
       <Box component="form" onSubmit={handleSubmit} display="flex" flexDirection="column" gap={2}>
         <TextField
-          label={he.email}
-          type="email"
+          label={he.loginIdentifier}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           fullWidth
           dir="ltr"
+          autoComplete="username"
         />
         <TextField
           label={he.password}

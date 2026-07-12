@@ -69,6 +69,7 @@ def create_team_employee(
         phone=(str(data.get("phone")).strip() if data.get("phone") else None),
         job_function=(str(data.get("job_function")).strip() if data.get("job_function") else None),
         branch_id=(str(data.get("branch_id")).strip() if data.get("branch_id") else None),
+        preferred_language=(str(data.get("preferred_language")).strip() if data.get("preferred_language") else None),
     )
     return {"message": "העובד נוצר — נשלח קישור אימות", "user": user}
 
@@ -93,6 +94,7 @@ def update_team_employee(
         phone=(str(payload.get("phone")).strip() if payload.get("phone") else None),
         job_function=(str(payload.get("job_function")).strip() if payload.get("job_function") else None),
         password=(str(payload.get("password")) if payload.get("password") else None),
+        preferred_language=(str(payload.get("preferred_language")).strip() if payload.get("preferred_language") else None),
     )
     return {"message": "פרטי העובד עודכנו", "user": user}
 

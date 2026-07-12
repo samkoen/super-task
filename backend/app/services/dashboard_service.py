@@ -18,6 +18,7 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
+from app.services.task_translation_service import TaskTranslationService
 
 TZ = ZoneInfo("Asia/Jerusalem")
 URGENT_EMPLOYEE_WINDOW = timedelta(hours=1)
@@ -82,11 +83,13 @@ class DashboardService:
         branch_repo: BranchRepository,
         department_repo: DepartmentRepository,
         user_repo: UserRepository,
+        translation_service: TaskTranslationService | None = None,
     ):
         self._occurrences = occurrence_repo
         self._branches = branch_repo
         self._departments = department_repo
         self._users = user_repo
+        self._translations = translation_service
 
     def manager_dashboard(
         self,
@@ -165,6 +168,13 @@ class DashboardService:
 
         progress = int(round(counts["completion_rate"] * 100))
         on_shift = len(in_progress) > 0
+        language = user.preferred_language if user else "he"
+
+        def localize_cards(tasks: list[TaskOccurrence]) -> list[dict]:
+            cards = [self._employee_task_card(t) for t in tasks]
+            if self._translations:
+                return self._translations.apply_to_cards(cards, language=language)
+            return cards
 
         return {
             "due_on": day.isoformat(),
@@ -174,14 +184,15 @@ class DashboardService:
                 "job_function": user.job_function if user else None,
                 "branch_id": actor.branch_id,
                 "branch_name": branch_name,
+                "preferred_language": language,
             },
             "progress_percent": progress,
             "on_shift": on_shift,
             "counts": counts,
-            "urgent_tasks": [self._employee_task_card(t) for t in urgent],
-            "in_progress_tasks": [self._employee_task_card(t) for t in in_progress],
-            "today_tasks": [self._employee_task_card(t) for t in today_open],
-            "completed_tasks": [self._employee_task_card(t) for t in completed],
+            "urgent_tasks": localize_cards(urgent),
+            "in_progress_tasks": localize_cards(in_progress),
+            "today_tasks": localize_cards(today_open),
+            "completed_tasks": localize_cards(completed),
         }
 
     def _resolve_manager_branch(self, actor: ActorContext, branch_id: str | None) -> str | None:

@@ -60,6 +60,8 @@ export interface TaskOccurrence {
   department_name?: string | null;
   assignee_name?: string | null;
   manager_name?: string | null;
+  spoken_text?: string;
+  display_language?: string;
   completion?: TaskCompletion | null;
 }
 
@@ -95,10 +97,17 @@ export interface CompleteTaskPayload {
 async function uploadTaskFile(file: File, kind: "photo" | "video" | "audio") {
   const form = new FormData();
   form.append("file", file);
-  const response = await api.post<{ url: string; kind: string }>(`/tasks/upload-${kind}`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await api.post<{ url: string; kind: string }>(`/tasks/upload-${kind}`, form);
   return response.data;
+}
+
+export interface TaskTranslation {
+  id: string;
+  title: string;
+  description: string;
+  spoken_text: string;
+  display_language: string;
+  translation_pending?: boolean;
 }
 
 export const taskService = {
@@ -140,6 +149,15 @@ export const taskService = {
   listMine: async (params?: { due_on?: string; due_from?: string; due_to?: string }) => {
     const response = await api.get<TaskOccurrence[]>("/tasks/mine", { params });
     return response.data;
+  },
+
+  translateMine: async (occurrenceIds: string[]) => {
+    const response = await api.post<{ translations: TaskTranslation[] }>(
+      "/tasks/mine/translate",
+      { occurrence_ids: occurrenceIds },
+      { timeout: 180_000 }
+    );
+    return response.data.translations;
   },
 
   start: async (occurrenceId: string) => {

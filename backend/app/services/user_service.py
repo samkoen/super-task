@@ -1,6 +1,7 @@
 from app.core import config
 from app.db import mappers as mp
 from app.domain import job_functions, roles
+from app.domain.employee_language import normalize_employee_language
 from app.domain.scope import ActorContext, assert_branch_visible
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.repositories.branch_repository import BranchRepository
@@ -107,6 +108,7 @@ class UserService:
         phone: str | None = None,
         job_function: str | None = None,
         branch_id: str | None = None,
+        preferred_language: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור עובד")
@@ -115,7 +117,7 @@ class UserService:
             email, password, first_name, last_name, job_function, require_job_function=True
         )
         if self._repo.count_by_email(email) > 0:
-            raise ValueError("האימייל כבר קיים")
+            raise ValueError("המזהה כבר קיים")
         scope = self._scope.resolve_for_role(
             roles.EMPLOYEE,
             network_id=None,
@@ -134,8 +136,9 @@ class UserService:
             job_function=job_function,
             network_id=scope.network_id,
             branch_id=scope.branch_id,
+            preferred_language=normalize_employee_language(preferred_language),
+            email_verified=True,
         )
-        send_verification_email(user.email, user.id, user.full_name)
         return self._to_api(user)
 
     def update_team_employee(
@@ -149,6 +152,7 @@ class UserService:
         phone: str | None = None,
         job_function: str | None = None,
         password: str | None = None,
+        preferred_language: str | None = None,
     ) -> dict:
         target = self._repo.find_by_id(user_id)
         if not target:
@@ -165,7 +169,7 @@ class UserService:
         )
         existing = self._repo.find_by_email(email)
         if existing and existing.id != user_id:
-            raise ValueError("האימייל כבר קיים")
+            raise ValueError("המזהה כבר קיים")
         updated = self._repo.update_employee(
             user_id,
             first_name=first_name.strip(),
@@ -174,6 +178,9 @@ class UserService:
             phone=(phone or "").strip() or None,
             job_function=job_function,
             password=(password or "").strip() or None,
+            preferred_language=normalize_employee_language(preferred_language)
+            if preferred_language is not None
+            else None,
         )
         assert updated is not None
         return self._to_api(updated)
@@ -233,7 +240,7 @@ class UserService:
         password_required: bool = True,
     ) -> None:
         if not (email or "").strip():
-            raise ValueError("נדרש אימייל")
+            raise ValueError("נדרש מזהה")
         if password_required and len((password or "").strip()) < config.PASSWORD_MIN_LENGTH:
             raise ValueError("הסיסמה קצרה מדי")
         if not (first_name or "").strip() or not (last_name or "").strip():

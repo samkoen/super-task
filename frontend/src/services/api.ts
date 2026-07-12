@@ -1,4 +1,4 @@
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 const api = axios.create({
   baseURL: "/api",
@@ -7,11 +7,20 @@ const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
+  return config;
+});
+
 const LOGOUT_PATHS = ["/auth/logout"];
 
 export type UserRole = "admin" | "network_manager" | "branch_manager" | "employee";
 
 export type JobFunction = "head_cashier" | "stockers" | "warehouse_worker";
+
+export type EmployeeLanguage = "he" | "ar" | "th" | "fr" | "en";
 
 export interface User {
   id: string;
@@ -28,6 +37,7 @@ export interface User {
   branch_name?: string | null;
   is_active: boolean;
   email_verified: boolean;
+  preferred_language?: EmployeeLanguage;
 }
 
 export class ApiError extends Error {
@@ -51,11 +61,26 @@ api.interceptors.response.use(
     }
     const msg =
       error.response?.data?.error ??
-      error.response?.data?.detail ??
+      formatApiDetail(error.response?.data?.detail) ??
       error.message ??
       "אירעה שגיאה";
     return Promise.reject(new ApiError(String(msg), error.response?.status ?? 500));
   }
 );
+
+function formatApiDetail(detail: unknown): string | undefined {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (!Array.isArray(detail)) return undefined;
+  const parts = detail
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const row = item as { msg?: string; loc?: unknown[] };
+      const field = Array.isArray(row.loc) ? row.loc.filter((x) => x !== "body").join(".") : "";
+      const message = row.msg || "";
+      return field ? `${field}: ${message}` : message;
+    })
+    .filter(Boolean);
+  return parts.length ? parts.join(" | ") : undefined;
+}
 
 export default api;

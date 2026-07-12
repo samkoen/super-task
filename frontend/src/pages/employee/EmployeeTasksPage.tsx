@@ -23,6 +23,8 @@ import {
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import StopIcon from "@mui/icons-material/Stop";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
@@ -34,7 +36,7 @@ import {
   type EmployeeDashboard,
   type EmployeeTaskCard,
 } from "../../services/dashboardService";
-import { taskService, type TaskStatus } from "../../services/taskService";
+import { taskService, type TaskStatus, type TaskTranslation } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -42,11 +44,14 @@ import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import {
   defaultRangeFrom,
   formatHebrewDay,
+  formatDueAt,
   groupTasksByDay,
   isToday,
   todayIso,
   type TaskDateViewMode,
 } from "../../utils/dateView";
+import { useTaskSpeech } from "../../hooks/useTaskSpeech";
+import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import type { TaskOccurrence } from "../../services/taskService";
 
@@ -68,14 +73,20 @@ function TaskCard({
   task,
   urgent,
   starting,
+  speaking,
   onStart,
   onComplete,
+  onListen,
+  onStopListen,
 }: {
   task: EmployeeTaskCard;
   urgent?: boolean;
   starting?: boolean;
+  speaking?: boolean;
   onStart: (task: EmployeeTaskCard) => void;
   onComplete: (task: EmployeeTaskCard) => void;
+  onListen: (task: EmployeeTaskCard) => void;
+  onStopListen: () => void;
 }) {
   return (
     <Card
@@ -100,11 +111,20 @@ function TaskCard({
           <Typography variant="body2" color="text.secondary" mb={1}>{task.description}</Typography>
         )}
         <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
-          {he.dueAt}: {new Date(task.due_at).toLocaleString("he-IL")}
+          {he.dueAt}: {formatDueAt(task.due_at)}
         </Typography>
         {task.photo_required && (
           <Typography variant="caption" color="warning.main" display="block">{he.photoRequired}</Typography>
         )}
+        <Button
+          size="small"
+          variant="text"
+          startIcon={speaking ? <StopIcon /> : <VolumeUpIcon />}
+          onClick={() => (speaking ? onStopListen() : onListen(task))}
+          sx={{ mt: 1, alignSelf: "flex-start" }}
+        >
+          {speaking ? he.taskListenStop : he.taskListen}
+        </Button>
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2, flexDirection: "column", gap: 1 }}>
         {(task.status === "pending" || task.status === "overdue") && (
@@ -129,6 +149,42 @@ function TaskCard({
   );
 }
 
+function mergeTaskTranslations<T extends EmployeeTaskCard>(
+  tasks: T[],
+  translations: TaskTranslation[]
+): T[] {
+  const byId = new Map(translations.map((item) => [item.id, item]));
+  return tasks.map((task) => {
+    const hit = byId.get(task.id);
+    if (!hit) return task;
+    return {
+      ...task,
+      title: hit.title,
+      description: hit.description,
+      spoken_text: hit.spoken_text,
+      display_language: hit.display_language,
+      translation_pending: hit.translation_pending,
+    };
+  });
+}
+
+function mergeDashboardTranslations(
+  dashboard: EmployeeDashboard,
+  translations: TaskTranslation[]
+): EmployeeDashboard {
+  return {
+    ...dashboard,
+    urgent_tasks: mergeTaskTranslations(dashboard.urgent_tasks, translations),
+    in_progress_tasks: mergeTaskTranslations(dashboard.in_progress_tasks, translations),
+    today_tasks: mergeTaskTranslations(dashboard.today_tasks, translations),
+    completed_tasks: mergeTaskTranslations(dashboard.completed_tasks, translations),
+  };
+}
+
+function collectPendingIds(tasks: EmployeeTaskCard[]): string[] {
+  return tasks.filter((task) => task.translation_pending).map((task) => task.id);
+}
+
 function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
   return {
     id: task.id,
@@ -140,6 +196,9 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     photo_required: task.photo_required,
     department_name: task.department_name ?? null,
     started_at: task.started_at,
+    spoken_text: (task as TaskOccurrence & { spoken_text?: string }).spoken_text,
+    display_language: (task as TaskOccurrence & { display_language?: string }).display_language,
+    translation_pending: (task as TaskOccurrence & { translation_pending?: boolean }).translation_pending,
   };
 }
 
@@ -172,12 +231,37 @@ export default function EmployeeTasksPage() {
   const [filterFrom, setFilterFrom] = useState(todayIso);
   const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
   const [rangeTasks, setRangeTasks] = useState<EmployeeTaskCard[]>([]);
+  const [employeeLanguage, setEmployeeLanguage] = useState<EmployeeLanguage>("he");
+  const [translatingTasks, setTranslatingTasks] = useState(false);
+  const { speakingId, speak, stop: stopSpeech, supported: speechSupported } = useTaskSpeech(employeeLanguage);
   const photoRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLInputElement>(null);
   const reportPhotoRef = useRef<HTMLInputElement>(null);
   const reportVideoRef = useRef<HTMLInputElement>(null);
   const reportAudioRef = useRef<HTMLInputElement>(null);
+
+  const translatePendingTasks = useCallback(
+    async (language: EmployeeLanguage, tasks: EmployeeTaskCard[]) => {
+      if (language === "he") return;
+      const pendingIds = collectPendingIds(tasks);
+      if (!pendingIds.length) return;
+      setTranslatingTasks(true);
+      try {
+        const translations = await taskService.translateMine(pendingIds);
+        if (dateViewMode === "day") {
+          setDashboard((prev) => (prev ? mergeDashboardTranslations(prev, translations) : prev));
+        } else {
+          setRangeTasks((prev) => mergeTaskTranslations(prev, translations));
+        }
+      } catch {
+        // Les tâches restent en hébreu si la traduction échoue.
+      } finally {
+        setTranslatingTasks(false);
+      }
+    },
+    [dateViewMode]
+  );
 
   const load = useCallback(async (silent = false) => {
     if (!silent) {
@@ -186,19 +270,33 @@ export default function EmployeeTasksPage() {
     }
     try {
       if (dateViewMode === "day") {
-        setDashboard(await dashboardService.getEmployee(filterDay));
+        const data = await dashboardService.getEmployee(filterDay);
+        setDashboard(data);
+        const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
+        setEmployeeLanguage(lang);
         setRangeTasks([]);
+        const allTasks = [
+          ...data.urgent_tasks,
+          ...data.in_progress_tasks,
+          ...data.today_tasks,
+          ...data.completed_tasks,
+        ];
+        void translatePendingTasks(lang, allTasks);
       } else {
         const items = await taskService.listMine({ due_from: filterFrom, due_to: filterTo });
-        setRangeTasks(items.map(toEmployeeCard));
+        const cards = items.map(toEmployeeCard);
+        setRangeTasks(cards);
         setDashboard(null);
+        const lang = (user?.preferred_language as EmployeeLanguage) || "he";
+        setEmployeeLanguage(lang);
+        void translatePendingTasks(lang, cards);
       }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filterDay, filterFrom, filterTo, dateViewMode]);
+  }, [filterDay, filterFrom, filterTo, dateViewMode, translatePendingTasks, user?.preferred_language]);
 
   useEffect(() => {
     load();
@@ -240,6 +338,7 @@ export default function EmployeeTasksPage() {
   };
 
   const openComplete = (task: EmployeeTaskCard) => {
+    stopSpeech();
     setSelected(task);
     setNote("");
     setNotDoneReason("");
@@ -248,6 +347,21 @@ export default function EmployeeTasksPage() {
     setVideoUrl("");
     setAudioUrl("");
   };
+
+  const handleListen = (task: EmployeeTaskCard) => {
+    if (!speechSupported) {
+      setError(he.taskListenUnsupported);
+      return;
+    }
+    const text = task.spoken_text || [task.title, task.description].filter(Boolean).join(". ");
+    speak(task.id, text);
+  };
+
+  useEffect(() => {
+    if (user?.preferred_language) {
+      setEmployeeLanguage(user.preferred_language as EmployeeLanguage);
+    }
+  }, [user?.preferred_language]);
 
   const handleUpload = async (file: File, kind: "photo" | "video" | "audio") => {
     setUploadingKind(kind);
@@ -409,6 +523,9 @@ export default function EmployeeTasksPage() {
       )}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
+      {translatingTasks && (
+        <Alert severity="info" sx={{ mb: 2 }}>{he.taskTranslating}</Alert>
+      )}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
 
       {loading ? (
@@ -423,8 +540,11 @@ export default function EmployeeTasksPage() {
                   key={task.id}
                   task={task}
                   starting={startingId === task.id}
+                  speaking={speakingId === task.id}
                   onStart={handleStart}
                   onComplete={openComplete}
+                  onListen={handleListen}
+                  onStopListen={stopSpeech}
                 />
               ))}
             </Box>
@@ -450,8 +570,11 @@ export default function EmployeeTasksPage() {
                         key={task.id}
                         task={task}
                         starting={startingId === task.id}
+                        speaking={speakingId === task.id}
                         onStart={handleStart}
                         onComplete={openComplete}
+                        onListen={handleListen}
+                        onStopListen={stopSpeech}
                       />
                     ))
                   )}
@@ -481,8 +604,11 @@ export default function EmployeeTasksPage() {
                   task={task}
                   urgent
                   starting={startingId === task.id}
+                  speaking={speakingId === task.id}
                   onStart={handleStart}
                   onComplete={openComplete}
+                  onListen={handleListen}
+                  onStopListen={stopSpeech}
                 />
               ))}
             </Box>
@@ -496,8 +622,11 @@ export default function EmployeeTasksPage() {
                   key={task.id}
                   task={task}
                   starting={startingId === task.id}
+                  speaking={speakingId === task.id}
                   onStart={handleStart}
                   onComplete={openComplete}
+                  onListen={handleListen}
+                  onStopListen={stopSpeech}
                 />
               ))}
             </Box>
@@ -514,8 +643,11 @@ export default function EmployeeTasksPage() {
                 key={task.id}
                 task={task}
                 starting={startingId === task.id}
+                speaking={speakingId === task.id}
                 onStart={handleStart}
                 onComplete={openComplete}
+                onListen={handleListen}
+                onStopListen={stopSpeech}
               />
             ))
           )}

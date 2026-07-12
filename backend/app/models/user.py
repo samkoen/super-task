@@ -16,6 +16,7 @@ class User:
     branch_id: Optional[str] = None
     is_active: bool = True
     email_verified: bool = False
+    preferred_language: str = "he"
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -48,6 +49,7 @@ class User:
             "branch_id",
             "is_active",
             "email_verified",
+            "preferred_language",
             "created_at",
             "updated_at",
         }

@@ -58,3 +58,45 @@ def uploads_dir() -> Path:
 
 
 UPLOADS_DIR = uploads_dir()
+
+# --- Fournisseur AI (gemini | opencode) ---
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini").strip().lower()
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+GEMINI_TEMPERATURE = float(os.environ.get("GEMINI_TEMPERATURE", "0.3"))
+GEMINI_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_MAX_OUTPUT_TOKENS", "2048"))
+GEMINI_GENERATION_MAX_OUTPUT_TOKENS = int(
+    os.environ.get("GEMINI_GENERATION_MAX_OUTPUT_TOKENS", "8192")
+)
+GEMINI_THINKING_BUDGET = int(os.environ.get("GEMINI_THINKING_BUDGET", "0"))
+GEMINI_TIMEOUT_SECONDS = float(os.environ.get("GEMINI_TIMEOUT_SECONDS", "45"))
+GEMINI_GENERATION_TIMEOUT_SECONDS = float(
+    os.environ.get("GEMINI_GENERATION_TIMEOUT_SECONDS", "120")
+)
+GEMINI_FALLBACK_MODELS = os.environ.get(
+    "GEMINI_FALLBACK_MODELS", "gemini-2.0-flash,gemini-2.5-flash-lite"
+)
+GEMINI_GENERATION_FALLBACK_MODELS = os.environ.get(
+    "GEMINI_GENERATION_FALLBACK_MODELS", "gemini-2.0-flash,gemini-2.5-flash-lite"
+)
+GEMINI_RETRY_COUNT = int(os.environ.get("GEMINI_RETRY_COUNT", "2"))
+GEMINI_RETRY_DELAY_SECONDS = float(os.environ.get("GEMINI_RETRY_DELAY_SECONDS", "2"))
+
+OPENCODE_SERVER_URL = os.environ.get("OPENCODE_SERVER_URL", "").strip()
+OPENCODE_SERVER_USERNAME = os.environ.get("OPENCODE_SERVER_USERNAME", "opencode").strip()
+OPENCODE_SERVER_PASSWORD = os.environ.get("OPENCODE_SERVER_PASSWORD", "").strip()
+OPENCODE_PROVIDER_ID = os.environ.get("OPENCODE_PROVIDER_ID", "opencode-go").strip()
+OPENCODE_API_KEY = os.environ.get("OPENCODE_API_KEY", "").strip()
+OPENCODE_API_BASE_URL = os.environ.get(
+    "OPENCODE_API_BASE_URL", "https://opencode.ai/zen/go/v1"
+).strip()
+OPENCODE_MODEL_ID = os.environ.get("OPENCODE_MODEL_ID", "deepseek-v4-flash").strip()
+OPENCODE_AGENT = os.environ.get("OPENCODE_AGENT", "build").strip()
+OPENCODE_SESSION_TITLE = os.environ.get("OPENCODE_SESSION_TITLE", "super-ai-chat").strip()
+OPENCODE_GENERATION_SESSION_TITLE = os.environ.get(
+    "OPENCODE_GENERATION_SESSION_TITLE", "super-ai-generation"
+).strip()
+OPENCODE_TIMEOUT_SECONDS = float(os.environ.get("OPENCODE_TIMEOUT_SECONDS", "240"))
+OPENCODE_RETRY_COUNT = int(os.environ.get("OPENCODE_RETRY_COUNT", "2"))
+OPENCODE_RETRY_DELAY_SECONDS = float(os.environ.get("OPENCODE_RETRY_DELAY_SECONDS", "2"))

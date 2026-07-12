@@ -61,6 +61,7 @@ class UserRepository:
         job_function: str | None = None,
         network_id: str | None = None,
         branch_id: str | None = None,
+        preferred_language: str = "he",
     ) -> User:
         import uuid
 
@@ -77,6 +78,7 @@ class UserRepository:
             branch_id=mp.parse_uuid(branch_id) if branch_id else None,
             is_active=True,
             email_verified=email_verified,
+            preferred_language=preferred_language,
         )
         self._db.add(row)
         self._db.flush()
@@ -176,6 +178,7 @@ class UserRepository:
         phone: str | None = None,
         job_function: str | None = None,
         password: str | None = None,
+        preferred_language: str | None = None,
     ) -> User | None:
         try:
             row = self._db.get(orm.User, mp.parse_uuid(user_id))
@@ -188,6 +191,8 @@ class UserRepository:
         row.email = email.lower().strip()
         row.phone = phone
         row.job_function = job_function
+        if preferred_language is not None:
+            row.preferred_language = preferred_language
         if password:
             row.password_hash = hash_password(password)
         self._db.flush()

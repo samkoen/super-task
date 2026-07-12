@@ -1,4 +1,4 @@
-import api, { type User, type UserRole } from "./api";
+import api, { type EmployeeLanguage, type User, type UserRole } from "./api";
 
 export interface CreateUserPayload {
   email: string;
@@ -19,6 +19,7 @@ export interface TeamEmployeePayload {
   phone?: string;
   job_function?: string;
   branch_id?: string;
+  preferred_language?: EmployeeLanguage;
 }
 
 export const userService = {

@@ -47,6 +47,7 @@ def user_orm_to_domain(row: orm.User | None) -> User | None:
         branch_id=str(row.branch_id) if row.branch_id else None,
         is_active=row.is_active,
         email_verified=row.email_verified,
+        preferred_language=getattr(row, "preferred_language", None) or "he",
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
     )
@@ -66,6 +67,7 @@ def user_domain_to_api(user: User) -> dict:
         "branch_id": user.branch_id,
         "is_active": user.is_active,
         "email_verified": user.email_verified,
+        "preferred_language": user.preferred_language,
     }
 
 

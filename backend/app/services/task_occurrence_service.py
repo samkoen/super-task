@@ -15,6 +15,7 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
+from app.services.task_translation_service import TaskTranslationService
 
 TZ = ZoneInfo("Asia/Jerusalem")
 
@@ -26,11 +27,13 @@ class TaskOccurrenceService:
         completion_repo: TaskCompletionRepository,
         branch_repo: BranchRepository,
         user_repo: UserRepository | None = None,
+        translation_service: TaskTranslationService | None = None,
     ):
         self._occurrences = occurrence_repo
         self._completions = completion_repo
         self._branch = branch_repo
         self._users = user_repo
+        self._translations = translation_service
 
     def list_occurrences(
         self,
@@ -87,7 +90,48 @@ class TaskOccurrenceService:
             due_from=day_from if not day else None,
             due_to=day_to if not day else None,
         )
-        return [self._to_api(o) for o in items]
+        rows = [self._to_api(o) for o in items]
+        language = "he"
+        if self._users:
+            user = self._users.find_by_id(actor.user_id)
+            if user:
+                language = user.preferred_language
+        if self._translations:
+            return self._translations.apply_to_occurrences(rows, language=language)
+        return rows
+
+    async def translate_mine(
+        self,
+        actor: ActorContext,
+        occurrence_ids: list[str],
+    ) -> list[dict]:
+        if actor.role != roles.EMPLOYEE:
+            raise PermissionError("רק עובדים יכולים לתרגם משימות")
+        if not self._translations or not self._users:
+            return []
+        user = self._users.find_by_id(actor.user_id)
+        language = user.preferred_language if user else "he"
+        cards: list[dict] = []
+        for occ_id in occurrence_ids:
+            occurrence = self._occurrences.find_by_id(occ_id)
+            if not occurrence:
+                continue
+            if not employee_can_see_occurrence(
+                actor,
+                assignee_user_id=occurrence.assignee_user_id,
+                branch_id=occurrence.branch_id,
+            ):
+                continue
+            cards.append(
+                {
+                    "id": occurrence.id,
+                    "title": occurrence.title,
+                    "description": occurrence.description,
+                }
+            )
+        if not cards:
+            return []
+        return await self._translations.translate_cards(cards, language=language)
 
     def create_ad_hoc(
         self,

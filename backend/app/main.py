@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.controllers import (
+    ai_controller,
     auth_controller,
     branch_controller,
     dashboard_controller,
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(events_controller.router, prefix="/api/events", tags=["events"])
     app.include_router(notification_controller.router, prefix="/api/notifications", tags=["notifications"])
+    app.include_router(ai_controller.router, prefix="/api/ai", tags=["ai"])
 
     return app
 

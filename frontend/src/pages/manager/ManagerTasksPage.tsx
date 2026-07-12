@@ -21,6 +21,7 @@ import { ApiError, type User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import TaskOccurrenceGridByDay from "../../components/tasks/TaskOccurrenceGridByDay";
+import TaskVoiceAssistant from "../../components/ai/TaskVoiceAssistant";
 import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStorage";
@@ -434,7 +435,20 @@ export default function ManagerTasksPage() {
           <TextField select label={he.branch} value={fixedForm.branch_id} onChange={(e) => setFixedForm({ ...fixedForm, branch_id: e.target.value })} required fullWidth disabled={isBranchManager}>
             {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
+          <TaskVoiceAssistant
+            branchId={fixedForm.branch_id}
+            taskKind="fixed"
+            disabled={saving}
+            onFilled={(data) => setFixedForm((f) => ({
+              ...f,
+              title: data.title,
+              description: data.description,
+              assignee_user_id: data.assignee_user_id || f.assignee_user_id,
+            }))}
+            onError={setError}
+          />
           <TextField label={he.taskTitle} value={fixedForm.title} onChange={(e) => setFixedForm({ ...fixedForm, title: e.target.value })} required fullWidth />
+          <TextField label={he.description} value={fixedForm.description} onChange={(e) => setFixedForm({ ...fixedForm, description: e.target.value })} multiline rows={2} fullWidth />
           <TextField select label={he.assignee} value={fixedForm.assignee_user_id} onChange={(e) => setFixedForm({ ...fixedForm, assignee_user_id: e.target.value })} required fullWidth>
             {filteredEmployees.map((u) => <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>)}
           </TextField>
@@ -473,6 +487,18 @@ export default function ManagerTasksPage() {
           <TextField select label={he.branch} value={adHocForm.branch_id} onChange={(e) => setAdHocForm({ ...adHocForm, branch_id: e.target.value })} required fullWidth disabled={isBranchManager}>
             {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
+          <TaskVoiceAssistant
+            branchId={adHocForm.branch_id}
+            taskKind="ad_hoc"
+            disabled={saving}
+            onFilled={(data) => setAdHocForm((f) => ({
+              ...f,
+              title: data.title,
+              description: data.description,
+              assignee_user_id: data.assignee_user_id || f.assignee_user_id,
+            }))}
+            onError={setError}
+          />
           <TextField label={he.taskTitle} value={adHocForm.title} onChange={(e) => setAdHocForm({ ...adHocForm, title: e.target.value })} required fullWidth />
           <TextField label={he.description} value={adHocForm.description} onChange={(e) => setAdHocForm({ ...adHocForm, description: e.target.value })} multiline rows={2} fullWidth />
           <TextField label={he.dueAt} type="datetime-local" value={adHocForm.due_at} onChange={(e) => setAdHocForm({ ...adHocForm, due_at: e.target.value })} InputLabelProps={{ shrink: true }} required fullWidth dir="ltr" />

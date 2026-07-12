@@ -28,6 +28,7 @@ import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { ApiError, type JobFunction, type User } from "../../services/api";
+import { EMPLOYEE_LANGUAGES, EMPLOYEE_LANGUAGE_LABELS, employeeLanguageLabel, type EmployeeLanguage } from "../../domain/employeeLanguages";
 import { branchService, type Branch } from "../../services/branchService";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
@@ -43,6 +44,7 @@ const emptyForm = {
   phone: "",
   job_function: "head_cashier" as JobFunction,
   branch_id: "",
+  preferred_language: "he" as EmployeeLanguage,
 };
 
 export default function ManagerEmployeesPage() {
@@ -109,6 +111,7 @@ export default function ManagerEmployeesPage() {
       phone: employee.phone ?? "",
       job_function: employee.job_function ?? "head_cashier",
       branch_id: employee.branch_id ?? "",
+      preferred_language: (employee.preferred_language ?? "he") as EmployeeLanguage,
     });
     setOpen(true);
   };
@@ -137,6 +140,7 @@ export default function ManagerEmployeesPage() {
           last_name: form.last_name,
           phone: form.phone || undefined,
           job_function: form.job_function,
+          preferred_language: form.preferred_language,
         });
         setSuccess(res.message || he.employeeUpdated);
       } else {
@@ -148,6 +152,7 @@ export default function ManagerEmployeesPage() {
           phone: form.phone || undefined,
           job_function: form.job_function,
           branch_id: isNetworkManager ? form.branch_id : undefined,
+          preferred_language: form.preferred_language,
         });
         setSuccess(res.message || he.employeeCreated);
       }
@@ -201,6 +206,8 @@ export default function ManagerEmployeesPage() {
   const jobLabel = (value: JobFunction | null) =>
     value ? he.jobFunctionLabels[value] : "—";
 
+  const languageLabel = (value: EmployeeLanguage | null | undefined) => employeeLanguageLabel(value);
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} gap={2} flexWrap="wrap">
@@ -246,11 +253,11 @@ export default function ManagerEmployeesPage() {
             <TableHead>
               <TableRow>
                 <TableCell>{he.fullName}</TableCell>
-                <TableCell>{he.email}</TableCell>
+                <TableCell>{he.loginIdentifier}</TableCell>
                 <TableCell>{he.phone}</TableCell>
                 <TableCell>{he.jobFunction}</TableCell>
+                <TableCell>{he.employeeLanguage}</TableCell>
                 {isNetworkManager && <TableCell>{he.branch}</TableCell>}
-                <TableCell>{he.emailVerifiedStatus}</TableCell>
                 <TableCell>{he.appAccess}</TableCell>
                 <TableCell>{he.actions}</TableCell>
               </TableRow>
@@ -269,14 +276,8 @@ export default function ManagerEmployeesPage() {
                     <TableCell dir="ltr">{u.email}</TableCell>
                     <TableCell dir="ltr">{u.phone || "—"}</TableCell>
                     <TableCell>{jobLabel(u.job_function)}</TableCell>
+                    <TableCell>{languageLabel(u.preferred_language)}</TableCell>
                     {isNetworkManager && <TableCell>{u.branch_name || "—"}</TableCell>}
-                    <TableCell>
-                      <Chip
-                        label={u.email_verified ? he.verified : he.pending}
-                        color={u.email_verified ? "success" : "warning"}
-                        size="small"
-                      />
-                    </TableCell>
                     <TableCell>
                       <Chip
                         label={u.is_active ? he.active : he.inactive}
@@ -319,7 +320,15 @@ export default function ManagerEmployeesPage() {
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
           <TextField label={he.firstName} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required fullWidth />
           <TextField label={he.lastName} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required fullWidth />
-          <TextField label={he.email} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required fullWidth dir="ltr" />
+          <TextField
+            label={he.loginIdentifier}
+            helperText={he.loginIdentifierHint}
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            required
+            fullWidth
+            dir="ltr"
+          />
           {!edit && (
             <TextField
               label={he.password}
@@ -344,6 +353,18 @@ export default function ManagerEmployeesPage() {
               ))}
             </TextField>
           )}
+          <TextField
+            select
+            label={he.employeeLanguage}
+            value={form.preferred_language}
+            onChange={(e) => setForm({ ...form, preferred_language: e.target.value as EmployeeLanguage })}
+            required
+            fullWidth
+          >
+            {EMPLOYEE_LANGUAGES.map((lang) => (
+              <MenuItem key={lang} value={lang}>{EMPLOYEE_LANGUAGE_LABELS[lang]}</MenuItem>
+            ))}
+          </TextField>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpen(false)} disabled={saving}>{he.cancel}</Button>

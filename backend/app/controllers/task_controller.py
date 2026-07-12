@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.auth.actor import load_actor
@@ -13,12 +14,14 @@ from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
+from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
 from app.realtime.task_events import notify_task_change
 from app.repositories.notification_repository import NotificationRepository
 from app.services.notification_service import NotificationService
 from app.services.task_occurrence_service import TaskOccurrenceService
 from app.services.task_scheduler_service import TaskSchedulerService
+from app.services.task_translation_service import TaskTranslationService
 from app.core.config import UPLOADS_DIR
 from app.services.task_template_service import TaskTemplateService
 
@@ -84,6 +87,7 @@ def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceServi
         TaskCompletionRepository(db),
         BranchRepository(db),
         UserRepository(db),
+        TaskTranslationService(TaskTranslationRepository(db)),
     )
 
 
@@ -226,6 +230,26 @@ def list_my_tasks(
 ):
     actor = load_actor(request, UserRepository(db))
     return service.list_mine(actor, due_on=due_on, due_from=due_from, due_to=due_to)
+
+
+@router.post("/mine/translate")
+async def translate_my_tasks(
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    raw_ids = payload.get("occurrence_ids") or []
+    if not isinstance(raw_ids, list):
+        return JSONResponse({"error": "רשימת משימות לא תקינה"}, status_code=400)
+    occurrence_ids = [str(item) for item in raw_ids if item]
+    try:
+        items = await service.translate_mine(actor, occurrence_ids)
+    except PermissionError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=403)
+    return {"translations": items}
 
 
 @router.post("/occurrences/{occurrence_id}/start")

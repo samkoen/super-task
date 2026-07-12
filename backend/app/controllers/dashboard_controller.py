@@ -7,8 +7,10 @@ from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
+from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
 from app.services.dashboard_service import DashboardService
+from app.services.task_translation_service import TaskTranslationService
 
 router = APIRouter()
 
@@ -19,6 +21,7 @@ def get_service(db: Session = Depends(get_db)) -> DashboardService:
         BranchRepository(db),
         DepartmentRepository(db),
         UserRepository(db),
+        TaskTranslationService(TaskTranslationRepository(db)),
     )
 
 

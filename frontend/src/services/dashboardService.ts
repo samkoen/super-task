@@ -82,6 +82,9 @@ export interface EmployeeTaskCard {
   photo_required: boolean;
   department_name: string | null;
   started_at: string | null;
+  spoken_text?: string;
+  display_language?: string;
+  translation_pending?: boolean;
 }
 
 export interface EmployeeDashboard {
@@ -92,6 +95,7 @@ export interface EmployeeDashboard {
     job_function: string | null;
     branch_id: string;
     branch_name: string | null;
+    preferred_language?: string;
   };
   progress_percent: number;
   on_shift: boolean;
