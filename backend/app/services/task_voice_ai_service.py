@@ -1,7 +1,8 @@
 """Analyse vocale manager → brouillon de tâche."""
 from __future__ import annotations
 
-from app.core import config
+from app.domain.employee_language import LANGUAGE_NAMES_EN, normalize_employee_language
+from app.domain.ai_provider import is_voice_ai_configured
 from app.domain import roles
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
@@ -48,19 +49,34 @@ class TaskVoiceAiService:
             raise ValueError("קובץ שמע ריק")
         if len(audio_bytes) > AUDIO_MAX_BYTES:
             raise ValueError("קובץ השמע גדול מדי")
-        if not config.GEMINI_API_KEY:
-            raise ValueError("עיבוד הקלטה דורש GEMINI_API_KEY — הוסיפו מפתח Gemini")
+        if not is_voice_ai_configured():
+            raise ValueError(
+                "הודעה קולית דורשת GEMINI_API_KEY (מולטימדיה Gemini) — "
+                "ללא קשר ל-AI_PROVIDER. הוסיפו מפתח Gemini ב-backend/.env"
+            )
 
         self._assert_branch_access(actor, branch_id)
         employees = self._branch_employees(actor, branch_id)
-        prompt = build_task_voice_prompt(employees=employees, task_kind=task_kind)
+        manager = self._users.find_by_id(actor.user_id)
+        manager_language = normalize_employee_language(manager.preferred_language if manager else None)
+        lang_name = LANGUAGE_NAMES_EN[manager_language]
+        prompt = build_task_voice_prompt(
+            employees=employees,
+            task_kind=task_kind,
+            manager_language=manager_language,
+        )
         mime = self._normalize_mime(mime_type)
         try:
             raw = await generate_from_audio(
                 audio_bytes,
                 mime,
                 prompt,
-                system_instruction="You transcribe and structure supermarket task instructions. Reply with JSON only.",
+                system_instruction=(
+                    f"You transcribe supermarket task instructions from audio. "
+                    f"The manager speaks {lang_name}. "
+                    "Reply with JSON only. Never invent or add content that was not spoken. "
+                    "Do not add extra requirements, steps, or assumptions."
+                ),
             )
         except GeminiError as exc:
             raise ValueError(str(exc)) from exc

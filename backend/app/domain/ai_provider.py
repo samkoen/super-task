@@ -42,3 +42,18 @@ def available_providers() -> list[AiProviderName]:
     if is_provider_configured("opencode"):
         providers.append("opencode")
     return providers
+
+
+def is_voice_ai_configured() -> bool:
+    """La voix (audio → tâche) utilise toujours l'API multimodale Gemini."""
+    return bool(config.GEMINI_API_KEY)
+
+
+def is_tts_ai_configured() -> bool:
+    """Haute parole tâche employé via Google Cloud Text-to-Speech."""
+    return bool(config.GOOGLE_CLOUD_API_KEY)
+
+
+def is_google_translate_configured() -> bool:
+    """Traduction tâches employé via Google Cloud Translation."""
+    return bool(config.GOOGLE_CLOUD_API_KEY)

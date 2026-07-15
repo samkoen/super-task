@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -119,6 +120,15 @@ def login(
         request.session["user_role"] = user["role"]
         request.session["user_email"] = user["email"]
         return {"message": "התחברות הצליחה", "user": user}
+    except OperationalError:
+        traceback.print_exc()
+        return JSONResponse(
+            {"error": "מסד הנתונים לא זמין — בדקו את DATABASE_URL והפעילו מחדש את השרת"},
+            status_code=503,
+        )
+    except SQLAlchemyError:
+        traceback.print_exc()
+        return JSONResponse({"error": "שגיאת מסד נתונים — נסו שוב"}, status_code=503)
     except Exception as e:
         traceback.print_exc()
         return JSONResponse({"error": f"שגיאת שרת: {str(e)}"}, status_code=500)

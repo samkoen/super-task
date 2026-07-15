@@ -15,6 +15,9 @@ class TaskOccurrence:
     task_kind: str
     manager_user_id: str | None
     photo_required: bool
+    reference_photo_url: str | None
+    reference_video_url: str | None
+    reference_audio_url: str | None
     started_at: str | None
     started_by_id: str | None
     created_by_id: str | None
@@ -35,6 +38,9 @@ class TaskOccurrence:
             "task_kind": self.task_kind,
             "manager_user_id": self.manager_user_id,
             "photo_required": self.photo_required,
+            "reference_photo_url": self.reference_photo_url,
+            "reference_video_url": self.reference_video_url,
+            "reference_audio_url": self.reference_audio_url,
             "started_at": self.started_at,
             "started_by_id": self.started_by_id,
             "created_by_id": self.created_by_id,

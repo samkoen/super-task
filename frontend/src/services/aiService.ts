@@ -20,6 +20,9 @@ export interface AiProviderStatus {
 export interface AiStatusResponse {
   available: AiProviderId[];
   default: AiProviderId;
+  voice_available?: boolean;
+  tts_available?: boolean;
+  tts_model?: string | null;
   providers: AiProviderStatus[];
 }
 
@@ -83,6 +86,27 @@ export const aiService = {
     const response = await api.post<TaskVoiceDraft>("/ai/task-from-voice", form, {
       timeout: 300_000,
     });
+    return response.data;
+  },
+
+  speakTask: async (text: string, language: string) => {
+    const response = await api.post<Blob>(
+      "/ai/task-tts",
+      { text, language },
+      {
+        timeout: 120_000,
+        responseType: "blob",
+      }
+    );
+    return response.data;
+  },
+
+  transcribeReferenceAudio: async (audioUrl: string) => {
+    const response = await api.post<{ transcript: string }>(
+      "/ai/transcribe-reference-audio",
+      { audio_url: audioUrl },
+      { timeout: 120_000 }
+    );
     return response.data;
   },
 };

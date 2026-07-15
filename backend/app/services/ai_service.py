@@ -7,7 +7,10 @@ from app.core import config
 from app.domain.ai_provider import (
     AiProviderName,
     ai_provider_for,
+    is_google_translate_configured,
     is_provider_configured,
+    is_tts_ai_configured,
+    is_voice_ai_configured,
     normalize_ai_provider_name,
 )
 from app.services.ai.ai_client import AiError, generate_chat, generate_text, resolve_provider
@@ -80,6 +83,10 @@ class AiService:
         return {
             "available": [p.id for p in providers if p.configured],
             "default": ai_provider_for(),
+            "voice_available": is_voice_ai_configured(),
+            "tts_available": is_tts_ai_configured(),
+            "translate_available": is_google_translate_configured(),
+            "tts_provider": "google" if is_tts_ai_configured() else None,
             "providers": [
                 {
                     "id": p.id,

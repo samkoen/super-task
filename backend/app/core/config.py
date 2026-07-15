@@ -100,3 +100,17 @@ OPENCODE_GENERATION_SESSION_TITLE = os.environ.get(
 OPENCODE_TIMEOUT_SECONDS = float(os.environ.get("OPENCODE_TIMEOUT_SECONDS", "240"))
 OPENCODE_RETRY_COUNT = int(os.environ.get("OPENCODE_RETRY_COUNT", "2"))
 OPENCODE_RETRY_DELAY_SECONDS = float(os.environ.get("OPENCODE_RETRY_DELAY_SECONDS", "2"))
+
+# Google Cloud — traduction + TTS employé (Translation API v2 + Text-to-Speech)
+GOOGLE_CLOUD_API_KEY = os.environ.get("GOOGLE_CLOUD_API_KEY", "").strip()
+GOOGLE_TRANSLATE_SOURCE = os.environ.get("GOOGLE_TRANSLATE_SOURCE", "he").strip()  # repli si langue auteur inconnue
+GOOGLE_TRANSLATE_TIMEOUT_SECONDS = float(os.environ.get("GOOGLE_TRANSLATE_TIMEOUT_SECONDS", "30"))
+GOOGLE_TTS_VOICE_HE = os.environ.get("GOOGLE_TTS_VOICE_HE", "he-IL-Wavenet-A").strip()
+GOOGLE_TTS_VOICE_AR = os.environ.get("GOOGLE_TTS_VOICE_AR", "ar-XA-Wavenet-B").strip()
+GOOGLE_TTS_VOICE_TH = os.environ.get("GOOGLE_TTS_VOICE_TH", "th-TH-Neural2-C").strip()
+GOOGLE_TTS_VOICE_FR = os.environ.get("GOOGLE_TTS_VOICE_FR", "fr-FR-Neural2-A").strip()
+GOOGLE_TTS_VOICE_EN = os.environ.get("GOOGLE_TTS_VOICE_EN", "en-US-Neural2-C").strip()
+GOOGLE_TTS_AUDIO_ENCODING = os.environ.get("GOOGLE_TTS_AUDIO_ENCODING", "MP3").strip()
+GOOGLE_TTS_SPEAKING_RATE = float(os.environ.get("GOOGLE_TTS_SPEAKING_RATE", "1.0"))
+GOOGLE_TTS_PITCH = float(os.environ.get("GOOGLE_TTS_PITCH", "0.0"))
+GOOGLE_TTS_TIMEOUT_SECONDS = float(os.environ.get("GOOGLE_TTS_TIMEOUT_SECONDS", "30"))

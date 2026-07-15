@@ -1,5 +1,5 @@
 import api from "./api";
-import type { TaskKind, TaskStatus } from "./taskService";
+import type { TaskCompletion, TaskKind, TaskStatus } from "./taskService";
 
 export type HealthLevel = "green" | "orange" | "red";
 
@@ -10,6 +10,7 @@ export interface DashboardCounts {
   tasks_in_progress: number;
   tasks_overdue: number;
   tasks_cancelled: number;
+  tasks_pending_review?: number;
   completion_rate: number;
   employees_total?: number;
   employees_active?: number;
@@ -40,6 +41,21 @@ export interface DashboardAlert {
   task_kind: TaskKind;
 }
 
+export interface TimelineTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  segment: "completed" | "in_progress" | "pending_review" | "upcoming" | "overdue";
+  due_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_minutes: number | null;
+  elapsed_minutes: number | null;
+  department_name: string | null;
+  assignee_name: string | null;
+  task_kind: TaskKind;
+}
+
 export interface TeamMember {
   user_id: string;
   full_name: string;
@@ -49,7 +65,29 @@ export interface TeamMember {
   current_task_title: string | null;
   current_department_name: string | null;
   completed_today: number;
+  total_today: number;
   open_tasks: number;
+  timeline: TimelineTask[];
+  overdue_backlog: TimelineTask[];
+}
+
+export interface TaskQueues {
+  completed: TimelineTask[];
+  in_progress: TimelineTask[];
+  pending_review: TimelineTask[];
+  upcoming: TimelineTask[];
+}
+
+export interface UnfinishedTask {
+  occurrence_id: string;
+  title: string;
+  status: TaskStatus;
+  due_at: string;
+  overdue_days: number;
+  department_name: string | null;
+  assignee_name: string | null;
+  pending_delegation: boolean;
+  task_kind: TaskKind;
 }
 
 export interface BranchSummary {
@@ -68,6 +106,8 @@ export interface ManagerDashboard {
   counts: DashboardCounts;
   by_department: DepartmentSummary[] | null;
   team: TeamMember[] | null;
+  task_queues: TaskQueues | null;
+  unfinished_tasks: UnfinishedTask[] | null;
   recent_alerts: DashboardAlert[];
   branches: BranchSummary[] | null;
 }
@@ -80,11 +120,16 @@ export interface EmployeeTaskCard {
   status: TaskStatus;
   task_kind: TaskKind;
   photo_required: boolean;
+  reference_photo_url?: string | null;
+  reference_video_url?: string | null;
+  reference_audio_url?: string | null;
   department_name: string | null;
   started_at: string | null;
+  completion?: TaskCompletion | null;
   spoken_text?: string;
   display_language?: string;
   translation_pending?: boolean;
+  title_he?: string;
 }
 
 export interface EmployeeDashboard {
@@ -102,14 +147,19 @@ export interface EmployeeDashboard {
   counts: DashboardCounts;
   urgent_tasks: EmployeeTaskCard[];
   in_progress_tasks: EmployeeTaskCard[];
+  pending_review_tasks: EmployeeTaskCard[];
   today_tasks: EmployeeTaskCard[];
   completed_tasks: EmployeeTaskCard[];
 }
 
 export const dashboardService = {
-  getManager: async (branchId?: string) => {
-    const params = branchId ? { branch_id: branchId } : undefined;
-    const response = await api.get<ManagerDashboard>("/dashboard/manager", { params });
+  getManager: async (branchId?: string, dueOn?: string) => {
+    const params: Record<string, string> = {};
+    if (branchId) params.branch_id = branchId;
+    if (dueOn) params.due_on = dueOn;
+    const response = await api.get<ManagerDashboard>("/dashboard/manager", {
+      params: Object.keys(params).length ? params : undefined,
+    });
     return response.data;
   },
 

@@ -83,4 +83,17 @@ describe("aiService", () => {
     );
     expect(result.title).toBe("משימה");
   });
+
+  it("speakTask posts text to /ai/task-tts as blob", async () => {
+    mockPost.mockResolvedValue({ data: new Blob(["audio"], { type: "audio/mpeg" }) });
+
+    const blob = await aiService.speakTask("مرحبا", "ar");
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/ai/task-tts",
+      { text: "مرحبا", language: "ar" },
+      expect.objectContaining({ timeout: 120_000, responseType: "blob" })
+    );
+    expect(blob.type).toBe("audio/mpeg");
+  });
 });

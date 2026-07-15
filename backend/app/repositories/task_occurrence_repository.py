@@ -87,6 +87,9 @@ class TaskOccurrenceRepository:
         task_kind: str = "fixed",
         manager_user_id: str | None = None,
         photo_required: bool = False,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
         created_by_id: str | None = None,
     ) -> TaskOccurrence:
         import uuid
@@ -104,6 +107,9 @@ class TaskOccurrenceRepository:
             task_kind=task_kind,
             manager_user_id=mp.parse_uuid(manager_user_id) if manager_user_id else None,
             photo_required=photo_required,
+            reference_photo_url=(reference_photo_url or "").strip() or None,
+            reference_video_url=(reference_video_url or "").strip() or None,
+            reference_audio_url=(reference_audio_url or "").strip() or None,
             created_by_id=mp.parse_uuid(created_by_id) if created_by_id else None,
         )
         self._db.add(row)
@@ -130,6 +136,14 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
+    def reopen_after_review(self, id_: str) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.status = task_status.IN_PROGRESS
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
     def delegate(self, id_: str, *, assignee_user_id: str) -> TaskOccurrence | None:
         row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
         if not row:
@@ -147,6 +161,12 @@ class TaskOccurrenceRepository:
         due_at: datetime,
         assignee_user_id: str | None,
         photo_required: bool | None = None,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
+        update_reference_photo: bool = False,
+        update_reference_video: bool = False,
+        update_reference_audio: bool = False,
     ) -> TaskOccurrence | None:
         row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
         if not row:
@@ -157,6 +177,29 @@ class TaskOccurrenceRepository:
         row.assignee_user_id = mp.parse_uuid(assignee_user_id) if assignee_user_id else None
         if photo_required is not None:
             row.photo_required = photo_required
+        if update_reference_photo:
+            row.reference_photo_url = (reference_photo_url or "").strip() or None
+        if update_reference_video:
+            row.reference_video_url = (reference_video_url or "").strip() or None
+        if update_reference_audio:
+            row.reference_audio_url = (reference_audio_url or "").strip() or None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def update_reference_media(
+        self,
+        id_: str,
+        *,
+        reference_photo_url: str | None,
+        reference_video_url: str | None,
+        reference_audio_url: str | None,
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.reference_photo_url = (reference_photo_url or "").strip() or None
+        row.reference_video_url = (reference_video_url or "").strip() or None
+        row.reference_audio_url = (reference_audio_url or "").strip() or None
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

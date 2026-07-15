@@ -2,8 +2,9 @@ import api from "./api";
 
 export type TaskRecurrence = "daily" | "weekly" | "biweekly" | "monthly";
 export type TaskKind = "fixed" | "ad_hoc";
-export type TaskStatus = "pending" | "in_progress" | "completed" | "overdue" | "cancelled";
+export type TaskStatus = "pending" | "in_progress" | "pending_review" | "completed" | "overdue" | "cancelled";
 export type CompletionStatus = "completed" | "not_completed";
+export type ManagerReviewStatus = "pending" | "approved" | "rejected";
 
 export interface TaskTemplate {
   id: string;
@@ -18,6 +19,9 @@ export interface TaskTemplate {
   department_id: string | null;
   task_kind: TaskKind;
   photo_required: boolean;
+  reference_photo_url?: string | null;
+  reference_video_url?: string | null;
+  reference_audio_url?: string | null;
   is_active: boolean;
   created_by_id: string;
   created_at: string;
@@ -34,9 +38,15 @@ export interface TaskCompletion {
   photo_path: string | null;
   video_path: string | null;
   audio_path: string | null;
+  audio_transcript?: string | null;
+  audio_transcript_employee?: string | null;
   not_completed_reason: string | null;
   completed_by_id: string;
   completed_at: string;
+  manager_review_status?: ManagerReviewStatus | null;
+  manager_reviewed_by_id?: string | null;
+  manager_reviewed_at?: string | null;
+  rejection_note?: string | null;
 }
 
 export interface TaskOccurrence {
@@ -52,6 +62,9 @@ export interface TaskOccurrence {
   task_kind: TaskKind;
   manager_user_id: string | null;
   photo_required: boolean;
+  reference_photo_url?: string | null;
+  reference_video_url?: string | null;
+  reference_audio_url?: string | null;
   started_at: string | null;
   pending_delegation?: boolean;
   created_at: string;
@@ -74,6 +87,9 @@ export interface CreateTaskTemplatePayload {
   weekly_days?: string;
   monthly_day?: number;
   assignee_user_id: string;
+  reference_photo_url?: string;
+  reference_video_url?: string;
+  reference_audio_url?: string;
 }
 
 export interface CreateAdHocPayload {
@@ -83,6 +99,9 @@ export interface CreateAdHocPayload {
   due_at: string;
   assignee_user_id?: string;
   photo_required?: boolean;
+  reference_photo_url?: string;
+  reference_video_url?: string;
+  reference_audio_url?: string;
 }
 
 export interface CompleteTaskPayload {
@@ -108,6 +127,7 @@ export interface TaskTranslation {
   spoken_text: string;
   display_language: string;
   translation_pending?: boolean;
+  title_he?: string;
 }
 
 export const taskService = {
@@ -143,6 +163,11 @@ export const taskService = {
     task_kind?: TaskKind;
   }) => {
     const response = await api.get<TaskOccurrence[]>("/tasks/occurrences", { params });
+    return response.data;
+  },
+
+  getOccurrence: async (occurrenceId: string) => {
+    const response = await api.get<TaskOccurrence>(`/tasks/occurrences/${occurrenceId}`);
     return response.data;
   },
 
@@ -183,6 +208,21 @@ export const taskService = {
     return response.data;
   },
 
+  approve: async (occurrenceId: string) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/approve`
+    );
+    return response.data;
+  },
+
+  reopen: async (occurrenceId: string, payload?: { rejection_note?: string }) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/reopen`,
+      payload ?? {}
+    );
+    return response.data;
+  },
+
   cancel: async (occurrenceId: string) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/cancel`
@@ -198,6 +238,9 @@ export const taskService = {
       due_at: string;
       assignee_user_id?: string;
       photo_required?: boolean;
+      reference_photo_url?: string | null;
+      reference_video_url?: string | null;
+      reference_audio_url?: string | null;
     }
   ) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(

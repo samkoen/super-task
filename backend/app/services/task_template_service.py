@@ -53,6 +53,9 @@ class TaskTemplateService:
         assignee_user_id: str | None = None,
         department_id: str | None = None,
         due_at: str | None = None,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
@@ -88,10 +91,19 @@ class TaskTemplateService:
             created_by_id=actor.user_id,
             task_kind=FIXED,
             biweekly_anchor=anchor,
+            reference_photo_url=reference_photo_url,
+            reference_video_url=reference_video_url,
+            reference_audio_url=reference_audio_url,
         )
+        created_occurrence = None
         if recurrence in task_recurrence.RECURRING:
-            self._scheduler.generate_from_template(template, on_date=datetime.now(TZ).date())
-        return self._to_api(template)
+            created_occurrence = self._scheduler.generate_from_template(
+                template, on_date=datetime.now(TZ).date()
+            )
+        result = self._to_api(template)
+        if created_occurrence is not None:
+            result["_created_occurrence"] = mp.task_occurrence_domain_to_api(created_occurrence)
+        return result
 
     def update_template(
         self,
@@ -105,6 +117,9 @@ class TaskTemplateService:
         assignee_user_id: str | None,
         department_id: str | None,
         is_active: bool,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
     ) -> dict:
         existing = self._templates.find_by_id(template_id)
         if not existing:
@@ -122,6 +137,9 @@ class TaskTemplateService:
             assignee_user_id=assignee_user_id,
             department_id=department_id,
             is_active=is_active,
+            reference_photo_url=reference_photo_url,
+            reference_video_url=reference_video_url,
+            reference_audio_url=reference_audio_url,
         )
         assert updated is not None
         return self._to_api(updated)

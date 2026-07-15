@@ -7,9 +7,6 @@ import {
   CircularProgress,
   Grid,
   LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
   MenuItem,
   Paper,
   TextField,
@@ -23,30 +20,21 @@ import { ApiError } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import {
   dashboardService,
-  type DashboardAlert,
   type ManagerDashboard,
 } from "../../services/dashboardService";
-import HealthBadge, { healthDotColor } from "../../components/dashboard/HealthBadge";
+import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
+import TeamTimelinePanel from "../../components/dashboard/TeamTimelinePanel";
+import HealthBadge from "../../components/dashboard/HealthBadge";
+import ManagerDayNav from "../../components/dashboard/ManagerDayNav";
 import StatCard from "../../components/dashboard/StatCard";
+import TaskQueuePanel from "../../components/dashboard/TaskQueuePanel";
+import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
+import UnfinishedTasksPanel from "../../components/dashboard/UnfinishedTasksPanel";
+import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
-
-function formatHebrewDate(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("he-IL", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function alertLabel(alert: DashboardAlert): string {
-  if (alert.type === "overdue") return he.alertOverdue;
-  if (alert.type === "delegation") return he.alertDelegation;
-  return he.alertDueSoon;
-}
+import { todayIso } from "../../utils/dateView";
 
 export default function ManagerDashboardPage() {
   const { user } = useAuth();
@@ -54,8 +42,12 @@ export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboard | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedDay, setSelectedDay] = useState(todayIso());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [success, setSuccess] = useState("");
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
 
@@ -66,13 +58,13 @@ export default function ManagerDashboardPage() {
     }
     try {
       const branchId = canPickBranch ? selectedBranch || undefined : undefined;
-      setData(await dashboardService.getManager(branchId));
+      setData(await dashboardService.getManager(branchId, selectedDay));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [canPickBranch, selectedBranch]);
+  }, [canPickBranch, selectedBranch, selectedDay]);
 
   useTaskChangeListener(useCallback(() => {
     load(true);
@@ -103,6 +95,19 @@ export default function ManagerDashboardPage() {
     return Math.round((data.counts.completion_rate ?? 0) * 100);
   }, [data]);
 
+  const handleReviewTask = useCallback(async (taskId: string) => {
+    setReviewLoading(true);
+    setError("");
+    try {
+      const occurrence = await taskService.getOccurrence(taskId);
+      setReviewTarget(occurrence);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setReviewLoading(false);
+    }
+  }, []);
+
   if (loading && !data) {
     return (
       <Box display="flex" justifyContent="center" py={8}>
@@ -119,8 +124,7 @@ export default function ManagerDashboardPage() {
             {data?.branch ? `${he.branch}: ${data.branch.name}` : he.dashboardNetworkOverview}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {data ? formatHebrewDate(data.due_on) : ""}
-            {user?.full_name ? ` · ${he.welcome(user.full_name)}` : ""}
+            {user?.full_name ? he.welcome(user.full_name) : ""}
           </Typography>
         </Box>
         <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
@@ -144,6 +148,12 @@ export default function ManagerDashboardPage() {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
+      {reviewLoading && (
+        <Box display="flex" justifyContent="center" py={1}>
+          <CircularProgress size={24} />
+        </Box>
+      )}
 
       {data && !data.branch && data.branches && (
         <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
@@ -172,6 +182,10 @@ export default function ManagerDashboardPage() {
 
       {data?.branch && (
         <>
+          <Box mb={2}>
+            <ManagerDayNav day={selectedDay} onDayChange={setSelectedDay} />
+          </Box>
+
           <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
             <Typography variant="subtitle1" fontWeight={700} mb={1}>{he.dashboardToday}</Typography>
             <Box display="flex" alignItems="center" gap={2} mb={1}>
@@ -216,90 +230,20 @@ export default function ManagerDashboardPage() {
             </Grid>
           </Grid>
 
-          <Grid container spacing={2} mb={3}>
-            <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>{he.dashboardUrgentAlerts}</Typography>
-                {data.recent_alerts.length === 0 ? (
-                  <Alert severity="success">{he.dashboardNoAlerts}</Alert>
-                ) : (
-                  <List dense disablePadding>
-                    {data.recent_alerts.map((alert) => (
-                      <ListItem key={`${alert.occurrence_id}-${alert.type}`} divider sx={{ px: 0 }}>
-                        <ListItemText
-                          primary={
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Typography component="span" fontWeight={700}>{alert.title}</Typography>
-                              <Typography component="span" variant="caption" color="text.secondary">
-                                ({alertLabel(alert)})
-                              </Typography>
-                            </Box>
-                          }
-                          secondary={`${alert.department_name || he.noDepartment}${alert.assignee_name ? ` · ${alert.assignee_name}` : ""}`}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper variant="outlined" sx={{ p: 2, height: "100%" }}>
-                <Typography variant="subtitle1" fontWeight={700} mb={2}>{he.dashboardTeamLive}</Typography>
-                <List dense disablePadding>
-                  {(data.team ?? []).map((member) => (
-                    <ListItem key={member.user_id} divider sx={{ px: 0 }}>
-                      <Box
-                        sx={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          bgcolor: member.is_active ? healthDotColor(member.status === "in_progress" ? "orange" : "green") : "grey.400",
-                          ml: 1,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <ListItemText
-                        primary={member.full_name}
-                        secondary={
-                          member.current_task_title
-                            ? `${member.current_department_name || ""} · ${member.current_task_title}`
-                            : member.is_active
-                              ? he.teamActive
-                              : he.teamIdle
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
-            </Grid>
-          </Grid>
+          {data.unfinished_tasks && (
+            <UnfinishedTasksPanel tasks={data.unfinished_tasks} />
+          )}
 
-          <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight={700} mb={2}>{he.dashboardDepartmentsLive}</Typography>
-            <Grid container spacing={2}>
-              {(data.by_department ?? []).map((dept) => (
-                <Grid item xs={12} sm={6} md={4} key={dept.department_id ?? "none"}>
-                  <Paper variant="outlined" sx={{ p: 2, borderInlineStart: `4px solid`, borderColor: healthDotColor(dept.health) }}>
-                    <Box display="flex" justifyContent="space-between" mb={1}>
-                      <Typography fontWeight={700}>{dept.name}</Typography>
-                      <HealthBadge level={dept.health} />
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      {dept.total === 0
-                        ? he.noTasks
-                        : dept.overdue > 0
-                          ? `${dept.overdue} ${he.dashboardOverdue}`
-                          : dept.pending + dept.in_progress > 0
-                            ? `${dept.pending + dept.in_progress} ${he.pending}`
-                            : `${Math.round(dept.completion_rate * 100)}% ${he.taskCompleted}`}
-                    </Typography>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
+          <Box mb={3} display="flex" flexDirection="column" gap={2}>
+            <TeamTimelinePanel team={data.team ?? []} />
+            {data.task_queues && (
+              <TaskQueuePanel queues={data.task_queues} onReviewTask={handleReviewTask} />
+            )}
+          </Box>
+
+          {data.by_department && data.by_department.length > 0 && (
+            <DepartmentProgressGrid departments={data.by_department} />
+          )}
 
           <Box display="flex" gap={2} flexWrap="wrap">
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/manager/tasks")}>
@@ -311,6 +255,15 @@ export default function ManagerDashboardPage() {
           </Box>
         </>
       )}
+
+      <TaskCompletionReviewDialog
+        task={reviewTarget}
+        onClose={() => setReviewTarget(null)}
+        onDone={(message) => {
+          setSuccess(message);
+          void load(true);
+        }}
+      />
     </Box>
   );
 }

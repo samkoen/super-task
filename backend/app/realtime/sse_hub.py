@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections import defaultdict
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class SSEHub:
@@ -25,12 +28,8 @@ class SSEHub:
 
     def publish_sync(self, channel: str, event: dict[str, Any]) -> None:
         loop = self._loop
-        if loop is None:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                return
-        if not loop.is_running():
+        if loop is None or not loop.is_running():
+            logger.warning("SSE publish skipped (loop not ready): channel=%s", channel)
             return
         payload = json.dumps(event, ensure_ascii=False)
         for queue in list(self._subscribers.get(channel, ())):

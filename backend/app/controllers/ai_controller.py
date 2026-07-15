@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -13,10 +13,13 @@ from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.user_repository import UserRepository
 from app.services.ai_service import AiChatMessage, AiService
+from app.services.reference_audio_transcription_service import transcribe_reference_audio
+from app.services.task_tts_service import TaskTtsService
 from app.services.task_voice_ai_service import TaskVoiceAiService
 
 router = APIRouter()
 _ai_service = AiService()
+_tts_service = TaskTtsService()
 
 
 def _voice_service(db: Session = Depends(get_db)) -> TaskVoiceAiService:
@@ -40,6 +43,15 @@ class AiCompleteRequest(BaseModel):
     provider: Literal["gemini", "opencode"] | None = None
     system: str | None = Field(default=None, max_length=8_000)
     for_generation: bool = False
+
+
+class AiTaskTtsRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1500)
+    language: Literal["he", "ar", "th", "fr", "en"] = "he"
+
+
+class TranscribeReferenceAudioRequest(BaseModel):
+    audio_url: str = Field(min_length=1, max_length=500)
 
 
 def _require_actor(request: Request, db: Session):
@@ -98,6 +110,35 @@ async def ai_task_from_voice(
         "assignee_user_id": draft.assignee_user_id,
         "assignee_name": draft.assignee_name,
     }
+
+
+@router.post("/transcribe-reference-audio")
+async def ai_transcribe_reference_audio(
+    body: TranscribeReferenceAudioRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    actor = _require_actor(request, db)
+    user = UserRepository(db).find_by_id(actor.user_id)
+    manager_language = user.preferred_language if user else "he"
+    try:
+        transcript = await transcribe_reference_audio(
+            body.audio_url,
+            manager_language=manager_language,
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return {"transcript": transcript or ""}
+
+
+@router.post("/task-tts")
+async def ai_task_tts(body: AiTaskTtsRequest, request: Request, db: Session = Depends(get_db)):
+    _require_actor(request, db)
+    try:
+        audio = await _tts_service.synthesize(text=body.text, language=body.language)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return Response(content=audio, media_type="audio/mpeg")
 
 
 @router.post("/complete")

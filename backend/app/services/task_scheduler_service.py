@@ -26,7 +26,7 @@ class TaskSchedulerService:
         overdue = self._mark_overdue()
         return {"generated": generated, "overdue_marked": overdue, "date": day.isoformat()}
 
-    def generate_from_template(self, template, *, on_date: date) -> bool:
+    def generate_from_template(self, template, *, on_date: date):
         anchor = None
         if template.biweekly_anchor:
             anchor = datetime.fromisoformat(template.biweekly_anchor).date()
@@ -37,11 +37,11 @@ class TaskSchedulerService:
             anchor_date=anchor,
             monthly_day=template.monthly_day,
         ):
-            return False
+            return None
         if self._occurrences.exists_for_template_on_date(template.id, on_date):
-            return False
+            return None
         due_at = task_recurrence.due_at_for_date(on_date, template.due_time)
-        self._occurrences.create(
+        return self._occurrences.create(
             template_id=template.id,
             branch_id=template.branch_id,
             title=template.title,
@@ -51,9 +51,11 @@ class TaskSchedulerService:
             department_id=template.department_id,
             task_kind=template.task_kind,
             photo_required=template.photo_required,
+            reference_photo_url=template.reference_photo_url,
+            reference_video_url=template.reference_video_url,
+            reference_audio_url=template.reference_audio_url,
             created_by_id=template.created_by_id,
         )
-        return True
 
     def create_once_occurrence(self, template, *, due_at: datetime | None = None) -> None:
         if due_at is None:
@@ -69,6 +71,9 @@ class TaskSchedulerService:
             department_id=template.department_id,
             task_kind=template.task_kind,
             photo_required=template.photo_required,
+            reference_photo_url=template.reference_photo_url,
+            reference_video_url=template.reference_video_url,
+            reference_audio_url=template.reference_audio_url,
             created_by_id=template.created_by_id,
         )
 

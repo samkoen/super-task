@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from app.db import mappers as mp
 from app.domain import roles, task_status
 from app.domain.health_rules import (
     aggregate_health,
@@ -11,11 +12,18 @@ from app.domain.health_rules import (
     occurrence_health,
 )
 from app.domain.scope import ActorContext, assert_branch_visible
+from app.domain.task_translation_source import task_source_language
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.models.task_occurrence import TaskOccurrence
 from app.models.user import User
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
+from app.domain.manager_dashboard import (
+    build_timeline_item,
+    build_unfinished_item,
+    sort_timeline_tasks,
+)
+from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
 from app.services.task_translation_service import TaskTranslationService
@@ -56,6 +64,7 @@ def _count_by_status(tasks: list[TaskOccurrence]) -> dict[str, int]:
         "tasks_in_progress": 0,
         "tasks_overdue": 0,
         "tasks_cancelled": 0,
+        "tasks_pending_review": 0,
     }
     for task in tasks:
         counts["tasks_total"] += 1
@@ -65,6 +74,8 @@ def _count_by_status(tasks: list[TaskOccurrence]) -> dict[str, int]:
             counts["tasks_pending"] += 1
         elif task.status == task_status.IN_PROGRESS:
             counts["tasks_in_progress"] += 1
+        elif task.status == task_status.PENDING_REVIEW:
+            counts["tasks_pending_review"] += 1
         elif task.status == task_status.OVERDUE:
             counts["tasks_overdue"] += 1
         elif task.status == task_status.CANCELLED:
@@ -83,12 +94,14 @@ class DashboardService:
         branch_repo: BranchRepository,
         department_repo: DepartmentRepository,
         user_repo: UserRepository,
+        completion_repo: TaskCompletionRepository,
         translation_service: TaskTranslationService | None = None,
     ):
         self._occurrences = occurrence_repo
         self._branches = branch_repo
         self._departments = department_repo
         self._users = user_repo
+        self._completions = completion_repo
         self._translations = translation_service
 
     def manager_dashboard(
@@ -110,7 +123,7 @@ class DashboardService:
             return self._branch_manager_dashboard(actor, resolved_branch_id, day, now)
         return self._network_overview_dashboard(actor, day, now)
 
-    def employee_dashboard(
+    async def employee_dashboard(
         self,
         actor: ActorContext,
         *,
@@ -139,6 +152,7 @@ class DashboardService:
         branch_name = self._occurrences.get_branch_name(actor.branch_id)
 
         in_progress = [t for t in all_assigned if t.status == task_status.IN_PROGRESS]
+        pending_review = [t for t in tasks_today if t.status == task_status.PENDING_REVIEW]
         completed = [t for t in tasks_today if t.status == task_status.COMPLETED]
         counts = _count_by_status(tasks_today)
 
@@ -170,10 +184,10 @@ class DashboardService:
         on_shift = len(in_progress) > 0
         language = user.preferred_language if user else "he"
 
-        def localize_cards(tasks: list[TaskOccurrence]) -> list[dict]:
+        async def localize_cards(tasks: list[TaskOccurrence]) -> list[dict]:
             cards = [self._employee_task_card(t) for t in tasks]
             if self._translations:
-                return self._translations.apply_to_cards(cards, language=language)
+                return await self._translations.apply_to_cards_translated(cards, language=language)
             return cards
 
         return {
@@ -189,10 +203,11 @@ class DashboardService:
             "progress_percent": progress,
             "on_shift": on_shift,
             "counts": counts,
-            "urgent_tasks": localize_cards(urgent),
-            "in_progress_tasks": localize_cards(in_progress),
-            "today_tasks": localize_cards(today_open),
-            "completed_tasks": localize_cards(completed),
+            "urgent_tasks": await localize_cards(urgent),
+            "in_progress_tasks": await localize_cards(in_progress),
+            "pending_review_tasks": await localize_cards(pending_review),
+            "today_tasks": await localize_cards(today_open),
+            "completed_tasks": await localize_cards(completed),
         }
 
     def _resolve_manager_branch(self, actor: ActorContext, branch_id: str | None) -> str | None:
@@ -245,7 +260,23 @@ class DashboardService:
         by_department = self._department_breakdown(tasks_today, departments, now)
 
         employees = self._users.list_users(role=roles.EMPLOYEE, branch_ids=[branch_id])
-        team = self._team_activity(employees, tasks_today, now)
+        completion_map = self._completions.find_by_occurrence_ids(
+            [
+                t.id
+                for t in tasks_today
+                if t.status in {task_status.COMPLETED, task_status.PENDING_REVIEW}
+            ]
+        )
+        team = self._team_timelines(
+            employees,
+            tasks_today,
+            overdue_branch,
+            completion_map,
+            day,
+            now,
+        )
+        task_queues = self._task_queues(tasks_today, completion_map, now)
+        unfinished = self._unfinished_tasks(overdue_branch, pending_delegation, day, now)
 
         alerts = self._build_alerts(overdue_branch, pending_delegation, tasks_today, now)
 
@@ -266,6 +297,8 @@ class DashboardService:
             },
             "by_department": by_department,
             "team": team,
+            "task_queues": task_queues,
+            "unfinished_tasks": unfinished,
             "recent_alerts": alerts[:10],
             "branches": None,
         }
@@ -341,6 +374,8 @@ class DashboardService:
             },
             "by_department": None,
             "team": None,
+            "task_queues": None,
+            "unfinished_tasks": None,
             "recent_alerts": sorted(all_alerts, key=lambda a: a["due_at"])[:15],
             "branches": branches_summary,
         }
@@ -393,6 +428,164 @@ class DashboardService:
             "total": counts["tasks_total"] - counts["tasks_cancelled"],
             "completion_rate": counts["completion_rate"],
         }
+
+    def _team_timelines(
+        self,
+        employees: list[User],
+        tasks_today: list[TaskOccurrence],
+        overdue_branch: list[TaskOccurrence],
+        completion_map: dict,
+        day: date,
+        now: datetime,
+    ) -> list[dict]:
+        by_assignee: dict[str, list[TaskOccurrence]] = {}
+        for task in tasks_today:
+            if task.assignee_user_id:
+                by_assignee.setdefault(task.assignee_user_id, []).append(task)
+
+        overdue_by_assignee: dict[str, list[TaskOccurrence]] = {}
+        for task in overdue_branch:
+            if not task.assignee_user_id:
+                continue
+            if _parse_due_at(task.due_at).date() >= day:
+                continue
+            overdue_by_assignee.setdefault(task.assignee_user_id, []).append(task)
+
+        team = []
+        for emp in employees:
+            emp_tasks = by_assignee.get(emp.id, [])
+            sorted_tasks = sort_timeline_tasks(emp_tasks, TZ)
+            in_progress = next((t for t in emp_tasks if t.status == task_status.IN_PROGRESS), None)
+            completed_today = sum(1 for t in emp_tasks if t.status == task_status.COMPLETED)
+            total_today = sum(1 for t in emp_tasks if t.status != task_status.CANCELLED)
+            is_active = in_progress is not None or completed_today > 0
+            current_department = None
+            if in_progress:
+                current_department = self._occurrences.get_department_name(in_progress.department_id)
+
+            timeline = [
+                build_timeline_item(
+                    task,
+                    now=now,
+                    tz=TZ,
+                    completion=completion_map.get(task.id),
+                    department_name=self._occurrences.get_department_name(task.department_id),
+                    assignee_name=emp.full_name,
+                )
+                for task in sorted_tasks
+            ]
+            backlog = [
+                build_timeline_item(
+                    task,
+                    now=now,
+                    tz=TZ,
+                    completion=completion_map.get(task.id),
+                    department_name=self._occurrences.get_department_name(task.department_id),
+                    assignee_name=emp.full_name,
+                )
+                for task in sorted(overdue_by_assignee.get(emp.id, []), key=lambda t: t.due_at)
+            ]
+
+            team.append({
+                "user_id": emp.id,
+                "full_name": emp.full_name,
+                "job_function": emp.job_function,
+                "is_active": is_active,
+                "status": "in_progress" if in_progress else ("active" if is_active else "idle"),
+                "current_task_title": in_progress.title if in_progress else None,
+                "current_department_name": current_department,
+                "completed_today": completed_today,
+                "total_today": total_today,
+                "open_tasks": sum(1 for t in emp_tasks if t.status in task_status.ACTIVE),
+                "timeline": timeline,
+                "overdue_backlog": backlog,
+            })
+        team.sort(key=lambda m: (not m["is_active"], m["full_name"]))
+        return team
+
+    def _task_queues(
+        self,
+        tasks_today: list[TaskOccurrence],
+        completion_map: dict,
+        now: datetime,
+    ) -> dict[str, list[dict]]:
+        completed: list[dict] = []
+        in_progress: list[dict] = []
+        pending_review: list[dict] = []
+        upcoming: list[dict] = []
+
+        for task in tasks_today:
+            if task.status == task_status.CANCELLED:
+                continue
+            item = build_timeline_item(
+                task,
+                now=now,
+                tz=TZ,
+                completion=completion_map.get(task.id),
+                department_name=self._occurrences.get_department_name(task.department_id),
+                assignee_name=self._occurrences.get_assignee_name(task.assignee_user_id),
+            )
+            if task.status == task_status.COMPLETED:
+                completed.append(item)
+            elif task.status == task_status.PENDING_REVIEW:
+                pending_review.append(item)
+            elif task.status == task_status.IN_PROGRESS:
+                in_progress.append(item)
+            elif (
+                task.status == task_status.PENDING
+                and _parse_due_at(task.due_at) > now
+            ):
+                upcoming.append(item)
+
+        completed.sort(key=lambda i: i.get("completed_at") or i["due_at"])
+        in_progress.sort(key=lambda i: i.get("started_at") or i["due_at"])
+        pending_review.sort(key=lambda i: i.get("completed_at") or i["due_at"], reverse=True)
+        upcoming.sort(key=lambda i: i["due_at"])
+        return {
+            "completed": completed,
+            "in_progress": in_progress,
+            "pending_review": pending_review,
+            "upcoming": upcoming,
+        }
+
+    def _unfinished_tasks(
+        self,
+        overdue_branch: list[TaskOccurrence],
+        pending_delegation: list[TaskOccurrence],
+        day: date,
+        now: datetime,
+    ) -> list[dict]:
+        items: list[dict] = []
+        seen: set[str] = set()
+        for task in sorted(overdue_branch, key=lambda t: t.due_at):
+            if task.id in seen:
+                continue
+            seen.add(task.id)
+            items.append(
+                build_unfinished_item(
+                    task,
+                    day=day,
+                    tz=TZ,
+                    department_name=self._occurrences.get_department_name(task.department_id),
+                    assignee_name=self._occurrences.get_assignee_name(task.assignee_user_id),
+                    pending_delegation=False,
+                )
+            )
+        for task in pending_delegation:
+            if task.id in seen:
+                continue
+            seen.add(task.id)
+            items.append(
+                build_unfinished_item(
+                    task,
+                    day=day,
+                    tz=TZ,
+                    department_name=self._occurrences.get_department_name(task.department_id),
+                    assignee_name=None,
+                    pending_delegation=True,
+                )
+            )
+        return items
 
     def _team_activity(
         self,
@@ -448,7 +641,8 @@ class DashboardService:
         return alerts
 
     def _employee_task_card(self, task: TaskOccurrence) -> dict:
-        return {
+        completion = self._completions.find_by_occurrence(task.id) if self._completions else None
+        card = {
             "id": task.id,
             "title": task.title,
             "description": task.description,
@@ -456,6 +650,13 @@ class DashboardService:
             "status": task.status,
             "task_kind": task.task_kind,
             "photo_required": task.photo_required,
+            "reference_photo_url": task.reference_photo_url,
+            "reference_video_url": task.reference_video_url,
+            "reference_audio_url": task.reference_audio_url,
             "department_name": self._occurrences.get_department_name(task.department_id),
             "started_at": task.started_at,
         }
+        if completion:
+            card["completion"] = mp.task_completion_domain_to_api(completion)
+        card["source_language"] = task_source_language(task, self._users)
+        return card

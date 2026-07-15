@@ -63,6 +63,9 @@ class TaskTemplateRepository:
         created_by_id: str,
         task_kind: str = "fixed",
         photo_required: bool = False,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
         biweekly_anchor: datetime | None = None,
     ) -> TaskTemplate:
         import uuid
@@ -80,6 +83,9 @@ class TaskTemplateRepository:
             department_id=mp.parse_uuid(department_id) if department_id else None,
             task_kind=task_kind,
             photo_required=photo_required,
+            reference_photo_url=(reference_photo_url or "").strip() or None,
+            reference_video_url=(reference_video_url or "").strip() or None,
+            reference_audio_url=(reference_audio_url or "").strip() or None,
             biweekly_anchor=biweekly_anchor,
             is_active=True,
             created_by_id=mp.parse_uuid(created_by_id),
@@ -101,6 +107,9 @@ class TaskTemplateRepository:
         assignee_user_id: str | None,
         department_id: str | None,
         is_active: bool,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
     ) -> TaskTemplate | None:
         row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
         if not row:
@@ -112,5 +121,11 @@ class TaskTemplateRepository:
         row.assignee_user_id = mp.parse_uuid(assignee_user_id) if assignee_user_id else None
         row.department_id = mp.parse_uuid(department_id) if department_id else None
         row.is_active = is_active
+        if reference_photo_url is not None:
+            row.reference_photo_url = reference_photo_url.strip() or None
+        if reference_video_url is not None:
+            row.reference_video_url = reference_video_url.strip() or None
+        if reference_audio_url is not None:
+            row.reference_audio_url = reference_audio_url.strip() or None
         self._db.flush()
         return mp.task_template_orm_to_domain(row)

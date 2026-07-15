@@ -59,6 +59,7 @@ def test_ai_service_status(monkeypatch):
     status = AiService().status()
     assert status["available"] == ["gemini", "opencode"]
     assert status["default"] == "gemini"
+    assert status["voice_available"] is True
     assert len(status["providers"]) == 2
     assert status["providers"][0]["is_default"] is True
 

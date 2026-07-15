@@ -53,6 +53,19 @@ def _notify_occurrence(event_type: str, item: dict) -> None:
     )
 
 
+def _sse_payload_from_create_template(item: dict) -> dict:
+    created = item.pop("_created_occurrence", None)
+    if created:
+        return created
+    return {
+        "id": item.get("id"),
+        "branch_id": item.get("branch_id"),
+        "assignee_user_id": item.get("assignee_user_id"),
+        "title": item.get("title"),
+        "status": "pending",
+    }
+
+
 def _emit_task_event(db: Session, event_type: str, item: dict) -> None:
     """Commit DB changes before SSE so refetching clients see fresh data."""
     svc = NotificationService(NotificationRepository(db), UserRepository(db))
@@ -88,6 +101,7 @@ def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceServi
         BranchRepository(db),
         UserRepository(db),
         TaskTranslationService(TaskTranslationRepository(db)),
+        TaskTemplateRepository(db),
     )
 
 
@@ -130,16 +144,12 @@ def create_template(
         assignee_user_id=payload.get("assignee_user_id"),
         department_id=payload.get("department_id"),
         due_at=payload.get("due_at"),
+        reference_photo_url=payload.get("reference_photo_url"),
+        reference_video_url=payload.get("reference_video_url"),
+        reference_audio_url=payload.get("reference_audio_url"),
     )
-    _emit_task_event(
-        db,
-        "task_created",
-        {
-            "branch_id": item.get("branch_id"),
-            "assignee_user_id": item.get("assignee_user_id"),
-            "title": item.get("title"),
-        },
-    )
+    emit_item = _sse_payload_from_create_template(item)
+    _emit_task_event(db, "task_created", emit_item)
     return {"message": "משימה קבועה נוצרה", "template": item}
 
 
@@ -164,6 +174,9 @@ def update_template(
         assignee_user_id=payload.get("assignee_user_id"),
         department_id=payload.get("department_id"),
         is_active=bool(payload.get("is_active", True)),
+        reference_photo_url=payload.get("reference_photo_url"),
+        reference_video_url=payload.get("reference_video_url"),
+        reference_audio_url=payload.get("reference_audio_url"),
     )
     return {"message": "המשימה עודכנה", "template": item}
 
@@ -186,6 +199,9 @@ def create_ad_hoc_task(
         due_at=str(payload.get("due_at") or ""),
         assignee_user_id=payload.get("assignee_user_id"),
         photo_required=bool(payload.get("photo_required", True)),
+        reference_photo_url=payload.get("reference_photo_url"),
+        reference_video_url=payload.get("reference_video_url"),
+        reference_audio_url=payload.get("reference_audio_url"),
     )
     _emit_task_event(db, "task_created", item)
     return {"message": "משימה מזדמנת נוצרה", "occurrence": item}
@@ -220,7 +236,7 @@ def list_occurrences(
 
 @router.get("/mine")
 @handle_controller_errors
-def list_my_tasks(
+async def list_my_tasks(
     request: Request,
     due_on: str | None = Query(None),
     due_from: str | None = Query(None),
@@ -229,7 +245,7 @@ def list_my_tasks(
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
-    return service.list_mine(actor, due_on=due_on, due_from=due_from, due_to=due_to)
+    return await service.list_mine(actor, due_on=due_on, due_from=due_from, due_to=due_to)
 
 
 @router.post("/mine/translate")
@@ -250,6 +266,18 @@ async def translate_my_tasks(
     except PermissionError as exc:
         return JSONResponse({"error": str(exc)}, status_code=403)
     return {"translations": items}
+
+
+@router.get("/occurrences/{occurrence_id}")
+@handle_controller_errors
+def get_occurrence(
+    occurrence_id: str,
+    request: Request,
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    return service.get_occurrence(actor, occurrence_id)
 
 
 @router.post("/occurrences/{occurrence_id}/start")
@@ -286,7 +314,7 @@ def delegate_occurrence(
 
 @router.post("/occurrences/{occurrence_id}/complete")
 @handle_controller_errors
-def complete_occurrence(
+async def complete_occurrence(
     occurrence_id: str,
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
@@ -295,7 +323,7 @@ def complete_occurrence(
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
-    item = service.complete_occurrence(
+    item = await service.complete_occurrence(
         actor,
         occurrence_id,
         completion_status=str(payload.get("status") or "completed"),
@@ -309,6 +337,40 @@ def complete_occurrence(
     return {"message": "המשימה עודכנה", "occurrence": item}
 
 
+@router.post("/occurrences/{occurrence_id}/approve")
+@handle_controller_errors
+def approve_occurrence(
+    occurrence_id: str,
+    request: Request,
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    item = service.approve_occurrence(actor, occurrence_id)
+    _emit_task_event(db, "task_approved", item)
+    return {"message": "המשימה אושרה ונסגרה", "occurrence": item}
+
+
+@router.post("/occurrences/{occurrence_id}/reopen")
+@handle_controller_errors
+def reopen_occurrence(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    item = service.reopen_occurrence(
+        actor,
+        occurrence_id,
+        rejection_note=payload.get("rejection_note"),
+    )
+    _emit_task_event(db, "task_reopened", item)
+    return {"message": "המשימה נפתחה מחדש לעובד", "occurrence": item}
+
+
 @router.post("/occurrences/{occurrence_id}/update")
 @handle_controller_errors
 def update_occurrence(
@@ -320,6 +382,11 @@ def update_occurrence(
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
+    ref_kwargs: dict[str, str | None] = {}
+    for field in ("reference_photo_url", "reference_video_url", "reference_audio_url"):
+        if field in payload:
+            value = payload.get(field)
+            ref_kwargs[field] = value if value is not None else None
     item = service.update_occurrence(
         actor,
         occurrence_id,
@@ -328,6 +395,7 @@ def update_occurrence(
         due_at=str(payload.get("due_at") or ""),
         assignee_user_id=payload.get("assignee_user_id"),
         photo_required=payload.get("photo_required"),
+        **ref_kwargs,
     )
     event_type = "task_delegated" if item.get("assignee_user_id") else "task_updated"
     _emit_task_event(db, event_type, item)

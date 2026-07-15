@@ -1,4 +1,5 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { he } from "../i18n/he";
 
 const api = axios.create({
   baseURL: "/api",
@@ -62,8 +63,9 @@ api.interceptors.response.use(
     const msg =
       error.response?.data?.error ??
       formatApiDetail(error.response?.data?.detail) ??
-      error.message ??
-      "אירעה שגיאה";
+      (error.response
+        ? error.message ?? "אירעה שגיאה"
+        : he.errorServerUnreachable);
     return Promise.reject(new ApiError(String(msg), error.response?.status ?? 500));
   }
 );

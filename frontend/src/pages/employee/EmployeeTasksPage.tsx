@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -25,9 +25,6 @@ import CheckIcon from "@mui/icons-material/Check";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import StopIcon from "@mui/icons-material/Stop";
-import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import VideocamIcon from "@mui/icons-material/Videocam";
-import MicIcon from "@mui/icons-material/Mic";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import { ApiError } from "../../services/api";
@@ -36,7 +33,7 @@ import {
   type EmployeeDashboard,
   type EmployeeTaskCard,
 } from "../../services/dashboardService";
-import { taskService, type TaskStatus, type TaskTranslation } from "../../services/taskService";
+import { taskService, type TaskStatus, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -51,13 +48,17 @@ import {
   type TaskDateViewMode,
 } from "../../utils/dateView";
 import { useTaskSpeech } from "../../hooks/useTaskSpeech";
+import { resolveSpeechLanguage } from "../../utils/speechVoice";
+import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
+import CompletionMediaPreview from "../../components/tasks/CompletionMediaPreview";
+import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
-import type { TaskOccurrence } from "../../services/taskService";
 
-const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error"> = {
+const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error" | "info"> = {
   pending: "warning",
   in_progress: "warning",
+  pending_review: "info",
   completed: "success",
   overdue: "error",
   cancelled: "default",
@@ -67,6 +68,36 @@ function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
   const labels = he.jobFunctionLabels as Record<string, string>;
   return labels[jobFunction] ?? jobFunction;
+}
+
+function showsHebrewTitle(task: EmployeeTaskCard): boolean {
+  return Boolean(
+    task.title_he &&
+      task.title_he !== task.title &&
+      task.display_language &&
+      task.display_language !== "he"
+  );
+}
+
+function EmployeeTaskTitle({
+  task,
+  variant = "h6",
+  fontWeight = 700,
+}: {
+  task: EmployeeTaskCard;
+  variant?: "h6" | "body1";
+  fontWeight?: number | string;
+}) {
+  return (
+    <Box>
+      <Typography variant={variant} fontWeight={fontWeight}>{task.title}</Typography>
+      {showsHebrewTitle(task) && (
+        <Typography variant="body2" color="text.secondary" dir="rtl" sx={{ mt: 0.25 }}>
+          {he.taskTitleHebrew}: {task.title_he}
+        </Typography>
+      )}
+    </Box>
+  );
 }
 
 function TaskCard({
@@ -88,6 +119,7 @@ function TaskCard({
   onListen: (task: EmployeeTaskCard) => void;
   onStopListen: () => void;
 }) {
+  const rejectionNote = task.completion?.rejection_note;
   return (
     <Card
       variant="outlined"
@@ -99,7 +131,7 @@ function TaskCard({
     >
       <CardContent>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} mb={1}>
-          <Typography variant="h6" fontWeight={700}>{task.title}</Typography>
+          <EmployeeTaskTitle task={task} />
           <Chip label={he.taskStatusLabels[task.status]} color={statusColor[task.status]} size="small" />
         </Box>
         <Box display="flex" gap={1} flexWrap="wrap" mb={1}>
@@ -110,11 +142,21 @@ function TaskCard({
         {task.description && (
           <Typography variant="body2" color="text.secondary" mb={1}>{task.description}</Typography>
         )}
+        <TaskReferenceMediaDisplay
+          reference_photo_url={task.reference_photo_url}
+          reference_video_url={task.reference_video_url}
+          reference_audio_url={task.reference_audio_url}
+        />
         <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
           {he.dueAt}: {formatDueAt(task.due_at)}
         </Typography>
         {task.photo_required && (
           <Typography variant="caption" color="warning.main" display="block">{he.photoRequired}</Typography>
+        )}
+        {rejectionNote && (
+          <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
+            {he.taskRejectedReopen}: {rejectionNote}
+          </Alert>
         )}
         <Button
           size="small"
@@ -159,6 +201,7 @@ function mergeTaskTranslations<T extends EmployeeTaskCard>(
     if (!hit) return task;
     return {
       ...task,
+      title_he: hit.title_he ?? task.title_he ?? task.title,
       title: hit.title,
       description: hit.description,
       spoken_text: hit.spoken_text,
@@ -176,13 +219,22 @@ function mergeDashboardTranslations(
     ...dashboard,
     urgent_tasks: mergeTaskTranslations(dashboard.urgent_tasks, translations),
     in_progress_tasks: mergeTaskTranslations(dashboard.in_progress_tasks, translations),
+    pending_review_tasks: mergeTaskTranslations(dashboard.pending_review_tasks, translations),
     today_tasks: mergeTaskTranslations(dashboard.today_tasks, translations),
     completed_tasks: mergeTaskTranslations(dashboard.completed_tasks, translations),
   };
 }
 
-function collectPendingIds(tasks: EmployeeTaskCard[]): string[] {
-  return tasks.filter((task) => task.translation_pending).map((task) => task.id);
+function collectPendingIds(tasks: EmployeeTaskCard[], language: EmployeeLanguage): string[] {
+  if (language === "he") return [];
+  return tasks
+    .filter(
+      (task) =>
+        task.translation_pending ||
+        !task.display_language ||
+        task.display_language !== language
+    )
+    .map((task) => task.id);
 }
 
 function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
@@ -194,11 +246,16 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     status: task.status,
     task_kind: task.task_kind,
     photo_required: task.photo_required,
+    reference_photo_url: task.reference_photo_url ?? null,
+    reference_video_url: task.reference_video_url ?? null,
+    reference_audio_url: task.reference_audio_url ?? null,
     department_name: task.department_name ?? null,
     started_at: task.started_at,
     spoken_text: (task as TaskOccurrence & { spoken_text?: string }).spoken_text,
     display_language: (task as TaskOccurrence & { display_language?: string }).display_language,
     translation_pending: (task as TaskOccurrence & { translation_pending?: boolean }).translation_pending,
+    title_he: (task as TaskOccurrence & { title_he?: string }).title_he,
+    completion: task.completion ?? null,
   };
 }
 
@@ -234,17 +291,11 @@ export default function EmployeeTasksPage() {
   const [employeeLanguage, setEmployeeLanguage] = useState<EmployeeLanguage>("he");
   const [translatingTasks, setTranslatingTasks] = useState(false);
   const { speakingId, speak, stop: stopSpeech, supported: speechSupported } = useTaskSpeech(employeeLanguage);
-  const photoRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLInputElement>(null);
-  const audioRef = useRef<HTMLInputElement>(null);
-  const reportPhotoRef = useRef<HTMLInputElement>(null);
-  const reportVideoRef = useRef<HTMLInputElement>(null);
-  const reportAudioRef = useRef<HTMLInputElement>(null);
 
   const translatePendingTasks = useCallback(
     async (language: EmployeeLanguage, tasks: EmployeeTaskCard[]) => {
       if (language === "he") return;
-      const pendingIds = collectPendingIds(tasks);
+      const pendingIds = collectPendingIds(tasks, language);
       if (!pendingIds.length) return;
       setTranslatingTasks(true);
       try {
@@ -278,6 +329,7 @@ export default function EmployeeTasksPage() {
         const allTasks = [
           ...data.urgent_tasks,
           ...data.in_progress_tasks,
+          ...data.pending_review_tasks,
           ...data.today_tasks,
           ...data.completed_tasks,
         ];
@@ -348,13 +400,21 @@ export default function EmployeeTasksPage() {
     setAudioUrl("");
   };
 
-  const handleListen = (task: EmployeeTaskCard) => {
+  const handleListen = async (task: EmployeeTaskCard) => {
     if (!speechSupported) {
       setError(he.taskListenUnsupported);
       return;
     }
     const text = task.spoken_text || [task.title, task.description].filter(Boolean).join(". ");
-    speak(task.id, text);
+    const speechLanguage = resolveSpeechLanguage(
+      employeeLanguage,
+      task.display_language,
+      task.translation_pending
+    );
+    const ok = await speak(task.id, text, speechLanguage);
+    if (!ok && speechLanguage === "ar") {
+      setError(he.taskListenVoiceMissing);
+    }
   };
 
   useEffect(() => {
@@ -363,7 +423,7 @@ export default function EmployeeTasksPage() {
     }
   }, [user?.preferred_language]);
 
-  const handleUpload = async (file: File, kind: "photo" | "video" | "audio") => {
+  const handleUpload = useCallback(async (file: File, kind: MediaKind) => {
     setUploadingKind(kind);
     setError("");
     try {
@@ -381,7 +441,7 @@ export default function EmployeeTasksPage() {
     } finally {
       setUploadingKind(null);
     }
-  };
+  }, []);
 
   const hasMedia = Boolean(photoUrl || videoUrl || audioUrl);
   const requiresMedia = Boolean(selected?.photo_required && done);
@@ -395,7 +455,7 @@ export default function EmployeeTasksPage() {
     setReportOpen(true);
   };
 
-  const handleReportUpload = async (file: File, kind: "photo" | "video" | "audio") => {
+  const handleReportUpload = useCallback(async (file: File, kind: MediaKind) => {
     setReportUploadingKind(kind);
     setError("");
     try {
@@ -413,7 +473,7 @@ export default function EmployeeTasksPage() {
     } finally {
       setReportUploadingKind(null);
     }
-  };
+  }, []);
 
   const hasReportContent = Boolean(
     reportText.trim() || reportPhotoUrl || reportVideoUrl || reportAudioUrl
@@ -453,6 +513,9 @@ export default function EmployeeTasksPage() {
         not_completed_reason: done ? undefined : notDoneReason,
       });
       setSelected(null);
+      if (done) {
+        setSuccess(he.taskSubmitSuccess);
+      }
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -463,6 +526,7 @@ export default function EmployeeTasksPage() {
 
   const urgentTasks = dashboard?.urgent_tasks ?? [];
   const inProgressTasks = dashboard?.in_progress_tasks ?? [];
+  const pendingReviewTasks = dashboard?.pending_review_tasks ?? [];
   const todayTasks = dashboard?.today_tasks ?? [];
   const completedTasks = dashboard?.completed_tasks ?? [];
 
@@ -581,7 +645,7 @@ export default function EmployeeTasksPage() {
                   {done.map((task) => (
                     <Card key={task.id} variant="outlined" sx={{ mb: 1, opacity: 0.85 }}>
                       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                        <Typography fontWeight={600}>{task.title}</Typography>
+                        <EmployeeTaskTitle task={task} variant="body1" fontWeight={600} />
                         <Chip label={he.taskCompleted} color="success" size="small" sx={{ mt: 0.5 }} />
                       </CardContent>
                     </Card>
@@ -628,6 +692,30 @@ export default function EmployeeTasksPage() {
                   onListen={handleListen}
                   onStopListen={stopSpeech}
                 />
+              ))}
+            </Box>
+          )}
+
+          {pendingReviewTasks.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.taskPendingReview}</Typography>
+              {pendingReviewTasks.map((task) => (
+                <Card key={task.id} variant="outlined" sx={{ mb: 2, opacity: 0.9 }}>
+                  <CardContent>
+                    <EmployeeTaskTitle task={task} />
+                    <Chip label={he.taskStatusLabels.pending_review} color="info" size="small" sx={{ mt: 1 }} />
+                    {task.completion && (
+                      <CompletionMediaPreview
+                        viewer="employee"
+                        photo_path={task.completion.photo_path}
+                        video_path={task.completion.video_path}
+                        audio_path={task.completion.audio_path}
+                        audio_transcript={task.completion.audio_transcript}
+                        audio_transcript_employee={task.completion.audio_transcript_employee}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
               ))}
             </Box>
           )}
@@ -697,18 +785,14 @@ export default function EmployeeTasksPage() {
             placeholder={he.completionMediaHint}
           />
           <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
-          <input ref={reportPhotoRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReportUpload(f, "photo"); e.target.value = ""; }} />
-          <input ref={reportVideoRef} type="file" accept="video/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReportUpload(f, "video"); e.target.value = ""; }} />
-          <input ref={reportAudioRef} type="file" accept="audio/*" capture="user" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReportUpload(f, "audio"); e.target.value = ""; }} />
-          <Button startIcon={<PhotoCameraIcon />} variant={reportPhotoUrl ? "contained" : "outlined"} onClick={() => reportPhotoRef.current?.click()} disabled={reportUploadingKind !== null}>
-            {reportUploadingKind === "photo" ? he.loading : reportPhotoUrl ? he.photoAdded : he.addPhoto}
-          </Button>
-          <Button startIcon={<VideocamIcon />} variant={reportVideoUrl ? "contained" : "outlined"} onClick={() => reportVideoRef.current?.click()} disabled={reportUploadingKind !== null}>
-            {reportUploadingKind === "video" ? he.loading : reportVideoUrl ? he.videoAdded : he.addVideo}
-          </Button>
-          <Button startIcon={<MicIcon />} variant={reportAudioUrl ? "contained" : "outlined"} onClick={() => reportAudioRef.current?.click()} disabled={reportUploadingKind !== null}>
-            {reportUploadingKind === "audio" ? he.loading : reportAudioUrl ? he.audioAdded : he.addAudio}
-          </Button>
+          <MediaCaptureActions
+            photoAdded={Boolean(reportPhotoUrl)}
+            videoAdded={Boolean(reportVideoUrl)}
+            audioAdded={Boolean(reportAudioUrl)}
+            uploadingKind={reportUploadingKind}
+            disabled={reportSaving}
+            onCapture={(file, kind) => handleReportUpload(file, kind)}
+          />
           {!hasReportContent && (
             <Typography variant="caption" color="warning.main">{he.issueReportRequired}</Typography>
           )}
@@ -726,7 +810,9 @@ export default function EmployeeTasksPage() {
       </Dialog>
 
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
-        <DialogTitle>{selected?.title}</DialogTitle>
+        <DialogTitle sx={{ pb: selected && showsHebrewTitle(selected) ? 1 : undefined }}>
+          {selected ? <EmployeeTaskTitle task={selected} variant="h6" /> : null}
+        </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
           <Button variant={done ? "contained" : "outlined"} color="success" size="large" onClick={() => setDone(true)}>{he.taskCompleted}</Button>
           <Button variant={!done ? "contained" : "outlined"} color="warning" size="large" onClick={() => setDone(false)}>{he.taskNotCompleted}</Button>
@@ -737,18 +823,23 @@ export default function EmployeeTasksPage() {
           {done && (
             <>
               <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
-              <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, "photo"); e.target.value = ""; }} />
-              <input ref={videoRef} type="file" accept="video/*" capture="environment" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, "video"); e.target.value = ""; }} />
-              <input ref={audioRef} type="file" accept="audio/*" capture="user" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f, "audio"); e.target.value = ""; }} />
-              <Button startIcon={<PhotoCameraIcon />} variant={photoUrl ? "contained" : "outlined"} onClick={() => photoRef.current?.click()} disabled={uploadingKind !== null}>
-                {uploadingKind === "photo" ? he.loading : photoUrl ? he.photoAdded : he.addPhoto}
-              </Button>
-              <Button startIcon={<VideocamIcon />} variant={videoUrl ? "contained" : "outlined"} onClick={() => videoRef.current?.click()} disabled={uploadingKind !== null}>
-                {uploadingKind === "video" ? he.loading : videoUrl ? he.videoAdded : he.addVideo}
-              </Button>
-              <Button startIcon={<MicIcon />} variant={audioUrl ? "contained" : "outlined"} onClick={() => audioRef.current?.click()} disabled={uploadingKind !== null}>
-                {uploadingKind === "audio" ? he.loading : audioUrl ? he.audioAdded : he.addAudio}
-              </Button>
+              <MediaCaptureActions
+                photoAdded={Boolean(photoUrl)}
+                videoAdded={Boolean(videoUrl)}
+                audioAdded={Boolean(audioUrl)}
+                uploadingKind={uploadingKind}
+                disabled={saving}
+                onCapture={(file, kind: MediaKind) => handleUpload(file, kind)}
+              />
+              <CompletionMediaPreview
+                photo_path={photoUrl}
+                video_path={videoUrl}
+                audio_path={audioUrl}
+                disabled={saving || uploadingKind !== null}
+                onRemovePhoto={() => setPhotoUrl("")}
+                onRemoveVideo={() => setVideoUrl("")}
+                onRemoveAudio={() => setAudioUrl("")}
+              />
               {requiresMedia && !hasMedia && (
                 <Typography variant="caption" color="warning.main">{he.photoRequired}</Typography>
               )}

@@ -13,13 +13,16 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import EditIcon from "@mui/icons-material/Edit";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import RateReviewIcon from "@mui/icons-material/RateReview";
+import CompletionMediaPreview from "./CompletionMediaPreview";
 import { cardColor } from "../../constants/cardColors";
 import { he } from "../../i18n/he";
 import type { TaskOccurrence, TaskStatus } from "../../services/taskService";
 
-const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error"> = {
+const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error" | "info"> = {
   pending: "warning",
   in_progress: "warning",
+  pending_review: "info",
   completed: "success",
   overdue: "error",
   cancelled: "default",
@@ -32,6 +35,7 @@ export interface TaskOccurrenceCardProps {
   onDelegate?: (task: TaskOccurrence) => void;
   onEdit?: (task: TaskOccurrence) => void;
   onCancel?: (task: TaskOccurrence) => void;
+  onReview?: (task: TaskOccurrence) => void;
 }
 
 export default function TaskOccurrenceCard({
@@ -41,14 +45,17 @@ export default function TaskOccurrenceCard({
   onDelegate,
   onEdit,
   onCancel,
+  onReview,
 }: TaskOccurrenceCardProps) {
   const { bg, accent } = cardColor(index);
   const urgent = task.status === "overdue";
+  const awaitingReview = task.status === "pending_review";
   const assigneeLabel = task.assignee_name
     ?? (task.pending_delegation ? he.pendingDelegation : he.allDepartment);
   const canCancel = !["completed", "cancelled"].includes(task.status) && !task.pending_delegation;
   const canDelegate = Boolean(task.pending_delegation && isBranchManager);
-  const canEdit = !["completed", "cancelled"].includes(task.status) && Boolean(onEdit);
+  const canEdit = !["completed", "cancelled", "pending_review"].includes(task.status) && Boolean(onEdit);
+  const canReview = awaitingReview && Boolean(onReview);
 
   return (
     <Card
@@ -146,6 +153,14 @@ export default function TaskOccurrenceCard({
           </Typography>
         ) : null}
 
+        {awaitingReview && task.completion && (
+          <CompletionMediaPreview
+            photo_path={task.completion.photo_path}
+            video_path={task.completion.video_path}
+            audio_path={task.completion.audio_path}
+          />
+        )}
+
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary", mt: "auto" }}>
           <PersonOutlineIcon sx={{ fontSize: 18, opacity: 0.7 }} />
           <Typography variant="caption">{assigneeLabel}</Typography>
@@ -156,8 +171,20 @@ export default function TaskOccurrenceCard({
         </Typography>
       </Box>
 
-      {(canDelegate || canCancel) && (
+      {(canDelegate || canCancel || canReview) && (
         <CardActions sx={{ px: 2, pb: 2, pt: 0, flexDirection: "column", gap: 1 }}>
+          {canReview && onReview && (
+            <Button
+              fullWidth
+              variant="contained"
+              color="info"
+              size="small"
+              startIcon={<RateReviewIcon />}
+              onClick={() => onReview(task)}
+            >
+              {he.taskReviewAction}
+            </Button>
+          )}
           {canDelegate && onDelegate && (
             <Button fullWidth variant="contained" size="small" onClick={() => onDelegate(task)}>
               {he.delegateTask}

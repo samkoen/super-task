@@ -30,18 +30,21 @@ def notify_task_change(
     occurrence_id: str | None = None,
     status: str | None = None,
 ) -> None:
+    branch_id = str(branch_id or "").strip()
+    if not branch_id:
+        return
     event: dict[str, Any] = {
         "type": event_type,
         "branch_id": branch_id,
     }
     if occurrence_id:
-        event["occurrence_id"] = occurrence_id
+        event["occurrence_id"] = str(occurrence_id)
     if assignee_user_id:
-        event["assignee_user_id"] = assignee_user_id
+        event["assignee_user_id"] = str(assignee_user_id)
     if status:
         event["status"] = status
 
     channels = [f"branch:{branch_id}"]
     if assignee_user_id:
-        channels.append(f"user:{assignee_user_id}")
+        channels.append(f"user:{str(assignee_user_id)}")
     sse_hub.publish_many_sync(channels, event)

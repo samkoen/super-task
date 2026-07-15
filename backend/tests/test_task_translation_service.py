@@ -1,12 +1,13 @@
 """Tests traduction tâches employé."""
 from __future__ import annotations
 
+import asyncio
+
 from app.services.task_translation_service import (
     TaskTranslationService,
     _default_spoken_text,
     _source_hash,
 )
-
 
 class _Cached:
     def __init__(self, row: dict):
@@ -37,6 +38,10 @@ def test_source_hash_changes_with_description():
     assert _source_hash("a", "b") != _source_hash("a", "c")
 
 
+def test_source_hash_changes_with_source_language():
+    assert _source_hash("a", "b", "he") != _source_hash("a", "b", "fr")
+
+
 def test_apply_to_cards_hebrew_skips_translation():
     service = TaskTranslationService(_FakeRepo())  # type: ignore[arg-type]
     cards = [{"id": "1", "title": "משימה", "description": "פרטים"}]
@@ -47,7 +52,8 @@ def test_apply_to_cards_hebrew_skips_translation():
 
 def test_apply_to_cards_uses_cache():
     repo = _FakeRepo()
-    digest = _source_hash("title", "desc")
+    hebrew_title = "כותרת"
+    digest = _source_hash(hebrew_title, "desc")
     repo.rows[("occ-1", "fr")] = {
         "occurrence_id": "occ-1",
         "language": "fr",
@@ -58,11 +64,21 @@ def test_apply_to_cards_uses_cache():
     }
     service = TaskTranslationService(repo)  # type: ignore[arg-type]
     result = service.apply_to_cards(
-        [{"id": "occ-1", "title": "title", "description": "desc"}],
+        [{"id": "occ-1", "title": hebrew_title, "description": "desc"}],
         language="fr",
     )
     assert result[0]["title"] == "Titre"
+    assert result[0]["title_he"] == hebrew_title
     assert result[0]["translation_pending"] is False
+
+
+def test_apply_to_cards_hebrew_has_no_title_he():
+    service = TaskTranslationService(_FakeRepo())  # type: ignore[arg-type]
+    result = service.apply_to_cards(
+        [{"id": "1", "title": "משימה", "description": "פרטים"}],
+        language="he",
+    )
+    assert "title_he" not in result[0]
 
 
 def test_apply_to_cards_marks_pending_without_cache():
@@ -102,3 +118,32 @@ def test_apply_to_cards_preserves_due_at():
     assert result[0]["title"] == "Titre"
     assert result[0]["due_at"] == "2026-07-12T14:30:00+03:00"
     assert result[0]["status"] == "pending"
+
+
+def test_apply_to_cards_translated_fetches_missing(monkeypatch):
+    service = TaskTranslationService(_FakeRepo())  # type: ignore[arg-type]
+
+    async def fake_translate(cards, *, language):
+        assert language == "fr"
+        assert cards[0]["source_language"] == "he"
+        return [
+            {
+                "id": "occ-3",
+                "title": "Titre",
+                "description": "Desc",
+                "spoken_text": "Titre. Desc",
+                "display_language": "fr",
+                "translation_pending": False,
+                "title_he": "משימה",
+            }
+        ]
+
+    monkeypatch.setattr(service, "translate_cards", fake_translate)
+    result = asyncio.run(
+        service.apply_to_cards_translated(
+            [{"id": "occ-3", "title": "משימה", "description": "", "source_language": "he"}],
+            language="fr",
+        )
+    )
+    assert result[0]["title"] == "Titre"
+    assert result[0]["translation_pending"] is False

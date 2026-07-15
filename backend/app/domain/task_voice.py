@@ -14,30 +14,43 @@ class TaskVoiceDraft:
     assignee_name: str | None
 
 
-def build_task_voice_prompt(*, employees: list[dict], task_kind: str) -> str:
+def build_task_voice_prompt(
+    *,
+    employees: list[dict],
+    task_kind: str,
+    manager_language: str = "he",
+) -> str:
+    from app.domain.employee_language import LANGUAGE_NAMES_EN, normalize_employee_language
+
+    lang = normalize_employee_language(manager_language)
+    lang_name = LANGUAGE_NAMES_EN[lang]
     kind_label = "משימה קבועה (חוזרת)" if task_kind == "fixed" else "משימה מזדמנת (חד-פעמית)"
     roster = "\n".join(
         f'- id="{e["id"]}", name="{e["full_name"]}"'
         + (f', job="{e["job_function"]}"' if e.get("job_function") else "")
         for e in employees
     ) or "- (אין עובדים ברשימה)"
-    return f"""You analyze a voice message from a supermarket branch manager creating a {kind_label}.
-The manager speaks Hebrew. Listen to the audio and extract task details.
+    return f"""You transcribe a voice message from a supermarket branch manager creating a {kind_label}.
+The manager speaks {lang_name}. Your job is to capture ONLY what was actually said in the audio — nothing more.
 
 Employees in this branch:
 {roster}
 
 Return ONLY valid JSON (no markdown, no extra text):
 {{
-  "title": "short Hebrew task title",
-  "description": "Hebrew task description with practical details",
+  "title": "short task title in {lang_name} taken from the spoken words",
+  "description": "text in {lang_name}: only details explicitly spoken in the audio",
   "assignee_name": "exact employee full name from the roster above, or empty string"
 }}
 
-Rules:
-- title: concise (max ~80 chars), in Hebrew
-- description: fuller instructions in Hebrew
-- assignee_name: must match an employee name from the roster if the manager named someone; otherwise ""
+Strict rules (critical):
+- TRANSCRIBE, do not invent. Do not add tasks, steps, requirements, or details that were not spoken.
+- Do not guess, assume, complete, or "improve" the manager's instructions.
+- Do not add standard supermarket procedures unless the manager said them aloud.
+- title: concise summary of what was said (max ~80 chars), in {lang_name}
+- description: verbatim or lightly cleaned transcript of spoken task details; if the manager said little, keep it short; leave "" if nothing beyond the title was said
+- assignee_name: only if the manager clearly named someone from the roster; otherwise ""
+- If audio is unclear, transcribe what you hear; do not fill gaps with invented content
 """
 
 

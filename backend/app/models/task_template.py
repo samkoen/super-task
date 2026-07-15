@@ -15,6 +15,9 @@ class TaskTemplate:
     department_id: str | None
     task_kind: str
     photo_required: bool
+    reference_photo_url: str | None
+    reference_video_url: str | None
+    reference_audio_url: str | None
     biweekly_anchor: str | None
     is_active: bool
     created_by_id: str
@@ -35,6 +38,9 @@ class TaskTemplate:
             "department_id": self.department_id,
             "task_kind": self.task_kind,
             "photo_required": self.photo_required,
+            "reference_photo_url": self.reference_photo_url,
+            "reference_video_url": self.reference_video_url,
+            "reference_audio_url": self.reference_audio_url,
             "biweekly_anchor": self.biweekly_anchor,
             "is_active": self.is_active,
             "created_by_id": self.created_by_id,

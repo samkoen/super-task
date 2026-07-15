@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { classifyMediaError } from "../utils/mediaCapture";
 
 export function useAudioRecorder() {
   const [recording, setRecording] = useState(false);
@@ -48,9 +49,9 @@ export function useAudioRecorder() {
       mediaRecorderRef.current = recorder;
       recorder.start();
       setRecording(true);
-    } catch {
+    } catch (caught) {
       cleanupStream();
-      setError("permission");
+      setError(classifyMediaError(caught));
     }
   }, [cleanupStream, supported]);
 

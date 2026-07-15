@@ -19,6 +19,15 @@ def test_build_task_voice_prompt_lists_employees():
     prompt = build_task_voice_prompt(employees=EMPLOYEES, task_kind="ad_hoc")
     assert "יוסי כהן" in prompt
     assert "משימה מזדמנת" in prompt
+    assert "do not invent" in prompt.lower() or "invented content" in prompt.lower()
+    assert "TRANSCRIBE" in prompt
+    assert "speaks Hebrew" in prompt
+
+
+def test_build_task_voice_prompt_uses_manager_language():
+    prompt = build_task_voice_prompt(employees=EMPLOYEES, task_kind="ad_hoc", manager_language="fr")
+    assert "French" in prompt
+    assert "in French" in prompt
 
 
 def test_resolve_assignee_exact_match():

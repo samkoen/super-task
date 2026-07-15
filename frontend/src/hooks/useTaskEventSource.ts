@@ -1,19 +1,30 @@
 import { useEffect } from "react";
-import { TASK_CHANGE_EVENT, NOTIFICATION_EVENT } from "../constants/events";
+import {
+  NOTIFICATION_EVENT,
+  TASK_CHANGE_EVENT,
+  type TaskChangeDetail,
+} from "../constants/events";
 
 const RECONNECT_MS = 3000;
 
-function dispatchFromPayload(raw: string) {
+function parseDetail(raw: string): TaskChangeDetail | undefined {
   try {
-    const data = JSON.parse(raw) as { type?: string };
-    if (data.type === "notification") {
-      window.dispatchEvent(new CustomEvent(NOTIFICATION_EVENT));
-      return;
-    }
+    return JSON.parse(raw) as TaskChangeDetail;
   } catch {
-    /* fall through */
+    return undefined;
   }
-  window.dispatchEvent(new CustomEvent(TASK_CHANGE_EVENT));
+}
+
+export function dispatchTaskEventFromPayload(raw: string) {
+  const detail = parseDetail(raw);
+  if (detail?.type === "notification") {
+    window.dispatchEvent(new CustomEvent(NOTIFICATION_EVENT, { detail }));
+    if (detail.kind?.startsWith("task_")) {
+      window.dispatchEvent(new CustomEvent(TASK_CHANGE_EVENT, { detail }));
+    }
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(TASK_CHANGE_EVENT, { detail }));
 }
 
 /** Opens one SSE connection and broadcasts task changes app-wide. */
@@ -33,7 +44,7 @@ export function useTaskEventSource(enabled: boolean) {
         /* keep-alive from server */
       });
       es.addEventListener("task", (ev) => {
-        dispatchFromPayload((ev as MessageEvent).data as string);
+        dispatchTaskEventFromPayload((ev as MessageEvent).data as string);
       });
       es.onerror = () => {
         es.close();
