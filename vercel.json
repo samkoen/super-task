@@ -3,7 +3,7 @@
   "services": {
     "frontend": {
       "root": "frontend",
-      "installCommand": "npm ci --omit=optional",
+      "installCommand": "npm ci",
       "buildCommand": "npm run build",
       "outputDirectory": "dist",
       "routes": [
