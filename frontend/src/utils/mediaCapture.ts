@@ -81,6 +81,33 @@ export function capturePhotoFromVideo(video: HTMLVideoElement): Promise<Blob | n
   });
 }
 
+/** Applique l'orientation EXIF (Samsung / iOS) pour éviter un aperçu recadré. */
+export async function normalizePhotoOrientation(blob: Blob): Promise<Blob> {
+  if (typeof createImageBitmap !== "function") return blob;
+  try {
+    const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" });
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return blob;
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return await new Promise<Blob>((resolve) => {
+      canvas.toBlob(
+        (normalized) => resolve(normalized ?? blob),
+        "image/jpeg",
+        0.92
+      );
+    });
+  } catch {
+    return blob;
+  }
+}
+
 export function pickVideoRecorderMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];

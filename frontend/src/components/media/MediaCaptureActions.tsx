@@ -9,6 +9,8 @@ import {
   DialogContent,
   DialogTitle,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -19,7 +21,7 @@ import { useCameraStream } from "../../hooks/useCameraStream";
 import { useVideoRecorder } from "../../hooks/useVideoRecorder";
 import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./PhotoAnnotationCanvas";
 import { he } from "../../i18n/he";
-import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported } from "../../utils/mediaCapture";
+import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
 
 export type MediaKind = "photo" | "video" | "audio";
 
@@ -75,6 +77,8 @@ function PhotoCaptureDialog({
   onCapture: (file: File) => void | Promise<void>;
 }) {
   const { supported, active, starting, error, onVideoRef, start } = camera;
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [capturing, setCapturing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -94,7 +98,7 @@ function PhotoCaptureDialog({
     try {
       const blob = await capturePhotoFromVideo(video);
       if (!blob) return;
-      setPreviewBlob(blob);
+      setPreviewBlob(await normalizePhotoOrientation(blob));
     } finally {
       setCapturing(false);
     }
@@ -121,9 +125,9 @@ function PhotoCaptureDialog({
   const hasPreview = Boolean(previewBlob && previewBlob.size > 0);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" dir="rtl" disableEnforceFocus>
+    <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="sm" dir="rtl" disableEnforceFocus>
       <DialogTitle>{he.mediaCapturePhotoTitle}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1, overflowY: "auto" }}>
         {hasPreview && previewBlob ? (
           <PhotoAnnotationCanvas ref={annotationRef} imageBlob={previewBlob} />
         ) : (
@@ -133,7 +137,7 @@ function PhotoCaptureDialog({
             playsInline
             autoPlay
             muted
-            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, objectFit: "cover" }}
+            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
           />
         )}
         {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}

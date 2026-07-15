@@ -122,6 +122,20 @@ export function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
+export function computePhotoDisplaySize(
+  naturalWidth: number,
+  naturalHeight: number,
+  bounds: { maxWidth: number; maxHeight: number }
+): { width: number; height: number; multiplier: number } {
+  if (naturalWidth <= 0 || naturalHeight <= 0) {
+    return { width: 0, height: 0, multiplier: 1 };
+  }
+  const scale = Math.min(1, bounds.maxWidth / naturalWidth, bounds.maxHeight / naturalHeight);
+  const width = Math.max(1, Math.round(naturalWidth * scale));
+  const height = Math.max(1, Math.round(naturalHeight * scale));
+  return { width, height, multiplier: naturalWidth / width };
+}
+
 export function appendDescriptionBlock(existing: string, addition: string): string {
   const extra = addition.trim();
   if (!extra) return existing;

@@ -11,7 +11,7 @@ import {
   dataUrlToFile,
   isAnnotationObject,
 } from "../../utils/fabricAnnotation";
-import { loadImageElement } from "../../utils/photoAnnotation";
+import { computePhotoDisplaySize, loadImageElement } from "../../utils/photoAnnotation";
 import { he } from "../../i18n/he";
 
 export type AnnotationTool = "select" | "ellipse" | "arrow";
@@ -22,7 +22,6 @@ export interface PhotoAnnotationCanvasHandle {
 
 interface PhotoAnnotationCanvasProps {
   imageBlob: Blob;
-  maxDisplayWidth?: number;
 }
 
 type DrawState = {
@@ -32,8 +31,15 @@ type DrawState = {
   draft?: ReturnType<typeof createAnnotationEllipse> | ReturnType<typeof createAnnotationArrow>;
 };
 
+function readDisplayBounds(container: HTMLElement | null): { maxWidth: number; maxHeight: number } {
+  const width = container?.clientWidth ?? 0;
+  const maxWidth = Math.max(280, width > 0 ? width : Math.min(window.innerWidth - 48, 640));
+  const maxHeight = Math.max(240, Math.min(window.innerHeight * 0.5, 520));
+  return { maxWidth, maxHeight };
+}
+
 const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnotationCanvasProps>(
-  function PhotoAnnotationCanvas({ imageBlob, maxDisplayWidth = 640 }, ref) {
+  function PhotoAnnotationCanvas({ imageBlob }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasElRef = useRef<HTMLCanvasElement | null>(null);
     const fabricRef = useRef<Canvas | null>(null);
@@ -43,10 +49,27 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
     const [tool, setTool] = useState<AnnotationTool>("ellipse");
     const [ready, setReady] = useState(false);
     const [hasSelection, setHasSelection] = useState(false);
+    const [displayBounds, setDisplayBounds] = useState(() => readDisplayBounds(null));
 
     useEffect(() => {
       toolRef.current = tool;
     }, [tool]);
+
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const updateBounds = () => setDisplayBounds(readDisplayBounds(container));
+      updateBounds();
+
+      const observer = new ResizeObserver(updateBounds);
+      observer.observe(container);
+      window.addEventListener("resize", updateBounds);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", updateBounds);
+      };
+    }, []);
 
     useEffect(() => {
       let cancelled = false;
@@ -56,10 +79,14 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
       void loadImageElement(url).then(async (image) => {
         if (cancelled || !canvasElRef.current || !containerRef.current) return;
 
-        const scale = Math.min(1, maxDisplayWidth / image.naturalWidth);
-        const width = Math.round(image.naturalWidth * scale);
-        const height = Math.round(image.naturalHeight * scale);
-        exportMultiplierRef.current = image.naturalWidth / width;
+        const { width, height, multiplier } = computePhotoDisplaySize(
+          image.naturalWidth,
+          image.naturalHeight,
+          displayBounds
+        );
+        if (width <= 0 || height <= 0) return;
+
+        exportMultiplierRef.current = multiplier;
 
         fabricRef.current?.dispose();
         const canvas = new Canvas(canvasElRef.current, {
@@ -77,11 +104,13 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
           canvas.dispose();
           return;
         }
+        const sourceWidth = bg.width || image.naturalWidth;
+        const sourceHeight = bg.height || image.naturalHeight;
         bg.set({
           left: 0,
           top: 0,
-          scaleX: width / image.naturalWidth,
-          scaleY: height / image.naturalHeight,
+          scaleX: width / sourceWidth,
+          scaleY: height / sourceHeight,
           selectable: false,
           evented: false,
         });
@@ -168,7 +197,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
         fabricRef.current = null;
         drawStateRef.current = null;
       };
-    }, [imageBlob, maxDisplayWidth]);
+    }, [imageBlob, displayBounds]);
 
     useEffect(() => {
       const canvas = fabricRef.current;
@@ -233,7 +262,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
     }));
 
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, width: "100%" }}>
         <ToggleButtonGroup
           exclusive
           size="small"
@@ -260,7 +289,19 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
         </Typography>
         <Box
           ref={containerRef}
-          sx={{ overflow: "auto", borderRadius: 1, border: "1px solid", borderColor: "divider", lineHeight: 0 }}
+          sx={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+            borderRadius: 1,
+            border: "1px solid",
+            borderColor: "divider",
+            lineHeight: 0,
+            bgcolor: "grey.100",
+            "& .canvas-container": {
+              maxWidth: "100%",
+            },
+          }}
         >
           <canvas ref={canvasElRef} />
         </Box>

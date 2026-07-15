@@ -4,6 +4,7 @@ import {
   capturePhotoFromVideo,
   classifyMediaError,
   getUserMediaWithFallback,
+  normalizePhotoOrientation,
   pickVideoRecorderMimeType,
 } from "./mediaCapture";
 
@@ -70,6 +71,40 @@ describe("mediaCapture", () => {
 
     const blob = await capturePhotoFromVideo(video);
     expect(blob?.type).toBe("image/jpeg");
+  });
+
+  it("normalizePhotoOrientation returns original blob when createImageBitmap is unavailable", async () => {
+    const blob = new Blob(["img"], { type: "image/jpeg" });
+    const original = globalThis.createImageBitmap;
+    // @ts-expect-error test override
+    globalThis.createImageBitmap = undefined;
+    await expect(normalizePhotoOrientation(blob)).resolves.toBe(blob);
+    globalThis.createImageBitmap = original;
+  });
+
+  it("normalizePhotoOrientation redraws oriented bitmap into jpeg blob", async () => {
+    const blob = new Blob(["img"], { type: "image/jpeg" });
+    const close = vi.fn();
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn().mockResolvedValue({
+        width: 1200,
+        height: 900,
+        close,
+      })
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb) => {
+      cb(new Blob(["normalized"], { type: "image/jpeg" }));
+    });
+
+    const normalized = await normalizePhotoOrientation(blob);
+    expect(normalized.type).toBe("image/jpeg");
+    expect(close).toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 
   it("pickVideoRecorderMimeType returns first supported mime", () => {
