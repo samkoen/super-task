@@ -196,6 +196,20 @@ function PhotoCaptureDialog({
   );
 }
 
+function useRecordedVideoRef(previewUrl: string | null) {
+  return useCallback(
+    (node: HTMLVideoElement | null) => {
+      if (!node) return;
+      node.srcObject = null;
+      if (previewUrl) {
+        node.src = previewUrl;
+        node.load();
+      }
+    },
+    [previewUrl]
+  );
+}
+
 function VideoCaptureDialog({
   open,
   uploading,
@@ -224,6 +238,7 @@ function VideoCaptureDialog({
   } = recorder;
   const previewUrl = useBlobPreviewUrl(blob);
   const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
+  const onRecordedVideoRef = useRecordedVideoRef(previewUrl);
   const [confirming, setConfirming] = useState(false);
 
   const handleConfirm = async () => {
@@ -239,6 +254,7 @@ function VideoCaptureDialog({
 
   const handleRetry = () => {
     reset();
+    void startPreview();
   };
 
   return (
@@ -247,20 +263,22 @@ function VideoCaptureDialog({
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         {hasPreview ? (
           <Box
+            key="recorded-preview"
             component="video"
-            src={previewUrl ?? undefined}
+            ref={onRecordedVideoRef}
             controls
             playsInline
-            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, objectFit: "cover" }}
+            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
           />
         ) : (
           <Box
+            key="live-camera"
             component="video"
             ref={onVideoRef}
             playsInline
             autoPlay
             muted
-            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, objectFit: "cover" }}
+            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
           />
         )}
         {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}

@@ -23,8 +23,7 @@ export function useVideoRecorder() {
 
   const supported = isMediaCaptureSupported();
 
-  const stopStream = useCallback(() => {
-    sessionRef.current += 1;
+  const detachLivePreview = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setStream(null);
@@ -32,8 +31,13 @@ export function useVideoRecorder() {
       videoRef.current.srcObject = null;
     }
     setPreviewReady(false);
-    setStarting(false);
   }, []);
+
+  const stopStream = useCallback(() => {
+    sessionRef.current += 1;
+    detachLivePreview();
+    setStarting(false);
+  }, [detachLivePreview]);
 
   const reset = useCallback(() => {
     setBlob(null);
@@ -104,11 +108,12 @@ export function useVideoRecorder() {
       const next = new Blob(chunksRef.current, { type: recorder.mimeType || "video/webm" });
       setBlob(next);
       setRecording(false);
+      detachLivePreview();
     };
     mediaRecorderRef.current = recorder;
     recorder.start();
     setRecording(true);
-  }, [recording]);
+  }, [detachLivePreview, recording]);
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
