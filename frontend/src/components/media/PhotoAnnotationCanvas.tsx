@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { Box, IconButton, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import NearMeIcon from "@mui/icons-material/NearMe";
+import AdjustIcon from "@mui/icons-material/Adjust";
 import PanToolIcon from "@mui/icons-material/PanTool";
 import { Canvas, FabricImage, type TPointerEventInfo } from "fabric";
 import {
@@ -239,11 +240,16 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
           value={tool}
           onChange={(_, value: AnnotationTool | null) => value && setTool(value)}
         >
-          <ToggleButton value="ellipse">{he.photoAnnotateEllipse}</ToggleButton>
-          <ToggleButton value="arrow">
-            <NearMeIcon fontSize="small" sx={{ mr: 0.5 }} />
-            {he.photoAnnotateArrow}
-          </ToggleButton>
+          <Tooltip title={he.photoAnnotateEllipse}>
+            <ToggleButton value="ellipse" aria-label={he.photoAnnotateEllipse}>
+              <AdjustIcon fontSize="small" />
+            </ToggleButton>
+          </Tooltip>
+          <Tooltip title={he.photoAnnotateArrow}>
+            <ToggleButton value="arrow" aria-label={he.photoAnnotateArrow}>
+              <NearMeIcon fontSize="small" />
+            </ToggleButton>
+          </Tooltip>
           <ToggleButton value="select">
             <PanToolIcon fontSize="small" sx={{ mr: 0.5 }} />
             {he.photoAnnotateSelect}
