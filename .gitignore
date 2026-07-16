@@ -5,6 +5,8 @@ venv/
 .env
 *.log
 node_modules/
+**/_nm_trash_*/
+**/node_modules_old*/
 frontend/dist/
 backend/uploads/
 .vercel

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { appendDescriptionBlock, computePhotoDisplaySize, scaleAnnotations } from "./photoAnnotation";
+import {
+  appendDescriptionBlock,
+  computePhotoDisplaySize,
+  dataUrlToFile,
+  hitTestAnnotation,
+  moveAnnotation,
+  scaleAnnotations,
+} from "./photoAnnotation";
 
 describe("appendDescriptionBlock", () => {
   it("returns addition when base empty", () => {
@@ -19,6 +26,41 @@ describe("scaleAnnotations", () => {
   it("scales circle coordinates to full image size", () => {
     const scaled = scaleAnnotations([{ type: "circle", cx: 100, cy: 50, radius: 20 }], 2, 2);
     expect(scaled[0]).toEqual({ type: "circle", cx: 200, cy: 100, radius: 40 });
+  });
+
+  it("scales ellipse axes independently", () => {
+    const scaled = scaleAnnotations([{ type: "ellipse", cx: 10, cy: 20, rx: 4, ry: 6 }], 2, 3);
+    expect(scaled[0]).toEqual({ type: "ellipse", cx: 20, cy: 60, rx: 8, ry: 18 });
+  });
+});
+
+describe("hitTestAnnotation", () => {
+  it("hits inside ellipse", () => {
+    expect(hitTestAnnotation({ type: "ellipse", cx: 50, cy: 50, rx: 20, ry: 10 }, 50, 50)).toBe(true);
+  });
+
+  it("misses far from arrow", () => {
+    expect(hitTestAnnotation({ type: "arrow", x1: 0, y1: 0, x2: 100, y2: 0 }, 50, 40, 5)).toBe(false);
+  });
+});
+
+describe("moveAnnotation", () => {
+  it("moves ellipse by delta", () => {
+    expect(moveAnnotation({ type: "ellipse", cx: 10, cy: 20, rx: 5, ry: 5 }, 3, -2)).toEqual({
+      type: "ellipse",
+      cx: 13,
+      cy: 18,
+      rx: 5,
+      ry: 5,
+    });
+  });
+});
+
+describe("dataUrlToFile", () => {
+  it("converts jpeg data url to file", () => {
+    const file = dataUrlToFile("data:image/jpeg;base64,/9j/4AAQ", "test.jpg");
+    expect(file.name).toBe("test.jpg");
+    expect(file.type).toBe("image/jpeg");
   });
 });
 
