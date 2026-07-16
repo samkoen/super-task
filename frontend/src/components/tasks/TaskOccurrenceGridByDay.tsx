@@ -1,4 +1,6 @@
 import { Box, Typography } from "@mui/material";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import EmptyState from "../ui/EmptyState";
 import TaskOccurrenceGrid, { type TaskOccurrenceGridProps } from "./TaskOccurrenceGrid";
 import { formatHebrewDay, groupTasksByDay, isToday } from "../../utils/dateView";
 import { he } from "../../i18n/he";
@@ -11,15 +13,18 @@ export interface TaskOccurrenceGridByDayProps extends Omit<TaskOccurrenceGridPro
 export default function TaskOccurrenceGridByDay({
   tasks,
   emptyMessage = he.noTasks,
+  emptyDescription = he.noTasksHint,
   ...gridProps
 }: TaskOccurrenceGridByDayProps) {
   const groups = groupTasksByDay(tasks);
 
   if (groups.length === 0) {
     return (
-      <Typography color="text.secondary" textAlign="center" py={6}>
-        {emptyMessage}
-      </Typography>
+      <EmptyState
+        title={emptyMessage}
+        description={emptyDescription}
+        icon={<TaskAltOutlinedIcon fontSize="inherit" />}
+      />
     );
   }
 

@@ -17,6 +17,8 @@ import RateReviewIcon from "@mui/icons-material/RateReview";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import { cardColor } from "../../constants/cardColors";
 import { he } from "../../i18n/he";
+import { formatDueAt } from "../../utils/dateView";
+import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import type { TaskOccurrence, TaskStatus } from "../../services/taskService";
 
 const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error" | "info"> = {
@@ -48,6 +50,7 @@ export default function TaskOccurrenceCard({
   onReview,
 }: TaskOccurrenceCardProps) {
   const { bg, accent } = cardColor(index);
+  const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
   const urgent = task.status === "overdue";
   const awaitingReview = task.status === "pending_review";
   const assigneeLabel = task.assignee_name
@@ -63,24 +66,68 @@ export default function TaskOccurrenceCard({
       sx={{
         height: "100%",
         bgcolor: bg,
-        borderRadius: 2,
+        borderRadius: 3,
         border: "1px solid",
-        borderColor: urgent ? "error.light" : "rgba(0,0,0,0.06)",
-        transition: "box-shadow 0.2s, transform 0.15s",
-        "&:hover": { boxShadow: 3, transform: "translateY(-2px)" },
+        borderColor: urgent ? "error.light" : "divider",
+        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+        transition: "box-shadow 0.2s, transform 0.15s, border-color 0.15s",
+        position: "relative",
+        overflow: "hidden",
+        ...(photoBg
+          ? {
+              backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.72) 100%), url(${photoBg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              color: "#fff",
+            }
+          : {}),
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          insetInlineStart: 0,
+          top: 0,
+          bottom: 0,
+          width: 3,
+          bgcolor: urgent ? "error.main" : accent,
+          zIndex: 1,
+        },
+        "&:hover": { boxShadow: 4, transform: "translateY(-3px)", borderColor: urgent ? "error.main" : accent },
       }}
     >
-      <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.5, minHeight: 168 }}>
+      <Box
+        sx={{
+          p: 2.5,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          minHeight: 168,
+          position: "relative",
+          zIndex: 1,
+          ...(photoBg
+            ? {
+                "& .MuiTypography-root": { color: "inherit" },
+                "& .MuiTypography-caption, & .MuiTypography-body2": { color: "rgba(255,255,255,0.85)" },
+                "& .MuiChip-root": {
+                  bgcolor: "rgba(255,255,255,0.16)",
+                  color: "#fff",
+                  borderColor: "rgba(255,255,255,0.35)",
+                },
+                "& .MuiIconButton-root": { color: "#fff" },
+              }
+            : {}),
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
           <Avatar
             sx={{
-              width: 48,
-              height: 48,
+              width: 46,
+              height: 46,
               bgcolor: accent,
               color: "#fff",
               fontWeight: 700,
-              fontSize: "1.1rem",
+              fontSize: "1.05rem",
               flexShrink: 0,
+              boxShadow: `0 4px 12px ${accent}40`,
             }}
           >
             {task.title.trim()[0]?.toUpperCase() ?? "?"}
@@ -167,12 +214,22 @@ export default function TaskOccurrenceCard({
         </Box>
 
         <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
-          {he.dueAt}: {new Date(task.due_at).toLocaleString("he-IL")}
+          {he.dueAt}: {formatDueAt(task.due_at)}
         </Typography>
       </Box>
 
       {(canDelegate || canCancel || canReview) && (
-        <CardActions sx={{ px: 2, pb: 2, pt: 0, flexDirection: "column", gap: 1 }}>
+        <CardActions
+          sx={{
+            px: 2,
+            pb: 2,
+            pt: 0,
+            flexDirection: "column",
+            gap: 1,
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
           {canReview && onReview && (
             <Button
               fullWidth

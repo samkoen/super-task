@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -69,6 +69,16 @@ class NotificationRepository:
             row.read_at = datetime.now().astimezone()
             self._db.flush()
         return self._to_domain(row)
+
+    def clear_issue_report_links(self, issue_report_id: str) -> int:
+        """Détache les notifications avant suppression d'un דיווח (FK sans CASCADE)."""
+        result = self._db.execute(
+            update(orm.UserNotification)
+            .where(orm.UserNotification.issue_report_id == mp.parse_uuid(issue_report_id))
+            .values(issue_report_id=None)
+        )
+        self._db.flush()
+        return int(result.rowcount or 0)
 
     def mark_all_read(self, user_id: str) -> int:
         q = (

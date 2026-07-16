@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   alpha,
+  Avatar,
   Box,
   Button,
-  CssBaseline,
   Drawer,
   Fab,
   List,
@@ -24,7 +24,7 @@ import InventoryIcon from "@mui/icons-material/Inventory";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import LogoutIcon from "@mui/icons-material/Logout";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
@@ -37,6 +37,9 @@ import {
   sidebarNavTextSx,
 } from "../../styles/hebrewAlign";
 
+const SIDEBAR_BG = "#0B1220";
+const SIDEBAR_ACCENT = "#1A9B86";
+
 const drawerPaperSx = {
   boxSizing: "border-box" as const,
   width: SIDEBAR_WIDTH,
@@ -44,8 +47,11 @@ const drawerPaperSx = {
   maxHeight: "100vh",
   overflow: "hidden",
   border: "none",
-  bgcolor: "background.paper",
-  borderInlineStart: `1px solid ${alpha("#1A2332", 0.08)}`,
+  bgcolor: SIDEBAR_BG,
+  backgroundImage: `
+    radial-gradient(ellipse 90% 50% at 0% 0%, ${alpha(SIDEBAR_ACCENT, 0.22)} 0%, transparent 55%),
+    linear-gradient(180deg, #111827 0%, ${SIDEBAR_BG} 40%, #080D16 100%)
+  `,
 };
 
 function Layout() {
@@ -99,23 +105,73 @@ function Layout() {
     setMobileOpen(false);
   };
 
+  const initials = (user?.full_name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("");
+
   const drawerContent = (
     <Box
       sx={{
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "primary.main",
-        color: "primary.contrastText",
+        color: alpha("#fff", 0.92),
       }}
     >
-      <Box sx={{ ...sidebarHeaderSx, borderBottomColor: alpha("#fff", 0.12) }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+      <Box sx={{ ...sidebarHeaderSx, borderBottomColor: alpha("#fff", 0.08) }}>
+        <Box display="flex" alignItems="center" gap={1.25} mb={2}>
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(SIDEBAR_ACCENT, 0.2),
+              color: SIDEBAR_ACCENT,
+              border: `1px solid ${alpha(SIDEBAR_ACCENT, 0.35)}`,
+            }}
+          >
+            <StorefrontIcon fontSize="small" />
+          </Box>
           <Box minWidth={0}>
-            <Typography variant="subtitle1" fontWeight={800} noWrap>
+            <Typography variant="subtitle1" fontWeight={800} noWrap letterSpacing="-0.02em">
               {he.appName}
             </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.8 }} noWrap>
+            <Typography variant="caption" sx={{ opacity: 0.55, display: "block" }} noWrap>
+              {he.appSubtitle}
+            </Typography>
+          </Box>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            p: 1.25,
+            borderRadius: 2.5,
+            bgcolor: alpha("#fff", 0.05),
+            border: `1px solid ${alpha("#fff", 0.07)}`,
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1.25} minWidth={0}>
+            <Avatar
+              sx={{
+                width: 34,
+                height: 34,
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                bgcolor: alpha(SIDEBAR_ACCENT, 0.25),
+                color: "#E6FFFA",
+              }}
+            >
+              {initials}
+            </Avatar>
+            <Typography variant="body2" fontWeight={600} noWrap sx={{ opacity: 0.9 }}>
               {user?.full_name}
             </Typography>
           </Box>
@@ -123,9 +179,19 @@ function Layout() {
         </Box>
       </Box>
 
-      <List sx={{ flex: 1, px: 1.5, py: 2 }}>
+      <Typography
+        variant="overline"
+        sx={{ px: 3, pt: 2.5, pb: 0.5, opacity: 0.4, fontSize: "0.65rem" }}
+      >
+        {he.mainMenu}
+      </Typography>
+
+      <List sx={{ flex: 1, px: 1.5, py: 0.5, overflowY: "auto" }}>
         {menuItems.map((item) => {
-          const selected = location.pathname.startsWith(item.path);
+          const selected =
+            item.path === "/manager" || item.path === "/admin" || item.path === "/employee"
+              ? location.pathname === item.path
+              : location.pathname.startsWith(item.path);
           return (
             <ListItemButton
               key={item.path}
@@ -133,37 +199,60 @@ function Layout() {
               onClick={() => handleNavigation(item.path)}
               sx={{
                 ...sidebarNavButtonSx,
-                borderRadius: 2,
+                borderRadius: 2.5,
                 mb: 0.5,
-                color: "inherit",
+                py: 1.1,
+                color: selected ? "#fff" : alpha("#fff", 0.72),
                 "&.Mui-selected": {
-                  bgcolor: alpha("#fff", 0.16),
-                  "&:hover": { bgcolor: alpha("#fff", 0.22) },
+                  bgcolor: alpha(SIDEBAR_ACCENT, 0.22),
+                  boxShadow: `inset 3px 0 0 ${SIDEBAR_ACCENT}`,
+                  "&:hover": { bgcolor: alpha(SIDEBAR_ACCENT, 0.28) },
                 },
-                "&:hover": { bgcolor: alpha("#fff", 0.1) },
+                "&:hover": { bgcolor: alpha("#fff", 0.06), color: "#fff" },
               }}
             >
-              <ListItemIcon sx={{ ...sidebarNavIconSx, color: "inherit" }}>
+              <ListItemIcon
+                sx={{
+                  ...sidebarNavIconSx,
+                  color: selected ? SIDEBAR_ACCENT : "inherit",
+                  opacity: selected ? 1 : 0.85,
+                }}
+              >
                 {item.icon}
               </ListItemIcon>
               <ListItemText
                 primary={item.text}
-                slotProps={{ primary: { sx: sidebarNavTextSx } }}
+                slotProps={{
+                  primary: {
+                    sx: {
+                      ...sidebarNavTextSx,
+                      fontWeight: selected ? 700 : 500,
+                      fontSize: "0.925rem",
+                    },
+                  },
+                }}
               />
-              <ChevronRightIcon sx={{ fontSize: 18, opacity: 0.7 }} />
             </ListItemButton>
           );
         })}
       </List>
 
-      <Box sx={{ p: 2, borderTop: `1px solid ${alpha("#fff", 0.12)}` }}>
+      <Box sx={{ p: 2, borderTop: `1px solid ${alpha("#fff", 0.08)}` }}>
         <Button
           fullWidth
           type="button"
           startIcon={<LogoutIcon />}
           onClick={handleLogout}
           sx={{
-            color: "inherit",
+            color: alpha("#fff", 0.75),
+            borderRadius: 2.5,
+            py: 1.1,
+            border: `1px solid ${alpha("#fff", 0.08)}`,
+            bgcolor: alpha("#fff", 0.03),
+            "&:hover": {
+              bgcolor: alpha("#fff", 0.08),
+              color: "#fff",
+            },
             ...sidebarNavButtonSx,
           }}
         >
@@ -176,34 +265,70 @@ function Layout() {
   if (isEmployee) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-        <CssBaseline />
         <Box
           sx={{
+            position: "sticky",
+            top: 0,
+            zIndex: (t) => t.zIndex.appBar,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            px: 2,
-            py: 1.5,
-            bgcolor: "primary.main",
-            color: "primary.contrastText",
+            px: { xs: 2, sm: 2.5 },
+            py: 1.25,
+            color: "#fff",
+            bgcolor: SIDEBAR_BG,
+            backgroundImage: `
+              radial-gradient(ellipse 80% 120% at 100% 0%, ${alpha(SIDEBAR_ACCENT, 0.28)} 0%, transparent 50%),
+              linear-gradient(90deg, #111827 0%, ${SIDEBAR_BG} 100%)
+            `,
+            borderBottom: `1px solid ${alpha("#fff", 0.06)}`,
+            boxShadow: `0 8px 24px ${alpha("#0B1220", 0.25)}`,
           }}
         >
-          <Typography variant="subtitle1" fontWeight={800}>{he.appName}</Typography>
+          <Box display="flex" alignItems="center" gap={1.25}>
+            <Box
+              sx={{
+                width: 34,
+                height: 34,
+                borderRadius: 1.5,
+                display: "grid",
+                placeItems: "center",
+                bgcolor: alpha(SIDEBAR_ACCENT, 0.2),
+                color: SIDEBAR_ACCENT,
+              }}
+            >
+              <StorefrontIcon sx={{ fontSize: 20 }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={800} lineHeight={1.2}>
+                {he.appName}
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.55, display: { xs: "none", sm: "block" } }}>
+                {user?.full_name}
+              </Typography>
+            </Box>
+          </Box>
           <Box display="flex" alignItems="center" gap={0.5}>
             <NotificationBell />
             <Button
-            type="button"
-            color="inherit"
-            size="small"
-            startIcon={<LogoutIcon />}
-            onClick={handleLogout}
-            sx={sidebarNavButtonSx}
-          >
-            {he.logout}
-          </Button>
+              type="button"
+              color="inherit"
+              size="small"
+              startIcon={<LogoutIcon />}
+              onClick={handleLogout}
+              sx={{
+                ...sidebarNavButtonSx,
+                opacity: 0.85,
+                borderRadius: 2,
+                px: 1.5,
+                "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
+              }}
+            >
+              {he.logout}
+            </Button>
           </Box>
         </Box>
-        <Box sx={{ px: { xs: 1.5, sm: 2 }, py: 2 }}>
+        <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 2.5 }, maxWidth: 960, mx: "auto" }}>
           <Outlet />
         </Box>
       </Box>
@@ -212,8 +337,6 @@ function Layout() {
 
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden" }}>
-      <CssBaseline />
-
       <Fab
         size="small"
         color="primary"
@@ -276,11 +399,13 @@ function Layout() {
           height: "100vh",
           overflowY: "auto",
           overflowX: "hidden",
-          px: { xs: 1.5, sm: 2.5 },
-          py: { xs: 2, sm: 3 },
+          px: { xs: 1.5, sm: 3, md: 4 },
+          py: { xs: 2.5, sm: 3.5 },
         }}
       >
-        <Outlet />
+        <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

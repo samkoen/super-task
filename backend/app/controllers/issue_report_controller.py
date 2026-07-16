@@ -107,6 +107,20 @@ def get_issue_report(
     return {"report": report}
 
 
+@router.delete("/{report_id}")
+@handle_controller_errors
+def delete_issue_report(
+    report_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    service: IssueReportService = Depends(get_issue_report_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    service.delete_report(actor, report_id)
+    db.commit()
+    return {"ok": True, "message": "הדיווח נמחק"}
+
+
 @router.post("/upload-photo")
 async def upload_issue_photo(file: UploadFile = File(...)):
     return await _upload_issue_attachment("photo", file)

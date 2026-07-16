@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Box,
   Button,
@@ -29,6 +30,8 @@ export interface TaskDateViewBarProps {
   rangeFrom: string;
   rangeTo: string;
   onRangeChange: (from: string, to: string) => void;
+  /** Filtres alignés sur la même ligne que le jour / la plage (ex. עובד). */
+  trailing?: ReactNode;
 }
 
 export default function TaskDateViewBar({
@@ -39,6 +42,7 @@ export default function TaskDateViewBar({
   rangeFrom,
   rangeTo,
   onRangeChange,
+  trailing,
 }: TaskDateViewBarProps) {
   const applyWeek = () => {
     const { from, to } = weekRangeAround(todayIso());
@@ -51,7 +55,7 @@ export default function TaskDateViewBar({
   };
 
   return (
-    <Box mb={2}>
+    <Box mb={1}>
       <Tabs
         value={mode}
         onChange={(_, value: TaskDateViewMode) => onModeChange(value)}
@@ -84,7 +88,8 @@ export default function TaskDateViewBar({
               {he.tasksToday}
             </Button>
           )}
-          <Typography variant="body2" color="text.secondary" sx={{ flex: "1 1 100%", minWidth: 200 }}>
+          {trailing}
+          <Typography variant="body2" color="text.secondary" sx={{ width: "100%" }}>
             {isToday(day) ? he.tasksTodayLabel : formatHebrewDay(day)}
           </Typography>
         </Box>
@@ -112,7 +117,8 @@ export default function TaskDateViewBar({
           />
           <Button size="small" variant="outlined" onClick={applyWeek}>{he.tasksThisWeek}</Button>
           <Button size="small" variant="outlined" onClick={applyNext7Days}>{he.tasksNext7Days}</Button>
-          <Typography variant="body2" color="text.secondary" sx={{ flex: "1 1 100%", minWidth: 200 }}>
+          {trailing}
+          <Typography variant="body2" color="text.secondary" sx={{ width: "100%" }}>
             {formatHebrewDayShort(rangeFrom)} – {formatHebrewDayShort(rangeTo)}
           </Typography>
         </Box>

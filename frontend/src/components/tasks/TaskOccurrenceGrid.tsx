@@ -1,4 +1,6 @@
-import { Grid2 as Grid, Typography } from "@mui/material";
+import { Grid2 as Grid } from "@mui/material";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import EmptyState from "../ui/EmptyState";
 import TaskOccurrenceCard, { type TaskOccurrenceCardProps } from "./TaskOccurrenceCard";
 import { he } from "../../i18n/he";
 import type { TaskOccurrence } from "../../services/taskService";
@@ -6,6 +8,7 @@ import type { TaskOccurrence } from "../../services/taskService";
 export interface TaskOccurrenceGridProps {
   tasks: TaskOccurrence[];
   emptyMessage?: string;
+  emptyDescription?: string;
   isBranchManager?: boolean;
   onDelegate?: TaskOccurrenceCardProps["onDelegate"];
   onEdit?: TaskOccurrenceCardProps["onEdit"];
@@ -16,6 +19,7 @@ export interface TaskOccurrenceGridProps {
 export default function TaskOccurrenceGrid({
   tasks,
   emptyMessage = he.noTasks,
+  emptyDescription = he.noTasksHint,
   isBranchManager,
   onDelegate,
   onEdit,
@@ -24,9 +28,11 @@ export default function TaskOccurrenceGrid({
 }: TaskOccurrenceGridProps) {
   if (tasks.length === 0) {
     return (
-      <Typography color="text.secondary" textAlign="center" py={6}>
-        {emptyMessage}
-      </Typography>
+      <EmptyState
+        title={emptyMessage}
+        description={emptyDescription}
+        icon={<TaskAltOutlinedIcon fontSize="inherit" />}
+      />
     );
   }
 

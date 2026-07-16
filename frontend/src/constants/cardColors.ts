@@ -1,11 +1,11 @@
-/** Pastel backgrounds for card grids (cycle by index). */
+/** Soft accent surfaces for task cards (cycle by index). */
 export const CARD_COLORS = [
-  { bg: "#e3f2fd", accent: "#1565c0" },
-  { bg: "#fce4ec", accent: "#c2185b" },
-  { bg: "#e0f7fa", accent: "#00838f" },
-  { bg: "#fff3e0", accent: "#ef6c00" },
-  { bg: "#e8f5e9", accent: "#2e7d32" },
-  { bg: "#fff8e1", accent: "#f9a825" },
+  { bg: "#EEF6F4", accent: "#0A6B5C" },
+  { bg: "#F0F4FA", accent: "#1D4E89" },
+  { bg: "#F7F2EE", accent: "#9A5B3C" },
+  { bg: "#F3F0F7", accent: "#5B4B8A" },
+  { bg: "#F0F6F0", accent: "#2F6B45" },
+  { bg: "#F7F4EA", accent: "#8A6D1F" },
 ] as const;
 
 export function cardColor(index: number) {

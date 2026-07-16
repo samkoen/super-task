@@ -1,8 +1,9 @@
 ﻿import { lazy, Suspense } from "react";
-import { Box, CircularProgress } from "@mui/material";
+import { Box } from "@mui/material";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ListSkeleton from "./components/ui/ListSkeleton";
 import { getHomePath } from "./config/routes";
 import { useAuth } from "./context/AuthContext";
 
@@ -24,8 +25,8 @@ const EmployeeTasksPage = lazy(() => import("./pages/employee/EmployeeTasksPage"
 
 function PageLoader() {
   return (
-    <Box display="flex" justifyContent="center" py={8}>
-      <CircularProgress />
+    <Box py={4} px={{ xs: 1.5, sm: 3 }}>
+      <ListSkeleton variant="dashboard" />
     </Box>
   );
 }

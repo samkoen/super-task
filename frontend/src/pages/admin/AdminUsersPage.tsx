@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -18,15 +17,19 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import { ApiError, type User, type UserRole } from "../../services/api";
 import { networkService, type Network } from "../../services/networkService";
 import { branchService, type Branch } from "../../services/branchService";
 import { userService } from "../../services/userService";
 import { needsNetworkField, needsBranchField } from "../../utils/userScopeForm";
 import { he } from "../../i18n/he";
+import { useFeedback } from "../../context/FeedbackContext";
+import PageHeader from "../../components/ui/PageHeader";
+import EmptyState from "../../components/ui/EmptyState";
+import ListSkeleton from "../../components/ui/ListSkeleton";
 
 const CREATABLE_ROLES: UserRole[] = ["network_manager", "branch_manager"];
 
@@ -48,19 +51,17 @@ const emptyForm = {
 };
 
 export default function AdminUsersPage() {
+  const { showSuccess, showError } = useFeedback();
   const [users, setUsers] = useState<User[]>([]);
   const [networks, setNetworks] = useState<Network[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
     try {
       const [userList, networkList, branchList] = await Promise.all([
         userService.list(),
@@ -71,11 +72,11 @@ export default function AdminUsersPage() {
       setNetworks(networkList);
       setBranches(branchList);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showError]);
 
   useEffect(() => {
     load();
@@ -83,8 +84,6 @@ export default function AdminUsersPage() {
 
   const handleCreate = async () => {
     setSaving(true);
-    setError("");
-    setSuccess("");
     try {
       const payload = {
         ...form,
@@ -94,10 +93,10 @@ export default function AdminUsersPage() {
       const res = await userService.create(payload);
       setOpen(false);
       setForm(emptyForm);
-      setSuccess(res.message);
+      showSuccess(res.message);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
@@ -111,23 +110,28 @@ export default function AdminUsersPage() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} gap={2}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>{he.adminUsers}</Typography>
-          <Typography variant="body2" color="text.secondary">{he.adminUsersSubtitle}</Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
-          {he.newUser}
-        </Button>
-      </Box>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
+      <PageHeader
+        title={he.adminUsers}
+        subtitle={he.adminUsersSubtitle}
+        action={
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
+            {he.newUser}
+          </Button>
+        }
+      />
 
       {loading && users.length === 0 ? (
-        <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>
+        <ListSkeleton variant="table" rows={6} />
+      ) : users.length === 0 ? (
+        <EmptyState
+          title={he.noUsers}
+          description={he.emptyTableHint}
+          icon={<PeopleOutlineIcon fontSize="inherit" />}
+          actionLabel={he.newUser}
+          onAction={() => setOpen(true)}
+        />
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
           <Table size="small">
             <TableHead>
               <TableRow>

@@ -30,7 +30,7 @@ export const sidebarNavTextSx = {
 
 export const sidebarHeaderSx = {
   flexShrink: 0,
-  px: 2.5,
-  py: 2,
-  borderBottom: "1px solid rgba(255,255,255,0.12)",
+  px: 2,
+  py: 2.25,
+  borderBottom: "1px solid rgba(255,255,255,0.08)",
 } as const;

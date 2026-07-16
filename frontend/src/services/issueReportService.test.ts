@@ -2,11 +2,13 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockGet = vi.fn();
 const mockPost = vi.fn();
+const mockDelete = vi.fn();
 
 vi.mock("./api", () => ({
   default: {
     get: (...args: unknown[]) => mockGet(...args),
     post: (...args: unknown[]) => mockPost(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
   },
   ApiError: class ApiError extends Error {
     constructor(message: string, public status: number) {
@@ -56,5 +58,14 @@ describe("issueReportService", () => {
       { headers: { "Content-Type": "multipart/form-data" } }
     );
     expect(result.url).toContain("issue_photos");
+  });
+
+  it("deleteReport calls DELETE /issue-reports/:id", async () => {
+    mockDelete.mockResolvedValue({ data: { ok: true, message: "deleted" } });
+
+    const result = await issueReportService.deleteReport("r1");
+
+    expect(mockDelete).toHaveBeenCalledWith("/issue-reports/r1");
+    expect(result.ok).toBe(true);
   });
 });

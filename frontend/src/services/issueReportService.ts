@@ -47,6 +47,11 @@ export const issueReportService = {
     return response.data.report;
   },
 
+  deleteReport: async (reportId: string) => {
+    const response = await api.delete<{ ok: boolean; message: string }>(`/issue-reports/${reportId}`);
+    return response.data;
+  },
+
   uploadPhoto: async (file: File) => uploadIssueFile(file, "photo"),
 
   uploadVideo: async (file: File) => uploadIssueFile(file, "video"),

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -10,6 +11,7 @@ import {
   FormControlLabel,
   DialogTitle,
   MenuItem,
+  Paper,
   Switch,
   Tab,
   Tabs,
@@ -31,7 +33,11 @@ import TaskReferenceMediaEditor, {
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
 import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
+import PageHeader from "../../components/ui/PageHeader";
+import ListSkeleton from "../../components/ui/ListSkeleton";
 import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStorage";
+import { useFeedback } from "../../context/FeedbackContext";
+import type { AdHocTaskPrefillFromIssue } from "../../utils/issueReportTaskPrefill";
 import {
   datetimeLocalForDay,
   defaultRangeFrom,
@@ -69,14 +75,15 @@ const EMPTY_REFERENCE_MEDIA: TaskReferenceMediaValue = {
 
 export default function ManagerTasksPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { showSuccess, showError } = useFeedback();
   const [tab, setTab] = useState(0);
   const [occurrences, setOccurrences] = useState<TaskOccurrence[]>([]);
   const [pending, setPending] = useState<TaskOccurrence[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [openFixed, setOpenFixed] = useState(false);
   const [openAdHoc, setOpenAdHoc] = useState(false);
   const [creationPicker, setCreationPicker] = useState<"fixed" | "ad_hoc" | null>(null);
@@ -172,10 +179,7 @@ export default function ManagerTasksPage() {
   );
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) {
-      setLoading(true);
-      setError("");
-    }
+    if (!silent) setLoading(true);
     try {
       const branchId = scopeBranchId || undefined;
       const dateParams =
@@ -193,11 +197,11 @@ export default function ManagerTasksPage() {
       setBranches(branchList);
       setEmployees(team);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, isBranchManager]);
+  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, isBranchManager, showError]);
 
   useEffect(() => {
     load();
@@ -258,17 +262,43 @@ export default function ManagerTasksPage() {
     setOpenFixed(true);
   };
 
-  const handleOpenAdHocForm = (prefill?: TaskVoiceFillResult) => {
+  const handleOpenAdHocForm = (
+    prefill?: TaskVoiceFillResult,
+    media?: TaskReferenceMediaValue,
+    options?: { branch_id?: string; assignee_user_id?: string }
+  ) => {
     setAdHocForm({
-      branch_id: voiceBranchId || scopeBranchId || user?.branch_id || "",
+      branch_id: options?.branch_id || voiceBranchId || scopeBranchId || user?.branch_id || "",
       title: prefill?.title ?? "",
       description: prefill?.description ?? "",
       due_at: datetimeLocalForDay(dateViewMode === "day" ? filterDay : filterFrom),
-      assignee_user_id: isBranchManager && filterEmployee ? filterEmployee : prefill?.assignee_user_id ?? "",
+      assignee_user_id:
+        options?.assignee_user_id
+        || (isBranchManager && filterEmployee ? filterEmployee : "")
+        || prefill?.assignee_user_id
+        || "",
     });
-    setAdHocReferenceMedia(EMPTY_REFERENCE_MEDIA);
+    setAdHocReferenceMedia(media ?? EMPTY_REFERENCE_MEDIA);
     setOpenAdHoc(true);
   };
+
+  useEffect(() => {
+    const state = location.state as { adHocPrefillFromIssue?: AdHocTaskPrefillFromIssue } | null;
+    const fromIssue = state?.adHocPrefillFromIssue;
+    if (!fromIssue) return;
+    handleOpenAdHocForm(
+      { title: fromIssue.title, description: fromIssue.description, assignee_user_id: fromIssue.assignee_user_id },
+      {
+        reference_photo_url: fromIssue.reference_photo_url,
+        reference_video_url: fromIssue.reference_video_url,
+        reference_audio_url: fromIssue.reference_audio_url,
+      },
+      { branch_id: fromIssue.branch_id, assignee_user_id: fromIssue.assignee_user_id }
+    );
+    navigate(location.pathname, { replace: true, state: {} });
+    // Intentionally once when arriving from דיווחי תקלות
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const handleCreationModeSelect = (mode: "manual" | "voice") => {
     if (!creationPicker) return;
@@ -312,10 +342,10 @@ export default function ManagerTasksPage() {
       });
       setOpenFixed(false);
       setFixedReferenceMedia(EMPTY_REFERENCE_MEDIA);
-      setSuccess(res.message);
+      showSuccess(res.message);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
@@ -341,10 +371,10 @@ export default function ManagerTasksPage() {
       });
       setOpenAdHoc(false);
       setAdHocReferenceMedia(EMPTY_REFERENCE_MEDIA);
-      setSuccess(res.message);
+      showSuccess(res.message);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
@@ -359,26 +389,24 @@ export default function ManagerTasksPage() {
       setDelegateAssignee("");
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = async (task: TaskOccurrence) => {
-    setError("");
     try {
       await taskService.cancel(task.id);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     }
   };
 
   const handleOpenEdit = async (task: TaskOccurrence) => {
     setEditTarget(null);
     setEditLoading(true);
-    setError("");
     setEditReferenceMediaDirty(false);
     try {
       const fresh = await taskService.getOccurrence(task.id);
@@ -394,7 +422,7 @@ export default function ManagerTasksPage() {
         reference_audio_url: fresh.reference_audio_url ?? "",
       });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setEditLoading(false);
     }
@@ -403,7 +431,6 @@ export default function ManagerTasksPage() {
   const handleSaveEdit = async () => {
     if (!editTarget) return;
     setSaving(true);
-    setError("");
     try {
       const payload: Parameters<typeof taskService.updateOccurrence>[1] = {
         title: editForm.title.trim(),
@@ -420,10 +447,10 @@ export default function ManagerTasksPage() {
       const res = await taskService.updateOccurrence(editTarget.id, payload);
       setEditTarget(null);
       setEditReferenceMediaDirty(false);
-      setSuccess(res.message);
+      showSuccess(res.message);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
@@ -436,64 +463,94 @@ export default function ManagerTasksPage() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={2} flexWrap="wrap">
-        <Box>
-          <Typography variant="h5" fontWeight={700}>{he.managerTasks}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {isBranchManager && user?.branch_name
-              ? `${he.branch}: ${user.branch_name}`
-              : he.managerTasksSubtitle}
-          </Typography>
-        </Box>
-        <Box display="flex" gap={1} flexWrap="wrap">
-          {canPickBranch && (
-            <TextField select size="small" label={he.branch} value={filterBranch} onChange={(e) => { setFilterBranch(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 160 }}>
-              <MenuItem value="">{he.all}</MenuItem>
-              {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-            </TextField>
-          )}
-          <TextField select size="small" label={he.filterByEmployee} value={filterEmployee} onChange={(e) => { setFilterEmployee(e.target.value); setActiveSavedFilterId(null); }} sx={{ minWidth: 180 }}>
-            <MenuItem value="">{he.all}</MenuItem>
-            {filterEmployees.map((u) => <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>)}
-          </TextField>
-          {isBranchManager && (
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreationPicker("fixed")}>{he.newFixedTask}</Button>
-          )}
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenAdHoc}>{he.newAdHocTask}</Button>
-        </Box>
-      </Box>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
-
-      <TaskDateViewBar
-        mode={dateViewMode}
-        onModeChange={(mode) => {
-          setDateViewMode(mode);
-          resetSavedFilterActive();
-        }}
-        day={filterDay}
-        onDayChange={(day) => {
-          setFilterDay(day);
-          resetSavedFilterActive();
-        }}
-        rangeFrom={filterFrom}
-        rangeTo={filterTo}
-        onRangeChange={(from, to) => {
-          setFilterFrom(from);
-          setFilterTo(to);
-          resetSavedFilterActive();
-        }}
+      <PageHeader
+        title={he.managerTasks}
+        subtitle={
+          isBranchManager && user?.branch_name
+            ? `${he.branch}: ${user.branch_name}`
+            : he.managerTasksSubtitle
+        }
+        action={
+          <Box display="flex" gap={1} flexWrap="wrap">
+            {isBranchManager && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreationPicker("fixed")}>
+                {he.newFixedTask}
+              </Button>
+            )}
+            <Button variant="outlined" startIcon={<AddIcon />} onClick={handleOpenAdHoc}>
+              {he.newAdHocTask}
+            </Button>
+          </Box>
+        }
       />
 
-      <SavedFiltersBar
-        filterClient={managerTasksSavedFiltersClient}
-        storageKeyExpanded={SAVED_FILTERS_EXPANDED_KEY}
-        filters={currentFilters}
-        activeSavedFilterId={activeSavedFilterId}
-        onSelectSaved={handleSelectSavedFilter}
-        onActiveFilterRemoved={() => setActiveSavedFilterId(null)}
-      />
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
+        <TaskDateViewBar
+          mode={dateViewMode}
+          onModeChange={(mode) => {
+            setDateViewMode(mode);
+            resetSavedFilterActive();
+          }}
+          day={filterDay}
+          onDayChange={(day) => {
+            setFilterDay(day);
+            resetSavedFilterActive();
+          }}
+          rangeFrom={filterFrom}
+          rangeTo={filterTo}
+          onRangeChange={(from, to) => {
+            setFilterFrom(from);
+            setFilterTo(to);
+            resetSavedFilterActive();
+          }}
+          trailing={
+            <>
+              {canPickBranch && (
+                <TextField
+                  select
+                  size="small"
+                  label={he.branch}
+                  value={filterBranch}
+                  onChange={(e) => {
+                    setFilterBranch(e.target.value);
+                    setActiveSavedFilterId(null);
+                  }}
+                  sx={{ minWidth: 140 }}
+                >
+                  <MenuItem value="">{he.all}</MenuItem>
+                  {branches.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                  ))}
+                </TextField>
+              )}
+              <TextField
+                select
+                size="small"
+                label={he.filterByEmployee}
+                value={filterEmployee}
+                onChange={(e) => {
+                  setFilterEmployee(e.target.value);
+                  setActiveSavedFilterId(null);
+                }}
+                sx={{ minWidth: 160 }}
+              >
+                <MenuItem value="">{he.all}</MenuItem>
+                {filterEmployees.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+                ))}
+              </TextField>
+            </>
+          }
+        />
+        <SavedFiltersBar
+          filterClient={managerTasksSavedFiltersClient}
+          storageKeyExpanded={SAVED_FILTERS_EXPANDED_KEY}
+          filters={currentFilters}
+          activeSavedFilterId={activeSavedFilterId}
+          onSelectSaved={handleSelectSavedFilter}
+          onActiveFilterRemoved={() => setActiveSavedFilterId(null)}
+        />
+      </Paper>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={`${he.allTasks} (${displayedOccurrences.length})`} />
@@ -501,11 +558,13 @@ export default function ManagerTasksPage() {
       </Tabs>
 
       {loading ? (
-        <Box display="flex" justifyContent="center" py={8}><CircularProgress /></Box>
+        <ListSkeleton variant="cards" rows={6} />
       ) : tab === 0 ? (
         dateViewMode === "range" ? (
           <TaskOccurrenceGridByDay
             tasks={displayedOccurrences}
+            emptyMessage={filterEmployee || filterBranch ? he.noTasksFiltered : he.noTasks}
+            emptyDescription={filterEmployee || filterBranch ? he.noTasksFilteredHint : he.noTasksHint}
             isBranchManager={isBranchManager}
             onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
             onEdit={canManageTasks ? handleOpenEdit : undefined}
@@ -515,6 +574,8 @@ export default function ManagerTasksPage() {
         ) : (
           <TaskOccurrenceGrid
             tasks={displayedOccurrences}
+            emptyMessage={filterEmployee || filterBranch ? he.noTasksFiltered : he.noTasks}
+            emptyDescription={filterEmployee || filterBranch ? he.noTasksFilteredHint : he.noTasksHint}
             isBranchManager={isBranchManager}
             onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
             onEdit={canManageTasks ? handleOpenEdit : undefined}
@@ -525,7 +586,8 @@ export default function ManagerTasksPage() {
       ) : (
         <TaskOccurrenceGrid
           tasks={displayedPending}
-          emptyMessage={filterEmployee ? he.noTasks : he.noTasks}
+          emptyMessage={filterEmployee ? he.noTasksFiltered : he.noTasks}
+          emptyDescription={filterEmployee ? he.noTasksFilteredHint : he.noTasksHint}
           isBranchManager={isBranchManager}
           onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
           onEdit={canManageTasks ? handleOpenEdit : undefined}
@@ -537,7 +599,7 @@ export default function ManagerTasksPage() {
         task={reviewTarget}
         onClose={() => setReviewTarget(null)}
         onDone={(message) => {
-          setSuccess(message);
+          showSuccess(message);
           void load(true);
         }}
       />
@@ -558,7 +620,7 @@ export default function ManagerTasksPage() {
         onBranchChange={setVoiceBranchId}
         onClose={() => setVoiceCreation(null)}
         onFilled={handleVoiceFilled}
-        onError={setError}
+        onError={showError}
       />
 
       <Dialog open={openFixed} onClose={() => setOpenFixed(false)} fullWidth maxWidth="sm" dir="rtl">
@@ -601,7 +663,7 @@ export default function ManagerTasksPage() {
               setFixedForm((f) => ({ ...f, description: appendDescriptionBlock(f.description, transcript) }))
             }
             disabled={saving}
-            onError={setError}
+            onError={showError}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -636,7 +698,7 @@ export default function ManagerTasksPage() {
               setAdHocForm((f) => ({ ...f, description: appendDescriptionBlock(f.description, transcript) }))
             }
             disabled={saving}
-            onError={setError}
+            onError={showError}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -735,7 +797,7 @@ export default function ManagerTasksPage() {
               setEditForm((f) => ({ ...f, description: appendDescriptionBlock(f.description, transcript) }))
             }
             disabled={saving}
-            onError={setError}
+            onError={showError}
           />
             </>
           ) : null}

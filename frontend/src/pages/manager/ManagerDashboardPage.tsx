@@ -30,6 +30,8 @@ import StatCard from "../../components/dashboard/StatCard";
 import TaskQueuePanel from "../../components/dashboard/TaskQueuePanel";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import UnfinishedTasksPanel from "../../components/dashboard/UnfinishedTasksPanel";
+import PageHeader from "../../components/ui/PageHeader";
+import ListSkeleton from "../../components/ui/ListSkeleton";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -109,43 +111,35 @@ export default function ManagerDashboardPage() {
   }, []);
 
   if (loading && !data) {
-    return (
-      <Box display="flex" justifyContent="center" py={8}>
-        <CircularProgress />
-      </Box>
-    );
+    return <ListSkeleton variant="dashboard" />;
   }
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2} mb={3}>
-        <Box>
-          <Typography variant="h5" fontWeight={800} gutterBottom>
-            {data?.branch ? `${he.branch}: ${data.branch.name}` : he.dashboardNetworkOverview}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {user?.full_name ? he.welcome(user.full_name) : ""}
-          </Typography>
-        </Box>
-        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-          {data && <HealthBadge level={data.health} size="medium" />}
-          {canPickBranch && (
-            <TextField
-              select
-              size="small"
-              label={he.dashboardSelectBranch}
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              sx={{ minWidth: 180 }}
-            >
-              <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
-              {branches.map((b) => (
-                <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
-              ))}
-            </TextField>
-          )}
-        </Box>
-      </Box>
+      <PageHeader
+        title={data?.branch ? `${he.branch}: ${data.branch.name}` : he.dashboardNetworkOverview}
+        subtitle={user?.full_name ? he.welcome(user.full_name) : undefined}
+        action={
+          <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+            {data && <HealthBadge level={data.health} size="medium" />}
+            {canPickBranch && (
+              <TextField
+                select
+                size="small"
+                label={he.dashboardSelectBranch}
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                sx={{ minWidth: 180 }}
+              >
+                <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
+                {branches.map((b) => (
+                  <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+                ))}
+              </TextField>
+            )}
+          </Box>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}

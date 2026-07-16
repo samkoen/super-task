@@ -5,6 +5,7 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { FeedbackProvider } from "./context/FeedbackContext";
 import { emotionCache } from "./emotion/caches";
 import { theme } from "./theme/theme";
 
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <CssBaseline />
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <FeedbackProvider>
+              <App />
+            </FeedbackProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

@@ -123,6 +123,21 @@ class IssueReportService:
         reports = self._repo.list_reports(branch_ids=branch_ids)
         return [self._enrich_report(r) for r in reports]
 
+    def delete_report(self, actor: ActorContext, report_id: str) -> None:
+        if actor.role not in {
+            roles.ADMIN,
+            roles.NETWORK_MANAGER,
+            roles.BRANCH_MANAGER,
+        }:
+            raise PermissionError("אין הרשאה למחוק דיווח תקלה")
+        report = self._repo.find_by_id(report_id)
+        if not report:
+            raise ValueError("דיווח לא נמצא")
+        self._assert_can_read(actor, report)
+        self._notifications.clear_issue_report_links(report_id)
+        if not self._repo.delete(report_id):
+            raise ValueError("דיווח לא נמצא")
+
     def _assert_can_read(self, actor: ActorContext, report) -> None:
         if actor.role == roles.EMPLOYEE:
             if report.reporter_user_id != actor.user_id:

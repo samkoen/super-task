@@ -134,3 +134,32 @@ def test_notifications_created_for_branch_managers():
     assert call_kw["branch_id"] == "b1"
     assert len(pending) == 1
     assert pending[0] == ("mgr1", "notif1", "issue_reported")
+
+
+def test_branch_manager_can_delete_report():
+    report = IssueReport(
+        id="r1",
+        reporter_user_id="emp1",
+        branch_id="b1",
+        text="בעיה",
+        photo_url=None,
+        video_url=None,
+        audio_url=None,
+        created_at="2026-01-01T10:00:00",
+    )
+    service = _service(report=report)
+    service._repo.delete.return_value = True
+    actor = ActorContext(user_id="mgr1", role=roles.BRANCH_MANAGER, branch_id="b1")
+
+    service.delete_report(actor, "r1")
+
+    service._notifications.clear_issue_report_links.assert_called_once_with("r1")
+    service._repo.delete.assert_called_once_with("r1")
+
+
+def test_employee_cannot_delete_report():
+    service = _service()
+    actor = ActorContext(user_id="emp1", role=roles.EMPLOYEE, branch_id="b1")
+
+    with pytest.raises(PermissionError):
+        service.delete_report(actor, "r1")
