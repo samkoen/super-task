@@ -8,6 +8,7 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
+from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
 from app.services.dashboard_service import DashboardService
@@ -24,6 +25,7 @@ def get_service(db: Session = Depends(get_db)) -> DashboardService:
         UserRepository(db),
         TaskCompletionRepository(db),
         TaskTranslationService(TaskTranslationRepository(db)),
+        TaskTemplateRepository(db),
     )
 
 

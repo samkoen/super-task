@@ -8,6 +8,7 @@ interface TaskReferenceMediaDisplayProps {
   reference_audio_url?: string | null;
 }
 
+/** Affiche les médias de référence (URLs Blob privées via proxy auth). */
 export default function TaskReferenceMediaDisplay({
   reference_photo_url,
   reference_video_url,
@@ -19,7 +20,7 @@ export default function TaskReferenceMediaDisplay({
   if (!photoSrc && !videoSrc && !audioSrc) return null;
 
   return (
-    <Box sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+    <Box sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 1.25 }}>
       <Typography variant="caption" color="text.secondary" fontWeight={600}>
         {he.taskReferenceMediaLabel}
       </Typography>
@@ -28,7 +29,15 @@ export default function TaskReferenceMediaDisplay({
           component="img"
           src={photoSrc}
           alt={he.taskReferencePhoto}
-          sx={{ maxWidth: "100%", maxHeight: 220, borderRadius: 1, display: "block" }}
+          sx={{
+            width: "100%",
+            maxHeight: 320,
+            objectFit: "contain",
+            objectPosition: "center",
+            borderRadius: 1,
+            display: "block",
+            bgcolor: "action.hover",
+          }}
         />
       )}
       {videoSrc && (
@@ -36,11 +45,25 @@ export default function TaskReferenceMediaDisplay({
           component="video"
           src={videoSrc}
           controls
-          sx={{ maxWidth: "100%", maxHeight: 240, borderRadius: 1, display: "block" }}
+          playsInline
+          preload="metadata"
+          sx={{
+            width: "100%",
+            maxHeight: 320,
+            borderRadius: 1,
+            display: "block",
+            bgcolor: "#000",
+          }}
         />
       )}
       {audioSrc && (
-        <Box component="audio" src={audioSrc} controls sx={{ width: "100%", display: "block" }} />
+        <Box
+          component="audio"
+          src={audioSrc}
+          controls
+          preload="metadata"
+          sx={{ width: "100%", display: "block" }}
+        />
       )}
     </Box>
   );

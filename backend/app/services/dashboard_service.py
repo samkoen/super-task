@@ -12,6 +12,7 @@ from app.domain.health_rules import (
     occurrence_health,
 )
 from app.domain.scope import ActorContext, assert_branch_visible
+from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.task_translation_source import task_source_language
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.models.task_occurrence import TaskOccurrence
@@ -25,6 +26,7 @@ from app.domain.manager_dashboard import (
 )
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
+from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
 from app.services.task_translation_service import TaskTranslationService
 
@@ -96,6 +98,7 @@ class DashboardService:
         user_repo: UserRepository,
         completion_repo: TaskCompletionRepository,
         translation_service: TaskTranslationService | None = None,
+        template_repo: TaskTemplateRepository | None = None,
     ):
         self._occurrences = occurrence_repo
         self._branches = branch_repo
@@ -103,6 +106,7 @@ class DashboardService:
         self._users = user_repo
         self._completions = completion_repo
         self._translations = translation_service
+        self._templates = template_repo
 
     def manager_dashboard(
         self,
@@ -609,7 +613,15 @@ class DashboardService:
                 alerts.append(_task_alert(task, alert_type="due_soon", occurrence_repo=self._occurrences))
         return alerts
 
+    def _with_reference_media(self, task: TaskOccurrence) -> TaskOccurrence:
+        """Fusion lecture seule template → occurrence (URLs Blob incluses)."""
+        if not task.template_id or not self._templates:
+            return task
+        template = self._templates.find_by_id(task.template_id)
+        return merge_occurrence_reference_media(task, template)
+
     def _employee_task_card(self, task: TaskOccurrence) -> dict:
+        task = self._with_reference_media(task)
         completion = self._completions.find_by_occurrence(task.id) if self._completions else None
         card = {
             "id": task.id,
