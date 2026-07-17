@@ -115,6 +115,7 @@ class DashboardService:
             raise PermissionError("אין הרשאה ללוח הבקרה")
 
         now = datetime.now(TZ)
+        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
         self._occurrences.mark_overdue_before(now)
         day = date.fromisoformat(due_on) if due_on else now.date()
 
@@ -135,6 +136,8 @@ class DashboardService:
             raise ValueError("לעובד חסר שיוך לסניף")
 
         now = datetime.now(TZ)
+        # Tâches non faites hier → deviennent des tâches d'aujourd'hui (due_at avance).
+        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
         self._occurrences.mark_overdue_before(now)
         day = date.fromisoformat(due_on) if due_on else now.date()
 
@@ -239,9 +242,6 @@ class DashboardService:
         overdue_branch = self._occurrences.list_occurrences(
             branch_id=branch_id, status=task_status.OVERDUE
         )
-        pending_delegation = self._occurrences.list_occurrences(
-            branch_id=branch_id, pending_delegation=True
-        )
 
         counts = _count_by_status(tasks_today)
         urgent_pending = sum(
@@ -276,9 +276,9 @@ class DashboardService:
             now,
         )
         task_queues = self._task_queues(tasks_today, completion_map, now)
-        unfinished = self._unfinished_tasks(overdue_branch, pending_delegation, day, now)
+        unfinished = self._unfinished_tasks(overdue_branch, day, now)
 
-        alerts = self._build_alerts(overdue_branch, pending_delegation, tasks_today, now)
+        alerts = self._build_alerts(overdue_branch, tasks_today, now)
 
         return {
             "due_on": day.isoformat(),
@@ -292,7 +292,6 @@ class DashboardService:
                 **counts,
                 "employees_total": len(employees),
                 "employees_active": sum(1 for m in team if m["is_active"]),
-                "pending_delegation": len(pending_delegation),
                 "overdue_open": len(overdue_branch),
             },
             "by_department": by_department,
@@ -342,14 +341,7 @@ class DashboardService:
             for key in total_counts:
                 if key != "completion_rate":
                     total_counts[key] += counts.get(key, 0)
-            all_alerts.extend(
-                self._build_alerts(
-                    overdue,
-                    self._occurrences.list_occurrences(branch_id=bid, pending_delegation=True),
-                    tasks_today,
-                    now,
-                )
-            )
+            all_alerts.extend(self._build_alerts(overdue, tasks_today, now))
 
         actionable = total_counts["tasks_total"] - total_counts["tasks_cancelled"]
         total_counts["completion_rate"] = (
@@ -369,7 +361,6 @@ class DashboardService:
                 **total_counts,
                 "employees_total": 0,
                 "employees_active": 0,
-                "pending_delegation": 0,
                 "overdue_open": total_counts["tasks_overdue"],
             },
             "by_department": None,
@@ -551,16 +542,11 @@ class DashboardService:
     def _unfinished_tasks(
         self,
         overdue_branch: list[TaskOccurrence],
-        pending_delegation: list[TaskOccurrence],
         day: date,
         now: datetime,
     ) -> list[dict]:
         items: list[dict] = []
-        seen: set[str] = set()
         for task in sorted(overdue_branch, key=lambda t: t.due_at):
-            if task.id in seen:
-                continue
-            seen.add(task.id)
             items.append(
                 build_unfinished_item(
                     task,
@@ -569,20 +555,6 @@ class DashboardService:
                     department_name=self._occurrences.get_department_name(task.department_id),
                     assignee_name=self._occurrences.get_assignee_name(task.assignee_user_id),
                     pending_delegation=False,
-                )
-            )
-        for task in pending_delegation:
-            if task.id in seen:
-                continue
-            seen.add(task.id)
-            items.append(
-                build_unfinished_item(
-                    task,
-                    day=day,
-                    tz=TZ,
-                    department_name=self._occurrences.get_department_name(task.department_id),
-                    assignee_name=None,
-                    pending_delegation=True,
                 )
             )
         return items
@@ -624,15 +596,12 @@ class DashboardService:
     def _build_alerts(
         self,
         overdue: list[TaskOccurrence],
-        pending_delegation: list[TaskOccurrence],
         tasks_today: list[TaskOccurrence],
         now: datetime,
     ) -> list[dict]:
         alerts: list[dict] = []
         for task in overdue:
             alerts.append(_task_alert(task, alert_type="overdue", occurrence_repo=self._occurrences))
-        for task in pending_delegation:
-            alerts.append(_task_alert(task, alert_type="delegation", occurrence_repo=self._occurrences))
         for task in tasks_today:
             if task.status not in {task_status.PENDING, task_status.IN_PROGRESS}:
                 continue
@@ -647,6 +616,7 @@ class DashboardService:
             "title": task.title,
             "description": task.description,
             "due_at": task.due_at,
+            "created_at": task.created_at,
             "status": task.status,
             "task_kind": task.task_kind,
             "photo_required": task.photo_required,

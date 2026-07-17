@@ -1,4 +1,4 @@
-"""Chargement édition : fusion template et persistance sur l'occurrence."""
+"""Chargement édition : fusion template en lecture seule (sans persistance)."""
 from unittest.mock import MagicMock
 
 from app.domain import roles
@@ -24,6 +24,7 @@ def _occurrence(**overrides) -> TaskOccurrence:
         "reference_photo_url": None,
         "reference_video_url": None,
         "reference_audio_url": None,
+        "media_purge_after": None,
         "started_at": None,
         "started_by_id": None,
         "created_by_id": "m1",
@@ -61,17 +62,12 @@ def _template(**overrides) -> TaskTemplate:
     return TaskTemplate(**base)
 
 
-def test_get_occurrence_syncs_reference_media_from_template():
+def test_get_occurrence_merges_template_media_without_persisting():
     occurrence = _occurrence()
-    synced = _occurrence(
-        reference_photo_url="/uploads/task_photos/tpl.jpg",
-        reference_audio_url="/uploads/task_audio/tpl.webm",
-    )
     template = _template()
 
     occurrence_repo = MagicMock()
     occurrence_repo.find_by_id.return_value = occurrence
-    occurrence_repo.update_reference_media.return_value = synced
     occurrence_repo.get_branch_name.return_value = "Branch"
     occurrence_repo.get_department_name.return_value = None
     occurrence_repo.get_assignee_name.return_value = "Worker"
@@ -96,6 +92,6 @@ def test_get_occurrence_syncs_reference_media_from_template():
 
     result = svc.get_occurrence(actor, "occ-1")
 
-    occurrence_repo.update_reference_media.assert_called_once()
+    occurrence_repo.update_reference_media.assert_not_called()
     assert result["reference_photo_url"] == "/uploads/task_photos/tpl.jpg"
     assert result["reference_audio_url"] == "/uploads/task_audio/tpl.webm"

@@ -18,6 +18,7 @@ class TaskOccurrence:
     reference_photo_url: str | None
     reference_video_url: str | None
     reference_audio_url: str | None
+    media_purge_after: str | None
     started_at: str | None
     started_by_id: str | None
     created_by_id: str | None
@@ -41,6 +42,7 @@ class TaskOccurrence:
             "reference_photo_url": self.reference_photo_url,
             "reference_video_url": self.reference_video_url,
             "reference_audio_url": self.reference_audio_url,
+            "media_purge_after": self.media_purge_after,
             "started_at": self.started_at,
             "started_by_id": self.started_by_id,
             "created_by_id": self.created_by_id,

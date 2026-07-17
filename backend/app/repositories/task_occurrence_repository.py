@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -6,7 +7,15 @@ from sqlalchemy.orm import Session
 import app.db.models as orm
 from app.db import mappers as mp
 from app.domain import task_status
+from app.domain.employee_task_carry_over import (
+    ROLLOVER_STATUSES,
+    rollover_due_datetime,
+    start_of_day,
+    status_after_rollover,
+)
 from app.models.task_occurrence import TaskOccurrence
+
+_TZ = ZoneInfo("Asia/Jerusalem")
 
 
 class TaskOccurrenceRepository:
@@ -217,6 +226,58 @@ class TaskOccurrenceRepository:
         if count:
             self._db.flush()
         return count
+
+    def rollover_open_tasks_to_day(self, day: date, *, now: datetime) -> int:
+        """Avance due_at des tâches ouvertes échues avant `day` vers ce jour (même heure)."""
+        cutoff = start_of_day(day, _TZ)
+        q = (
+            select(orm.TaskOccurrence)
+            .where(orm.TaskOccurrence.status.in_(tuple(ROLLOVER_STATUSES)))
+            .where(orm.TaskOccurrence.due_at < cutoff)
+        )
+        rows = self._db.execute(q).scalars().all()
+        count = 0
+        for row in rows:
+            new_due = rollover_due_datetime(row.due_at, to_day=day, tz=_TZ)
+            row.due_at = new_due
+            row.status = status_after_rollover(row.status, new_due_at=new_due, now=now)
+            count += 1
+        if count:
+            self._db.flush()
+        return count
+
+    def set_media_purge_after(self, id_: str, when: datetime | None) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.media_purge_after = when
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def list_due_for_media_purge(self, before: datetime) -> list[TaskOccurrence]:
+        q = (
+            select(orm.TaskOccurrence)
+            .where(orm.TaskOccurrence.media_purge_after.is_not(None))
+            .where(orm.TaskOccurrence.media_purge_after <= before)
+        )
+        rows = self._db.execute(q).scalars().all()
+        return [o for r in rows if (o := mp.task_occurrence_orm_to_domain(r))]
+
+    def clear_reference_media(self, id_: str) -> TaskOccurrence | None:
+        return self.update_reference_media(
+            id_,
+            reference_photo_url=None,
+            reference_video_url=None,
+            reference_audio_url=None,
+        )
+
+    def delete(self, id_: str) -> bool:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return False
+        self._db.delete(row)
+        self._db.flush()
+        return True
 
     def get_branch_name(self, branch_id: str) -> str | None:
         row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))

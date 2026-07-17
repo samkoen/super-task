@@ -14,7 +14,6 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
-import PeopleIcon from "@mui/icons-material/People";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { ApiError } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
@@ -37,6 +36,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
 import { todayIso } from "../../utils/dateView";
+import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
 
 export default function ManagerDashboardPage() {
   const { user } = useAuth();
@@ -165,7 +165,7 @@ export default function ManagerDashboardPage() {
                     <HealthBadge level={b.health} />
                   </Box>
                   <Typography variant="body2" color="text.secondary">
-                    {Math.round(b.completion_rate * 100)}% · {b.pending} {he.pending} · {b.overdue} {he.dashboardOverdue}
+                    {Math.round(b.completion_rate * 100)}% · {b.overdue} {he.dashboardOverdue}
                   </Typography>
                 </Paper>
               </Grid>
@@ -194,32 +194,20 @@ export default function ManagerDashboardPage() {
           </Paper>
 
           <Grid container spacing={2} mb={3}>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title={he.dashboardActiveEmployees}
-                value={`${data.counts.employees_active ?? 0} / ${data.counts.employees_total ?? 0}`}
-                icon={<PeopleIcon color="primary" />}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={4}>
               <StatCard
                 title={he.dashboardOverdue}
                 value={data.counts.overdue_open ?? 0}
                 icon={<WarningAmberIcon color="error" />}
                 accent="#d32f2f"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title={he.pending}
-                value={(data.counts.tasks_pending ?? 0) + (data.counts.tasks_in_progress ?? 0)}
-                icon={<TaskAltIcon color="warning" />}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard
-                title={he.dashboardPendingDelegation}
-                value={data.counts.pending_delegation ?? 0}
+                onClick={() =>
+                  navigate(
+                    buildManagerTasksPath({
+                      status: "overdue",
+                      dueOn: selectedDay,
+                    })
+                  )
+                }
               />
             </Grid>
           </Grid>
@@ -229,7 +217,17 @@ export default function ManagerDashboardPage() {
           )}
 
           <Box mb={3} display="flex" flexDirection="column" gap={2}>
-            <TeamTimelinePanel team={data.team ?? []} />
+            <TeamTimelinePanel
+              team={data.team ?? []}
+              onEmployeeClick={(member) =>
+                navigate(
+                  buildManagerTasksPath({
+                    employeeId: member.user_id,
+                    dueOn: selectedDay,
+                  })
+                )
+              }
+            />
             {data.task_queues && (
               <TaskQueuePanel queues={data.task_queues} onReviewTask={handleReviewTask} />
             )}

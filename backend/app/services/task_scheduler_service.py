@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from app.domain import task_recurrence, task_status
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
+from app.services import blob_storage
 
 TZ = ZoneInfo("Asia/Jerusalem")
 
@@ -22,9 +23,16 @@ class TaskSchedulerService:
 
     def run_for_date(self, on_date: date | None = None) -> dict:
         day = on_date or datetime.now(TZ).date()
+        now = datetime.now(TZ)
         generated = self._generate_occurrences(day)
+        rolled = self._occurrences.rollover_open_tasks_to_day(day, now=now)
         overdue = self._mark_overdue()
-        return {"generated": generated, "overdue_marked": overdue, "date": day.isoformat()}
+        return {
+            "generated": generated,
+            "rolled_forward": rolled,
+            "overdue_marked": overdue,
+            "date": day.isoformat(),
+        }
 
     def generate_from_template(self, template, *, on_date: date):
         anchor = None
@@ -41,6 +49,7 @@ class TaskSchedulerService:
         if self._occurrences.exists_for_template_on_date(template.id, on_date):
             return None
         due_at = task_recurrence.due_at_for_date(on_date, template.due_time)
+        photo, video, audio = self._copy_reference_media(template)
         return self._occurrences.create(
             template_id=template.id,
             branch_id=template.branch_id,
@@ -51,9 +60,9 @@ class TaskSchedulerService:
             department_id=template.department_id,
             task_kind=template.task_kind,
             photo_required=template.photo_required,
-            reference_photo_url=template.reference_photo_url,
-            reference_video_url=template.reference_video_url,
-            reference_audio_url=template.reference_audio_url,
+            reference_photo_url=photo,
+            reference_video_url=video,
+            reference_audio_url=audio,
             created_by_id=template.created_by_id,
         )
 
@@ -61,6 +70,7 @@ class TaskSchedulerService:
         if due_at is None:
             day = datetime.now(TZ).date()
             due_at = task_recurrence.due_at_for_date(day, template.due_time)
+        photo, video, audio = self._copy_reference_media(template)
         self._occurrences.create(
             template_id=template.id,
             branch_id=template.branch_id,
@@ -71,10 +81,17 @@ class TaskSchedulerService:
             department_id=template.department_id,
             task_kind=template.task_kind,
             photo_required=template.photo_required,
-            reference_photo_url=template.reference_photo_url,
-            reference_video_url=template.reference_video_url,
-            reference_audio_url=template.reference_audio_url,
+            reference_photo_url=photo,
+            reference_video_url=video,
+            reference_audio_url=audio,
             created_by_id=template.created_by_id,
+        )
+
+    def _copy_reference_media(self, template) -> tuple[str | None, str | None, str | None]:
+        return (
+            blob_storage.copy_media_url(template.reference_photo_url, folder="task_photos"),
+            blob_storage.copy_media_url(template.reference_video_url, folder="task_videos"),
+            blob_storage.copy_media_url(template.reference_audio_url, folder="task_audio"),
         )
 
     def _generate_occurrences(self, day: date) -> int:

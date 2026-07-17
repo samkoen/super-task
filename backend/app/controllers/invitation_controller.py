@@ -6,7 +6,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.auth.session_roles import require_manager
+from app.auth.actor import require_manager_actor
 from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.invitation_repository import InvitationRepository
@@ -35,10 +35,11 @@ def get_invitation_service(db: Session = Depends(get_db)) -> InvitationService:
 def list_invitations(
     request: Request,
     service: InvitationService = Depends(get_invitation_service),
+    db: Session = Depends(get_db),
 ):
     try:
-        inviter_id, inviter_role = require_manager(request)
-        return service.list_invitations(inviter_id=inviter_id, inviter_role=inviter_role)
+        actor = require_manager_actor(request, UserRepository(db))
+        return service.list_invitations(inviter_id=actor.user_id, inviter_role=actor.role)
     except HTTPException as e:
         return JSONResponse({"error": e.detail}, status_code=e.status_code)
 
@@ -48,9 +49,11 @@ def create_invitation(
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
     service: InvitationService = Depends(get_invitation_service),
+    db: Session = Depends(get_db),
 ):
     try:
-        inviter_id, inviter_role = require_manager(request)
+        actor = require_manager_actor(request, UserRepository(db))
+        inviter_id, inviter_role = actor.user_id, actor.role
         if not data:
             return JSONResponse({"error": "חסרים נתונים"}, status_code=400)
         inv = service.create_invitation(
@@ -74,13 +77,14 @@ def cancel_invitation(
     invitation_id: str,
     request: Request,
     service: InvitationService = Depends(get_invitation_service),
+    db: Session = Depends(get_db),
 ):
     try:
-        inviter_id, inviter_role = require_manager(request)
+        actor = require_manager_actor(request, UserRepository(db))
         service.cancel_invitation(
             invitation_id,
-            inviter_id=inviter_id,
-            inviter_role=inviter_role,
+            inviter_id=actor.user_id,
+            inviter_role=actor.role,
         )
         return {"message": "ההזמנה בוטלה"}
     except HTTPException as e:

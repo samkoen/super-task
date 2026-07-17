@@ -155,3 +155,29 @@ class TaskCompletionRepository:
             audio_transcript=audio_transcript,
             audio_transcript_employee=None,
         )
+
+    def clear_media_paths(self, occurrence_id: str) -> TaskCompletion | None:
+        row = (
+            self._db.query(orm.TaskCompletion)
+            .filter(orm.TaskCompletion.occurrence_id == mp.parse_uuid(occurrence_id))
+            .first()
+        )
+        if not row:
+            return None
+        row.photo_path = None
+        row.video_path = None
+        row.audio_path = None
+        self._db.flush()
+        return mp.task_completion_orm_to_domain(row)
+
+    def delete_by_occurrence(self, occurrence_id: str) -> bool:
+        row = (
+            self._db.query(orm.TaskCompletion)
+            .filter(orm.TaskCompletion.occurrence_id == mp.parse_uuid(occurrence_id))
+            .first()
+        )
+        if not row:
+            return False
+        self._db.delete(row)
+        self._db.flush()
+        return True

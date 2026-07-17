@@ -14,10 +14,16 @@ load_dotenv(_PROJECT_DIR / ".env")
 IS_VERCEL = bool(os.environ.get("VERCEL"))
 IS_SERVERLESS = IS_VERCEL or bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+_DEFAULT_SECRET = "dev-secret-key-change-in-production"
+SECRET_KEY = os.environ.get("SECRET_KEY", _DEFAULT_SECRET)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 APP_NAME = os.environ.get("APP_NAME", "Super")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+IS_PRODUCTION = ENVIRONMENT == "production" or IS_VERCEL
+LOG_LEVEL = os.environ.get(
+    "LOG_LEVEL",
+    "DEBUG" if ENVIRONMENT == "development" and not IS_VERCEL else "INFO",
+).strip().upper()
 
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true" if IS_VERCEL else "false").lower() in (
     "1",
@@ -58,6 +64,37 @@ def uploads_dir() -> Path:
 
 
 UPLOADS_DIR = uploads_dir()
+
+# --- Médias (Vercel Blob + rétention) ---
+BLOB_READ_WRITE_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN", "").strip()
+# Doit correspondre au store Vercel : "private" (défaut) ou "public"
+_BLOB_ACCESS_RAW = os.environ.get("BLOB_ACCESS", "private").strip().lower()
+BLOB_ACCESS = _BLOB_ACCESS_RAW if _BLOB_ACCESS_RAW in {"private", "public"} else "private"
+MEDIA_RETENTION_HOURS = int(os.environ.get("MEDIA_RETENTION_HOURS", "24"))
+MEDIA_PHOTO_MAX_EDGE_PX = int(os.environ.get("MEDIA_PHOTO_MAX_EDGE_PX", "1280"))
+MEDIA_PHOTO_QUALITY = int(os.environ.get("MEDIA_PHOTO_QUALITY", "65"))
+CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
+
+
+def blob_storage_enabled() -> bool:
+    return bool(BLOB_READ_WRITE_TOKEN)
+
+
+def assert_secure_runtime_config() -> None:
+    """Refuse de démarrer en prod avec des secrets / stockage dangereux."""
+    if not IS_PRODUCTION:
+        return
+    if SECRET_KEY == _DEFAULT_SECRET or len(SECRET_KEY) < 24:
+        raise RuntimeError(
+            "SECRET_KEY must be set to a strong value in production/Vercel "
+            "(min 24 chars, not the default)."
+        )
+    if not blob_storage_enabled():
+        raise RuntimeError(
+            "BLOB_READ_WRITE_TOKEN is required on Vercel/production "
+            "(ephemeral /tmp uploads are not allowed)."
+        )
+
 
 # --- Fournisseur AI (gemini | opencode) ---
 AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini").strip().lower()

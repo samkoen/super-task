@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -13,10 +12,7 @@ import {
   MenuItem,
   Paper,
   Switch,
-  Tab,
-  Tabs,
   TextField,
-  Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { ApiError, type User } from "../../services/api";
@@ -28,6 +24,7 @@ import TaskCreationModeDialog from "../../components/tasks/TaskCreationModeDialo
 import TaskVoiceCreationDialog from "../../components/tasks/TaskVoiceCreationDialog";
 import type { TaskVoiceFillResult } from "../../components/ai/TaskVoiceAssistant";
 import TaskReferenceMediaEditor, {
+  resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
@@ -45,6 +42,12 @@ import {
   toDatetimeLocal,
   type TaskDateViewMode,
 } from "../../utils/dateView";
+import {
+  buildManagerTasksPath,
+  filterManagerTaskOccurrences,
+  MANAGER_TASK_STATUS_FILTERS,
+  parseManagerTasksSearchParams,
+} from "../../utils/managerTaskFilters";
 import {
   taskService,
   type TaskOccurrence,
@@ -77,10 +80,9 @@ export default function ManagerTasksPage() {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { showSuccess, showError } = useFeedback();
-  const [tab, setTab] = useState(0);
   const [occurrences, setOccurrences] = useState<TaskOccurrence[]>([]);
-  const [pending, setPending] = useState<TaskOccurrence[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,8 +91,6 @@ export default function ManagerTasksPage() {
   const [creationPicker, setCreationPicker] = useState<"fixed" | "ad_hoc" | null>(null);
   const [voiceCreation, setVoiceCreation] = useState<"fixed" | "ad_hoc" | null>(null);
   const [voiceBranchId, setVoiceBranchId] = useState("");
-  const [delegateTarget, setDelegateTarget] = useState<TaskOccurrence | null>(null);
-  const [delegateAssignee, setDelegateAssignee] = useState("");
   const [editTarget, setEditTarget] = useState<TaskOccurrence | null>(null);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
   const [editLoading, setEditLoading] = useState(false);
@@ -104,10 +104,13 @@ export default function ManagerTasksPage() {
     reference_photo_url: "",
     reference_video_url: "",
     reference_audio_url: "",
+    pending_photo: null as File | null,
+    pending_video: null as File | null,
   });
   const [saving, setSaving] = useState(false);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [filterDay, setFilterDay] = useState(todayIso);
   const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
   const [filterFrom, setFilterFrom] = useState(todayIso);
@@ -160,23 +163,12 @@ export default function ManagerTasksPage() {
     [employees, fixedForm.branch_id]
   );
 
-  const filterByAssignee = useCallback(
-    (rows: TaskOccurrence[]) => {
-      if (!filterEmployee) return rows;
-      return rows.filter((o) => o.assignee_user_id === filterEmployee);
-    },
-    [filterEmployee]
-  );
-
   const displayedOccurrences = useMemo(
-    () => filterByAssignee(occurrences),
-    [occurrences, filterByAssignee]
+    () => filterManagerTaskOccurrences(occurrences, { employeeId: filterEmployee, status: filterStatus }),
+    [occurrences, filterEmployee, filterStatus]
   );
 
-  const displayedPending = useMemo(
-    () => (filterEmployee ? [] : pending),
-    [pending, filterEmployee]
-  );
+  const hasListFilters = Boolean(filterEmployee || filterStatus || filterBranch);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -186,14 +178,12 @@ export default function ManagerTasksPage() {
         dateViewMode === "day"
           ? { due_on: filterDay }
           : { due_from: filterFrom, due_to: filterTo };
-      const [occ, pend, branchList, team] = await Promise.all([
+      const [occ, branchList, team] = await Promise.all([
         taskService.listOccurrences({ branch_id: branchId, ...dateParams }),
-        isBranchManager ? taskService.listOccurrences({ pending_delegation: true, branch_id: branchId }) : Promise.resolve([]),
         branchService.list(),
         userService.listTeam("employee"),
       ]);
       setOccurrences(occ);
-      setPending(pend);
       setBranches(branchList);
       setEmployees(team);
     } catch (e) {
@@ -201,7 +191,7 @@ export default function ManagerTasksPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, isBranchManager, showError]);
+  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, showError]);
 
   useEffect(() => {
     load();
@@ -219,21 +209,61 @@ export default function ManagerTasksPage() {
   }, [user]);
 
   useEffect(() => {
+    if (!location.search) return;
+    const parsed = parseManagerTasksSearchParams(searchParams);
+    setFilterEmployee(parsed.employeeId);
+    setFilterStatus(parsed.status);
+    setFilterDay(parsed.dueOn);
+    setDateViewMode(parsed.dateViewMode);
+    setFilterFrom(parsed.rangeFrom);
+    setFilterTo(parsed.rangeTo);
+    setActiveSavedFilterId(null);
+  }, [location.search, searchParams]);
+
+  const syncFiltersToUrl = useCallback(
+    (next: {
+      filterEmployee?: string;
+      filterStatus?: string;
+      filterDay?: string;
+      dateViewMode?: TaskDateViewMode;
+      filterFrom?: string;
+      filterTo?: string;
+    }) => {
+      navigate(
+        buildManagerTasksPath({
+          employeeId: next.filterEmployee ?? filterEmployee,
+          status: next.filterStatus ?? filterStatus,
+          dueOn: next.filterDay ?? filterDay,
+          dateViewMode: next.dateViewMode ?? dateViewMode,
+          rangeFrom: next.filterFrom ?? filterFrom,
+          rangeTo: next.filterTo ?? filterTo,
+        }),
+        { replace: true }
+      );
+    },
+    [navigate, filterEmployee, filterStatus, filterDay, dateViewMode, filterFrom, filterTo]
+  );
+
+  useEffect(() => {
+    // Wait until team is loaded — otherwise deep-link ?employee= is cleared too early.
+    if (loading || employees.length === 0) return;
     if (filterEmployee && !filterEmployees.some((u) => u.id === filterEmployee)) {
       setFilterEmployee("");
+      syncFiltersToUrl({ filterEmployee: "" });
     }
-  }, [filterEmployee, filterEmployees]);
+  }, [filterEmployee, filterEmployees, loading, employees.length, syncFiltersToUrl]);
 
   const currentFilters = useMemo(
     () => ({
       ...(canPickBranch ? { filterBranch } : {}),
       filterEmployee,
+      filterStatus,
       filterDay,
       dateViewMode,
       filterFrom,
       filterTo,
     }),
-    [canPickBranch, filterBranch, filterEmployee, filterDay, dateViewMode, filterFrom, filterTo]
+    [canPickBranch, filterBranch, filterEmployee, filterStatus, filterDay, dateViewMode, filterFrom, filterTo]
   );
 
   const handleSelectSavedFilter = (item: { id: string; filters: Record<string, string | number> }) => {
@@ -241,6 +271,7 @@ export default function ManagerTasksPage() {
       setFilterBranch(String(item.filters.filterBranch ?? ""));
     }
     setFilterEmployee(String(item.filters.filterEmployee ?? ""));
+    setFilterStatus(String(item.filters.filterStatus ?? ""));
     setFilterDay(String(item.filters.filterDay ?? todayIso()));
     setDateViewMode((item.filters.dateViewMode as TaskDateViewMode) ?? "day");
     setFilterFrom(String(item.filters.filterFrom ?? todayIso()));
@@ -329,6 +360,7 @@ export default function ManagerTasksPage() {
   const handleCreateFixed = async () => {
     setSaving(true);
     try {
+      const media = await resolveTaskReferenceMedia(fixedReferenceMedia);
       const res = await taskService.createTemplate({
         ...fixedForm,
         weekly_days:
@@ -336,9 +368,7 @@ export default function ManagerTasksPage() {
             ? fixedForm.weekly_days
             : undefined,
         monthly_day: fixedForm.recurrence === "monthly" ? fixedForm.monthly_day : undefined,
-        reference_photo_url: fixedReferenceMedia.reference_photo_url || undefined,
-        reference_video_url: fixedReferenceMedia.reference_video_url || undefined,
-        reference_audio_url: fixedReferenceMedia.reference_audio_url || undefined,
+        ...media,
       });
       setOpenFixed(false);
       setFixedReferenceMedia(EMPTY_REFERENCE_MEDIA);
@@ -358,35 +388,19 @@ export default function ManagerTasksPage() {
   const handleCreateAdHoc = async () => {
     setSaving(true);
     try {
+      const media = await resolveTaskReferenceMedia(adHocReferenceMedia);
       const res = await taskService.createAdHoc({
         branch_id: adHocForm.branch_id,
         title: adHocForm.title,
         description: adHocForm.description,
         due_at: new Date(adHocForm.due_at).toISOString(),
-        assignee_user_id: isBranchManager ? adHocForm.assignee_user_id || undefined : undefined,
+        assignee_user_id: adHocForm.assignee_user_id || undefined,
         photo_required: true,
-        reference_photo_url: adHocReferenceMedia.reference_photo_url || undefined,
-        reference_video_url: adHocReferenceMedia.reference_video_url || undefined,
-        reference_audio_url: adHocReferenceMedia.reference_audio_url || undefined,
+        ...media,
       });
       setOpenAdHoc(false);
       setAdHocReferenceMedia(EMPTY_REFERENCE_MEDIA);
       showSuccess(res.message);
-      await load();
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelegate = async () => {
-    if (!delegateTarget) return;
-    setSaving(true);
-    try {
-      await taskService.delegate(delegateTarget.id, delegateAssignee);
-      setDelegateTarget(null);
-      setDelegateAssignee("");
       await load();
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -420,6 +434,8 @@ export default function ManagerTasksPage() {
         reference_photo_url: fresh.reference_photo_url ?? "",
         reference_video_url: fresh.reference_video_url ?? "",
         reference_audio_url: fresh.reference_audio_url ?? "",
+        pending_photo: null,
+        pending_video: null,
       });
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -440,9 +456,10 @@ export default function ManagerTasksPage() {
         photo_required: editTarget.task_kind === "ad_hoc" ? editForm.photo_required : undefined,
       };
       if (editReferenceMediaDirty) {
-        payload.reference_photo_url = editForm.reference_photo_url || null;
-        payload.reference_video_url = editForm.reference_video_url || null;
-        payload.reference_audio_url = editForm.reference_audio_url || null;
+        const media = await resolveTaskReferenceMedia(editForm);
+        payload.reference_photo_url = media.reference_photo_url || null;
+        payload.reference_video_url = media.reference_video_url || null;
+        payload.reference_audio_url = media.reference_audio_url || null;
       }
       const res = await taskService.updateOccurrence(editTarget.id, payload);
       setEditTarget(null);
@@ -490,11 +507,13 @@ export default function ManagerTasksPage() {
           onModeChange={(mode) => {
             setDateViewMode(mode);
             resetSavedFilterActive();
+            syncFiltersToUrl({ dateViewMode: mode });
           }}
           day={filterDay}
           onDayChange={(day) => {
             setFilterDay(day);
             resetSavedFilterActive();
+            syncFiltersToUrl({ filterDay: day });
           }}
           rangeFrom={filterFrom}
           rangeTo={filterTo}
@@ -502,6 +521,7 @@ export default function ManagerTasksPage() {
             setFilterFrom(from);
             setFilterTo(to);
             resetSavedFilterActive();
+            syncFiltersToUrl({ filterFrom: from, filterTo: to, dateViewMode: "range" });
           }}
           trailing={
             <>
@@ -529,14 +549,51 @@ export default function ManagerTasksPage() {
                 label={he.filterByEmployee}
                 value={filterEmployee}
                 onChange={(e) => {
-                  setFilterEmployee(e.target.value);
+                  const value = e.target.value;
+                  setFilterEmployee(value);
                   setActiveSavedFilterId(null);
+                  syncFiltersToUrl({ filterEmployee: value });
                 }}
                 sx={{ minWidth: 160 }}
               >
                 <MenuItem value="">{he.all}</MenuItem>
                 {filterEmployees.map((u) => (
                   <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                size="small"
+                label={he.filterByStatus}
+                value={filterStatus}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFilterStatus(value);
+                  setActiveSavedFilterId(null);
+                  if (value === "overdue") {
+                    const parsed = parseManagerTasksSearchParams(
+                      new URLSearchParams(`status=overdue&due_on=${filterDay}`)
+                    );
+                    setDateViewMode(parsed.dateViewMode);
+                    setFilterFrom(parsed.rangeFrom);
+                    setFilterTo(parsed.rangeTo);
+                    syncFiltersToUrl({
+                      filterStatus: value,
+                      dateViewMode: parsed.dateViewMode,
+                      filterFrom: parsed.rangeFrom,
+                      filterTo: parsed.rangeTo,
+                    });
+                  } else {
+                    syncFiltersToUrl({ filterStatus: value });
+                  }
+                }}
+                sx={{ minWidth: 150 }}
+              >
+                <MenuItem value="">{he.all}</MenuItem>
+                {MANAGER_TASK_STATUS_FILTERS.map((status) => (
+                  <MenuItem key={status} value={status}>
+                    {he.taskStatusLabels[status]}
+                  </MenuItem>
                 ))}
               </TextField>
             </>
@@ -552,45 +609,26 @@ export default function ManagerTasksPage() {
         />
       </Paper>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label={`${he.allTasks} (${displayedOccurrences.length})`} />
-        {isBranchManager && <Tab label={`${he.pendingDelegation} (${displayedPending.length})`} />}
-      </Tabs>
-
       {loading ? (
         <ListSkeleton variant="cards" rows={6} />
-      ) : tab === 0 ? (
-        dateViewMode === "range" ? (
-          <TaskOccurrenceGridByDay
-            tasks={displayedOccurrences}
-            emptyMessage={filterEmployee || filterBranch ? he.noTasksFiltered : he.noTasks}
-            emptyDescription={filterEmployee || filterBranch ? he.noTasksFilteredHint : he.noTasksHint}
-            isBranchManager={isBranchManager}
-            onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
-            onEdit={canManageTasks ? handleOpenEdit : undefined}
-            onCancel={handleCancel}
-            onReview={canManageTasks ? setReviewTarget : undefined}
-          />
-        ) : (
-          <TaskOccurrenceGrid
-            tasks={displayedOccurrences}
-            emptyMessage={filterEmployee || filterBranch ? he.noTasksFiltered : he.noTasks}
-            emptyDescription={filterEmployee || filterBranch ? he.noTasksFilteredHint : he.noTasksHint}
-            isBranchManager={isBranchManager}
-            onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
-            onEdit={canManageTasks ? handleOpenEdit : undefined}
-            onCancel={handleCancel}
-            onReview={canManageTasks ? setReviewTarget : undefined}
-          />
-        )
+      ) : dateViewMode === "range" ? (
+        <TaskOccurrenceGridByDay
+          tasks={displayedOccurrences}
+          emptyMessage={hasListFilters ? he.noTasksFiltered : he.noTasks}
+          emptyDescription={hasListFilters ? he.noTasksFilteredHint : he.noTasksHint}
+          isBranchManager={isBranchManager}
+          onEdit={canManageTasks ? handleOpenEdit : undefined}
+          onCancel={handleCancel}
+          onReview={canManageTasks ? setReviewTarget : undefined}
+        />
       ) : (
         <TaskOccurrenceGrid
-          tasks={displayedPending}
-          emptyMessage={filterEmployee ? he.noTasksFiltered : he.noTasks}
-          emptyDescription={filterEmployee ? he.noTasksFilteredHint : he.noTasksHint}
+          tasks={displayedOccurrences}
+          emptyMessage={hasListFilters ? he.noTasksFiltered : he.noTasks}
+          emptyDescription={hasListFilters ? he.noTasksFilteredHint : he.noTasksHint}
           isBranchManager={isBranchManager}
-          onDelegate={(task) => { setDelegateTarget(task); setDelegateAssignee(""); }}
           onEdit={canManageTasks ? handleOpenEdit : undefined}
+          onCancel={handleCancel}
           onReview={canManageTasks ? setReviewTarget : undefined}
         />
       )}
@@ -681,16 +719,20 @@ export default function ManagerTasksPage() {
           <TextField label={he.taskTitle} value={adHocForm.title} onChange={(e) => setAdHocForm({ ...adHocForm, title: e.target.value })} required fullWidth />
           <TextField label={he.description} value={adHocForm.description} onChange={(e) => setAdHocForm({ ...adHocForm, description: e.target.value })} multiline rows={2} fullWidth />
           <TextField label={he.dueAt} type="datetime-local" value={adHocForm.due_at} onChange={(e) => setAdHocForm({ ...adHocForm, due_at: e.target.value })} InputLabelProps={{ shrink: true }} required fullWidth dir="ltr" />
-          {isBranchManager && (
-            <TextField select label={he.assignee} value={adHocForm.assignee_user_id} onChange={(e) => setAdHocForm({ ...adHocForm, assignee_user_id: e.target.value })} required fullWidth>
-              {employees.filter((u) => u.branch_id === adHocForm.branch_id).map((u) => (
+          <TextField
+            select
+            label={he.assignee}
+            value={adHocForm.assignee_user_id}
+            onChange={(e) => setAdHocForm({ ...adHocForm, assignee_user_id: e.target.value })}
+            required
+            fullWidth
+          >
+            {employees
+              .filter((u) => !adHocForm.branch_id || u.branch_id === adHocForm.branch_id)
+              .map((u) => (
                 <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
               ))}
-            </TextField>
-          )}
-          {isNetworkManager && (
-            <Alert severity="info">{he.adHocNetworkManagerHint}</Alert>
-          )}
+          </TextField>
           <TaskReferenceMediaEditor
             value={adHocReferenceMedia}
             onChange={setAdHocReferenceMedia}
@@ -757,7 +799,7 @@ export default function ManagerTasksPage() {
               label={he.assignee}
               value={editForm.assignee_user_id}
               onChange={(e) => setEditForm({ ...editForm, assignee_user_id: e.target.value })}
-              required={isBranchManager && editTarget?.task_kind === "ad_hoc" && !editTarget.pending_delegation}
+              required={editTarget?.task_kind === "ad_hoc"}
               fullWidth
             >
               <MenuItem value="">{he.noAssignee}</MenuItem>
@@ -783,6 +825,8 @@ export default function ManagerTasksPage() {
               reference_photo_url: editForm.reference_photo_url,
               reference_video_url: editForm.reference_video_url,
               reference_audio_url: editForm.reference_audio_url,
+              pending_photo: editForm.pending_photo,
+              pending_video: editForm.pending_video,
             }}
             onChange={(media) => {
               setEditReferenceMediaDirty(true);
@@ -791,6 +835,8 @@ export default function ManagerTasksPage() {
                 reference_photo_url: media.reference_photo_url,
                 reference_video_url: media.reference_video_url,
                 reference_audio_url: media.reference_audio_url,
+                pending_photo: media.pending_photo ?? null,
+                pending_video: media.pending_video ?? null,
               });
             }}
             onDescriptionAppend={(transcript) =>
@@ -822,19 +868,6 @@ export default function ManagerTasksPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!delegateTarget} onClose={() => setDelegateTarget(null)} fullWidth maxWidth="xs" dir="rtl">
-        <DialogTitle>{he.delegateTask}</DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
-          <Typography variant="body2" mb={2}>{delegateTarget?.title}</Typography>
-          <TextField select label={he.assignee} value={delegateAssignee} onChange={(e) => setDelegateAssignee(e.target.value)} fullWidth required>
-            {employees.map((u) => <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>)}
-          </TextField>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDelegateTarget(null)} disabled={saving}>{he.cancel}</Button>
-          <Button variant="contained" onClick={handleDelegate} disabled={saving || !delegateAssignee}>{he.delegateTask}</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

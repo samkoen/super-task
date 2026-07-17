@@ -4,14 +4,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from app.core.config import UPLOADS_DIR
 from app.domain.ai_provider import is_voice_ai_configured
 from app.domain.completion_audio_transcription import (
     build_completion_audio_system_instruction,
     build_completion_audio_transcription_prompt,
 )
-from app.domain.employee_language import EmployeeLanguage, normalize_employee_language
+from app.domain.employee_language import normalize_employee_language
 from app.services.ai.gemini_client import GeminiError, generate_from_audio
+from app.services import blob_storage
 
 logger = logging.getLogger(__name__)
 
@@ -26,18 +26,23 @@ _AUDIO_MIME: dict[str, str] = {
 
 
 def upload_url_to_path(url: str | None) -> Path | None:
+    """Compat tests / local : résout un chemin /uploads/... (pas les URLs Blob)."""
     if not url or not url.strip():
+        return None
+    if blob_storage.is_remote_media_url(url):
         return None
     relative = url.strip().lstrip("/")
     if relative.startswith("uploads/"):
         relative = relative[len("uploads/") :]
     if not relative or ".." in relative.replace("\\", "/"):
         return None
+    from app.core.config import UPLOADS_DIR
+
     return UPLOADS_DIR / relative
 
 
-def _mime_for_path(path: Path) -> str:
-    return _AUDIO_MIME.get(path.suffix.lower(), "audio/webm")
+def _mime_for_suffix(suffix: str) -> str:
+    return _AUDIO_MIME.get(suffix.lower(), "audio/webm")
 
 
 async def transcribe_completion_audio(
@@ -47,17 +52,18 @@ async def transcribe_completion_audio(
 ) -> str | None:
     if not is_voice_ai_configured():
         return None
-    file_path = upload_url_to_path(audio_path)
-    if not file_path or not file_path.is_file():
+    payload = blob_storage.read_media_bytes(audio_path)
+    if not payload:
         return None
+    audio_bytes, suffix = payload
 
     manager_lang = normalize_employee_language(manager_language)
     prompt = build_completion_audio_transcription_prompt(manager_language=manager_lang)
     system = build_completion_audio_system_instruction(manager_language=manager_lang)
     try:
         raw = await generate_from_audio(
-            file_path.read_bytes(),
-            _mime_for_path(file_path),
+            audio_bytes,
+            _mime_for_suffix(suffix),
             prompt,
             system_instruction=system,
         )

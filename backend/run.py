@@ -52,6 +52,8 @@ def main() -> None:
 
     print(f"\n=== Super API (FastAPI / Uvicorn) ===\n  http://127.0.0.1:{port}/health\n")
 
+    log_level = os.environ.get("LOG_LEVEL", "debug" if os.environ.get("ENVIRONMENT", "development") == "development" else "info").lower()
+
     if reload:
         # Le rechargement auto exige un import string (sous-processus).
         uvicorn.run(
@@ -59,6 +61,7 @@ def main() -> None:
             host=host,
             port=port,
             reload=True,
+            log_level=log_level,
             timeout_graceful_shutdown=3,
         )
         return
@@ -69,6 +72,7 @@ def main() -> None:
         host=host,
         port=port,
         reload=False,
+        log_level=log_level,
         timeout_graceful_shutdown=3,
     )
 

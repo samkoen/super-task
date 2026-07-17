@@ -45,7 +45,7 @@ def test_transcribe_reads_file_and_calls_gemini(monkeypatch, tmp_path: Path):
     audio_file.write_bytes(b"fake-audio")
 
     monkeypatch.setattr(
-        "app.services.completion_audio_transcription_service.UPLOADS_DIR",
+        "app.services.blob_storage.UPLOADS_DIR",
         tmp_path,
     )
     monkeypatch.setattr(

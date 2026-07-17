@@ -7,9 +7,10 @@ import EmployeeTimelineCard from "./EmployeeTimelineCard";
 
 export interface TeamTimelinePanelProps {
   team: TeamMember[];
+  onEmployeeClick?: (member: TeamMember) => void;
 }
 
-export default function TeamTimelinePanel({ team }: TeamTimelinePanelProps) {
+export default function TeamTimelinePanel({ team, onEmployeeClick }: TeamTimelinePanelProps) {
   const activeCount = team.filter((m) => m.is_active).length;
   const inProgressCount = team.filter((m) => m.status === "in_progress").length;
 
@@ -30,7 +31,13 @@ export default function TeamTimelinePanel({ team }: TeamTimelinePanelProps) {
           {he.dashboardNoTimelineTasks}
         </Typography>
       ) : (
-        team.map((member) => <EmployeeTimelineCard key={member.user_id} member={member} />)
+        team.map((member) => (
+          <EmployeeTimelineCard
+            key={member.user_id}
+            member={member}
+            onEmployeeClick={onEmployeeClick}
+          />
+        ))
       )}
     </DashboardSectionAccordion>
   );

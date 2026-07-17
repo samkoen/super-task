@@ -1,8 +1,6 @@
-import uuid
-from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -11,35 +9,26 @@ from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
+from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
 from app.realtime.task_events import notify_task_change
-from app.repositories.notification_repository import NotificationRepository
+from app.services.media_upload_service import upload_attachment
 from app.services.notification_service import NotificationService
 from app.services.task_occurrence_service import TaskOccurrenceService
 from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
-from app.core.config import UPLOADS_DIR
 from app.services.task_template_service import TaskTemplateService
 
 router = APIRouter()
 
-TASK_PHOTO_DIR = UPLOADS_DIR / "task_photos"
-TASK_VIDEO_DIR = UPLOADS_DIR / "task_videos"
-TASK_AUDIO_DIR = UPLOADS_DIR / "task_audio"
-PHOTO_MAX_BYTES = 10 * 1024 * 1024
-VIDEO_MAX_BYTES = 50 * 1024 * 1024
-AUDIO_MAX_BYTES = 20 * 1024 * 1024
-PHOTO_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-VIDEO_ALLOWED_EXT = {".mp4", ".webm", ".mov", ".mpeg", ".mpg"}
-AUDIO_ALLOWED_EXT = {".mp3", ".wav", ".ogg", ".webm", ".m4a", ".aac"}
-ATTACHMENT_DIRS = {
-    "photo": (TASK_PHOTO_DIR, PHOTO_ALLOWED_EXT, PHOTO_MAX_BYTES, "task_photos"),
-    "video": (TASK_VIDEO_DIR, VIDEO_ALLOWED_EXT, VIDEO_MAX_BYTES, "task_videos"),
-    "audio": (TASK_AUDIO_DIR, AUDIO_ALLOWED_EXT, AUDIO_MAX_BYTES, "task_audio"),
+_TASK_FOLDERS = {
+    "photo": "task_photos",
+    "video": "task_videos",
+    "audio": "task_audio",
 }
 
 
@@ -66,14 +55,25 @@ def _sse_payload_from_create_template(item: dict) -> dict:
     }
 
 
-def _emit_task_event(db: Session, event_type: str, item: dict) -> None:
+_UNSET = object()
+
+
+def _emit_task_event(
+    db: Session,
+    event_type: str,
+    item: dict,
+    *,
+    occurrence_id: str | None | object = _UNSET,
+) -> None:
     """Commit DB changes before SSE so refetching clients see fresh data."""
+    # Après hard-delete (ביטול), ne pas lier la notif à l'occurrence disparue (FK).
+    linked_occurrence_id = item.get("id") if occurrence_id is _UNSET else occurrence_id
     svc = NotificationService(NotificationRepository(db), UserRepository(db))
     pending_notifications = svc.publish_task_event(
         event_type=event_type,
         branch_id=str(item.get("branch_id") or ""),
         assignee_user_id=item.get("assignee_user_id"),
-        occurrence_id=item.get("id"),
+        occurrence_id=linked_occurrence_id,
         task_title=item.get("title"),
     )
     db.commit()
@@ -102,6 +102,7 @@ def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceServi
         UserRepository(db),
         TaskTranslationService(TaskTranslationRepository(db)),
         TaskTemplateRepository(db),
+        notification_repo=NotificationRepository(db),
     )
 
 
@@ -412,42 +413,44 @@ def cancel_occurrence(
 ):
     actor = load_actor(request, UserRepository(db))
     item = service.cancel_occurrence(actor, occurrence_id)
-    _emit_task_event(db, "task_cancelled", item)
-    return {"message": "המשימה בוטלה", "occurrence": item}
+    media_to_delete = item.pop("_media_to_delete", []) or []
+    _emit_task_event(db, "task_cancelled", item, occurrence_id=None)
+    # Après commit : suppression storage (DB déjà cohérente).
+    from app.services import blob_storage
+
+    for url in media_to_delete:
+        blob_storage.delete_media_url(url)
+    return {"message": "המשימה נמחקה", "occurrence": item, "deleted": True}
 
 
 @router.post("/upload-photo")
-async def upload_task_photo(file: UploadFile = File(...)):
-    return await _upload_task_attachment("photo", file)
+async def upload_task_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    load_actor(request, UserRepository(db))
+    return await upload_attachment(kind="photo", folder=_TASK_FOLDERS["photo"], file=file)
 
 
 @router.post("/upload-video")
-async def upload_task_video(file: UploadFile = File(...)):
-    return await _upload_task_attachment("video", file)
+async def upload_task_video(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    load_actor(request, UserRepository(db))
+    return await upload_attachment(kind="video", folder=_TASK_FOLDERS["video"], file=file)
 
 
 @router.post("/upload-audio")
-async def upload_task_audio(file: UploadFile = File(...)):
-    return await _upload_task_attachment("audio", file)
-
-
-async def _upload_task_attachment(kind: str, file: UploadFile) -> dict:
-    config = ATTACHMENT_DIRS.get(kind)
-    if not config:
-        raise HTTPException(status_code=400, detail="סוג קובץ לא נתמך")
-    target_dir, allowed_ext, max_bytes, url_folder = config
-    ext = Path(file.filename or "").suffix.lower()
-    if ext not in allowed_ext:
-        raise HTTPException(status_code=400, detail="סוג קובץ לא נתמך")
-    target_dir.mkdir(parents=True, exist_ok=True)
-    name = f"{uuid.uuid4().hex}{ext}"
-    path = target_dir / name
-    data = await file.read()
-    if len(data) > max_bytes:
-        limit_mb = max_bytes // (1024 * 1024)
-        raise HTTPException(status_code=400, detail=f"הקובץ גדול מדי (מקסימום {limit_mb}MB)")
-    path.write_bytes(data)
-    return {"url": f"/uploads/{url_folder}/{name}", "kind": kind}
+async def upload_task_audio(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    load_actor(request, UserRepository(db))
+    return await upload_attachment(kind="audio", folder=_TASK_FOLDERS["audio"], file=file)
 
 
 @router.post("/run-scheduler")

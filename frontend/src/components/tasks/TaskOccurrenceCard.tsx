@@ -12,7 +12,6 @@ import {
 import CancelIcon from "@mui/icons-material/Cancel";
 import EditIcon from "@mui/icons-material/Edit";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import { cardColor } from "../../constants/cardColors";
@@ -34,7 +33,6 @@ export interface TaskOccurrenceCardProps {
   task: TaskOccurrence;
   index: number;
   isBranchManager?: boolean;
-  onDelegate?: (task: TaskOccurrence) => void;
   onEdit?: (task: TaskOccurrence) => void;
   onCancel?: (task: TaskOccurrence) => void;
   onReview?: (task: TaskOccurrence) => void;
@@ -43,8 +41,6 @@ export interface TaskOccurrenceCardProps {
 export default function TaskOccurrenceCard({
   task,
   index,
-  isBranchManager,
-  onDelegate,
   onEdit,
   onCancel,
   onReview,
@@ -53,10 +49,8 @@ export default function TaskOccurrenceCard({
   const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
   const urgent = task.status === "overdue";
   const awaitingReview = task.status === "pending_review";
-  const assigneeLabel = task.assignee_name
-    ?? (task.pending_delegation ? he.pendingDelegation : he.allDepartment);
-  const canCancel = !["completed", "cancelled"].includes(task.status) && !task.pending_delegation;
-  const canDelegate = Boolean(task.pending_delegation && isBranchManager);
+  const assigneeLabel = task.assignee_name ?? he.allDepartment;
+  const canCancel = !["completed", "cancelled"].includes(task.status);
   const canEdit = !["completed", "cancelled", "pending_review"].includes(task.status) && Boolean(onEdit);
   const canReview = awaitingReview && Boolean(onReview);
 
@@ -150,13 +144,6 @@ export default function TaskOccurrenceCard({
                 </IconButton>
               </Tooltip>
             )}
-            {canDelegate && onDelegate && (
-              <Tooltip title={he.delegateTask}>
-                <IconButton size="small" color="primary" onClick={() => onDelegate(task)}>
-                  <SwapHorizIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
             {canCancel && onCancel && (
               <Tooltip title={he.cancel}>
                 <IconButton size="small" color="warning" onClick={() => onCancel(task)}>
@@ -218,7 +205,7 @@ export default function TaskOccurrenceCard({
         </Typography>
       </Box>
 
-      {(canDelegate || canCancel || canReview) && (
+      {(canCancel || canReview) && (
         <CardActions
           sx={{
             px: 2,
@@ -240,11 +227,6 @@ export default function TaskOccurrenceCard({
               onClick={() => onReview(task)}
             >
               {he.taskReviewAction}
-            </Button>
-          )}
-          {canDelegate && onDelegate && (
-            <Button fullWidth variant="contained" size="small" onClick={() => onDelegate(task)}>
-              {he.delegateTask}
             </Button>
           )}
           {canCancel && onCancel && (

@@ -238,6 +238,9 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         reference_photo_url=row.reference_photo_url,
         reference_video_url=row.reference_video_url,
         reference_audio_url=row.reference_audio_url,
+        media_purge_after=(
+            parse_datetime_iso(row.media_purge_after) if row.media_purge_after else None
+        ),
         started_at=parse_datetime_iso(row.started_at) if row.started_at else None,
         started_by_id=str(row.started_by_id) if row.started_by_id else None,
         created_by_id=str(row.created_by_id) if row.created_by_id else None,

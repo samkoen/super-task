@@ -132,10 +132,12 @@ function TimelineBarRow({ row }: { row: TimelineRowModel }) {
 
 export interface EmployeeTimelineCardProps {
   member: TeamMember;
+  onEmployeeClick?: (member: TeamMember) => void;
 }
 
-export default function EmployeeTimelineCard({ member }: EmployeeTimelineCardProps) {
+export default function EmployeeTimelineCard({ member, onEmployeeClick }: EmployeeTimelineCardProps) {
   const rows = buildTimelineRows(member.timeline, member.overdue_backlog);
+  const clickable = Boolean(onEmployeeClick);
 
   return (
     <Paper variant="outlined" sx={{ p: 2, mb: 1.5 }}>
@@ -148,6 +150,30 @@ export default function EmployeeTimelineCard({ member }: EmployeeTimelineCardPro
         pb={1}
         borderBottom="1px solid"
         borderColor="divider"
+        role={clickable ? "button" : undefined}
+        tabIndex={clickable ? 0 : undefined}
+        onClick={clickable ? () => onEmployeeClick?.(member) : undefined}
+        onKeyDown={
+          clickable
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onEmployeeClick?.(member);
+                }
+              }
+            : undefined
+        }
+        sx={
+          clickable
+            ? {
+                cursor: "pointer",
+                borderRadius: 1,
+                mx: -0.5,
+                px: 0.5,
+                "&:hover": { bgcolor: "action.hover" },
+              }
+            : undefined
+        }
       >
         <Box minWidth={0}>
           <Typography fontWeight={800}>

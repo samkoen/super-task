@@ -37,6 +37,7 @@ def _task(**kwargs) -> TaskOccurrence:
         "reference_photo_url": None,
         "reference_video_url": None,
         "reference_audio_url": None,
+        "media_purge_after": None,
         "started_at": None,
         "started_by_id": None,
         "created_by_id": None,

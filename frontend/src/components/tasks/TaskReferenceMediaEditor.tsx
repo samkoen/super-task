@@ -11,6 +11,9 @@ export interface TaskReferenceMediaValue {
   reference_photo_url: string;
   reference_video_url: string;
   reference_audio_url: string;
+  /** Fichier local — upload seulement à la soumission du formulaire. */
+  pending_photo?: File | null;
+  pending_video?: File | null;
 }
 
 interface TaskReferenceMediaEditorProps {
@@ -19,6 +22,43 @@ interface TaskReferenceMediaEditorProps {
   onDescriptionAppend?: (transcript: string) => void;
   disabled?: boolean;
   onError?: (message: string) => void;
+}
+
+function revokeIfBlob(url: string | undefined): void {
+  if (url?.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Upload les fichiers locaux et renvoie des URLs serveur prêtes à persister. */
+export async function resolveTaskReferenceMedia(
+  value: TaskReferenceMediaValue,
+): Promise<{
+  reference_photo_url?: string;
+  reference_video_url?: string;
+  reference_audio_url?: string;
+}> {
+  let photo = value.reference_photo_url || undefined;
+  let video = value.reference_video_url || undefined;
+  const audio = value.reference_audio_url || undefined;
+
+  if (value.pending_photo) {
+    photo = (await taskService.uploadPhoto(value.pending_photo)).url;
+  } else if (photo?.startsWith("blob:")) {
+    photo = undefined;
+  }
+
+  if (value.pending_video) {
+    video = (await taskService.uploadVideo(value.pending_video)).url;
+  } else if (video?.startsWith("blob:")) {
+    video = undefined;
+  }
+
+  return {
+    reference_photo_url: photo,
+    reference_video_url: video,
+    reference_audio_url: audio,
+  };
 }
 
 export default function TaskReferenceMediaEditor({
@@ -31,24 +71,35 @@ export default function TaskReferenceMediaEditor({
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [transcribingAudio, setTranscribingAudio] = useState(false);
 
-  const handleUpload = useCallback(
+  const handleCapture = useCallback(
     async (file: File, kind: MediaKind) => {
-      setUploadingKind(kind);
-      try {
-        const res =
-          kind === "photo"
-            ? await taskService.uploadPhoto(file)
-            : kind === "video"
-              ? await taskService.uploadVideo(file)
-              : await taskService.uploadAudio(file);
+      if (kind === "photo") {
+        revokeIfBlob(value.reference_photo_url);
         onChange({
           ...value,
-          reference_photo_url: kind === "photo" ? res.url : value.reference_photo_url,
-          reference_video_url: kind === "video" ? res.url : value.reference_video_url,
-          reference_audio_url: kind === "audio" ? res.url : value.reference_audio_url,
+          reference_photo_url: URL.createObjectURL(file),
+          pending_photo: file,
         });
+        return;
+      }
+      if (kind === "video") {
+        revokeIfBlob(value.reference_video_url);
+        onChange({
+          ...value,
+          reference_video_url: URL.createObjectURL(file),
+          pending_video: file,
+        });
+        return;
+      }
 
-        if (kind === "audio" && onDescriptionAppend) {
+      setUploadingKind("audio");
+      try {
+        const res = await taskService.uploadAudio(file);
+        onChange({
+          ...value,
+          reference_audio_url: res.url,
+        });
+        if (onDescriptionAppend) {
           setTranscribingAudio(true);
           try {
             const { transcript } = await aiService.transcribeReferenceAudio(res.url);
@@ -67,7 +118,7 @@ export default function TaskReferenceMediaEditor({
         setUploadingKind(null);
       }
     },
-    [onDescriptionAppend, onChange, onError, value]
+    [onDescriptionAppend, onChange, onError, value],
   );
 
   const photoSrc = mediaUrl(value.reference_photo_url || null);
@@ -85,7 +136,7 @@ export default function TaskReferenceMediaEditor({
         audioAdded={Boolean(value.reference_audio_url)}
         uploadingKind={uploadingKind}
         disabled={disabled || transcribingAudio}
-        onCapture={handleUpload}
+        onCapture={handleCapture}
       />
       {transcribingAudio && (
         <Box display="flex" alignItems="center" gap={1}>
@@ -110,7 +161,10 @@ export default function TaskReferenceMediaEditor({
             size="small"
             color="inherit"
             disabled={disabled}
-            onClick={() => onChange({ ...value, reference_photo_url: "" })}
+            onClick={() => {
+              revokeIfBlob(value.reference_photo_url);
+              onChange({ ...value, reference_photo_url: "", pending_photo: null });
+            }}
             sx={{ mt: 0.5 }}
           >
             {he.removeMedia}
@@ -132,7 +186,10 @@ export default function TaskReferenceMediaEditor({
             size="small"
             color="inherit"
             disabled={disabled}
-            onClick={() => onChange({ ...value, reference_video_url: "" })}
+            onClick={() => {
+              revokeIfBlob(value.reference_video_url);
+              onChange({ ...value, reference_video_url: "", pending_video: null });
+            }}
             sx={{ mt: 0.5 }}
           >
             {he.removeMedia}

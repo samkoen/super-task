@@ -80,6 +80,16 @@ class NotificationRepository:
         self._db.flush()
         return int(result.rowcount or 0)
 
+    def clear_occurrence_links(self, occurrence_id: str) -> int:
+        """Détache les notifications avant suppression d'une occurrence (FK sans CASCADE)."""
+        result = self._db.execute(
+            update(orm.UserNotification)
+            .where(orm.UserNotification.occurrence_id == mp.parse_uuid(occurrence_id))
+            .values(occurrence_id=None)
+        )
+        self._db.flush()
+        return int(result.rowcount or 0)
+
     def mark_all_read(self, user_id: str) -> int:
         q = (
             select(orm.UserNotification)

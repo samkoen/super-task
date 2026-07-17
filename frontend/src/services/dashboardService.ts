@@ -117,6 +117,7 @@ export interface EmployeeTaskCard {
   title: string;
   description: string;
   due_at: string;
+  created_at?: string | null;
   status: TaskStatus;
   task_kind: TaskKind;
   photo_required: boolean;

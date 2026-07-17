@@ -48,23 +48,31 @@ def test_generate_from_template_copies_reference_media(monkeypatch):
         "app.services.task_scheduler_service.task_recurrence.should_generate_on_date",
         lambda *args, **kwargs: True,
     )
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.blob_storage.copy_media_url",
+        lambda url, folder: f"copied:{folder}:{url}" if url else None,
+    )
 
     day = date(2026, 7, 14)
     ok = scheduler.generate_from_template(template, on_date=day)
 
-    assert ok is True
+    assert ok is not None
     occurrence_repo.create.assert_called_once()
     kwargs = occurrence_repo.create.call_args.kwargs
-    assert kwargs["reference_photo_url"] == "/uploads/task_photos/ref.jpg"
-    assert kwargs["reference_video_url"] == "/uploads/task_videos/ref.mp4"
-    assert kwargs["reference_audio_url"] == "/uploads/task_audio/ref.webm"
+    assert kwargs["reference_photo_url"] == "copied:task_photos:/uploads/task_photos/ref.jpg"
+    assert kwargs["reference_video_url"] == "copied:task_videos:/uploads/task_videos/ref.mp4"
+    assert kwargs["reference_audio_url"] == "copied:task_audio:/uploads/task_audio/ref.webm"
     assert kwargs["template_id"] == template.id
 
 
-def test_create_once_occurrence_copies_reference_media():
+def test_create_once_occurrence_copies_reference_media(monkeypatch):
     template = _template(reference_photo_url=None, reference_video_url=None)
     occurrence_repo = MagicMock()
     scheduler = TaskSchedulerService(MagicMock(), occurrence_repo)
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.blob_storage.copy_media_url",
+        lambda url, folder: f"copied:{url}" if url else None,
+    )
 
     due_at = datetime(2026, 7, 14, 9, 0, tzinfo=TZ)
     scheduler.create_once_occurrence(template, due_at=due_at)

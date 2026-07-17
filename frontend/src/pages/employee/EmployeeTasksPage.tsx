@@ -42,7 +42,9 @@ import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import {
   defaultRangeFrom,
+  dueDateIso,
   formatHebrewDay,
+  formatHebrewDayShort,
   formatDueAt,
   groupTasksByDay,
   isToday,
@@ -56,6 +58,12 @@ import CompletionMediaPreview from "../../components/tasks/CompletionMediaPrevie
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
+import {
+  type PendingMedia,
+  replacePendingMedia,
+  revokePendingMedia,
+  uploadPendingMedia,
+} from "../../utils/pendingMedia";
 
 const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error" | "info"> = {
   pending: "warning",
@@ -105,6 +113,7 @@ function EmployeeTaskTitle({
 function TaskCard({
   task,
   urgent,
+  carryOver,
   starting,
   speaking,
   onStart,
@@ -114,6 +123,7 @@ function TaskCard({
 }: {
   task: EmployeeTaskCard;
   urgent?: boolean;
+  carryOver?: boolean;
   starting?: boolean;
   speaking?: boolean;
   onStart: (task: EmployeeTaskCard) => void;
@@ -127,8 +137,8 @@ function TaskCard({
       variant="outlined"
       sx={{
         mb: 2,
-        borderColor: urgent ? "error.light" : undefined,
-        bgcolor: urgent ? "rgba(211, 47, 47, 0.06)" : undefined,
+        borderColor: urgent || carryOver ? "error.light" : undefined,
+        bgcolor: urgent || carryOver ? "rgba(211, 47, 47, 0.06)" : undefined,
       }}
     >
       <CardContent>
@@ -140,6 +150,17 @@ function TaskCard({
           <Chip label={he.taskKindLabels[task.task_kind]} size="small" />
           {task.department_name && <Chip label={task.department_name} size="small" variant="outlined" />}
           {urgent && <Chip label={he.employeeUrgentTasks} color="error" size="small" />}
+          {carryOver && (
+            <Chip
+              label={
+                task.created_at
+                  ? he.employeeTaskCreatedOn(formatHebrewDayShort(dueDateIso(task.created_at)))
+                  : he.employeeCarryOverTask
+              }
+              color="warning"
+              size="small"
+            />
+          )}
         </Box>
         {task.description && (
           <Typography variant="body2" color="text.secondary" mb={1}>{task.description}</Typography>
@@ -152,9 +173,7 @@ function TaskCard({
         <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
           {he.dueAt}: {formatDueAt(task.due_at)}
         </Typography>
-        {task.photo_required && (
-          <Typography variant="caption" color="warning.main" display="block">{he.photoRequired}</Typography>
-        )}
+        <Typography variant="caption" color="warning.main" display="block">{he.photoRequired}</Typography>
         {rejectionNote && (
           <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
             {he.taskRejectedReopen}: {rejectionNote}
@@ -239,12 +258,17 @@ function collectPendingIds(tasks: EmployeeTaskCard[], language: EmployeeLanguage
     .map((task) => task.id);
 }
 
+function isRolledFromPreviousDay(task: Pick<EmployeeTaskCard, "created_at" | "due_at">): boolean {
+  return Boolean(task.created_at && dueDateIso(task.created_at) < dueDateIso(task.due_at));
+}
+
 function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
   return {
     id: task.id,
     title: task.title,
     description: task.description,
     due_at: task.due_at,
+    created_at: task.created_at,
     status: task.status,
     task_kind: task.task_kind,
     photo_required: task.photo_required,
@@ -270,10 +294,9 @@ export default function EmployeeTasksPage() {
   const [note, setNote] = useState("");
   const [notDoneReason, setNotDoneReason] = useState("");
   const [done, setDone] = useState(true);
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [audioUrl, setAudioUrl] = useState("");
-  const [uploadingKind, setUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
+  const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
+  const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -387,15 +410,28 @@ export default function EmployeeTasksPage() {
     }
   };
 
+  const clearCompletionMedia = useCallback(() => {
+    setPendingPhoto((prev) => {
+      revokePendingMedia(prev);
+      return null;
+    });
+    setPendingVideo((prev) => {
+      revokePendingMedia(prev);
+      return null;
+    });
+    setPendingAudio((prev) => {
+      revokePendingMedia(prev);
+      return null;
+    });
+  }, []);
+
   const openComplete = (task: EmployeeTaskCard) => {
     stopSpeech();
+    clearCompletionMedia();
     setSelected(task);
     setNote("");
     setNotDoneReason("");
     setDone(true);
-    setPhotoUrl("");
-    setVideoUrl("");
-    setAudioUrl("");
   };
 
   const handleListen = async (task: EmployeeTaskCard) => {
@@ -421,28 +457,21 @@ export default function EmployeeTasksPage() {
     }
   }, [user?.preferred_language]);
 
-  const handleUpload = useCallback(async (file: File, kind: MediaKind) => {
-    setUploadingKind(kind);
-    try {
-      const res =
-        kind === "photo"
-          ? await taskService.uploadPhoto(file)
-          : kind === "video"
-            ? await taskService.uploadVideo(file)
-            : await taskService.uploadAudio(file);
-      if (kind === "photo") setPhotoUrl(res.url);
-      if (kind === "video") setVideoUrl(res.url);
-      if (kind === "audio") setAudioUrl(res.url);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setUploadingKind(null);
+  const handleCapture = useCallback((file: File, kind: MediaKind) => {
+    if (kind === "photo") {
+      setPendingPhoto((prev) => replacePendingMedia(prev, file));
+      return;
     }
+    if (kind === "video") {
+      setPendingVideo((prev) => replacePendingMedia(prev, file));
+      return;
+    }
+    setPendingAudio((prev) => replacePendingMedia(prev, file));
   }, []);
 
-  const hasMedia = Boolean(photoUrl || videoUrl || audioUrl);
-  const requiresMedia = Boolean(selected?.photo_required && done);
-  const canSubmitDone = !requiresMedia || hasMedia;
+  const hasVisualMedia = Boolean(pendingPhoto || pendingVideo);
+  const requiresMedia = Boolean(done);
+  const canSubmitDone = !requiresMedia || hasVisualMedia;
 
   const openReport = () => {
     setReportText("");
@@ -498,14 +527,24 @@ export default function EmployeeTasksPage() {
     if (!selected) return;
     setSaving(true);
     try {
+      const photo_path = done
+        ? await uploadPendingMedia(pendingPhoto, taskService.uploadPhoto)
+        : undefined;
+      const video_path = done
+        ? await uploadPendingMedia(pendingVideo, taskService.uploadVideo)
+        : undefined;
+      const audio_path = done
+        ? await uploadPendingMedia(pendingAudio, taskService.uploadAudio)
+        : undefined;
       await taskService.complete(selected.id, {
         status: done ? "completed" : "not_completed",
         note: note || undefined,
-        photo_path: photoUrl || undefined,
-        video_path: videoUrl || undefined,
-        audio_path: audioUrl || undefined,
+        photo_path,
+        video_path,
+        audio_path,
         not_completed_reason: done ? undefined : notDoneReason,
       });
+      clearCompletionMedia();
       setSelected(null);
       if (done) {
         showSuccess(he.taskSubmitSuccess);
@@ -674,6 +713,7 @@ export default function EmployeeTasksPage() {
                   key={task.id}
                   task={task}
                   urgent
+                  carryOver={isRolledFromPreviousDay(task)}
                   starting={startingId === task.id}
                   speaking={speakingId === task.id}
                   onStart={handleStart}
@@ -692,6 +732,7 @@ export default function EmployeeTasksPage() {
                 <TaskCard
                   key={task.id}
                   task={task}
+                  carryOver={isRolledFromPreviousDay(task)}
                   starting={startingId === task.id}
                   speaking={speakingId === task.id}
                   onStart={handleStart}
@@ -740,6 +781,7 @@ export default function EmployeeTasksPage() {
               <TaskCard
                 key={task.id}
                 task={task}
+                carryOver={isRolledFromPreviousDay(task)}
                 starting={startingId === task.id}
                 speaking={speakingId === task.id}
                 onStart={handleStart}
@@ -854,31 +896,52 @@ export default function EmployeeTasksPage() {
             <>
               <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
               <MediaCaptureActions
-                photoAdded={Boolean(photoUrl)}
-                videoAdded={Boolean(videoUrl)}
-                audioAdded={Boolean(audioUrl)}
-                uploadingKind={uploadingKind}
+                photoAdded={Boolean(pendingPhoto)}
+                videoAdded={Boolean(pendingVideo)}
+                audioAdded={Boolean(pendingAudio)}
+                uploadingKind={null}
                 disabled={saving}
-                onCapture={(file, kind: MediaKind) => handleUpload(file, kind)}
+                onCapture={(file, kind: MediaKind) => handleCapture(file, kind)}
               />
               <CompletionMediaPreview
-                photo_path={photoUrl}
-                video_path={videoUrl}
-                audio_path={audioUrl}
-                disabled={saving || uploadingKind !== null}
-                onRemovePhoto={() => setPhotoUrl("")}
-                onRemoveVideo={() => setVideoUrl("")}
-                onRemoveAudio={() => setAudioUrl("")}
+                photo_path={pendingPhoto?.previewUrl}
+                video_path={pendingVideo?.previewUrl}
+                audio_path={pendingAudio?.previewUrl}
+                disabled={saving}
+                onRemovePhoto={() => {
+                  revokePendingMedia(pendingPhoto);
+                  setPendingPhoto(null);
+                }}
+                onRemoveVideo={() => {
+                  revokePendingMedia(pendingVideo);
+                  setPendingVideo(null);
+                }}
+                onRemoveAudio={() => {
+                  revokePendingMedia(pendingAudio);
+                  setPendingAudio(null);
+                }}
               />
-              {requiresMedia && !hasMedia && (
+              {requiresMedia && !hasVisualMedia && (
                 <Typography variant="caption" color="warning.main">{he.photoRequired}</Typography>
               )}
             </>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setSelected(null)} disabled={saving}>{he.cancel}</Button>
-          <Button variant="contained" onClick={handleSubmit} disabled={saving || uploadingKind !== null || (!done && !notDoneReason.trim()) || !canSubmitDone}>
+          <Button
+            onClick={() => {
+              clearCompletionMedia();
+              setSelected(null);
+            }}
+            disabled={saving}
+          >
+            {he.cancel}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleSubmit()}
+            disabled={saving || (!done && !notDoneReason.trim()) || !canSubmitDone}
+          >
             {saving ? <CircularProgress size={22} color="inherit" /> : he.submit}
           </Button>
         </DialogActions>

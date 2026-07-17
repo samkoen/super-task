@@ -78,9 +78,7 @@ export default function UnfinishedTasksPanel({ tasks }: UnfinishedTasksPanelProp
                       <TableCell>
                         <Typography fontWeight={600}>{task.title}</Typography>
                       </TableCell>
-                      <TableCell>
-                        {task.pending_delegation ? he.pendingDelegation : task.assignee_name || "—"}
-                      </TableCell>
+                      <TableCell>{task.assignee_name || "—"}</TableCell>
                       <TableCell>{task.department_name || he.noDepartment}</TableCell>
                       <TableCell>
                         {formatTime(task.due_at)}
@@ -89,9 +87,7 @@ export default function UnfinishedTasksPanel({ tasks }: UnfinishedTasksPanelProp
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        {task.pending_delegation ? (
-                          <Chip label={he.alertDelegation} size="small" color="warning" />
-                        ) : task.overdue_days > 0 ? (
+                        {task.overdue_days > 0 ? (
                           <Chip
                             label={he.dashboardOverdueDays(task.overdue_days)}
                             size="small"

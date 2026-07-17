@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from app.core import config
 from app.db import mappers as mp
 from app.domain import roles, task_status
+from app.domain.completion_media import has_required_completion_visual_media
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
 from app.domain.task_translation_source import task_source_language
@@ -17,11 +18,14 @@ from app.domain.task_scope import (
 )
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
+from app.services import blob_storage
 from app.services.completion_audio_transcription_service import transcribe_completion_audio
+from app.services.media_retention_service import MediaRetentionService
 from app.services.task_translation_service import TaskTranslationService
 
 TZ = ZoneInfo("Asia/Jerusalem")
@@ -37,6 +41,8 @@ class TaskOccurrenceService:
         user_repo: UserRepository | None = None,
         translation_service: TaskTranslationService | None = None,
         template_repo: TaskTemplateRepository | None = None,
+        media_retention: MediaRetentionService | None = None,
+        notification_repo: NotificationRepository | None = None,
     ):
         self._occurrences = occurrence_repo
         self._completions = completion_repo
@@ -44,6 +50,10 @@ class TaskOccurrenceService:
         self._users = user_repo
         self._translations = translation_service
         self._templates = template_repo
+        self._media_retention = media_retention or MediaRetentionService(
+            occurrence_repo, completion_repo, template_repo=template_repo
+        )
+        self._notifications = notification_repo
 
     def list_occurrences(
         self,
@@ -59,6 +69,9 @@ class TaskOccurrenceService:
     ) -> list[dict]:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לצפות במשימות")
+        now = datetime.now(TZ)
+        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
+        self._occurrences.mark_overdue_before(now)
         branch_ids = visible_branch_ids_for_tasks(actor, self._branch)
         day = date.fromisoformat(due_on) if due_on else None
         day_from = date.fromisoformat(due_from) if due_from else None
@@ -88,9 +101,12 @@ class TaskOccurrenceService:
     ) -> list[dict]:
         if actor.role != roles.EMPLOYEE:
             raise PermissionError("רק עובדים יכולים לראות את המשימות שלהם")
+        now = datetime.now(TZ)
+        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
+        self._occurrences.mark_overdue_before(now)
         day = date.fromisoformat(due_on) if due_on else None
         if not day and not due_from and not due_to:
-            day = datetime.now(TZ).date()
+            day = now.date()
         day_from = date.fromisoformat(due_from) if due_from else None
         day_to = date.fromisoformat(due_to) if due_to else None
         items = self._occurrences.list_occurrences(
@@ -170,40 +186,47 @@ class TaskOccurrenceService:
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=TZ)
 
-        manager_user_id: str | None = None
-        final_assignee = assignee_user_id
+        if not assignee_user_id:
+            raise ValueError("נדרש שיוך לעובד למשימה מזדמנת")
+        self._validate_employee(branch_id, assignee_user_id)
 
-        if actor.role == roles.NETWORK_MANAGER:
-            if not self._users:
-                raise RuntimeError("user repository required")
-            branch_manager = self._users.find_by_branch_and_role(branch_id, roles.BRANCH_MANAGER)
-            if not branch_manager:
-                raise ValueError("לא נמצא מנהל סניף לסניף זה")
-            manager_user_id = branch_manager.id
-            final_assignee = None
-        elif actor.role == roles.BRANCH_MANAGER:
-            if assignee_user_id:
-                self._validate_employee(branch_id, assignee_user_id)
-            else:
-                raise ValueError("נדרש שיוך לעובד למשימה מזדמנת")
-
+        photo, video, audio = self._isolate_issue_media(
+            reference_photo_url, reference_video_url, reference_audio_url
+        )
         occurrence = self._occurrences.create(
             template_id=None,
             branch_id=branch_id,
             title=title,
             description=description,
             due_at=parsed,
-            assignee_user_id=final_assignee,
+            assignee_user_id=assignee_user_id,
             department_id=None,
             task_kind=AD_HOC,
-            manager_user_id=manager_user_id,
+            manager_user_id=None,
             photo_required=photo_required,
-            reference_photo_url=reference_photo_url,
-            reference_video_url=reference_video_url,
-            reference_audio_url=reference_audio_url,
+            reference_photo_url=photo,
+            reference_video_url=video,
+            reference_audio_url=audio,
             created_by_id=actor.user_id,
         )
         return self._to_api(occurrence)
+
+    @staticmethod
+    def _isolate_issue_media(
+        photo: str | None, video: str | None, audio: str | None
+    ) -> tuple[str | None, str | None, str | None]:
+        """Copie les médias issus d'un issue report pour ne pas les partager à la purge."""
+
+        def _copy_if_issue(url: str | None, folder: str) -> str | None:
+            if not url or "issue_" not in url:
+                return url
+            return blob_storage.copy_media_url(url, folder=folder)
+
+        return (
+            _copy_if_issue(photo, "task_photos"),
+            _copy_if_issue(video, "task_videos"),
+            _copy_if_issue(audio, "task_audio"),
+        )
 
     def delegate_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, assignee_user_id: str
@@ -268,12 +291,13 @@ class TaskOccurrenceService:
             raise ValueError("סטטוס סיום לא תקין")
         if completion_status == task_status.COMPLETION_NOT_DONE and not (not_completed_reason or "").strip():
             raise ValueError("נדרשת סיבה אם המשימה לא בוצעה")
+        requires_visual_media = actor.role == roles.EMPLOYEE or occurrence.photo_required
         if (
-            occurrence.photo_required
-            and completion_status == task_status.COMPLETION_DONE
-            and not any((p or "").strip() for p in (photo_path, video_path, audio_path))
+            completion_status == task_status.COMPLETION_DONE
+            and requires_visual_media
+            and not has_required_completion_visual_media(photo_path, video_path)
         ):
-            raise ValueError("נדרש לפחות קובץ מדיה (תמונה, וידאו או שמע) למשימה מזדמנת")
+            raise ValueError("נדרשת תמונה או וידאו לסיום המשימה (שמע אופציונלי)")
 
         note_clean = (note or "").strip() or None
         reason_clean = (not_completed_reason or "").strip() or None
@@ -347,6 +371,8 @@ class TaskOccurrenceService:
 
         updated = self._occurrences.update_status(occurrence_id, new_status)
         assert updated is not None
+        if new_status == task_status.COMPLETED:
+            self._media_retention.schedule_purge(occurrence_id)
         data = self._to_api(updated)
         data["completion"] = mp.task_completion_domain_to_api(completion)
         return data
@@ -372,6 +398,7 @@ class TaskOccurrenceService:
         assert reviewed is not None
         updated = self._occurrences.update_status(occurrence_id, task_status.COMPLETED)
         assert updated is not None
+        self._media_retention.schedule_purge(occurrence_id)
         data = self._to_api(updated)
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
@@ -406,6 +433,7 @@ class TaskOccurrenceService:
         return data
 
     def cancel_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
+        """ביטול = suppression complète (DB + médias storage)."""
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לבטל משימות")
         occurrence = self._occurrences.find_by_id(occurrence_id)
@@ -414,9 +442,19 @@ class TaskOccurrenceService:
         self._assert_branch_access(actor, occurrence.branch_id)
         if occurrence.status in task_status.TERMINAL:
             raise ValueError("המשימה כבר נסגרה")
-        updated = self._occurrences.update_status(occurrence_id, task_status.CANCELLED)
-        assert updated is not None
-        return self._to_api(updated)
+
+        snapshot = self._to_api(occurrence)
+        # Collecter les URLs avant delete DB — purge storage après commit (évite perte si rollback).
+        media_to_delete = self._media_retention.collect_deletable_media_urls(occurrence_id)
+        self._completions.delete_by_occurrence(occurrence_id)
+        if self._notifications:
+            self._notifications.clear_occurrence_links(occurrence_id)
+        if not self._occurrences.delete(occurrence_id):
+            raise ValueError("משימה לא נמצאה")
+        snapshot["status"] = task_status.CANCELLED
+        snapshot["deleted"] = True
+        snapshot["_media_to_delete"] = media_to_delete
+        return snapshot
 
     def update_occurrence(
         self,
@@ -485,24 +523,9 @@ class TaskOccurrenceService:
         if not occurrence:
             raise ValueError("משימה לא נמצאה")
         self._assert_branch_access(actor, occurrence.branch_id)
-        merged = self._with_reference_media(occurrence)
-        if self._reference_media_differs(occurrence, merged):
-            synced = self._occurrences.update_reference_media(
-                occurrence.id,
-                reference_photo_url=merged.reference_photo_url,
-                reference_video_url=merged.reference_video_url,
-                reference_audio_url=merged.reference_audio_url,
-            )
-            assert synced is not None
-            occurrence = synced
+        # Fusion lecture seule (template) — ne pas persister les URLs template sur l'occurrence
+        # (sinon cancel/purge supprimerait les fichiers du modèle récurrent).
         return self._to_api(occurrence)
-
-    def _reference_media_differs(self, left, right) -> bool:
-        return (
-            (left.reference_photo_url or None) != (right.reference_photo_url or None)
-            or (left.reference_video_url or None) != (right.reference_video_url or None)
-            or (left.reference_audio_url or None) != (right.reference_audio_url or None)
-        )
 
     def _task_source_language(self, occurrence) -> str:
         return task_source_language(occurrence, self._users)

@@ -6,8 +6,7 @@ from fastapi import APIRouter, Body, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.auth.actor import load_actor
-from app.auth.session_roles import require_admin_user_id
+from app.auth.actor import load_actor, require_admin_actor
 from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
@@ -32,8 +31,9 @@ def list_users(
     request: Request,
     role: str | None = Query(None),
     service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
 ):
-    require_admin_user_id(request)
+    require_admin_actor(request, UserRepository(db))
     return service.list_users(role=role)
 
 
@@ -156,8 +156,9 @@ def create_user(
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
     service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
 ):
-    require_admin_user_id(request)
+    require_admin_actor(request, UserRepository(db))
     if not data:
         return JSONResponse({"error": "חסרים נתונים"}, status_code=400)
     user = service.create_user(
@@ -180,8 +181,9 @@ def update_user_scope(
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
     service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
 ):
-    require_admin_user_id(request)
+    require_admin_actor(request, UserRepository(db))
     payload = data or {}
     user = service.update_user_scope(
         user_id,

@@ -7,20 +7,36 @@ interface StatCardProps {
   subtitle?: string;
   icon?: ReactNode;
   accent?: string;
+  onClick?: () => void;
 }
 
-export default function StatCard({ title, value, subtitle, icon, accent }: StatCardProps) {
+export default function StatCard({ title, value, subtitle, icon, accent, onClick }: StatCardProps) {
   const tone = accent ?? "#0A6B5C";
+  const clickable = Boolean(onClick);
 
   return (
     <Paper
       variant="outlined"
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        clickable
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
       sx={{
         p: 2.5,
         height: "100%",
         position: "relative",
         overflow: "hidden",
         borderRadius: 3,
+        cursor: clickable ? "pointer" : "default",
         transition: "box-shadow 0.2s, transform 0.15s, border-color 0.15s",
         "&:hover": {
           transform: "translateY(-2px)",

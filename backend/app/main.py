@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -13,19 +16,43 @@ from app.controllers import (
     ai_controller,
     auth_controller,
     branch_controller,
+    cron_controller,
     dashboard_controller,
     department_controller,
     events_controller,
     invitation_controller,
     issue_report_controller,
+    media_controller,
     network_controller,
     notification_controller,
     product_controller,
     task_controller,
     user_controller,
 )
-from app.core.config import COOKIE_SECURE, FRONTEND_URL, SECRET_KEY, UPLOADS_DIR
+from app.core.config import (
+    COOKIE_SECURE,
+    FRONTEND_URL,
+    IS_PRODUCTION,
+    LOG_LEVEL,
+    SECRET_KEY,
+    UPLOADS_DIR,
+    assert_secure_runtime_config,
+)
 from app.realtime.sse_hub import sse_hub
+
+logger = logging.getLogger(__name__)
+
+
+def _configure_logging() -> None:
+    level = getattr(logging, LOG_LEVEL, logging.INFO)
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)s [%(name)s] %(message)s",
+        force=True,
+    )
+    logging.getLogger("uvicorn.error").setLevel(level)
+    logging.getLogger("uvicorn.access").setLevel(level)
+    logging.getLogger("app").setLevel(level)
 
 
 @asynccontextmanager
@@ -35,7 +62,19 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    _configure_logging()
+    assert_secure_runtime_config()
     app = FastAPI(title="Super API", redirect_slashes=False, lifespan=lifespan)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        logger.warning(
+            "422 validation path=%s query=%s errors=%s",
+            request.url.path,
+            dict(request.query_params),
+            exc.errors(),
+        )
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
     app.add_middleware(
         CORSMiddleware,
@@ -59,7 +98,9 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "issue_photos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "issue_videos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "issue_audio").mkdir(exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+    # Prod/Vercel : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
+    if not IS_PRODUCTION:
+        app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
     @app.get("/health", tags=["health"])
     @app.get("/api/health", tags=["health"])
@@ -79,6 +120,8 @@ def create_app() -> FastAPI:
     app.include_router(events_controller.router, prefix="/api/events", tags=["events"])
     app.include_router(notification_controller.router, prefix="/api/notifications", tags=["notifications"])
     app.include_router(ai_controller.router, prefix="/api/ai", tags=["ai"])
+    app.include_router(cron_controller.router, prefix="/api/cron", tags=["cron"])
+    app.include_router(media_controller.router, prefix="/api/media", tags=["media"])
 
     return app
 

@@ -27,6 +27,7 @@ def _occurrence(**overrides) -> TaskOccurrence:
         "reference_photo_url": None,
         "reference_video_url": None,
         "reference_audio_url": None,
+        "media_purge_after": None,
         "started_at": "2026-01-01T08:00:00+02:00",
         "started_by_id": "emp-1",
         "created_by_id": "mgr-1",
@@ -105,6 +106,27 @@ def test_employee_complete_sets_pending_review():
     assert result["completion"]["manager_review_status"] == task_status.REVIEW_PENDING
 
 
+def test_employee_complete_rejects_audio_only():
+    occurrence = _occurrence()
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    svc = _service(occurrence_repo, MagicMock())
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+
+    with pytest.raises(ValueError, match="תמונה או וידאו"):
+        asyncio.run(
+            svc.complete_occurrence(
+                actor,
+                "occ-1",
+                completion_status=task_status.COMPLETION_DONE,
+                audio_path="/uploads/a.webm",
+            )
+        )
+
+
 def test_manager_complete_skips_review():
     occurrence = _occurrence()
     completed = _occurrence(status=task_status.COMPLETED)
@@ -163,6 +185,7 @@ def test_approve_occurrence_closes_task():
     result = svc.approve_occurrence(actor, "occ-1")
 
     occurrence_repo.update_status.assert_called_once_with("occ-1", task_status.COMPLETED)
+    occurrence_repo.set_media_purge_after.assert_called_once()
     assert result["status"] == task_status.COMPLETED
     assert result["completion"]["manager_review_status"] == task_status.REVIEW_APPROVED
 

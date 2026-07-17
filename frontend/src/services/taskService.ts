@@ -224,9 +224,11 @@ export const taskService = {
   },
 
   cancel: async (occurrenceId: string) => {
-    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
-      `/tasks/occurrences/${occurrenceId}/cancel`
-    );
+    const response = await api.post<{
+      message: string;
+      occurrence: TaskOccurrence;
+      deleted?: boolean;
+    }>(`/tasks/occurrences/${occurrenceId}/cancel`);
     return response.data;
   },
 
