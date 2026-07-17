@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/purge-media",
-      "schedule": "15 * * * *"
+      "schedule": "15 3 * * *"
     }
   ],
   "services": {
