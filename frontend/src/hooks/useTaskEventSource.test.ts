@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { TASK_CHANGE_EVENT, NOTIFICATION_EVENT } from "../constants/events";
-import { dispatchTaskEventFromPayload } from "./useTaskEventSource";
+import { dispatchTaskEventFromPayload, hasActiveSession } from "./useTaskEventSource";
 
 describe("dispatchTaskEventFromPayload", () => {
   it("dispatches task change for task SSE events", () => {
@@ -23,5 +23,27 @@ describe("dispatchTaskEventFromPayload", () => {
     expect(taskHandler).toHaveBeenCalledTimes(1);
     window.removeEventListener(TASK_CHANGE_EVENT, taskHandler);
     window.removeEventListener(NOTIFICATION_EVENT, notifHandler);
+  });
+});
+
+describe("hasActiveSession", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns false when /auth/me is unauthorized", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 401 }),
+    );
+    await expect(hasActiveSession()).resolves.toBe(false);
+  });
+
+  it("returns true when /auth/me is ok", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200 }),
+    );
+    await expect(hasActiveSession()).resolves.toBe(true);
   });
 });

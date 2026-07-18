@@ -100,6 +100,7 @@ class TaskOccurrenceRepository:
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
         created_by_id: str | None = None,
+        source_gallery_item_id: str | None = None,
     ) -> TaskOccurrence:
         import uuid
 
@@ -120,6 +121,9 @@ class TaskOccurrenceRepository:
             reference_video_url=(reference_video_url or "").strip() or None,
             reference_audio_url=(reference_audio_url or "").strip() or None,
             created_by_id=mp.parse_uuid(created_by_id) if created_by_id else None,
+            source_gallery_item_id=(
+                mp.parse_uuid(source_gallery_item_id) if source_gallery_item_id else None
+            ),
         )
         self._db.add(row)
         self._db.flush()

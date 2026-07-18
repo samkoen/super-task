@@ -76,6 +76,9 @@ export interface TaskOccurrence {
   spoken_text?: string;
   display_language?: string;
   completion?: TaskCompletion | null;
+  source_gallery_item_id?: string | null;
+  in_gallery?: boolean;
+  can_add_to_gallery?: boolean;
 }
 
 export interface CreateTaskTemplatePayload {
@@ -90,6 +93,7 @@ export interface CreateTaskTemplatePayload {
   reference_photo_url?: string;
   reference_video_url?: string;
   reference_audio_url?: string;
+  source_gallery_item_id?: string;
 }
 
 export interface CreateAdHocPayload {
@@ -102,6 +106,7 @@ export interface CreateAdHocPayload {
   reference_photo_url?: string;
   reference_video_url?: string;
   reference_audio_url?: string;
+  source_gallery_item_id?: string;
 }
 
 export interface CompleteTaskPayload {

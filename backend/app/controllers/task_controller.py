@@ -11,6 +11,7 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
+from app.repositories.task_gallery_repository import TaskGalleryRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
@@ -103,6 +104,7 @@ def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceServi
         TaskTranslationService(TaskTranslationRepository(db)),
         TaskTemplateRepository(db),
         notification_repo=NotificationRepository(db),
+        gallery_repo=TaskGalleryRepository(db),
     )
 
 
@@ -148,6 +150,7 @@ def create_template(
         reference_photo_url=payload.get("reference_photo_url"),
         reference_video_url=payload.get("reference_video_url"),
         reference_audio_url=payload.get("reference_audio_url"),
+        source_gallery_item_id=payload.get("source_gallery_item_id"),
     )
     emit_item = _sse_payload_from_create_template(item)
     _emit_task_event(db, "task_created", emit_item)
@@ -203,6 +206,7 @@ def create_ad_hoc_task(
         reference_photo_url=payload.get("reference_photo_url"),
         reference_video_url=payload.get("reference_video_url"),
         reference_audio_url=payload.get("reference_audio_url"),
+        source_gallery_item_id=payload.get("source_gallery_item_id"),
     )
     _emit_task_event(db, "task_created", item)
     return {"message": "משימה מזדמנת נוצרה", "occurrence": item}

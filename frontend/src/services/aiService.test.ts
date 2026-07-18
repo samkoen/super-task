@@ -84,6 +84,17 @@ describe("aiService", () => {
     expect(result.title).toBe("משימה");
   });
 
+  it("generateTaskTitle posts description to /ai/task-title-from-description", async () => {
+    mockPost.mockResolvedValue({ data: { title: "ניקוי מדף" } });
+    const result = await aiService.generateTaskTitle("צריך לנקות את המדף");
+    expect(mockPost).toHaveBeenCalledWith(
+      "/ai/task-title-from-description",
+      { description: "צריך לנקות את המדף" },
+      { timeout: 60_000 },
+    );
+    expect(result.title).toBe("ניקוי מדף");
+  });
+
   it("speakTask posts text to /ai/task-tts as blob", async () => {
     mockPost.mockResolvedValue({ data: new Blob(["audio"], { type: "audio/mpeg" }) });
 

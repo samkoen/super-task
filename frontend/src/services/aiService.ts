@@ -109,4 +109,13 @@ export const aiService = {
     );
     return response.data;
   },
+
+  generateTaskTitle: async (description: string) => {
+    const response = await api.post<{ title: string }>(
+      "/ai/task-title-from-description",
+      { description },
+      { timeout: 60_000 },
+    );
+    return response.data;
+  },
 };

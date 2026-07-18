@@ -16,8 +16,12 @@ from app.domain.task_scope import (
     employee_can_see_occurrence,
     visible_branch_ids_for_tasks,
 )
+from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
+from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
+from app.domain.task_title_from_description import resolve_create_title
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.task_gallery_repository import TaskGalleryRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
@@ -43,6 +47,7 @@ class TaskOccurrenceService:
         template_repo: TaskTemplateRepository | None = None,
         media_retention: MediaRetentionService | None = None,
         notification_repo: NotificationRepository | None = None,
+        gallery_repo: TaskGalleryRepository | None = None,
     ):
         self._occurrences = occurrence_repo
         self._completions = completion_repo
@@ -54,6 +59,7 @@ class TaskOccurrenceService:
             occurrence_repo, completion_repo, template_repo=template_repo
         )
         self._notifications = notification_repo
+        self._gallery = gallery_repo
 
     def list_occurrences(
         self,
@@ -89,7 +95,12 @@ class TaskOccurrenceService:
             if pending_delegation and actor.role == roles.BRANCH_MANAGER
             else None,
         )
-        return [self._to_api(o) for o in items]
+        in_gallery = set()
+        if self._gallery and items:
+            in_gallery = self._gallery.source_occurrence_ids_in([o.id for o in items])
+        return [
+            self._to_api(o, already_in_gallery=o.id in in_gallery) for o in items
+        ]
 
     async def list_mine(
         self,
@@ -175,11 +186,11 @@ class TaskOccurrenceService:
         reference_photo_url: str | None = None,
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
+        source_gallery_item_id: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
-        if not (title or "").strip():
-            raise ValueError("נדרש כותרת משימה")
+        title = resolve_create_title(title, description)
         self._assert_branch_access(actor, branch_id)
 
         parsed = datetime.fromisoformat(due_at)
@@ -193,6 +204,7 @@ class TaskOccurrenceService:
         photo, video, audio = self._isolate_issue_media(
             reference_photo_url, reference_video_url, reference_audio_url
         )
+        gallery_id = (source_gallery_item_id or "").strip() or None
         occurrence = self._occurrences.create(
             template_id=None,
             branch_id=branch_id,
@@ -208,8 +220,9 @@ class TaskOccurrenceService:
             reference_video_url=video,
             reference_audio_url=audio,
             created_by_id=actor.user_id,
+            source_gallery_item_id=gallery_id,
         )
-        return self._to_api(occurrence)
+        return self._to_api(occurrence, already_in_gallery=False)
 
     @staticmethod
     def _isolate_issue_media(
@@ -218,7 +231,9 @@ class TaskOccurrenceService:
         """Copie les médias issus d'un issue report pour ne pas les partager à la purge."""
 
         def _copy_if_issue(url: str | None, folder: str) -> str | None:
-            if not url or "issue_" not in url:
+            if not url:
+                return url
+            if "issue_" not in url and "gallery_" not in url:
                 return url
             return blob_storage.copy_media_url(url, folder=folder)
 
@@ -559,9 +574,14 @@ class TaskOccurrenceService:
         ):
             raise PermissionError("אין הרשאה לבצע משימה זו")
 
-    def _to_api(self, occurrence) -> dict:
+    def _to_api(self, occurrence, *, already_in_gallery: bool | None = None) -> dict:
         occurrence = self._with_reference_media(occurrence)
         completion = self._completions.find_by_occurrence(occurrence.id)
+        if already_in_gallery is None and self._gallery:
+            already_in_gallery = bool(
+                self._gallery.find_by_source_occurrence_id(occurrence.id)
+            )
+        in_gallery = bool(already_in_gallery)
         return mp.task_occurrence_domain_to_api(
             occurrence,
             branch_name=self._occurrences.get_branch_name(occurrence.branch_id),
@@ -569,6 +589,11 @@ class TaskOccurrenceService:
             assignee_name=self._occurrences.get_assignee_name(occurrence.assignee_user_id),
             manager_name=self._occurrences.get_manager_name(occurrence.manager_user_id),
             completion=mp.task_completion_domain_to_api(completion) if completion else None,
+            in_gallery=in_gallery,
+            can_add_to_gallery=can_add_occurrence_to_gallery(
+                source_gallery_item_id=occurrence.source_gallery_item_id,
+                already_in_gallery=in_gallery,
+            ),
         )
 
     def _with_reference_media(self, occurrence):

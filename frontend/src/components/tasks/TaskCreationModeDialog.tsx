@@ -1,9 +1,10 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import MicIcon from "@mui/icons-material/Mic";
 import { he } from "../../i18n/he";
 
-export type TaskCreationMode = "manual" | "voice";
+export type TaskCreationMode = "manual" | "voice" | "gallery";
 
 interface TaskCreationModeDialogProps {
   open: boolean;
@@ -42,6 +43,15 @@ export default function TaskCreationModeDialog({
           sx={{ justifyContent: "flex-start" }}
         >
           {he.taskCreationModeVoice}
+        </Button>
+        <Button
+          variant="outlined"
+          size="large"
+          startIcon={<CollectionsBookmarkIcon />}
+          onClick={() => onSelect("gallery")}
+          sx={{ justifyContent: "flex-start" }}
+        >
+          {he.taskCreationModeGallery}
         </Button>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>

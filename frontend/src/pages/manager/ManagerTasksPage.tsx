@@ -20,8 +20,12 @@ import { branchService, type Branch } from "../../services/branchService";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import TaskOccurrenceGridByDay from "../../components/tasks/TaskOccurrenceGridByDay";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
-import TaskCreationModeDialog from "../../components/tasks/TaskCreationModeDialog";
+import TaskCreationModeDialog, {
+  type TaskCreationMode,
+} from "../../components/tasks/TaskCreationModeDialog";
+import TaskGalleryPickerDialog from "../../components/tasks/TaskGalleryPickerDialog";
 import TaskVoiceCreationDialog from "../../components/tasks/TaskVoiceCreationDialog";
+import { taskGalleryService, type TaskGalleryItem } from "../../services/taskGalleryService";
 import type { TaskVoiceFillResult } from "../../components/ai/TaskVoiceAssistant";
 import TaskReferenceMediaEditor, {
   resolveTaskReferenceMedia,
@@ -56,6 +60,7 @@ import {
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { he } from "../../i18n/he";
 
 const RECURRENCES: TaskRecurrence[] = ["daily", "weekly", "biweekly", "monthly"];
@@ -90,6 +95,8 @@ export default function ManagerTasksPage() {
   const [openAdHoc, setOpenAdHoc] = useState(false);
   const [creationPicker, setCreationPicker] = useState<"fixed" | "ad_hoc" | null>(null);
   const [voiceCreation, setVoiceCreation] = useState<"fixed" | "ad_hoc" | null>(null);
+  const [galleryPicker, setGalleryPicker] = useState<"fixed" | "ad_hoc" | null>(null);
+  const [gallerySourceId, setGallerySourceId] = useState<string | null>(null);
   const [voiceBranchId, setVoiceBranchId] = useState("");
   const [editTarget, setEditTarget] = useState<TaskOccurrence | null>(null);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
@@ -282,6 +289,7 @@ export default function ManagerTasksPage() {
   const resetSavedFilterActive = () => setActiveSavedFilterId(null);
 
   const handleOpenFixedForm = (prefill?: TaskVoiceFillResult) => {
+    setGallerySourceId(null);
     setFixedForm((f) => ({
       ...f,
       branch_id: voiceBranchId || scopeBranchId || user?.branch_id || f.branch_id,
@@ -296,8 +304,11 @@ export default function ManagerTasksPage() {
   const handleOpenAdHocForm = (
     prefill?: TaskVoiceFillResult,
     media?: TaskReferenceMediaValue,
-    options?: { branch_id?: string; assignee_user_id?: string }
+    options?: { branch_id?: string; assignee_user_id?: string; keepGallerySource?: boolean }
   ) => {
+    if (!options?.keepGallerySource) {
+      setGallerySourceId(null);
+    }
     setAdHocForm({
       branch_id: options?.branch_id || voiceBranchId || scopeBranchId || user?.branch_id || "",
       title: prefill?.title ?? "",
@@ -331,7 +342,7 @@ export default function ManagerTasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
-  const handleCreationModeSelect = (mode: "manual" | "voice") => {
+  const handleCreationModeSelect = (mode: TaskCreationMode) => {
     if (!creationPicker) return;
     const kind = creationPicker;
     setCreationPicker(null);
@@ -341,10 +352,56 @@ export default function ManagerTasksPage() {
       setVoiceCreation(kind);
       return;
     }
+    if (mode === "gallery") {
+      setGalleryPicker(kind);
+      return;
+    }
     if (kind === "fixed") {
       handleOpenFixedForm();
     } else {
       handleOpenAdHocForm();
+    }
+  };
+
+  const handleGalleryPicked = (item: TaskGalleryItem) => {
+    const kind = galleryPicker;
+    setGalleryPicker(null);
+    setGallerySourceId(item.id);
+    const media: TaskReferenceMediaValue = {
+      reference_photo_url: item.reference_photo_url ?? "",
+      reference_video_url: item.reference_video_url ?? "",
+      reference_audio_url: item.reference_audio_url ?? "",
+    };
+    const prefill = {
+      title: item.title,
+      description: item.description,
+      assignee_user_id: "",
+    };
+    if (kind === "fixed") {
+      setFixedForm((f) => ({
+        ...f,
+        branch_id: voiceBranchId || scopeBranchId || user?.branch_id || f.branch_id,
+        title: item.title,
+        description: item.description,
+        recurrence: (item.recurrence as TaskRecurrence) || "daily",
+        due_time: item.due_time || "09:00",
+        weekly_days: item.weekly_days || "0",
+        monthly_day: item.monthly_day ?? 1,
+      }));
+      setFixedReferenceMedia(media);
+      setOpenFixed(true);
+      return;
+    }
+    handleOpenAdHocForm(prefill, media, { keepGallerySource: true });
+  };
+
+  const handleAddToGallery = async (task: TaskOccurrence) => {
+    try {
+      const res = await taskGalleryService.createFromOccurrence(task.id);
+      showSuccess(res.message || he.taskGalleryAdded);
+      await load(true);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     }
   };
 
@@ -360,22 +417,31 @@ export default function ManagerTasksPage() {
   const handleCreateFixed = async () => {
     setSaving(true);
     try {
+      const title = await ensureTaskTitle(fixedForm.title, fixedForm.description);
+      setFixedForm((f) => ({ ...f, title }));
       const media = await resolveTaskReferenceMedia(fixedReferenceMedia);
       const res = await taskService.createTemplate({
         ...fixedForm,
+        title,
         weekly_days:
           fixedForm.recurrence === "weekly" || fixedForm.recurrence === "biweekly"
             ? fixedForm.weekly_days
             : undefined,
         monthly_day: fixedForm.recurrence === "monthly" ? fixedForm.monthly_day : undefined,
+        source_gallery_item_id: gallerySourceId || undefined,
         ...media,
       });
       setOpenFixed(false);
+      setGallerySourceId(null);
       setFixedReferenceMedia(EMPTY_REFERENCE_MEDIA);
       showSuccess(res.message);
       await load();
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      if (e instanceof Error && e.message === "TITLE_OR_DESCRIPTION_REQUIRED") {
+        showError(he.taskTitleOrDescriptionRequired);
+      } else {
+        showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      }
     } finally {
       setSaving(false);
     }
@@ -388,22 +454,30 @@ export default function ManagerTasksPage() {
   const handleCreateAdHoc = async () => {
     setSaving(true);
     try {
+      const title = await ensureTaskTitle(adHocForm.title, adHocForm.description);
+      setAdHocForm((f) => ({ ...f, title }));
       const media = await resolveTaskReferenceMedia(adHocReferenceMedia);
       const res = await taskService.createAdHoc({
         branch_id: adHocForm.branch_id,
-        title: adHocForm.title,
+        title,
         description: adHocForm.description,
         due_at: new Date(adHocForm.due_at).toISOString(),
         assignee_user_id: adHocForm.assignee_user_id || undefined,
         photo_required: true,
+        source_gallery_item_id: gallerySourceId || undefined,
         ...media,
       });
       setOpenAdHoc(false);
+      setGallerySourceId(null);
       setAdHocReferenceMedia(EMPTY_REFERENCE_MEDIA);
       showSuccess(res.message);
       await load();
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      if (e instanceof Error && e.message === "TITLE_OR_DESCRIPTION_REQUIRED") {
+        showError(he.taskTitleOrDescriptionRequired);
+      } else {
+        showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      }
     } finally {
       setSaving(false);
     }
@@ -620,6 +694,7 @@ export default function ManagerTasksPage() {
           onEdit={canManageTasks ? handleOpenEdit : undefined}
           onCancel={handleCancel}
           onReview={canManageTasks ? setReviewTarget : undefined}
+          onAddToGallery={canManageTasks ? handleAddToGallery : undefined}
         />
       ) : (
         <TaskOccurrenceGrid
@@ -630,6 +705,7 @@ export default function ManagerTasksPage() {
           onEdit={canManageTasks ? handleOpenEdit : undefined}
           onCancel={handleCancel}
           onReview={canManageTasks ? setReviewTarget : undefined}
+          onAddToGallery={canManageTasks ? handleAddToGallery : undefined}
         />
       )}
 
@@ -647,6 +723,13 @@ export default function ManagerTasksPage() {
         title={creationPicker === "fixed" ? he.newFixedTask : he.newAdHocTask}
         onClose={() => setCreationPicker(null)}
         onSelect={handleCreationModeSelect}
+      />
+
+      <TaskGalleryPickerDialog
+        open={galleryPicker !== null}
+        taskKind={galleryPicker === "fixed" ? "fixed" : "ad_hoc"}
+        onClose={() => setGalleryPicker(null)}
+        onSelect={handleGalleryPicked}
       />
 
       <TaskVoiceCreationDialog
@@ -667,7 +750,13 @@ export default function ManagerTasksPage() {
           <TextField select label={he.branch} value={fixedForm.branch_id} onChange={(e) => setFixedForm({ ...fixedForm, branch_id: e.target.value })} required fullWidth disabled={isBranchManager}>
             {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
-          <TextField label={he.taskTitle} value={fixedForm.title} onChange={(e) => setFixedForm({ ...fixedForm, title: e.target.value })} required fullWidth />
+          <TextField
+            label={he.taskTitle}
+            value={fixedForm.title}
+            onChange={(e) => setFixedForm({ ...fixedForm, title: e.target.value })}
+            helperText={he.taskTitleOptionalHint}
+            fullWidth
+          />
           <TextField label={he.description} value={fixedForm.description} onChange={(e) => setFixedForm({ ...fixedForm, description: e.target.value })} multiline rows={2} fullWidth />
           <TextField select label={he.assignee} value={fixedForm.assignee_user_id} onChange={(e) => setFixedForm({ ...fixedForm, assignee_user_id: e.target.value })} required fullWidth>
             {filteredEmployees.map((u) => <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>)}
@@ -716,7 +805,13 @@ export default function ManagerTasksPage() {
           <TextField select label={he.branch} value={adHocForm.branch_id} onChange={(e) => setAdHocForm({ ...adHocForm, branch_id: e.target.value })} required fullWidth disabled={isBranchManager}>
             {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
           </TextField>
-          <TextField label={he.taskTitle} value={adHocForm.title} onChange={(e) => setAdHocForm({ ...adHocForm, title: e.target.value })} required fullWidth />
+          <TextField
+            label={he.taskTitle}
+            value={adHocForm.title}
+            onChange={(e) => setAdHocForm({ ...adHocForm, title: e.target.value })}
+            helperText={he.taskTitleOptionalHint}
+            fullWidth
+          />
           <TextField label={he.description} value={adHocForm.description} onChange={(e) => setAdHocForm({ ...adHocForm, description: e.target.value })} multiline rows={2} fullWidth />
           <TextField label={he.dueAt} type="datetime-local" value={adHocForm.due_at} onChange={(e) => setAdHocForm({ ...adHocForm, due_at: e.target.value })} InputLabelProps={{ shrink: true }} required fullWidth dir="ltr" />
           <TextField

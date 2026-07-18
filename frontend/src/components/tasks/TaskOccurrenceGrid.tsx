@@ -13,6 +13,7 @@ export interface TaskOccurrenceGridProps {
   onEdit?: TaskOccurrenceCardProps["onEdit"];
   onCancel?: TaskOccurrenceCardProps["onCancel"];
   onReview?: TaskOccurrenceCardProps["onReview"];
+  onAddToGallery?: TaskOccurrenceCardProps["onAddToGallery"];
 }
 
 export default function TaskOccurrenceGrid({
@@ -23,6 +24,7 @@ export default function TaskOccurrenceGrid({
   onEdit,
   onCancel,
   onReview,
+  onAddToGallery,
 }: TaskOccurrenceGridProps) {
   if (tasks.length === 0) {
     return (
@@ -45,6 +47,7 @@ export default function TaskOccurrenceGrid({
             onEdit={onEdit}
             onCancel={onCancel}
             onReview={onReview}
+            onAddToGallery={onAddToGallery}
           />
         </Grid>
       ))}

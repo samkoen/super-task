@@ -14,6 +14,7 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.user_repository import UserRepository
 from app.services.ai_service import AiChatMessage, AiService
 from app.services.reference_audio_transcription_service import transcribe_reference_audio
+from app.services.task_title_ai_service import generate_title_from_description
 from app.services.task_tts_service import TaskTtsService
 from app.services.task_voice_ai_service import TaskVoiceAiService
 
@@ -52,6 +53,10 @@ class AiTaskTtsRequest(BaseModel):
 
 class TranscribeReferenceAudioRequest(BaseModel):
     audio_url: str = Field(min_length=1, max_length=500)
+
+
+class TaskTitleFromDescriptionRequest(BaseModel):
+    description: str = Field(min_length=1, max_length=2000)
 
 
 def _require_actor(request: Request, db: Session):
@@ -129,6 +134,25 @@ async def ai_transcribe_reference_audio(
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return {"transcript": transcript or ""}
+
+
+@router.post("/task-title-from-description")
+async def ai_task_title_from_description(
+    body: TaskTitleFromDescriptionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    actor = _require_actor(request, db)
+    user = UserRepository(db).find_by_id(actor.user_id)
+    manager_language = user.preferred_language if user else "he"
+    try:
+        title = await generate_title_from_description(
+            body.description,
+            manager_language=manager_language,
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return {"title": title}
 
 
 @router.post("/task-tts")

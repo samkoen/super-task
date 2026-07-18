@@ -22,6 +22,7 @@ import BusinessIcon from "@mui/icons-material/Business";
 import CategoryIcon from "@mui/icons-material/Category";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import LogoutIcon from "@mui/icons-material/Logout";
 import StorefrontIcon from "@mui/icons-material/Storefront";
@@ -55,8 +56,8 @@ const drawerPaperSx = {
 };
 
 function Layout() {
-  const { user, logout } = useAuth();
-  useTaskEventSource(Boolean(user));
+  const { user, loading, logout } = useAuth();
+  useTaskEventSource(Boolean(user) && !loading);
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -72,6 +73,7 @@ function Layout() {
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/admin/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/admin/products" },
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/admin/tasks" },
+        { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/admin/gallery" },
         { text: he.adminUsers, icon: <PeopleIcon />, path: "/admin/users" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/admin/invitations" },
       ];
@@ -88,6 +90,7 @@ function Layout() {
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/manager/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/manager/products" },
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/manager/tasks" },
+        { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/manager/gallery" },
         { text: he.managerIssues, icon: <ReportProblemIcon />, path: "/manager/issues" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
       );

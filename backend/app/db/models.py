@@ -175,6 +175,9 @@ class TaskTemplate(Base):
     reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     biweekly_anchor: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_gallery_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("task_gallery_items.id", ondelete="SET NULL"), nullable=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
@@ -219,6 +222,12 @@ class TaskOccurrence(Base):
     reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     media_purge_after: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
+    )
+    source_gallery_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("task_gallery_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_by_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -284,6 +293,47 @@ class TaskCompletion(Base):
     )
     completed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TaskGalleryItem(Base):
+    __tablename__ = "task_gallery_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    network_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("networks.id"), nullable=False, index=True
+    )
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str] = mapped_column(String(2000), nullable=False, default="")
+    task_kind: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    recurrence: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    due_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    weekly_days: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    monthly_day: Mapped[int | None] = mapped_column(nullable=True)
+    photo_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    reference_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_occurrence_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("task_occurrences.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
 

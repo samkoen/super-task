@@ -6,10 +6,12 @@ from app.domain import task_recurrence
 from app.domain.task_kind import FIXED
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.task_title_from_description import resolve_create_title
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
+from app.services import blob_storage
 from app.services.task_scheduler_service import TaskSchedulerService
 
 TZ = ZoneInfo("Asia/Jerusalem")
@@ -56,13 +58,13 @@ class TaskTemplateService:
         reference_photo_url: str | None = None,
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
+        source_gallery_item_id: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
         self._validate_branch(actor, branch_id)
         self._validate_assignment(branch_id, assignee_user_id, department_id)
-        if not (title or "").strip():
-            raise ValueError("נדרש כותרת משימה")
+        title = resolve_create_title(title, description)
         if recurrence not in task_recurrence.RECURRING:
             raise ValueError("משימה קבועה דורשת חזרה יומית/שבועית/דו-שבועית/חודשית")
         if not assignee_user_id:
@@ -77,6 +79,10 @@ class TaskTemplateService:
             parsed_monthly_day = int(raw_day)
 
         anchor = datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None
+        photo, video, audio = self._isolate_external_media(
+            reference_photo_url, reference_video_url, reference_audio_url
+        )
+        gallery_id = (source_gallery_item_id or "").strip() or None
 
         template = self._templates.create(
             branch_id=branch_id,
@@ -91,9 +97,10 @@ class TaskTemplateService:
             created_by_id=actor.user_id,
             task_kind=FIXED,
             biweekly_anchor=anchor,
-            reference_photo_url=reference_photo_url,
-            reference_video_url=reference_video_url,
-            reference_audio_url=reference_audio_url,
+            reference_photo_url=photo,
+            reference_video_url=video,
+            reference_audio_url=audio,
+            source_gallery_item_id=gallery_id,
         )
         created_occurrence = None
         if recurrence in task_recurrence.RECURRING:
@@ -143,6 +150,23 @@ class TaskTemplateService:
         )
         assert updated is not None
         return self._to_api(updated)
+
+    @staticmethod
+    def _isolate_external_media(
+        photo: str | None, video: str | None, audio: str | None
+    ) -> tuple[str | None, str | None, str | None]:
+        def _copy(url: str | None, folder: str) -> str | None:
+            if not url:
+                return url
+            if "issue_" not in url and "gallery_" not in url:
+                return url
+            return blob_storage.copy_media_url(url, folder=folder)
+
+        return (
+            _copy(photo, "task_photos"),
+            _copy(video, "task_videos"),
+            _copy(audio, "task_audio"),
+        )
 
     def _validate_branch(self, actor: ActorContext, branch_id: str) -> None:
         branch = self._branch.find_by_id(branch_id)

@@ -85,6 +85,7 @@ class TaskSchedulerService:
             reference_video_url=video,
             reference_audio_url=audio,
             created_by_id=template.created_by_id,
+            source_gallery_item_id=getattr(template, "source_gallery_item_id", None),
         )
 
     def _copy_reference_media(self, template) -> tuple[str | None, str | None, str | None]:

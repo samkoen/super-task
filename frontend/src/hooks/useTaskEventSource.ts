@@ -27,6 +27,16 @@ export function dispatchTaskEventFromPayload(raw: string) {
   window.dispatchEvent(new CustomEvent(TASK_CHANGE_EVENT, { detail }));
 }
 
+/** true si une session cookie est encore valide. */
+export async function hasActiveSession(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/me", { credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Opens one SSE connection and broadcasts task changes app-wide. */
 export function useTaskEventSource(enabled: boolean) {
   useEffect(() => {
@@ -35,6 +45,13 @@ export function useTaskEventSource(enabled: boolean) {
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+
+    const scheduleReconnect = () => {
+      if (stopped) return;
+      reconnectTimer = setTimeout(() => {
+        void connect();
+      }, RECONNECT_MS);
+    };
 
     const attach = (es: EventSource) => {
       es.addEventListener("connected", () => {
@@ -49,19 +66,29 @@ export function useTaskEventSource(enabled: boolean) {
       es.onerror = () => {
         es.close();
         if (source === es) source = null;
-        if (!stopped) {
-          reconnectTimer = setTimeout(connect, RECONNECT_MS);
-        }
+        if (stopped) return;
+        // 401 / session expirée : ne pas spammer le serveur toutes les 3s
+        void hasActiveSession().then((ok) => {
+          if (!ok) {
+            stopped = true;
+            return;
+          }
+          scheduleReconnect();
+        });
       };
     };
 
-    const connect = () => {
+    const connect = async () => {
       if (stopped) return;
-      source = new EventSource("/api/events/stream");
+      if (!(await hasActiveSession())) {
+        stopped = true;
+        return;
+      }
+      source = new EventSource("/api/events/stream", { withCredentials: true });
       attach(source);
     };
 
-    connect();
+    void connect();
 
     return () => {
       stopped = true;

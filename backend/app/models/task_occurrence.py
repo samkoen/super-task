@@ -24,6 +24,7 @@ class TaskOccurrence:
     created_by_id: str | None
     created_at: str
     updated_at: str
+    source_gallery_item_id: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -43,6 +44,7 @@ class TaskOccurrence:
             "reference_video_url": self.reference_video_url,
             "reference_audio_url": self.reference_audio_url,
             "media_purge_after": self.media_purge_after,
+            "source_gallery_item_id": self.source_gallery_item_id,
             "started_at": self.started_at,
             "started_by_id": self.started_by_id,
             "created_by_id": self.created_by_id,

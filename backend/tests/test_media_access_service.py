@@ -8,11 +8,14 @@ from app.domain.scope import ActorContext
 from app.services.media_access_service import actor_can_access_media_url
 
 
-def _actor(role: str, branch_id: str | None = "b1") -> ActorContext:
+def _actor(
+    role: str,
+    branch_id: str | None = "11111111-1111-1111-1111-111111111111",
+) -> ActorContext:
     return ActorContext(
         user_id="u1",
         role=role,
-        network_id="n1",
+        network_id="22222222-2222-2222-2222-222222222222",
         branch_id=branch_id,
     )
 
@@ -62,6 +65,29 @@ def test_manager_allowed_when_url_in_branch():
                 db,
                 _actor(roles.BRANCH_MANAGER, branch_id=branch_id),
                 "https://x/ok.jpg",
+            )
+            is True
+        )
+
+
+def test_manager_allowed_when_url_in_gallery():
+    db = MagicMock()
+    miss = MagicMock()
+    miss.first.return_value = None
+    hit = MagicMock()
+    hit.first.return_value = ("g1",)
+    # occurrence, completion, template, issue miss ; then gallery scope hit
+    db.execute.side_effect = [miss, miss, miss, miss, hit]
+    branch_id = "11111111-1111-1111-1111-111111111111"
+    with patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=[branch_id],
+    ):
+        assert (
+            actor_can_access_media_url(
+                db,
+                _actor(roles.BRANCH_MANAGER, branch_id=branch_id),
+                "/uploads/gallery_photos/a.jpg",
             )
             is True
         )

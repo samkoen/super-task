@@ -210,6 +210,11 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         created_by_id=str(row.created_by_id),
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
+        source_gallery_item_id=(
+            str(row.source_gallery_item_id)
+            if getattr(row, "source_gallery_item_id", None)
+            else None
+        ),
     )
 
 
@@ -246,6 +251,11 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         created_by_id=str(row.created_by_id) if row.created_by_id else None,
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
+        source_gallery_item_id=(
+            str(row.source_gallery_item_id)
+            if getattr(row, "source_gallery_item_id", None)
+            else None
+        ),
     )
 
 

@@ -27,6 +27,7 @@ from app.controllers import (
     notification_controller,
     product_controller,
     task_controller,
+    task_gallery_controller,
     user_controller,
 )
 from app.core.config import (
@@ -98,6 +99,9 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "issue_photos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "issue_videos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "issue_audio").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "gallery_photos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "gallery_videos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "gallery_audio").mkdir(exist_ok=True)
     # Prod/Vercel : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
     if not IS_PRODUCTION:
         app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
@@ -115,6 +119,9 @@ def create_app() -> FastAPI:
     app.include_router(department_controller.router, prefix="/api/departments", tags=["departments"])
     app.include_router(product_controller.router, prefix="/api/products", tags=["products"])
     app.include_router(task_controller.router, prefix="/api/tasks", tags=["tasks"])
+    app.include_router(
+        task_gallery_controller.router, prefix="/api/task-gallery", tags=["task-gallery"]
+    )
     app.include_router(issue_report_controller.router, prefix="/api/issue-reports", tags=["issue-reports"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(events_controller.router, prefix="/api/events", tags=["events"])

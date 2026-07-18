@@ -10,6 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
+import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import EditIcon from "@mui/icons-material/Edit";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import RateReviewIcon from "@mui/icons-material/RateReview";
@@ -36,6 +37,7 @@ export interface TaskOccurrenceCardProps {
   onEdit?: (task: TaskOccurrence) => void;
   onCancel?: (task: TaskOccurrence) => void;
   onReview?: (task: TaskOccurrence) => void;
+  onAddToGallery?: (task: TaskOccurrence) => void;
 }
 
 export default function TaskOccurrenceCard({
@@ -44,6 +46,7 @@ export default function TaskOccurrenceCard({
   onEdit,
   onCancel,
   onReview,
+  onAddToGallery,
 }: TaskOccurrenceCardProps) {
   const { bg, accent } = cardColor(index);
   const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
@@ -137,6 +140,13 @@ export default function TaskOccurrenceCard({
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 0.25, flexShrink: 0 }}>
+            {onAddToGallery && task.can_add_to_gallery && (
+              <Tooltip title={he.taskGalleryAddFromTask}>
+                <IconButton size="small" color="primary" onClick={() => onAddToGallery(task)}>
+                  <CollectionsBookmarkIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
             {canEdit && onEdit && (
               <Tooltip title={he.editTask}>
                 <IconButton size="small" color="primary" onClick={() => onEdit(task)}>

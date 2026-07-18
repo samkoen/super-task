@@ -20,6 +20,7 @@ const AdminDepartmentsPage = lazy(() => import("./pages/admin/AdminDepartmentsPa
 const AdminProductsPage = lazy(() => import("./pages/admin/AdminProductsPage"));
 const ManagerTasksPage = lazy(() => import("./pages/manager/ManagerTasksPage"));
 const ManagerIssuesPage = lazy(() => import("./pages/manager/ManagerIssuesPage"));
+const ManagerTaskGalleryPage = lazy(() => import("./pages/manager/ManagerTaskGalleryPage"));
 const ManagerEmployeesPage = lazy(() => import("./pages/manager/ManagerEmployeesPage"));
 const EmployeeTasksPage = lazy(() => import("./pages/employee/EmployeeTasksPage"));
 
@@ -63,12 +64,14 @@ export default function App() {
             <Route path="/admin/departments" element={<AdminDepartmentsPage />} />
             <Route path="/admin/products" element={<AdminProductsPage />} />
             <Route path="/admin/tasks" element={<ManagerTasksPage />} />
+            <Route path="/admin/gallery" element={<ManagerTaskGalleryPage />} />
           </Route>
           <Route element={<ProtectedRoute roles={["network_manager", "branch_manager"]} />}>
             <Route path="/manager" element={<ManagerDashboardPage />} />
             <Route path="/manager/employees" element={<ManagerEmployeesPage />} />
             <Route path="/manager/invitations" element={<InvitationsPage />} />
             <Route path="/manager/tasks" element={<ManagerTasksPage />} />
+            <Route path="/manager/gallery" element={<ManagerTaskGalleryPage />} />
             <Route path="/manager/issues" element={<ManagerIssuesPage />} />
             <Route path="/manager/departments" element={<AdminDepartmentsPage />} />
             <Route path="/manager/products" element={<AdminProductsPage />} />
