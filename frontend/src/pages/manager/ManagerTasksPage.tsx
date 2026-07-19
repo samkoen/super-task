@@ -60,6 +60,7 @@ import {
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+import { adHocDialogTitle } from "../../utils/adHocDialogTitle";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { he } from "../../i18n/he";
 
@@ -552,6 +553,11 @@ export default function ManagerTasksPage() {
     [employees, editTarget]
   );
 
+  const adHocBranchName =
+    branches.find((b) => b.id === adHocForm.branch_id)?.name
+    || user?.branch_name
+    || "";
+
   return (
     <Box>
       <PageHeader
@@ -800,11 +806,26 @@ export default function ManagerTasksPage() {
       </Dialog>
 
       <Dialog open={openAdHoc} onClose={() => setOpenAdHoc(false)} fullWidth maxWidth="sm" dir="rtl">
-        <DialogTitle>{he.newAdHocTask}</DialogTitle>
+        <DialogTitle>
+          {adHocDialogTitle(he.newAdHocTask, adHocBranchName, {
+            showBranchBesideTitle: isBranchManager,
+          })}
+        </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-          <TextField select label={he.branch} value={adHocForm.branch_id} onChange={(e) => setAdHocForm({ ...adHocForm, branch_id: e.target.value })} required fullWidth disabled={isBranchManager}>
-            {branches.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-          </TextField>
+          {!isBranchManager && (
+            <TextField
+              select
+              label={he.branch}
+              value={adHocForm.branch_id}
+              onChange={(e) => setAdHocForm({ ...adHocForm, branch_id: e.target.value })}
+              required
+              fullWidth
+            >
+              {branches.map((s) => (
+                <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             label={he.taskTitle}
             value={adHocForm.title}
