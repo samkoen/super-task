@@ -20,9 +20,11 @@ import { branchService, type Branch } from "../../services/branchService";
 import {
   dashboardService,
   type ManagerDashboard,
+  type TeamMember,
 } from "../../services/dashboardService";
 import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
 import TeamTimelinePanel from "../../components/dashboard/TeamTimelinePanel";
+import EmployeeTasksDrawer from "../../components/dashboard/EmployeeTasksDrawer";
 import HealthBadge from "../../components/dashboard/HealthBadge";
 import ManagerDayNav from "../../components/dashboard/ManagerDayNav";
 import StatCard from "../../components/dashboard/StatCard";
@@ -50,6 +52,7 @@ export default function ManagerDashboardPage() {
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [success, setSuccess] = useState("");
+  const [drawerMember, setDrawerMember] = useState<TeamMember | null>(null);
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
 
@@ -219,14 +222,7 @@ export default function ManagerDashboardPage() {
           <Box mb={3} display="flex" flexDirection="column" gap={2}>
             <TeamTimelinePanel
               team={data.team ?? []}
-              onEmployeeClick={(member) =>
-                navigate(
-                  buildManagerTasksPath({
-                    employeeId: member.user_id,
-                    dueOn: selectedDay,
-                  })
-                )
-              }
+              onEmployeeClick={setDrawerMember}
             />
             {data.task_queues && (
               <TaskQueuePanel queues={data.task_queues} onReviewTask={handleReviewTask} />
@@ -245,6 +241,14 @@ export default function ManagerDashboardPage() {
               {he.dashboardViewTasks}
             </Button>
           </Box>
+
+          <EmployeeTasksDrawer
+            member={drawerMember}
+            branchId={data.branch.id}
+            dueOn={selectedDay}
+            onClose={() => setDrawerMember(null)}
+            onChanged={() => void load(true)}
+          />
         </>
       )}
 

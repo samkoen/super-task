@@ -288,6 +288,10 @@ export const he = {
     in_progress: "בטיפול קודם",
     workload: "לפי עומס משימות",
   },
+  dashboardEmployeeDrawerSubtitle: (dueOn: string) => `משימות ליום ${dueOn}`,
+  dashboardEmployeeDrawerOpenTasks: "פתוחות",
+  dashboardEmployeeDrawerAllTasks: "כל המשימות",
+  dashboardEmployeeDrawerEmpty: "אין משימות לעובד ביום זה",
   dashboardTeamAccordionHint: (active: number, total: number, inProgress: number) =>
     inProgress > 0
       ? `${active}/${total} פעילים · ${inProgress} בטיפול`
