@@ -35,7 +35,7 @@ import {
   type EmployeeDashboard,
   type EmployeeTaskCard,
 } from "../../services/dashboardService";
-import { taskService, type TaskStatus, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
+import { taskService, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -56,6 +56,8 @@ import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import CompletionMediaPreview from "../../components/tasks/CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
+import TaskStatusChip from "../../components/tasks/TaskStatusChip";
+import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
@@ -64,15 +66,6 @@ import {
   revokePendingMedia,
   uploadPendingMedia,
 } from "../../utils/pendingMedia";
-
-const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error" | "info"> = {
-  pending: "warning",
-  in_progress: "warning",
-  pending_review: "info",
-  completed: "success",
-  overdue: "error",
-  cancelled: "default",
-};
 
 function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
@@ -132,19 +125,32 @@ function TaskCard({
   onStopListen: () => void;
 }) {
   const rejectionNote = task.completion?.rejection_note;
+  const visual = taskStatusVisual(task.status);
   return (
     <Card
       variant="outlined"
       sx={{
         mb: 2,
-        borderColor: urgent || carryOver ? "error.light" : undefined,
-        bgcolor: urgent || carryOver ? "rgba(211, 47, 47, 0.06)" : undefined,
+        border: "2px solid",
+        borderColor: urgent || carryOver ? visual.bar : visual.border,
+        bgcolor: visual.surface,
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          insetInlineStart: 0,
+          top: 0,
+          bottom: 0,
+          width: 5,
+          bgcolor: visual.bar,
+        },
       }}
     >
       <CardContent>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} mb={1}>
           <EmployeeTaskTitle task={task} />
-          <Chip label={he.taskStatusLabels[task.status]} color={statusColor[task.status]} size="small" />
+          <TaskStatusChip status={task.status} />
         </Box>
         <Box display="flex" gap={1} flexWrap="wrap" mb={1}>
           <Chip label={he.taskKindLabels[task.task_kind]} size="small" />

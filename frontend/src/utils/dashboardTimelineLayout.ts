@@ -59,9 +59,20 @@ export function buildTimelineRows(
   const upcoming = timeline
     .filter((t) => t.segment === "upcoming")
     .sort((a, b) => parseMs(a.due_at) - parseMs(b.due_at));
-  const overdue = [...overdueBacklog]
-    .map((t) => ({ ...t, segment: "overdue" as const }))
-    .sort((a, b) => parseMs(a.due_at) - parseMs(b.due_at));
+  // Overdue du jour sont dans `timeline` (segment overdue) ; le backlog = jours précédents.
+  // Sans les deux, une tâche due « maintenant » (souvent ad-hoc) disparaît jusqu'à התחלה.
+  const overdueSeen = new Set<string>();
+  const overdue: TimelineTask[] = [];
+  for (const task of timeline.filter((t) => t.segment === "overdue")) {
+    overdueSeen.add(task.id);
+    overdue.push(task);
+  }
+  for (const task of overdueBacklog) {
+    if (overdueSeen.has(task.id)) continue;
+    overdueSeen.add(task.id);
+    overdue.push({ ...task, segment: "overdue" });
+  }
+  overdue.sort((a, b) => parseMs(a.due_at) - parseMs(b.due_at));
 
   for (const task of completed) {
     rows.push(toRow(task, "completed"));

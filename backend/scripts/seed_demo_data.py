@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv(backend_dir / ".env")
 
+from scripts._db_env import describe_database_url, resolve_database_url  # noqa: E402
 from app.db import session as db_session  # noqa: E402
 from app.domain import job_functions, roles, task_recurrence  # noqa: E402
 from app.repositories.branch_repository import BranchRepository  # noqa: E402
@@ -258,6 +259,10 @@ def main() -> None:
     args = parser.parse_args()
     require_confirmation(args.confirm)
 
+    url = resolve_database_url()
+    print(f"Target DB: {describe_database_url(url)}")
+
+    db_session.reset_engine()
     db_session.get_engine()
     if db_session.SessionLocal is None:
         print("Impossible d'initialiser la session DB.")

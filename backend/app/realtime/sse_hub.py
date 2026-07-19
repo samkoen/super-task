@@ -29,10 +29,18 @@ class SSEHub:
     def publish_sync(self, channel: str, event: dict[str, Any]) -> None:
         loop = self._loop
         if loop is None or not loop.is_running():
-            logger.warning("SSE publish skipped (loop not ready): channel=%s", channel)
+            try:
+                loop = asyncio.get_running_loop()
+                self._loop = loop
+            except RuntimeError:
+                logger.warning("SSE publish skipped (loop not ready): channel=%s", channel)
+                return
+        subs = list(self._subscribers.get(channel, ()))
+        if not subs:
+            logger.debug("SSE publish to empty channel=%s type=%s", channel, event.get("type"))
             return
         payload = json.dumps(event, ensure_ascii=False)
-        for queue in list(self._subscribers.get(channel, ())):
+        for queue in subs:
             loop.call_soon_threadsafe(self._enqueue, queue, payload)
 
     def publish_many_sync(self, channels: list[str], event: dict[str, Any]) -> None:

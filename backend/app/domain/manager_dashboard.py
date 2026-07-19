@@ -87,6 +87,21 @@ def sort_timeline_tasks(tasks: list[TaskOccurrence], tz) -> list[TaskOccurrence]
     return sorted(tasks, key=key)
 
 
+def task_queue_bucket(status: str) -> str | None:
+    """File dashboard : completed | in_progress | pending_review | upcoming | None."""
+    if status == task_status.CANCELLED:
+        return None
+    if status == task_status.COMPLETED:
+        return "completed"
+    if status == task_status.PENDING_REVIEW:
+        return "pending_review"
+    if status == task_status.IN_PROGRESS:
+        return "in_progress"
+    if status in {task_status.PENDING, task_status.OVERDUE}:
+        return "upcoming"
+    return None
+
+
 def overdue_days(task: TaskOccurrence, *, day: date, tz) -> int:
     return max(0, (day - _due_day(task, tz)).days)
 

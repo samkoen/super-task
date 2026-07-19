@@ -43,6 +43,32 @@ describe("dashboardTimelineLayout", () => {
     expect(rows.map((r) => r.task.id)).toEqual(["2", "3", "5", "1", "4"]);
   });
 
+  it("buildTimelineRows shows overdue from today timeline before start", () => {
+    const rows = buildTimelineRows(
+      [
+        task({
+          id: "today-overdue",
+          status: "overdue",
+          segment: "overdue",
+          due_at: "2026-07-14T10:05:00+03:00",
+          started_at: null,
+        }),
+        task({ id: "later", segment: "upcoming", due_at: "2026-07-14T16:00:00+03:00" }),
+      ],
+      [],
+    );
+    expect(rows.map((r) => r.task.id)).toEqual(["later", "today-overdue"]);
+    expect(rows.find((r) => r.task.id === "today-overdue")?.kind).toBe("overdue");
+  });
+
+  it("buildTimelineRows dedupes overdue when present in timeline and backlog", () => {
+    const rows = buildTimelineRows(
+      [task({ id: "same", status: "overdue", segment: "overdue", due_at: "2026-07-14T09:00:00+03:00" })],
+      [task({ id: "same", status: "overdue", segment: "overdue", due_at: "2026-07-14T09:00:00+03:00" })],
+    );
+    expect(rows.filter((r) => r.task.id === "same")).toHaveLength(1);
+  });
+
   it("barWidthPercent scales with duration", () => {
     const short = task({ id: "a", segment: "completed", duration_minutes: 30 });
     const long = task({ id: "b", segment: "completed", duration_minutes: 90 });

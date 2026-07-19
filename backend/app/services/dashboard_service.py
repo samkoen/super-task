@@ -23,6 +23,7 @@ from app.domain.manager_dashboard import (
     build_timeline_item,
     build_unfinished_item,
     sort_timeline_tasks,
+    task_queue_bucket,
 )
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
@@ -509,8 +510,15 @@ class DashboardService:
         pending_review: list[dict] = []
         upcoming: list[dict] = []
 
+        buckets = {
+            "completed": completed,
+            "in_progress": in_progress,
+            "pending_review": pending_review,
+            "upcoming": upcoming,
+        }
         for task in tasks_today:
-            if task.status == task_status.CANCELLED:
+            bucket = task_queue_bucket(task.status)
+            if not bucket:
                 continue
             item = build_timeline_item(
                 task,
@@ -520,17 +528,7 @@ class DashboardService:
                 department_name=self._occurrences.get_department_name(task.department_id),
                 assignee_name=self._occurrences.get_assignee_name(task.assignee_user_id),
             )
-            if task.status == task_status.COMPLETED:
-                completed.append(item)
-            elif task.status == task_status.PENDING_REVIEW:
-                pending_review.append(item)
-            elif task.status == task_status.IN_PROGRESS:
-                in_progress.append(item)
-            elif (
-                task.status == task_status.PENDING
-                and _parse_due_at(task.due_at) > now
-            ):
-                upcoming.append(item)
+            buckets[bucket].append(item)
 
         completed.sort(key=lambda i: i.get("completed_at") or i["due_at"])
         in_progress.sort(key=lambda i: i.get("started_at") or i["due_at"])

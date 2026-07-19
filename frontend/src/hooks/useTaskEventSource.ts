@@ -55,7 +55,10 @@ export function useTaskEventSource(enabled: boolean) {
 
     const attach = (es: EventSource) => {
       es.addEventListener("connected", () => {
-        /* stream is alive */
+        // Rattrapage après (re)connexion — événements manqués pendant la coupure.
+        window.dispatchEvent(
+          new CustomEvent(TASK_CHANGE_EVENT, { detail: { type: "sse_connected" } }),
+        );
       });
       es.addEventListener("ping", () => {
         /* keep-alive from server */

@@ -26,9 +26,13 @@ from sqlalchemy import inspect
 from app.db import models  # noqa: F401
 from app.db.base import Base
 from app.db import session as db_session
+from scripts._db_env import describe_database_url, resolve_database_url
 
 
 def main() -> None:
+    url = resolve_database_url()
+    print(f"Target DB: {describe_database_url(url)}")
+
     db_session.reset_engine()
     engine = db_session.get_engine()
     insp = inspect(engine)

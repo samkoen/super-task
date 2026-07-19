@@ -10,6 +10,7 @@ from app.domain.manager_dashboard import (
     build_unfinished_item,
     duration_minutes,
     sort_timeline_tasks,
+    task_queue_bucket,
     timeline_segment,
 )
 from app.models.task_completion import TaskCompletion
@@ -133,3 +134,24 @@ def test_duration_minutes_non_negative():
     start = datetime(2026, 7, 14, 10, 0, tzinfo=TZ)
     end = datetime(2026, 7, 14, 9, 0, tzinfo=TZ)
     assert duration_minutes(start, end) == 0
+
+
+def test_task_queue_bucket_includes_pending_and_overdue_before_start():
+    assert task_queue_bucket(task_status.PENDING) == "upcoming"
+    assert task_queue_bucket(task_status.OVERDUE) == "upcoming"
+    assert task_queue_bucket(task_status.IN_PROGRESS) == "in_progress"
+    assert task_queue_bucket(task_status.CANCELLED) is None
+
+
+def test_build_timeline_item_overdue_before_start():
+    task = _task(status=task_status.OVERDUE, due_at="2026-07-14T10:05:00+03:00", started_at=None)
+    item = build_timeline_item(
+        task,
+        now=NOW,
+        tz=TZ,
+        completion=None,
+        department_name=None,
+        assignee_name="יוסי",
+    )
+    assert item["segment"] == "overdue"
+    assert item["started_at"] is None

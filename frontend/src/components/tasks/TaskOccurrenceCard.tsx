@@ -15,20 +15,12 @@ import EditIcon from "@mui/icons-material/Edit";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import CompletionMediaPreview from "./CompletionMediaPreview";
-import { cardColor } from "../../constants/cardColors";
+import TaskStatusChip from "./TaskStatusChip";
+import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
-import type { TaskOccurrence, TaskStatus } from "../../services/taskService";
-
-const statusColor: Record<TaskStatus, "default" | "warning" | "success" | "error" | "info"> = {
-  pending: "warning",
-  in_progress: "warning",
-  pending_review: "info",
-  completed: "success",
-  overdue: "error",
-  cancelled: "default",
-};
+import type { TaskOccurrence } from "../../services/taskService";
 
 export interface TaskOccurrenceCardProps {
   task: TaskOccurrence;
@@ -42,15 +34,13 @@ export interface TaskOccurrenceCardProps {
 
 export default function TaskOccurrenceCard({
   task,
-  index,
   onEdit,
   onCancel,
   onReview,
   onAddToGallery,
 }: TaskOccurrenceCardProps) {
-  const { bg, accent } = cardColor(index);
+  const visual = taskStatusVisual(task.status);
   const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
-  const urgent = task.status === "overdue";
   const awaitingReview = task.status === "pending_review";
   const assigneeLabel = task.assignee_name ?? he.allDepartment;
   const canCancel = !["completed", "cancelled"].includes(task.status);
@@ -62,14 +52,15 @@ export default function TaskOccurrenceCard({
       elevation={0}
       sx={{
         height: "100%",
-        bgcolor: bg,
+        bgcolor: photoBg ? undefined : visual.surface,
         borderRadius: 3,
-        border: "1px solid",
-        borderColor: urgent ? "error.light" : "divider",
+        border: "2px solid",
+        borderColor: visual.border,
         boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
         transition: "box-shadow 0.2s, transform 0.15s, border-color 0.15s",
         position: "relative",
         overflow: "hidden",
+        opacity: task.status === "cancelled" ? 0.72 : 1,
         ...(photoBg
           ? {
               backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.72) 100%), url(${photoBg})`,
@@ -84,11 +75,15 @@ export default function TaskOccurrenceCard({
           insetInlineStart: 0,
           top: 0,
           bottom: 0,
-          width: 3,
-          bgcolor: urgent ? "error.main" : accent,
+          width: 5,
+          bgcolor: visual.bar,
           zIndex: 1,
         },
-        "&:hover": { boxShadow: 4, transform: "translateY(-3px)", borderColor: urgent ? "error.main" : accent },
+        "&:hover": {
+          boxShadow: 4,
+          transform: "translateY(-3px)",
+          borderColor: visual.bar,
+        },
       }}
     >
       <Box
@@ -104,7 +99,7 @@ export default function TaskOccurrenceCard({
             ? {
                 "& .MuiTypography-root": { color: "inherit" },
                 "& .MuiTypography-caption, & .MuiTypography-body2": { color: "rgba(255,255,255,0.85)" },
-                "& .MuiChip-root": {
+                "& .MuiChip-root:not([data-status-chip])": {
                   bgcolor: "rgba(255,255,255,0.16)",
                   color: "#fff",
                   borderColor: "rgba(255,255,255,0.35)",
@@ -119,20 +114,23 @@ export default function TaskOccurrenceCard({
             sx={{
               width: 46,
               height: 46,
-              bgcolor: accent,
+              bgcolor: visual.bar,
               color: "#fff",
               fontWeight: 700,
               fontSize: "1.05rem",
               flexShrink: 0,
-              boxShadow: `0 4px 12px ${accent}40`,
+              boxShadow: `0 4px 12px ${visual.bar}40`,
             }}
           >
             {task.title.trim()[0]?.toUpperCase() ?? "?"}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0, pt: 0.25 }}>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.35 }}>
-              {task.title}
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, flexWrap: "wrap" }}>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.35, flex: 1, minWidth: 0 }}>
+                {task.title}
+              </Typography>
+              <TaskStatusChip status={task.status} />
+            </Box>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
               {he.taskKindLabels[task.task_kind]}
               {task.branch_name ? ` · ${task.branch_name}` : ""}
@@ -164,23 +162,11 @@ export default function TaskOccurrenceCard({
           </Box>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            {he.status}:
-          </Typography>
-          <Chip
-            label={he.taskStatusLabels[task.status]}
-            color={statusColor[task.status]}
-            size="small"
-            sx={{ height: 22, fontSize: "0.75rem", fontWeight: 600 }}
-          />
-          {urgent && (
-            <Chip label={he.employeeUrgentTasks} color="error" size="small" sx={{ height: 22, fontSize: "0.75rem" }} />
-          )}
-          {task.photo_required && (
+        {task.photo_required && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             <Chip label={he.photoRequired} size="small" variant="outlined" sx={{ height: 22, fontSize: "0.75rem" }} />
-          )}
-        </Box>
+          </Box>
+        )}
 
         {task.description ? (
           <Typography
