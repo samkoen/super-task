@@ -281,6 +281,13 @@ export const he = {
   dashboardYesterday: "אתמול",
   dashboardTomorrow: "מחר",
   dashboardTeamTimeline: "ציר זמן — צוות",
+  dashboardTimelineSort: "מיון צוות",
+  dashboardTimelineSortModes: {
+    urgency: "לפי דחיפות / איחור",
+    name: "לפי שם עובד",
+    in_progress: "בטיפול קודם",
+    workload: "לפי עומס משימות",
+  },
   dashboardTeamAccordionHint: (active: number, total: number, inProgress: number) =>
     inProgress > 0
       ? `${active}/${total} פעילים · ${inProgress} בטיפול`
