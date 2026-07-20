@@ -86,8 +86,6 @@ export default function TaskOccurrenceCard({
         position: "relative",
         overflow: "hidden",
         opacity: task.status === "cancelled" ? 0.72 : 1,
-        contentVisibility: "auto",
-        containIntrinsicSize: "0 220px",
         ...(showPhoto
           ? {
               backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.72) 100%), url(${photoBg})`,

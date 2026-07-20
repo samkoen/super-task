@@ -317,9 +317,9 @@ export default function EmployeeTasksPage() {
   const [reportUploadingKind, setReportUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
   const [reportSaving, setReportSaving] = useState(false);
   const [startingId, setStartingId] = useState<string | null>(null);
-  const [filterDay, setFilterDay] = useState(todayIso);
+  const [filterDay, setFilterDay] = useState(() => todayIso());
   const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
-  const [filterFrom, setFilterFrom] = useState(todayIso);
+  const [filterFrom, setFilterFrom] = useState(() => todayIso());
   const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
   const [rangeTasks, setRangeTasks] = useState<EmployeeTaskCard[]>([]);
   const [employeeLanguage, setEmployeeLanguage] = useState<EmployeeLanguage>("he");

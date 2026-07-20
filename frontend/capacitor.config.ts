@@ -58,9 +58,9 @@ const config: CapacitorConfig = {
     ...(serverUrl ? { url: serverUrl } : {}),
   },
   plugins: {
-    // Cookies WebView suffisent pour Vercel same-origin ; CapacitorCookies ajoute de la latence.
+    // Nécessaire sur Android WebView pour que la session (cookie) tienne après login.
     CapacitorCookies: {
-      enabled: false,
+      enabled: true,
     },
     // Sur HTTPS distant (Vercel), laisser le WebView (comme Chrome).
     CapacitorHttp: {

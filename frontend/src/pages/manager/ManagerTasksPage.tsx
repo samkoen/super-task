@@ -119,9 +119,9 @@ export default function ManagerTasksPage() {
   const [filterBranch, setFilterBranch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterDay, setFilterDay] = useState(todayIso);
+  const [filterDay, setFilterDay] = useState(() => todayIso());
   const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
-  const [filterFrom, setFilterFrom] = useState(todayIso);
+  const [filterFrom, setFilterFrom] = useState(() => todayIso());
   const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
   const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
 
@@ -187,18 +187,17 @@ export default function ManagerTasksPage() {
           ? { due_on: filterDay }
           : { due_from: filterFrom, due_to: filterTo };
       // Afficher la liste dès que les occurrences arrivent (ne pas attendre branches/équipe).
-      const occPromise = taskService.listOccurrences({ branch_id: branchId, ...dateParams });
-      const metaPromise = Promise.all([branchService.list(), userService.listTeam("employee")]);
-      const occ = await occPromise;
+      const occ = await taskService.listOccurrences({ branch_id: branchId, ...dateParams });
       setOccurrences(occ);
       if (!silent) setLoading(false);
-      try {
-        const [branchList, team] = await metaPromise;
-        setBranches(branchList);
-        setEmployees(team);
-      } catch {
-        /* filtres incomplets — la liste reste utilisable */
-      }
+      void Promise.all([branchService.list(), userService.listTeam("employee")])
+        .then(([branchList, team]) => {
+          setBranches(branchList);
+          setEmployees(team);
+        })
+        .catch(() => {
+          /* filtres incomplets — la liste reste utilisable */
+        });
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
       if (!silent) setLoading(false);
