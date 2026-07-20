@@ -363,7 +363,7 @@ function Layout() {
         anchor="left"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        ModalProps={{ keepMounted: true }}
+        ModalProps={{ keepMounted: false }}
         sx={{
           display: { xs: "block", sm: "none" },
           "& .MuiDrawer-paper": { ...drawerPaperSx, position: "fixed" },

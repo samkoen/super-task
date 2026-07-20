@@ -87,11 +87,14 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # SameSite=None + Secure : cookies session pour l'APK Capacitor
+    # (origine https://localhost → API https://*.vercel.app).
+    # Sur le site web same-origin, None fonctionne aussi avec HTTPS.
     app.add_middleware(
         SessionMiddleware,
         secret_key=SECRET_KEY,
         max_age=60 * 60 * 24 * 31,
-        same_site="lax",
+        same_site="none" if COOKIE_SECURE else "lax",
         https_only=COOKIE_SECURE,
     )
 

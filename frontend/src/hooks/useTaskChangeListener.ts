@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Capacitor } from "@capacitor/core";
 import { TASK_CHANGE_EVENT, type TaskChangeDetail } from "../constants/events";
+import { isNativeApp } from "../utils/isNativeApp";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const POLL_MS = 25_000;
@@ -17,12 +17,12 @@ export function useTaskChangeListener(
 ) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  const nativeDefault = Capacitor.isNativePlatform() ? false : POLL_MS;
+  const nativeDefault = isNativeApp() ? false : POLL_MS;
   const pollMs = options?.pollMs === false ? 0 : (options?.pollMs ?? nativeDefault);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const native = Capacitor.isNativePlatform();
+    const native = isNativeApp();
 
     const schedule = (ev?: Event) => {
       const detail = (ev as CustomEvent<TaskChangeDetail> | undefined)?.detail;

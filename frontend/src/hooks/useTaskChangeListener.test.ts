@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { TASK_CHANGE_EVENT } from "../constants/events";
 
-vi.mock("@capacitor/core", () => ({
-  Capacitor: { isNativePlatform: () => false },
+vi.mock("../utils/isNativeApp", () => ({
+  isNativeApp: () => false,
 }));
 
 import { useTaskChangeListener } from "./useTaskChangeListener";

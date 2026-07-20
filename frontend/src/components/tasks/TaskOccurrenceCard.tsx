@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Capacitor } from "@capacitor/core";
 import {
   Avatar,
   Box,
@@ -21,6 +20,7 @@ import TaskStatusChip from "./TaskStatusChip";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
+import { isNativeApp } from "../../utils/isNativeApp";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import type { TaskOccurrence } from "../../services/taskService";
 
@@ -41,8 +41,7 @@ export default function TaskOccurrenceCard({
   onReview,
   onAddToGallery,
 }: TaskOccurrenceCardProps) {
-  // Appeler dans le render : au top-level module le bridge Capacitor n'est pas toujours prêt.
-  const isNative = Capacitor.isNativePlatform();
+  const isNative = isNativeApp();
   const visual = taskStatusVisual(task.status);
   const photoBg = isNative ? null : taskCardBackgroundUrl(task.reference_photo_url);
   const [photoReady, setPhotoReady] = useState(false);

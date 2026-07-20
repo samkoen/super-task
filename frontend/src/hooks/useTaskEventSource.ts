@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
 import {
   NOTIFICATION_EVENT,
   TASK_CHANGE_EVENT,
   type TaskChangeDetail,
 } from "../constants/events";
+import { isNativeApp } from "../utils/isNativeApp";
 
 const RECONNECT_MS_MIN = 5_000;
 const RECONNECT_MS_MAX = 60_000;
@@ -46,7 +46,7 @@ export async function hasActiveSession(): Promise<boolean> {
 export function useTaskEventSource(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
-    if (Capacitor.isNativePlatform()) return;
+    if (isNativeApp()) return;
 
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
