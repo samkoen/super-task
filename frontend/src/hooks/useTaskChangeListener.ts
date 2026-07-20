@@ -4,7 +4,11 @@ import { TASK_CHANGE_EVENT, type TaskChangeDetail } from "../constants/events";
 const REFETCH_DEBOUNCE_MS = 300;
 const POLL_MS = 25_000;
 
-/** Refetch handler for pages that display tasks (debounced SSE + focus + poll). */
+/**
+ * Refetch handler for pages that display tasks (debounced SSE + focus + poll).
+ * Ignore `sse_connected` — on Vercel/WebView the stream reconnects often and
+ * a full list reload each time freezes the UI.
+ */
 export function useTaskChangeListener(
   onChange: () => void,
   options?: { pollMs?: number | false },
@@ -16,7 +20,9 @@ export function useTaskChangeListener(
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const schedule = (_ev?: Event) => {
+    const schedule = (ev?: Event) => {
+      const detail = (ev as CustomEvent<TaskChangeDetail> | undefined)?.detail;
+      if (detail?.type === "sse_connected") return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => onChangeRef.current(), REFETCH_DEBOUNCE_MS);
     };

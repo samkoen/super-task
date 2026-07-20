@@ -36,4 +36,15 @@ describe("useTaskChangeListener", () => {
     vi.advanceTimersByTime(300);
     expect(onChange).toHaveBeenCalledTimes(1);
   });
+
+  it("ignores sse_connected so reconnect storms do not reload the list", () => {
+    const onChange = vi.fn();
+    renderHook(() => useTaskChangeListener(onChange, { pollMs: false }));
+
+    window.dispatchEvent(
+      new CustomEvent(TASK_CHANGE_EVENT, { detail: { type: "sse_connected" } })
+    );
+    vi.advanceTimersByTime(300);
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

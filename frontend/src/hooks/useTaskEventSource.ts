@@ -1,11 +1,13 @@
 import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import {
   NOTIFICATION_EVENT,
   TASK_CHANGE_EVENT,
   type TaskChangeDetail,
 } from "../constants/events";
 
-const RECONNECT_MS = 3000;
+const RECONNECT_MS_MIN = 5_000;
+const RECONNECT_MS_MAX = 60_000;
 
 function parseDetail(raw: string): TaskChangeDetail | undefined {
   try {
@@ -37,25 +39,39 @@ export async function hasActiveSession(): Promise<boolean> {
   }
 }
 
-/** Opens one SSE connection and broadcasts task changes app-wide. */
+/**
+ * SSE app-wide. Désactivé sur Capacitor natif : le WebView + Vercel serverless
+ * se reconnectent en boucle et figent משימות. L'app s'appuie alors sur le poll.
+ */
 export function useTaskEventSource(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
+    if (Capacitor.isNativePlatform()) return;
 
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+    let attempt = 0;
+    let announcedConnected = false;
 
     const scheduleReconnect = () => {
       if (stopped) return;
+      const delay = Math.min(
+        RECONNECT_MS_MAX,
+        RECONNECT_MS_MIN * 2 ** Math.min(attempt, 4)
+      );
+      attempt += 1;
       reconnectTimer = setTimeout(() => {
         void connect();
-      }, RECONNECT_MS);
+      }, delay);
     };
 
     const attach = (es: EventSource) => {
       es.addEventListener("connected", () => {
-        // Rattrapage après (re)connexion — événements manqués pendant la coupure.
+        attempt = 0;
+        // Une seule fois par montage — évite reload liste à chaque reconnect.
+        if (announcedConnected) return;
+        announcedConnected = true;
         window.dispatchEvent(
           new CustomEvent(TASK_CHANGE_EVENT, { detail: { type: "sse_connected" } }),
         );
@@ -70,7 +86,6 @@ export function useTaskEventSource(enabled: boolean) {
         es.close();
         if (source === es) source = null;
         if (stopped) return;
-        // 401 / session expirée : ne pas spammer le serveur toutes les 3s
         void hasActiveSession().then((ok) => {
           if (!ok) {
             stopped = true;

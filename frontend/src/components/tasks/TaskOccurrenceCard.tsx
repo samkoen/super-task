@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import {
   Avatar,
   Box,
@@ -23,6 +24,9 @@ import { formatDueAt } from "../../utils/dateView";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import type { TaskOccurrence } from "../../services/taskService";
 
+/** WebView Android : les /api/media/proxy en fond figent le scroll — désactivés en natif. */
+const SKIP_CARD_PHOTO_BG = Capacitor.isNativePlatform();
+
 export interface TaskOccurrenceCardProps {
   task: TaskOccurrence;
   index: number;
@@ -41,7 +45,7 @@ export default function TaskOccurrenceCard({
   onAddToGallery,
 }: TaskOccurrenceCardProps) {
   const visual = taskStatusVisual(task.status);
-  const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
+  const photoBg = SKIP_CARD_PHOTO_BG ? null : taskCardBackgroundUrl(task.reference_photo_url);
   // Précharge en async : la carte s'affiche tout de suite, la photo arrive ensuite.
   const [photoReady, setPhotoReady] = useState(false);
   useEffect(() => {

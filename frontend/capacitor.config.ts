@@ -58,11 +58,11 @@ const config: CapacitorConfig = {
     ...(serverUrl ? { url: serverUrl } : {}),
   },
   plugins: {
+    // Cookies WebView suffisent pour Vercel same-origin ; CapacitorCookies ajoute de la latence.
     CapacitorCookies: {
-      enabled: true,
+      enabled: false,
     },
     // Sur HTTPS distant (Vercel), laisser le WebView (comme Chrome).
-    // CapacitorHttp native casse souvent axios + cookies vers le même site.
     CapacitorHttp: {
       enabled: !remoteIsHttps,
     },
