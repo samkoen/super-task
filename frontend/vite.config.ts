@@ -62,6 +62,7 @@ export default defineConfig({
     globals: true,
   },
   server: {
+    host: true,
     port: 5173,
     proxy: {
       "/api/events/stream": sseProxy,

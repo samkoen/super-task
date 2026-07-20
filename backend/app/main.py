@@ -33,7 +33,8 @@ from app.controllers import (
 )
 from app.core.config import (
     COOKIE_SECURE,
-    FRONTEND_URL,
+    CORS_ALLOW_ORIGIN_REGEX,
+    CORS_ALLOW_ORIGINS,
     IS_PRODUCTION,
     LOG_LEVEL,
     SECRET_KEY,
@@ -80,7 +81,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[FRONTEND_URL, "http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=CORS_ALLOW_ORIGINS,
+        allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SuperShift</string>
+    <string name="title_activity_main">SuperShift</string>
+    <string name="package_name">com.supershift.app</string>
+    <string name="custom_url_scheme">com.supershift.app</string>
+</resources>

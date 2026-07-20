@@ -1,8 +1,9 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { he } from "../i18n/he";
+import { resolveApiBaseUrl } from "./apiBaseUrl";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: resolveApiBaseUrl(),
   timeout: 30_000,
   headers: { "Content-Type": "application/json" },
   withCredentials: true,

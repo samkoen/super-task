@@ -20,6 +20,27 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 APP_NAME = os.environ.get("APP_NAME", "Super")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 IS_PRODUCTION = ENVIRONMENT == "production" or IS_VERCEL
+
+# Origines CORS (web + Capacitor). En local, regex pour IP LAN (téléphone → Vite).
+_CORS_DEFAULT = [
+    FRONTEND_URL,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "capacitor://localhost",
+    "https://localhost",
+    "http://localhost",
+]
+_CORS_EXTRA = [
+    o.strip()
+    for o in os.environ.get("CORS_EXTRA_ORIGINS", "").split(",")
+    if o.strip()
+]
+CORS_ALLOW_ORIGINS = list(dict.fromkeys([*_CORS_DEFAULT, *_CORS_EXTRA]))
+CORS_ALLOW_ORIGIN_REGEX = (
+    None
+    if IS_PRODUCTION
+    else r"https?://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?"
+)
 LOG_LEVEL = os.environ.get(
     "LOG_LEVEL",
     "DEBUG" if ENVIRONMENT == "development" and not IS_VERCEL else "INFO",
