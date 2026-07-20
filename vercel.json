@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/employee-inactivity",
-      "schedule": "*/5 5-19 * * *"
+      "schedule": "0 10 * * *"
     }
   ],
   "services": {
