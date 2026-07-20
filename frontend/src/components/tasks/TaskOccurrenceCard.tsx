@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Avatar,
   Box,
@@ -41,6 +42,26 @@ export default function TaskOccurrenceCard({
 }: TaskOccurrenceCardProps) {
   const visual = taskStatusVisual(task.status);
   const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
+  // Précharge en async : la carte s'affiche tout de suite, la photo arrive ensuite.
+  const [photoReady, setPhotoReady] = useState(false);
+  useEffect(() => {
+    setPhotoReady(false);
+    if (!photoBg) return;
+    let cancelled = false;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (!cancelled) setPhotoReady(true);
+    };
+    img.onerror = () => {
+      if (!cancelled) setPhotoReady(false);
+    };
+    img.src = photoBg;
+    return () => {
+      cancelled = true;
+    };
+  }, [photoBg]);
+  const showPhoto = Boolean(photoBg && photoReady);
   const awaitingReview = task.status === "pending_review";
   const assigneeLabel = task.assignee_name ?? he.allDepartment;
   const canCancel = !["completed", "cancelled"].includes(task.status);
@@ -52,7 +73,7 @@ export default function TaskOccurrenceCard({
       elevation={0}
       sx={{
         height: "100%",
-        bgcolor: photoBg ? undefined : visual.surface,
+        bgcolor: showPhoto ? undefined : visual.surface,
         borderRadius: 3,
         border: "2px solid",
         borderColor: visual.border,
@@ -61,7 +82,9 @@ export default function TaskOccurrenceCard({
         position: "relative",
         overflow: "hidden",
         opacity: task.status === "cancelled" ? 0.72 : 1,
-        ...(photoBg
+        contentVisibility: "auto",
+        containIntrinsicSize: "0 220px",
+        ...(showPhoto
           ? {
               backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.72) 100%), url(${photoBg})`,
               backgroundSize: "cover",

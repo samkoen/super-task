@@ -26,12 +26,22 @@ function loadFrontendEnv(): void {
 loadFrontendEnv();
 
 /**
- * URL chargée dans le WebView :
- * - Prod : https://super-nihul.vercel.app
- * - Dev local : http://<IP-PC>:5173
+ * URL chargée dans le WebView (prod Vercel ou Vite local).
  * Sans ça, l'APK charge dist/ (nécessite VITE_API_URL).
  */
 const serverUrl = process.env.CAPACITOR_DEV_SERVER_URL?.trim();
+
+let remoteHostname: string | undefined;
+let remoteIsHttps = false;
+try {
+  if (serverUrl) {
+    const u = new URL(serverUrl);
+    remoteHostname = u.hostname;
+    remoteIsHttps = u.protocol === "https:";
+  }
+} catch {
+  /* ignore */
+}
 
 const config: CapacitorConfig = {
   appId: "com.supershift.app",
@@ -43,11 +53,18 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
     cleartext: true,
+    // Même hôte que le site → cookies session comme Chrome
+    ...(remoteHostname ? { hostname: remoteHostname } : {}),
     ...(serverUrl ? { url: serverUrl } : {}),
   },
   plugins: {
-    CapacitorHttp: {
+    CapacitorCookies: {
       enabled: true,
+    },
+    // Sur HTTPS distant (Vercel), laisser le WebView (comme Chrome).
+    // CapacitorHttp native casse souvent axios + cookies vers le même site.
+    CapacitorHttp: {
+      enabled: !remoteIsHttps,
     },
   },
 };

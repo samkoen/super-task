@@ -18,6 +18,25 @@ class TaskTemplateRepository:
         except ValueError:
             return None
 
+    def find_by_ids(self, ids: list[str]) -> dict[str, TaskTemplate]:
+        if not ids:
+            return {}
+        try:
+            uuids = [mp.parse_uuid(i) for i in ids]
+        except ValueError:
+            return {}
+        rows = (
+            self._db.execute(select(orm.TaskTemplate).where(orm.TaskTemplate.id.in_(uuids)))
+            .scalars()
+            .all()
+        )
+        out: dict[str, TaskTemplate] = {}
+        for row in rows:
+            domain = mp.task_template_orm_to_domain(row)
+            if domain:
+                out[domain.id] = domain
+        return out
+
     def list_templates(
         self,
         *,

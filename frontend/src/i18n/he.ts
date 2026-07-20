@@ -15,7 +15,7 @@ export const he = {
   submit: "שליחה",
   loading: "טוען…",
   errorGeneric: "אירעה שגיאה",
-  errorServerUnreachable: "לא ניתן להתחבר לשרת — ודאו שה-backend רץ (פורט 5001)",
+  errorServerUnreachable: "לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.",
   loginFailed: "מזהה או סיסמה שגויים",
   emailNotVerified: "יש לאמת את האימייל לפני ההתחברות",
   registerSuccessAwaitVerification:

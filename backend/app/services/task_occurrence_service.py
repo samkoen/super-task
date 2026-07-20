@@ -76,9 +76,11 @@ class TaskOccurrenceService:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לצפות במשימות")
         now = datetime.now(TZ)
-        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
-        self._occurrences.mark_overdue_before(now)
         branch_ids = visible_branch_ids_for_tasks(actor, self._branch)
+        self._occurrences.rollover_open_tasks_to_day(
+            now.date(), now=now, branch_ids=branch_ids
+        )
+        self._occurrences.mark_overdue_before(now, branch_ids=branch_ids)
         day = date.fromisoformat(due_on) if due_on else None
         day_from = date.fromisoformat(due_from) if due_from else None
         day_to = date.fromisoformat(due_to) if due_to else None
@@ -98,9 +100,7 @@ class TaskOccurrenceService:
         in_gallery = set()
         if self._gallery and items:
             in_gallery = self._gallery.source_occurrence_ids_in([o.id for o in items])
-        return [
-            self._to_api(o, already_in_gallery=o.id in in_gallery) for o in items
-        ]
+        return self._occurrences_to_api(items, in_gallery=in_gallery)
 
     async def list_mine(
         self,
@@ -113,8 +113,11 @@ class TaskOccurrenceService:
         if actor.role != roles.EMPLOYEE:
             raise PermissionError("רק עובדים יכולים לראות את המשימות שלהם")
         now = datetime.now(TZ)
-        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
-        self._occurrences.mark_overdue_before(now)
+        scope_branches = [actor.branch_id] if actor.branch_id else []
+        self._occurrences.rollover_open_tasks_to_day(
+            now.date(), now=now, branch_ids=scope_branches
+        )
+        self._occurrences.mark_overdue_before(now, branch_ids=scope_branches)
         day = date.fromisoformat(due_on) if due_on else None
         if not day and not due_from and not due_to:
             day = now.date()
@@ -127,7 +130,7 @@ class TaskOccurrenceService:
             due_from=day_from if not day else None,
             due_to=day_to if not day else None,
         )
-        rows = [self._to_api(o) for o in items]
+        rows = self._occurrences_to_api(items)
         language = "he"
         if self._users:
             user = self._users.find_by_id(actor.user_id)
@@ -575,26 +578,80 @@ class TaskOccurrenceService:
             raise PermissionError("אין הרשאה לבצע משימה זו")
 
     def _to_api(self, occurrence, *, already_in_gallery: bool | None = None) -> dict:
-        occurrence = self._with_reference_media(occurrence)
-        completion = self._completions.find_by_occurrence(occurrence.id)
-        if already_in_gallery is None and self._gallery:
-            already_in_gallery = bool(
-                self._gallery.find_by_source_occurrence_id(occurrence.id)
-            )
-        in_gallery = bool(already_in_gallery)
-        return mp.task_occurrence_domain_to_api(
-            occurrence,
-            branch_name=self._occurrences.get_branch_name(occurrence.branch_id),
-            department_name=self._occurrences.get_department_name(occurrence.department_id),
-            assignee_name=self._occurrences.get_assignee_name(occurrence.assignee_user_id),
-            manager_name=self._occurrences.get_manager_name(occurrence.manager_user_id),
-            completion=mp.task_completion_domain_to_api(completion) if completion else None,
-            in_gallery=in_gallery,
-            can_add_to_gallery=can_add_occurrence_to_gallery(
-                source_gallery_item_id=occurrence.source_gallery_item_id,
-                already_in_gallery=in_gallery,
-            ),
+        in_gallery = set()
+        if already_in_gallery:
+            in_gallery.add(occurrence.id)
+        elif already_in_gallery is None and self._gallery:
+            if self._gallery.find_by_source_occurrence_id(occurrence.id):
+                in_gallery.add(occurrence.id)
+        return self._occurrences_to_api([occurrence], in_gallery=in_gallery)[0]
+
+    def _occurrences_to_api(
+        self,
+        items: list,
+        *,
+        in_gallery: set[str] | None = None,
+    ) -> list[dict]:
+        """Serialize many occurrences with batched lookups (avoids N+1)."""
+        if not items:
+            return []
+        gallery_ids = in_gallery or set()
+        completions = self._completions.find_by_occurrence_ids([o.id for o in items])
+        template_ids = list({o.template_id for o in items if o.template_id})
+        templates = (
+            self._templates.find_by_ids(template_ids)
+            if self._templates and template_ids
+            else {}
         )
+        branch_ids = {o.branch_id for o in items if o.branch_id}
+        department_ids = {o.department_id for o in items if o.department_id}
+        user_ids = {
+            uid
+            for o in items
+            for uid in (o.assignee_user_id, o.manager_user_id)
+            if uid
+        }
+        branch_names, department_names, user_names = self._occurrences.lookup_display_names(
+            branch_ids=branch_ids,
+            department_ids=department_ids,
+            user_ids=user_ids,
+        )
+        rows: list[dict] = []
+        for occurrence in items:
+            template = templates.get(occurrence.template_id) if occurrence.template_id else None
+            occurrence = merge_occurrence_reference_media(occurrence, template)
+            completion = completions.get(occurrence.id)
+            already = occurrence.id in gallery_ids
+            rows.append(
+                mp.task_occurrence_domain_to_api(
+                    occurrence,
+                    branch_name=branch_names.get(occurrence.branch_id),
+                    department_name=(
+                        department_names.get(occurrence.department_id)
+                        if occurrence.department_id
+                        else None
+                    ),
+                    assignee_name=(
+                        user_names.get(occurrence.assignee_user_id)
+                        if occurrence.assignee_user_id
+                        else None
+                    ),
+                    manager_name=(
+                        user_names.get(occurrence.manager_user_id)
+                        if occurrence.manager_user_id
+                        else None
+                    ),
+                    completion=(
+                        mp.task_completion_domain_to_api(completion) if completion else None
+                    ),
+                    in_gallery=already,
+                    can_add_to_gallery=can_add_occurrence_to_gallery(
+                        source_gallery_item_id=occurrence.source_gallery_item_id,
+                        already_in_gallery=already,
+                    ),
+                )
+            )
+        return rows
 
     def _with_reference_media(self, occurrence):
         if not occurrence.template_id or not self._templates:

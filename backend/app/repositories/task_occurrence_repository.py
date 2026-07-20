@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -216,22 +216,33 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
-    def mark_overdue_before(self, now: datetime) -> int:
+    def mark_overdue_before(
+        self, now: datetime, *, branch_ids: list[str] | None = None
+    ) -> int:
+        """Passe PENDING → OVERDUE en un seul UPDATE (pas de N+1)."""
         q = (
-            select(orm.TaskOccurrence)
+            update(orm.TaskOccurrence)
             .where(orm.TaskOccurrence.status == task_status.PENDING)
             .where(orm.TaskOccurrence.due_at < now)
+            .values(status=task_status.OVERDUE)
         )
-        rows = self._db.execute(q).scalars().all()
-        count = 0
-        for row in rows:
-            row.status = task_status.OVERDUE
-            count += 1
-        if count:
-            self._db.flush()
-        return count
+        if branch_ids is not None:
+            if not branch_ids:
+                return 0
+            q = q.where(
+                orm.TaskOccurrence.branch_id.in_([mp.parse_uuid(i) for i in branch_ids])
+            )
+        result = self._db.execute(q)
+        self._db.flush()
+        return int(result.rowcount or 0)
 
-    def rollover_open_tasks_to_day(self, day: date, *, now: datetime) -> int:
+    def rollover_open_tasks_to_day(
+        self,
+        day: date,
+        *,
+        now: datetime,
+        branch_ids: list[str] | None = None,
+    ) -> int:
         """Avance due_at des tâches ouvertes échues avant `day` vers ce jour (même heure)."""
         cutoff = start_of_day(day, _TZ)
         q = (
@@ -239,6 +250,12 @@ class TaskOccurrenceRepository:
             .where(orm.TaskOccurrence.status.in_(tuple(ROLLOVER_STATUSES)))
             .where(orm.TaskOccurrence.due_at < cutoff)
         )
+        if branch_ids is not None:
+            if not branch_ids:
+                return 0
+            q = q.where(
+                orm.TaskOccurrence.branch_id.in_([mp.parse_uuid(i) for i in branch_ids])
+            )
         rows = self._db.execute(q).scalars().all()
         count = 0
         for row in rows:
@@ -303,3 +320,39 @@ class TaskOccurrenceRepository:
 
     def get_manager_name(self, user_id: str | None) -> str | None:
         return self.get_assignee_name(user_id)
+
+    def lookup_display_names(
+        self,
+        *,
+        branch_ids: set[str],
+        department_ids: set[str],
+        user_ids: set[str],
+    ) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+        """Batch branch / department / user names for list serialization."""
+        branches: dict[str, str] = {}
+        if branch_ids:
+            rows = (
+                self._db.query(orm.Branch)
+                .filter(orm.Branch.id.in_([mp.parse_uuid(i) for i in branch_ids]))
+                .all()
+            )
+            branches = {str(r.id): r.name for r in rows}
+        departments: dict[str, str] = {}
+        if department_ids:
+            rows = (
+                self._db.query(orm.Department)
+                .filter(orm.Department.id.in_([mp.parse_uuid(i) for i in department_ids]))
+                .all()
+            )
+            departments = {str(r.id): r.name for r in rows}
+        users: dict[str, str] = {}
+        if user_ids:
+            rows = (
+                self._db.query(orm.User)
+                .filter(orm.User.id.in_([mp.parse_uuid(i) for i in user_ids]))
+                .all()
+            )
+            users = {
+                str(r.id): f"{r.first_name} {r.last_name}".strip() for r in rows
+            }
+        return branches, departments, users
