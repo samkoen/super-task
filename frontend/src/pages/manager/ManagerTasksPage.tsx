@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
@@ -178,7 +178,10 @@ export default function ManagerTasksPage() {
 
   const hasListFilters = Boolean(filterEmployee || filterStatus || filterBranch);
 
+  const loadInFlight = useRef(false);
   const load = useCallback(async (silent = false) => {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
     if (!silent) setLoading(true);
     try {
       const branchId = scopeBranchId || undefined;
@@ -201,6 +204,8 @@ export default function ManagerTasksPage() {
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
       if (!silent) setLoading(false);
+    } finally {
+      loadInFlight.current = false;
     }
   }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, showError]);
 

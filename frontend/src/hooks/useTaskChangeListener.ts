@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Capacitor } from "@capacitor/core";
 import { TASK_CHANGE_EVENT, type TaskChangeDetail } from "../constants/events";
 
 const REFETCH_DEBOUNCE_MS = 300;
@@ -8,6 +9,7 @@ const POLL_MS = 25_000;
  * Refetch handler for pages that display tasks (debounced SSE + focus + poll).
  * Ignore `sse_connected` — on Vercel/WebView the stream reconnects often and
  * a full list reload each time freezes the UI.
+ * Sur l’APK : pas de poll ni visibility refetch (évite freeze WebView).
  */
 export function useTaskChangeListener(
   onChange: () => void,
@@ -15,10 +17,12 @@ export function useTaskChangeListener(
 ) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  const pollMs = options?.pollMs === false ? 0 : (options?.pollMs ?? POLL_MS);
+  const nativeDefault = Capacitor.isNativePlatform() ? false : POLL_MS;
+  const pollMs = options?.pollMs === false ? 0 : (options?.pollMs ?? nativeDefault);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const native = Capacitor.isNativePlatform();
 
     const schedule = (ev?: Event) => {
       const detail = (ev as CustomEvent<TaskChangeDetail> | undefined)?.detail;
@@ -28,6 +32,7 @@ export function useTaskChangeListener(
     };
 
     const onVisible = () => {
+      if (native) return;
       if (document.visibilityState === "visible") {
         schedule();
       }
@@ -37,7 +42,7 @@ export function useTaskChangeListener(
     document.addEventListener("visibilitychange", onVisible);
 
     let pollTimer: ReturnType<typeof setInterval> | undefined;
-    if (pollMs > 0) {
+    if (typeof pollMs === "number" && pollMs > 0) {
       pollTimer = setInterval(() => {
         if (document.visibilityState === "visible") {
           onChangeRef.current();

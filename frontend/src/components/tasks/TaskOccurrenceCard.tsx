@@ -24,9 +24,6 @@ import { formatDueAt } from "../../utils/dateView";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import type { TaskOccurrence } from "../../services/taskService";
 
-/** WebView Android : les /api/media/proxy en fond figent le scroll — désactivés en natif. */
-const SKIP_CARD_PHOTO_BG = Capacitor.isNativePlatform();
-
 export interface TaskOccurrenceCardProps {
   task: TaskOccurrence;
   index: number;
@@ -44,9 +41,10 @@ export default function TaskOccurrenceCard({
   onReview,
   onAddToGallery,
 }: TaskOccurrenceCardProps) {
+  // Appeler dans le render : au top-level module le bridge Capacitor n'est pas toujours prêt.
+  const isNative = Capacitor.isNativePlatform();
   const visual = taskStatusVisual(task.status);
-  const photoBg = SKIP_CARD_PHOTO_BG ? null : taskCardBackgroundUrl(task.reference_photo_url);
-  // Précharge en async : la carte s'affiche tout de suite, la photo arrive ensuite.
+  const photoBg = isNative ? null : taskCardBackgroundUrl(task.reference_photo_url);
   const [photoReady, setPhotoReady] = useState(false);
   useEffect(() => {
     setPhotoReady(false);
@@ -208,12 +206,15 @@ export default function TaskOccurrenceCard({
           </Typography>
         ) : null}
 
-        {awaitingReview && task.completion && (
+        {awaitingReview && task.completion && !isNative && (
           <CompletionMediaPreview
             photo_path={task.completion.photo_path}
             video_path={task.completion.video_path}
             audio_path={task.completion.audio_path}
           />
+        )}
+        {awaitingReview && task.completion && isNative && (
+          <Chip label={he.completionMediaAdded} size="small" color="info" variant="outlined" />
         )}
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary", mt: "auto" }}>

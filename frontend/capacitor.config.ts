@@ -25,24 +25,20 @@ function loadFrontendEnv(): void {
 
 loadFrontendEnv();
 
-/**
- * URL chargée dans le WebView (prod Vercel ou Vite local).
- * Sans ça, l'APK charge dist/ (nécessite VITE_API_URL).
- */
 const serverUrl = process.env.CAPACITOR_DEV_SERVER_URL?.trim();
 
-let remoteHostname: string | undefined;
 let remoteIsHttps = false;
 try {
-  if (serverUrl) {
-    const u = new URL(serverUrl);
-    remoteHostname = u.hostname;
-    remoteIsHttps = u.protocol === "https:";
-  }
+  if (serverUrl) remoteIsHttps = new URL(serverUrl).protocol === "https:";
 } catch {
   /* ignore */
 }
 
+/**
+ * Ne pas fixer `hostname` sur le domaine Vercel en même temps que `url` :
+ * ça casse parfois cookies / origine dans le WebView.
+ * CapacitorCookies désactivé : le bridge synchrone fige souvent l’UI Android.
+ */
 const config: CapacitorConfig = {
   appId: "com.supershift.app",
   appName: "SuperShift",
@@ -53,16 +49,12 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
     cleartext: true,
-    // Même hôte que le site → cookies session comme Chrome
-    ...(remoteHostname ? { hostname: remoteHostname } : {}),
     ...(serverUrl ? { url: serverUrl } : {}),
   },
   plugins: {
-    // Nécessaire sur Android WebView pour que la session (cookie) tienne après login.
     CapacitorCookies: {
-      enabled: true,
+      enabled: false,
     },
-    // Sur HTTPS distant (Vercel), laisser le WebView (comme Chrome).
     CapacitorHttp: {
       enabled: !remoteIsHttps,
     },

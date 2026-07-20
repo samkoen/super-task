@@ -401,11 +401,17 @@ function Layout() {
           minWidth: 0,
           width: 0,
           order: 1,
-          height: "100vh",
-          overflowY: "auto",
+          height: "100dvh",
+          maxHeight: "100dvh",
+          overflowY: "scroll",
           overflowX: "hidden",
+          WebkitOverflowScrolling: "touch",
+          touchAction: "pan-y",
+          overscrollBehavior: "contain",
           px: { xs: 1.5, sm: 3, md: 4 },
           py: { xs: 2.5, sm: 3.5 },
+          // Espace sous le FAB menu (mobile)
+          pb: { xs: 10, sm: 3.5 },
         }}
       >
         <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
