@@ -11,4 +11,6 @@ export interface TaskChangeDetail {
   occurrence_id?: string;
   status?: string;
   kind?: string;
+  sound?: string;
+  notification_id?: string;
 }

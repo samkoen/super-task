@@ -28,6 +28,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
+import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
 import { SIDEBAR_WIDTH } from "../../constants/layout";
@@ -58,10 +59,11 @@ const drawerPaperSx = {
 function Layout() {
   const { user, loading, logout } = useAuth();
   useTaskEventSource(Boolean(user) && !loading);
+  const isEmployee = user?.role === "employee";
+  useEmployeeNotificationSounds(Boolean(user) && !loading && isEmployee);
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isEmployee = user?.role === "employee";
 
   const menuItems = useMemo(() => {
     if (!user) return [];

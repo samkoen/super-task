@@ -37,8 +37,10 @@ import {
 } from "../../services/dashboardService";
 import { taskService, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
+import { employeeActivityService } from "../../services/employeeActivityService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+import { playTaskEndSound } from "../../utils/notificationSounds";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import {
   defaultRangeFrom,
@@ -310,6 +312,8 @@ export default function EmployeeTasksPage() {
   const [reportPhotoUrl, setReportPhotoUrl] = useState("");
   const [reportVideoUrl, setReportVideoUrl] = useState("");
   const [reportAudioUrl, setReportAudioUrl] = useState("");
+  const [onBreak, setOnBreak] = useState(false);
+  const [breakBusy, setBreakBusy] = useState(false);
   const [reportUploadingKind, setReportUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
   const [reportSaving, setReportSaving] = useState(false);
   const [startingId, setStartingId] = useState<string | null>(null);
@@ -350,8 +354,12 @@ export default function EmployeeTasksPage() {
     }
     try {
       if (dateViewMode === "day") {
-        const data = await dashboardService.getEmployee(filterDay);
+        const [data, breakState] = await Promise.all([
+          dashboardService.getEmployee(filterDay),
+          employeeActivityService.getBreak().catch(() => ({ on_break: false, on_break_since: null })),
+        ]);
         setDashboard(data);
+        setOnBreak(Boolean(breakState.on_break));
         const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
         setEmployeeLanguage(lang);
         setRangeTasks([]);
@@ -553,6 +561,7 @@ export default function EmployeeTasksPage() {
       clearCompletionMedia();
       setSelected(null);
       if (done) {
+        playTaskEndSound();
         showSuccess(he.taskSubmitSuccess);
       }
       await load();
@@ -560,6 +569,21 @@ export default function EmployeeTasksPage() {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleBreak = async () => {
+    setBreakBusy(true);
+    try {
+      const res = onBreak
+        ? await employeeActivityService.endBreak()
+        : await employeeActivityService.startBreak();
+      setOnBreak(Boolean(res.on_break));
+      showSuccess(onBreak ? he.employeeBreakEnded : he.employeeBreakStarted);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setBreakBusy(false);
     }
   };
 
@@ -604,12 +628,24 @@ export default function EmployeeTasksPage() {
           {headerBranch ? `${he.branch}: ${headerBranch}` : ""}
           {headerJob ? ` · ${jobLabel(headerJob)}` : ""}
         </Typography>
-        <Chip
-          size="small"
-          color={onShift ? "success" : "default"}
-          label={onShift ? he.employeeOnShift : he.employeeOffShift}
-          sx={{ mt: 1.25 }}
-        />
+        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" sx={{ mt: 1.25 }}>
+          <Chip
+            size="small"
+            color={onBreak ? "warning" : onShift ? "success" : "default"}
+            label={
+              onBreak ? he.employeeOnBreak : onShift ? he.employeeOnShift : he.employeeOffShift
+            }
+          />
+          <Button
+            size="small"
+            variant={onBreak ? "contained" : "outlined"}
+            color={onBreak ? "warning" : "primary"}
+            disabled={breakBusy}
+            onClick={() => void handleToggleBreak()}
+          >
+            {onBreak ? he.employeeBreakEnd : he.employeeBreakStart}
+          </Button>
+        </Box>
       </Box>
 
       <TaskDateViewBar

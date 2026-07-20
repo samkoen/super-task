@@ -18,6 +18,7 @@ from app.repositories.task_translation_repository import TaskTranslationReposito
 from app.repositories.user_repository import UserRepository
 from app.realtime.task_events import notify_task_change
 from app.services.media_upload_service import upload_attachment
+from app.services.employee_activity_service import EmployeeActivityService
 from app.services.notification_service import NotificationService
 from app.services.task_occurrence_service import TaskOccurrenceService
 from app.services.task_scheduler_service import TaskSchedulerService
@@ -76,9 +77,19 @@ def _emit_task_event(
         assignee_user_id=item.get("assignee_user_id"),
         occurrence_id=linked_occurrence_id,
         task_title=item.get("title"),
+        created_by_user_id=item.get("created_by_id"),
     )
     db.commit()
     _notify_occurrence(event_type, item)
+    assignee = item.get("assignee_user_id")
+    if assignee:
+        activity = EmployeeActivityService(UserRepository(db), TaskOccurrenceRepository(db))
+        if event_type == "task_started":
+            activity.on_task_started(str(assignee))
+            db.commit()
+        elif event_type in {"task_completed", "task_cancelled", "task_approved"}:
+            activity.on_left_in_progress(str(assignee))
+            db.commit()
     NotificationService.push_task_event_sse(pending_notifications)
 
 

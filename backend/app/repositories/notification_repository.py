@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -103,6 +103,14 @@ class NotificationRepository:
         if rows:
             self._db.flush()
         return len(rows)
+
+    def delete_older_than(self, cutoff: datetime) -> int:
+        """Supprime les alertes créées avant `cutoff` (lues et non lues)."""
+        result = self._db.execute(
+            delete(orm.UserNotification).where(orm.UserNotification.created_at < cutoff)
+        )
+        self._db.flush()
+        return int(result.rowcount or 0)
 
     @staticmethod
     def _to_domain(row: orm.UserNotification | None) -> UserNotification | None:

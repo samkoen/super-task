@@ -36,6 +36,11 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     preferred_language: Mapped[str] = mapped_column(String(8), nullable=False, default="he")
+    on_break_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idle_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    inactivity_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

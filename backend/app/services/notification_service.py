@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from app.domain import roles
+from app.domain.notification_rules import notification_sound_for, recipients_for_task_event
 from app.realtime.sse_hub import sse_hub
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.user_repository import UserRepository
@@ -10,9 +11,14 @@ _TASK_LABELS = {
     "task_created": ("משימה חדשה", "הוקצתה אליך משימה חדשה"),
     "task_delegated": ("משימה שויכה", "הוקצתה אליך משימה לטיפול"),
     "task_started": ("משימה התחילה", "עובד התחיל לטפל במשימה"),
-    "task_completed": ("משימה הושלמה", "משימה הושלמה על ידי עובד"),
+    "task_completed": ("משימה ממתינה לאישור", "עובד שלח משימה לאישור"),
     "task_cancelled": ("משימה בוטלה", "משימה בוטלה"),
     "task_updated": ("משימה עודכנה", "פרטי המשימה עודכנו"),
+    "task_reopened": ("משימה נפתחה מחדש", "המנהל ביקש לתקן את המשימה"),
+    "task_approved": ("משימה אושרה", "המשימה אושרה ונסגרה"),
+    "employee_idle_no_tasks": ("בלי משימה בטיפול", "אין משימות בקנה"),
+    "employee_idle_has_tasks": ("בלי משימה בטיפול", "יש משימות אבל לא התחיל אף אחת"),
+    "employee_idle_on_break": ("בלי משימה בטיפול", "העובד בהפסקה"),
 }
 
 
@@ -42,44 +48,68 @@ class NotificationService:
         assignee_user_id: str | None = None,
         occurrence_id: str | None = None,
         task_title: str | None = None,
-    ) -> list[tuple[str, str, str]]:
-        """Persist notifications; caller must commit before push_task_event_sse."""
-        title, base_message = _TASK_LABELS.get(event_type, ("עדכון משימה", "עדכון במשימות"))
-        detail = f": {task_title}" if task_title else ""
-        message = f"{base_message}{detail}"
+        created_by_user_id: str | None = None,
+        message_override: str | None = None,
+    ) -> list[tuple[str, str, str, str]]:
+        """Persist notifications; caller must commit before push_task_event_sse.
 
-        recipients = self._recipients_for(event_type, branch_id, assignee_user_id)
-        pending: list[tuple[str, str, str]] = []
-        for user_id in recipients:
+        Returns list of (user_id, notification_id, kind, sound).
+        """
+        title, base_message = _TASK_LABELS.get(event_type, ("עדכון משימה", "עדכון במשימות"))
+        if message_override:
+            message = message_override
+        else:
+            detail = f": {task_title}" if task_title else ""
+            message = f"{base_message}{detail}"
+
+        managers = [
+            m.id
+            for m in self._users.list_users(role=roles.BRANCH_MANAGER, branch_ids=[branch_id])
+            if m.is_active
+        ]
+        recipient_ids = recipients_for_task_event(
+            event_type,
+            assignee_user_id=assignee_user_id,
+            branch_manager_ids=managers,
+            created_by_user_id=created_by_user_id,
+        )
+
+        pending: list[tuple[str, str, str, str]] = []
+        for user_id in recipient_ids:
+            user = self._users.find_by_id(user_id)
+            is_employee = bool(user and user.role == roles.EMPLOYEE)
+            sound = notification_sound_for(event_type, recipient_is_employee=is_employee)
+            # Messages côté manager pour idle / started / completed.
+            row_title, row_message = title, message
+            if event_type == "task_started" and not is_employee:
+                row_title, row_message = _TASK_LABELS["task_started"]
+                if task_title:
+                    row_message = f"{row_message}: {task_title}"
             row = self._repo.create(
                 user_id=user_id,
                 kind=event_type,
-                title=title,
-                message=message,
+                title=row_title,
+                message=row_message,
                 occurrence_id=occurrence_id,
                 branch_id=branch_id,
             )
-            pending.append((user_id, row.id, event_type))
+            pending.append((user_id, row.id, event_type, sound))
         return pending
 
     @staticmethod
-    def push_task_event_sse(pending: list[tuple[str, str, str]]) -> None:
-        for user_id, notification_id, kind in pending:
+    def push_task_event_sse(pending: list[tuple]) -> None:
+        for item in pending:
+            if len(item) == 4:
+                user_id, notification_id, kind, sound = item
+            else:
+                user_id, notification_id, kind = item
+                sound = "none"
             sse_hub.publish_sync(
                 f"user:{user_id}",
-                {"type": "notification", "notification_id": notification_id, "kind": kind},
+                {
+                    "type": "notification",
+                    "notification_id": notification_id,
+                    "kind": kind,
+                    "sound": sound,
+                },
             )
-
-    def _recipients_for(
-        self, event_type: str, branch_id: str, assignee_user_id: str | None
-    ) -> set[str]:
-        recipients: set[str] = set()
-        if event_type in {"task_created", "task_delegated", "task_updated"} and assignee_user_id:
-            recipients.add(assignee_user_id)
-        elif event_type == "task_created":
-            for mgr in self._users.list_users(role=roles.BRANCH_MANAGER, branch_ids=[branch_id]):
-                recipients.add(mgr.id)
-        if event_type in {"task_started", "task_completed", "task_cancelled", "task_updated"}:
-            for mgr in self._users.list_users(role=roles.BRANCH_MANAGER, branch_ids=[branch_id]):
-                recipients.add(mgr.id)
-        return recipients
