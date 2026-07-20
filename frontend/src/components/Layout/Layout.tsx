@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   alpha,
@@ -13,6 +13,7 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
+import ListSkeleton from "../ui/ListSkeleton";
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
@@ -38,6 +39,8 @@ import {
   sidebarNavIconSx,
   sidebarNavTextSx,
 } from "../../styles/hebrewAlign";
+import { isNativeApp } from "../../utils/isNativeApp";
+import { shouldUseMainNavOverlay } from "../../utils/mainNavOverlay";
 
 const SIDEBAR_BG = "#0B1220";
 const SIDEBAR_ACCENT = "#1A9B86";
@@ -56,6 +59,20 @@ const drawerPaperSx = {
   `,
 };
 
+function OutletSuspense({ children }: { children?: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <Box py={4}>
+          <ListSkeleton variant="dashboard" />
+        </Box>
+      }
+    >
+      {children ?? <Outlet />}
+    </Suspense>
+  );
+}
+
 function Layout() {
   const { user, loading, logout } = useAuth();
   useTaskEventSource(Boolean(user) && !loading);
@@ -64,6 +81,9 @@ function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const overlayNav = shouldUseMainNavOverlay(isNativeApp());
+
+  const closeMainNav = () => setMobileOpen(false);
 
   const menuItems = useMemo(() => {
     if (!user) return [];
@@ -102,12 +122,13 @@ function Layout() {
   }, [user]);
 
   const handleLogout = () => {
+    closeMainNav();
     void logout();
   };
 
   const handleNavigation = (path: string) => {
+    closeMainNav();
     navigate(path);
-    setMobileOpen(false);
   };
 
   const initials = (user?.full_name || "?")
@@ -334,7 +355,7 @@ function Layout() {
           </Box>
         </Box>
         <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 2.5 }, maxWidth: 960, mx: "auto" }}>
-          <Outlet />
+          <OutletSuspense />
         </Box>
       </Box>
     );
@@ -352,7 +373,11 @@ function Layout() {
           top: 16,
           right: 16,
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          display: { xs: "inline-flex", sm: "none" },
+          // Natif / mobile : FAB toujours ; desktop web : seulement xs
+          display: overlayNav ? "inline-flex" : { xs: "inline-flex", sm: "none" },
+          // Force paint WebView (sinon le FAB n’apparaît qu’après un tap)
+          transform: "translateZ(0)",
+          WebkitBackfaceVisibility: "hidden",
         }}
       >
         <MenuIcon />
@@ -362,60 +387,61 @@ function Layout() {
         variant="temporary"
         anchor="left"
         open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
+        onClose={closeMainNav}
         ModalProps={{ keepMounted: false }}
         sx={{
-          display: { xs: "block", sm: "none" },
+          display: overlayNav ? "block" : { xs: "block", sm: "none" },
           "& .MuiDrawer-paper": { ...drawerPaperSx, position: "fixed" },
         }}
       >
         {drawerContent}
       </Drawer>
 
-      <Drawer
-        variant="permanent"
-        anchor="left"
-        open
-        sx={{
-          display: { xs: "none", sm: "block" },
-          flexShrink: 0,
-          order: 0,
-          width: SIDEBAR_WIDTH,
-          "&.MuiDrawer-docked": {
-            position: "relative",
-            height: "100vh",
-          },
-          "& .MuiDrawer-paper": {
-            ...drawerPaperSx,
-            position: "relative",
-          },
-        }}
-      >
-        {drawerContent}
-      </Drawer>
+      {!overlayNav && (
+        <Drawer
+          variant="permanent"
+          anchor="left"
+          open
+          sx={{
+            display: { xs: "none", sm: "block" },
+            flexShrink: 0,
+            order: 0,
+            width: SIDEBAR_WIDTH,
+            "&.MuiDrawer-docked": {
+              position: "relative",
+              height: "100vh",
+            },
+            "& .MuiDrawer-paper": {
+              ...drawerPaperSx,
+              position: "relative",
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
+      )}
 
       <Box
         component="main"
         sx={{
-          flex: "1 1 0",
+          flex: 1,
           minWidth: 0,
-          width: 0,
           order: 1,
-          height: "100dvh",
-          maxHeight: "100dvh",
-          overflowY: "scroll",
+          height: "100%",
+          minHeight: "100vh",
+          maxHeight: "100vh",
+          overflowY: "auto",
           overflowX: "hidden",
           WebkitOverflowScrolling: "touch",
           touchAction: "pan-y",
           overscrollBehavior: "contain",
           px: { xs: 1.5, sm: 3, md: 4 },
           py: { xs: 2.5, sm: 3.5 },
-          // Espace sous le FAB menu (mobile)
           pb: { xs: 10, sm: 3.5 },
         }}
       >
         <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
-          <Outlet />
+          <OutletSuspense />
         </Box>
       </Box>
     </Box>

@@ -40,7 +40,7 @@ import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStora
 import { useFeedback } from "../../context/FeedbackContext";
 import type { AdHocTaskPrefillFromIssue } from "../../utils/issueReportTaskPrefill";
 import {
-  datetimeLocalForDay,
+  datetimeLocalForNewTask,
   defaultRangeFrom,
   todayIso,
   toDatetimeLocal,
@@ -322,7 +322,7 @@ export default function ManagerTasksPage() {
       branch_id: options?.branch_id || voiceBranchId || scopeBranchId || user?.branch_id || "",
       title: prefill?.title ?? "",
       description: prefill?.description ?? "",
-      due_at: datetimeLocalForDay(dateViewMode === "day" ? filterDay : filterFrom),
+      due_at: datetimeLocalForNewTask(dateViewMode === "day" ? filterDay : filterFrom),
       assignee_user_id:
         options?.assignee_user_id
         || (isBranchManager && filterEmployee ? filterEmployee : "")

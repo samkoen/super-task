@@ -249,6 +249,8 @@ export const he = {
     cancelled: "בוטל",
   },
   completionMediaAdded: "קבצים שהוספת",
+  /** Indique média vidéo/audio/clôture sans le charger dans la liste */
+  taskExtraMediaHint: "יש מדיה נוספת — נפתח עם המשימה",
   taskPendingReview: "נשלח — ממתין לאישור מנהל",
   taskRejectedReopen: "המנהל ביקש לתקן",
   taskReviewTitle: "בדיקת סיום משימה",

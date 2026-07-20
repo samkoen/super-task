@@ -78,11 +78,29 @@ export function formatDueAt(isoDateTime: string | null | undefined, now = new Da
 
 export type TaskDateViewMode = "day" | "range";
 
-export function datetimeLocalForDay(dayIso: string, reference = new Date()): string {
+/** Échéance datetime-local pour un jour. `addMinutes` évite due ≈ now → באיחור immédiat. */
+export function datetimeLocalForDay(
+  dayIso: string,
+  reference = new Date(),
+  addMinutes = 0,
+): string {
   const [year, month, day] = dayIso.split("-").map(Number);
-  const value = new Date(year, month - 1, day, reference.getHours(), reference.getMinutes());
+  const value = new Date(
+    year,
+    month - 1,
+    day,
+    reference.getHours(),
+    reference.getMinutes() + addMinutes,
+  );
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+/** Défaut création tâche : +15 min (aligné grâce overdue backend). */
+export const NEW_TASK_DUE_GRACE_MINUTES = 15;
+
+export function datetimeLocalForNewTask(dayIso: string, reference = new Date()): string {
+  return datetimeLocalForDay(dayIso, reference, NEW_TASK_DUE_GRACE_MINUTES);
 }
 
 export function toDatetimeLocal(iso: string): string {

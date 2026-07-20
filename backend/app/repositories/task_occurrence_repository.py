@@ -219,11 +219,18 @@ class TaskOccurrenceRepository:
     def mark_overdue_before(
         self, now: datetime, *, branch_ids: list[str] | None = None
     ) -> int:
-        """Passe PENDING → OVERDUE en un seul UPDATE (pas de N+1)."""
+        """Passe PENDING → OVERDUE en un seul UPDATE (pas de N+1).
+
+        Grâce de 15 min après l'échéance pour éviter באיחור immédiat
+        quand due_at est proche de « maintenant » à la création.
+        """
+        from app.domain.task_overdue import overdue_cutoff
+
+        cutoff = overdue_cutoff(now)
         q = (
             update(orm.TaskOccurrence)
             .where(orm.TaskOccurrence.status == task_status.PENDING)
-            .where(orm.TaskOccurrence.due_at < now)
+            .where(orm.TaskOccurrence.due_at < cutoff)
             .values(status=task_status.OVERDUE)
         )
         if branch_ids is not None:

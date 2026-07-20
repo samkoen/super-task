@@ -38,9 +38,11 @@ def rollover_due_datetime(due_at: datetime, *, to_day: date, tz: ZoneInfo) -> da
 
 
 def status_after_rollover(status: str, *, new_due_at: datetime, now: datetime) -> str:
+    from app.domain.task_overdue import is_past_due
+
     if status == task_status.IN_PROGRESS:
         return task_status.IN_PROGRESS
-    if new_due_at < now:
+    if is_past_due(new_due_at, now):
         return task_status.OVERDUE
     return task_status.PENDING
 

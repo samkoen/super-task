@@ -29,7 +29,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import type { TeamMember } from "../../services/dashboardService";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
-import { datetimeLocalForDay, formatHebrewDayShort } from "../../utils/dateView";
+import { datetimeLocalForNewTask, formatHebrewDayShort } from "../../utils/dateView";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { filterTasksForEmployee } from "../../utils/employeeDrawerTasks";
 import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
@@ -123,7 +123,7 @@ export default function EmployeeTasksDrawer({
     revokeMediaBlobs(referenceMedia);
     setTitle("");
     setDescription("");
-    setDueAt(datetimeLocalForDay(dueOn));
+    setDueAt(datetimeLocalForNewTask(dueOn));
     setReferenceMedia(EMPTY_REFERENCE_MEDIA);
     setCreateOpen(true);
   };

@@ -15,13 +15,13 @@ import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import EditIcon from "@mui/icons-material/Edit";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import RateReviewIcon from "@mui/icons-material/RateReview";
-import CompletionMediaPreview from "./CompletionMediaPreview";
 import TaskStatusChip from "./TaskStatusChip";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { isNativeApp } from "../../utils/isNativeApp";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
+import { hasDeferredTaskMedia } from "../../utils/taskListMedia";
 import type { TaskOccurrence } from "../../services/taskService";
 
 export interface TaskOccurrenceCardProps {
@@ -36,6 +36,7 @@ export interface TaskOccurrenceCardProps {
 
 export default function TaskOccurrenceCard({
   task,
+  index = 0,
   onEdit,
   onCancel,
   onReview,
@@ -43,7 +44,9 @@ export default function TaskOccurrenceCard({
 }: TaskOccurrenceCardProps) {
   const isNative = isNativeApp();
   const visual = taskStatusVisual(task.status);
-  const photoBg = isNative ? null : taskCardBackgroundUrl(task.reference_photo_url);
+  // Fond = photo de référence uniquement. Vidéo/audio/clôture → à l'ouverture (review).
+  const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
+  const showExtraMediaHint = hasDeferredTaskMedia(task);
   const [photoReady, setPhotoReady] = useState(false);
   useEffect(() => {
     setPhotoReady(false);
@@ -51,17 +54,22 @@ export default function TaskOccurrenceCard({
     let cancelled = false;
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => {
-      if (!cancelled) setPhotoReady(true);
+    // Sur WebView : charge après le paint pour ne pas bloquer le menu
+    const start = () => {
+      img.onload = () => {
+        if (!cancelled) setPhotoReady(true);
+      };
+      img.onerror = () => {
+        if (!cancelled) setPhotoReady(false);
+      };
+      img.src = photoBg;
     };
-    img.onerror = () => {
-      if (!cancelled) setPhotoReady(false);
-    };
-    img.src = photoBg;
+    const t = window.setTimeout(start, isNative ? 80 + Math.min(index, 8) * 40 : 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
-  }, [photoBg]);
+  }, [photoBg, isNative, index]);
   const showPhoto = Boolean(photoBg && photoReady);
   const awaitingReview = task.status === "pending_review";
   const assigneeLabel = task.assignee_name ?? he.allDepartment;
@@ -205,15 +213,8 @@ export default function TaskOccurrenceCard({
           </Typography>
         ) : null}
 
-        {awaitingReview && task.completion && !isNative && (
-          <CompletionMediaPreview
-            photo_path={task.completion.photo_path}
-            video_path={task.completion.video_path}
-            audio_path={task.completion.audio_path}
-          />
-        )}
-        {awaitingReview && task.completion && isNative && (
-          <Chip label={he.completionMediaAdded} size="small" color="info" variant="outlined" />
+        {showExtraMediaHint && (
+          <Chip label={he.taskExtraMediaHint} size="small" color="info" variant="outlined" />
         )}
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary", mt: "auto" }}>

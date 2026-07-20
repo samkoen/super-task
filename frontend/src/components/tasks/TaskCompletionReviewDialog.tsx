@@ -14,6 +14,7 @@ import {
 import { ApiError } from "../../services/api";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import CompletionMediaPreview from "./CompletionMediaPreview";
+import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import { he } from "../../i18n/he";
 
 interface TaskCompletionReviewDialogProps {
@@ -81,6 +82,13 @@ export default function TaskCompletionReviewDialog({
           <Typography variant="subtitle1" fontWeight={700}>
             {task.title}
           </Typography>
+        )}
+        {task && (
+          <TaskReferenceMediaDisplay
+            reference_photo_url={task.reference_photo_url}
+            reference_video_url={task.reference_video_url}
+            reference_audio_url={task.reference_audio_url}
+          />
         )}
         {completion?.note && (
           <Box>

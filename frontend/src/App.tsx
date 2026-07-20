@@ -32,6 +32,10 @@ function PageLoader() {
   );
 }
 
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
+
 function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
@@ -39,51 +43,207 @@ function HomeRedirect() {
   return <Navigate to={getHomePath(user.role)} replace />;
 }
 
+/**
+ * Pas de Suspense autour de Layout : sinon le menu/FAB disparaît pendant
+ * le lazy-load de משימות (bug WebView Android très visible).
+ */
 export default function App() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/accept-invite" element={<AcceptInvitePage />} />
-        <Route path="/register" element={<Navigate to="/login" replace />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/" element={<HomeRedirect />} />
-          <Route element={<ProtectedRoute roles={["admin"]} />}>
-            <Route path="/admin" element={<PlaceholderPage title="ניהול מערכת" />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/invitations" element={<InvitationsPage />} />
-            <Route path="/admin/networks" element={<AdminNetworkPage />} />
-            <Route path="/admin/branches" element={<AdminBranchPage />} />
-            <Route path="/admin/departments" element={<AdminDepartmentsPage />} />
-            <Route path="/admin/products" element={<AdminProductsPage />} />
-            <Route path="/admin/tasks" element={<ManagerTasksPage />} />
-            <Route path="/admin/gallery" element={<ManagerTaskGalleryPage />} />
-          </Route>
-          <Route element={<ProtectedRoute roles={["network_manager", "branch_manager"]} />}>
-            <Route path="/manager" element={<ManagerDashboardPage />} />
-            <Route path="/manager/employees" element={<ManagerEmployeesPage />} />
-            <Route path="/manager/invitations" element={<InvitationsPage />} />
-            <Route path="/manager/tasks" element={<ManagerTasksPage />} />
-            <Route path="/manager/gallery" element={<ManagerTaskGalleryPage />} />
-            <Route path="/manager/issues" element={<ManagerIssuesPage />} />
-            <Route path="/manager/departments" element={<AdminDepartmentsPage />} />
-            <Route path="/manager/products" element={<AdminProductsPage />} />
-          </Route>
-          <Route element={<ProtectedRoute roles={["network_manager"]} />}>
-            <Route path="/manager/branches" element={<AdminBranchPage />} />
-          </Route>
-          <Route element={<ProtectedRoute roles={["employee"]} />}>
-            <Route path="/employee" element={<EmployeeTasksPage />} />
-          </Route>
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          <LazyPage>
+            <LoginPage />
+          </LazyPage>
+        }
+      />
+      <Route
+        path="/accept-invite"
+        element={
+          <LazyPage>
+            <AcceptInvitePage />
+          </LazyPage>
+        }
+      />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
+      <Route
+        path="/verify-email"
+        element={
+          <LazyPage>
+            <VerifyEmailPage />
+          </LazyPage>
+        }
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/" element={<HomeRedirect />} />
+        <Route element={<ProtectedRoute roles={["admin"]} />}>
+          <Route
+            path="/admin"
+            element={
+              <LazyPage>
+                <PlaceholderPage title="ניהול מערכת" />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <LazyPage>
+                <AdminUsersPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/invitations"
+            element={
+              <LazyPage>
+                <InvitationsPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/networks"
+            element={
+              <LazyPage>
+                <AdminNetworkPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/branches"
+            element={
+              <LazyPage>
+                <AdminBranchPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/departments"
+            element={
+              <LazyPage>
+                <AdminDepartmentsPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/products"
+            element={
+              <LazyPage>
+                <AdminProductsPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/tasks"
+            element={
+              <LazyPage>
+                <ManagerTasksPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/gallery"
+            element={
+              <LazyPage>
+                <ManagerTaskGalleryPage />
+              </LazyPage>
+            }
+          />
         </Route>
-      </Routes>
-    </Suspense>
+        <Route element={<ProtectedRoute roles={["network_manager", "branch_manager"]} />}>
+          <Route
+            path="/manager"
+            element={
+              <LazyPage>
+                <ManagerDashboardPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/employees"
+            element={
+              <LazyPage>
+                <ManagerEmployeesPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/invitations"
+            element={
+              <LazyPage>
+                <InvitationsPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/tasks"
+            element={
+              <LazyPage>
+                <ManagerTasksPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/gallery"
+            element={
+              <LazyPage>
+                <ManagerTaskGalleryPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/issues"
+            element={
+              <LazyPage>
+                <ManagerIssuesPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/departments"
+            element={
+              <LazyPage>
+                <AdminDepartmentsPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/products"
+            element={
+              <LazyPage>
+                <AdminProductsPage />
+              </LazyPage>
+            }
+          />
+        </Route>
+        <Route element={<ProtectedRoute roles={["network_manager"]} />}>
+          <Route
+            path="/manager/branches"
+            element={
+              <LazyPage>
+                <AdminBranchPage />
+              </LazyPage>
+            }
+          />
+        </Route>
+        <Route element={<ProtectedRoute roles={["employee"]} />}>
+          <Route
+            path="/employee"
+            element={
+              <LazyPage>
+                <EmployeeTasksPage />
+              </LazyPage>
+            }
+          />
+        </Route>
+      </Route>
+    </Routes>
   );
 }

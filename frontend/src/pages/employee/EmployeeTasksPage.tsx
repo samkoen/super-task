@@ -58,6 +58,9 @@ import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import CompletionMediaPreview from "../../components/tasks/CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
+import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
+import { hasDeferredTaskMedia } from "../../utils/taskListMedia";
+import { isNativeApp } from "../../utils/isNativeApp";
 import TaskStatusChip from "../../components/tasks/TaskStatusChip";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
@@ -128,6 +131,32 @@ function TaskCard({
 }) {
   const rejectionNote = task.completion?.rejection_note;
   const visual = taskStatusVisual(task.status);
+  const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
+  const [photoReady, setPhotoReady] = useState(false);
+  const native = isNativeApp();
+  useEffect(() => {
+    setPhotoReady(false);
+    if (!photoBg) return;
+    let cancelled = false;
+    const img = new Image();
+    img.decoding = "async";
+    const start = () => {
+      img.onload = () => {
+        if (!cancelled) setPhotoReady(true);
+      };
+      img.onerror = () => {
+        if (!cancelled) setPhotoReady(false);
+      };
+      img.src = photoBg;
+    };
+    const t = window.setTimeout(start, native ? 100 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [photoBg, native]);
+  const showPhoto = Boolean(photoBg && photoReady);
+  const showExtraMediaHint = hasDeferredTaskMedia(task);
   return (
     <Card
       variant="outlined"
@@ -135,9 +164,19 @@ function TaskCard({
         mb: 2,
         border: "2px solid",
         borderColor: urgent || carryOver ? visual.bar : visual.border,
-        bgcolor: visual.surface,
+        bgcolor: showPhoto ? undefined : visual.surface,
         position: "relative",
         overflow: "hidden",
+        ...(showPhoto
+          ? {
+              backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.72) 100%), url(${photoBg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              color: "#fff",
+              "& .MuiTypography-root": { color: "inherit" },
+              "& .MuiTypography-caption, & .MuiTypography-body2": { color: "rgba(255,255,255,0.85)" },
+            }
+          : {}),
         "&::before": {
           content: '""',
           position: "absolute",
@@ -149,7 +188,7 @@ function TaskCard({
         },
       }}
     >
-      <CardContent>
+      <CardContent sx={{ position: "relative", zIndex: 1 }}>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} mb={1}>
           <EmployeeTaskTitle task={task} />
           <TaskStatusChip status={task.status} />
@@ -169,15 +208,13 @@ function TaskCard({
               size="small"
             />
           )}
+          {showExtraMediaHint && (
+            <Chip label={he.taskExtraMediaHint} size="small" color="info" variant="outlined" />
+          )}
         </Box>
         {task.description && (
           <Typography variant="body2" color="text.secondary" mb={1}>{task.description}</Typography>
         )}
-        <TaskReferenceMediaDisplay
-          reference_photo_url={task.reference_photo_url}
-          reference_video_url={task.reference_video_url}
-          reference_audio_url={task.reference_audio_url}
-        />
         <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
           {he.dueAt}: {formatDueAt(task.due_at)}
         </Typography>
@@ -793,17 +830,12 @@ export default function EmployeeTasksPage() {
                 <Card key={task.id} variant="outlined" sx={{ mb: 2, opacity: 0.9 }}>
                   <CardContent>
                     <EmployeeTaskTitle task={task} />
-                    <Chip label={he.taskStatusLabels.pending_review} color="info" size="small" sx={{ mt: 1 }} />
-                    {task.completion && (
-                      <CompletionMediaPreview
-                        viewer="employee"
-                        photo_path={task.completion.photo_path}
-                        video_path={task.completion.video_path}
-                        audio_path={task.completion.audio_path}
-                        audio_transcript={task.completion.audio_transcript}
-                        audio_transcript_employee={task.completion.audio_transcript_employee}
-                      />
-                    )}
+                    <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
+                      <Chip label={he.taskStatusLabels.pending_review} color="info" size="small" />
+                      {hasDeferredTaskMedia(task) && (
+                        <Chip label={he.taskExtraMediaHint} size="small" color="info" variant="outlined" />
+                      )}
+                    </Box>
                   </CardContent>
                 </Card>
               ))}
@@ -928,6 +960,13 @@ export default function EmployeeTasksPage() {
           {selected ? <EmployeeTaskTitle task={selected} variant="h6" /> : null}
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          {selected && (
+            <TaskReferenceMediaDisplay
+              reference_photo_url={selected.reference_photo_url}
+              reference_video_url={selected.reference_video_url}
+              reference_audio_url={selected.reference_audio_url}
+            />
+          )}
           <Button variant={done ? "contained" : "outlined"} color="success" size="large" onClick={() => setDone(true)}>{he.taskCompleted}</Button>
           <Button variant={!done ? "contained" : "outlined"} color="warning" size="large" onClick={() => setDone(false)}>{he.taskNotCompleted}</Button>
           {!done && (
