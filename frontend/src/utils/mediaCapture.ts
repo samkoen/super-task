@@ -17,6 +17,17 @@ export function classifyMediaError(error: unknown): MediaCaptureErrorCode {
 export async function getUserMediaWithFallback(
   constraintsList: MediaStreamConstraints[]
 ): Promise<MediaStream> {
+  const needCamera = constraintsList.some((c) => Boolean(c.video));
+  const needMic = constraintsList.some((c) => Boolean(c.audio));
+  const { ensureNativeAvPermissions } = await import("../plugins/mediaPermissions");
+  const granted = await ensureNativeAvPermissions({
+    camera: needCamera,
+    microphone: needMic,
+  });
+  if (!granted) {
+    throw new DOMException("Permission denied", "NotAllowedError");
+  }
+
   let lastError: unknown;
   for (const constraints of constraintsList) {
     try {

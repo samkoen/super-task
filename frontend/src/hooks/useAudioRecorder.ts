@@ -33,6 +33,12 @@ export function useAudioRecorder() {
     setError("");
     setBlob(null);
     try {
+      const { ensureNativeAvPermissions } = await import("../plugins/mediaPermissions");
+      const granted = await ensureNativeAvPermissions({ camera: false, microphone: true });
+      if (!granted) {
+        setError("permission");
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const recorder = new MediaRecorder(stream);

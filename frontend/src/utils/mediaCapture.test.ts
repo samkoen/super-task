@@ -8,6 +8,10 @@ import {
   pickVideoRecorderMimeType,
 } from "./mediaCapture";
 
+vi.mock("../plugins/mediaPermissions", () => ({
+  ensureNativeAvPermissions: vi.fn().mockResolvedValue(true),
+}));
+
 describe("mediaCapture", () => {
   it("blobToFile wraps blob with filename and type", () => {
     const blob = new Blob(["x"], { type: "image/jpeg" });

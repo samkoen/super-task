@@ -20,6 +20,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import TaskOccurrenceCard from "../tasks/TaskOccurrenceCard";
 import TaskCompletionReviewDialog from "../tasks/TaskCompletionReviewDialog";
+import TaskReferenceMediaEditor, {
+  resolveTaskReferenceMedia,
+  type TaskReferenceMediaValue,
+} from "../tasks/TaskReferenceMediaEditor";
 import { ApiError } from "../../services/api";
 import { useFeedback } from "../../context/FeedbackContext";
 import type { TeamMember } from "../../services/dashboardService";
@@ -29,7 +33,24 @@ import { datetimeLocalForDay, formatHebrewDayShort } from "../../utils/dateView"
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { filterTasksForEmployee } from "../../utils/employeeDrawerTasks";
 import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
+import { appendDescriptionBlock } from "../../utils/photoAnnotation";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+
+const EMPTY_REFERENCE_MEDIA: TaskReferenceMediaValue = {
+  reference_photo_url: "",
+  reference_video_url: "",
+  reference_audio_url: "",
+};
+
+function revokeMediaBlobs(media: TaskReferenceMediaValue) {
+  for (const url of [
+    media.reference_photo_url,
+    media.reference_video_url,
+    media.reference_audio_url,
+  ]) {
+    if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+  }
+}
 
 export interface EmployeeTasksDrawerProps {
   member: TeamMember | null;
@@ -56,6 +77,8 @@ export default function EmployeeTasksDrawer({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueAt, setDueAt] = useState("");
+  const [referenceMedia, setReferenceMedia] =
+    useState<TaskReferenceMediaValue>(EMPTY_REFERENCE_MEDIA);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -89,10 +112,19 @@ export default function EmployeeTasksDrawer({
     }, [open, loadTasks]),
   );
 
+  const handleCloseCreate = () => {
+    if (saving) return;
+    revokeMediaBlobs(referenceMedia);
+    setReferenceMedia(EMPTY_REFERENCE_MEDIA);
+    setCreateOpen(false);
+  };
+
   const handleOpenCreate = () => {
+    revokeMediaBlobs(referenceMedia);
     setTitle("");
     setDescription("");
     setDueAt(datetimeLocalForDay(dueOn));
+    setReferenceMedia(EMPTY_REFERENCE_MEDIA);
     setCreateOpen(true);
   };
 
@@ -101,6 +133,7 @@ export default function EmployeeTasksDrawer({
     setSaving(true);
     try {
       const resolvedTitle = await ensureTaskTitle(title, description);
+      const media = await resolveTaskReferenceMedia(referenceMedia);
       const res = await taskService.createAdHoc({
         branch_id: branchId,
         title: resolvedTitle,
@@ -108,7 +141,10 @@ export default function EmployeeTasksDrawer({
         due_at: new Date(dueAt).toISOString(),
         assignee_user_id: member.user_id,
         photo_required: true,
+        ...media,
       });
+      revokeMediaBlobs(referenceMedia);
+      setReferenceMedia(EMPTY_REFERENCE_MEDIA);
       setCreateOpen(false);
       showSuccess(res.message);
       await loadTasks();
@@ -225,7 +261,7 @@ export default function EmployeeTasksDrawer({
         </Box>
       </Drawer>
 
-      <Dialog open={createOpen} onClose={() => !saving && setCreateOpen(false)} fullWidth maxWidth="sm" dir="rtl">
+      <Dialog open={createOpen} onClose={handleCloseCreate} fullWidth maxWidth="sm" dir="rtl">
         <DialogTitle>{he.newAdHocTask}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
           <TextField
@@ -259,9 +295,18 @@ export default function EmployeeTasksDrawer({
             fullWidth
             dir="ltr"
           />
+          <TaskReferenceMediaEditor
+            value={referenceMedia}
+            onChange={setReferenceMedia}
+            onDescriptionAppend={(transcript) =>
+              setDescription((prev) => appendDescriptionBlock(prev, transcript))
+            }
+            disabled={saving}
+            onError={showError}
+          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} disabled={saving}>
+          <Button onClick={handleCloseCreate} disabled={saving}>
             {he.cancel}
           </Button>
           <Button variant="contained" onClick={() => void handleCreate()} disabled={saving || !dueAt}>
