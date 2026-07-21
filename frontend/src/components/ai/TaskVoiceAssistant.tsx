@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import StopIcon from "@mui/icons-material/Stop";
@@ -11,6 +11,7 @@ export interface TaskVoiceFillResult {
   title: string;
   description: string;
   assignee_user_id: string;
+  assignee_name?: string;
 }
 
 interface TaskVoiceAssistantProps {
@@ -32,6 +33,10 @@ export default function TaskVoiceAssistant({
   const [processing, setProcessing] = useState(false);
   const [info, setInfo] = useState("");
   const [localError, setLocalError] = useState("");
+  const onFilledRef = useRef(onFilled);
+  const onErrorRef = useRef(onError);
+  onFilledRef.current = onFilled;
+  onErrorRef.current = onError;
 
   useEffect(() => {
     if (!blob) return;
@@ -58,21 +63,24 @@ export default function TaskVoiceAssistant({
           file: new File([blob], "manager-voice.webm", { type: blob.type || "audio/webm" }),
         });
         if (cancelled) return;
-        onFilled({
+        onFilledRef.current({
           title: draft.title,
           description: draft.description,
           assignee_user_id: draft.assignee_user_id ?? "",
+          assignee_name: draft.assignee_name ?? "",
         });
         const assigneeHint = draft.assignee_name
           ? `${he.assignee}: ${draft.assignee_name}`
-          : he.taskVoiceNoAssignee;
+          : draft.assignee_user_id
+            ? he.assignee
+            : he.taskVoiceNoAssignee;
         setInfo(`${he.taskVoiceFilledHint} (${assigneeHint})`);
         reset();
       } catch (e) {
         if (cancelled) return;
         const message = e instanceof ApiError ? e.message : he.taskVoiceError;
         setLocalError(message);
-        onError?.(message);
+        onErrorRef.current?.(message);
         reset();
       } finally {
         if (!cancelled) setProcessing(false);
@@ -82,7 +90,7 @@ export default function TaskVoiceAssistant({
     return () => {
       cancelled = true;
     };
-  }, [blob, branchId, onError, onFilled, reset, taskKind]);
+  }, [blob, branchId, reset, taskKind]);
 
   const recorderMessage =
     recorderError === "permission"

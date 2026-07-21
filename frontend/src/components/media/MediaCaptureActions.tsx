@@ -63,18 +63,23 @@ function useBlobPreviewUrl(blob: Blob | null) {
   return previewUrl;
 }
 
-function PhotoCaptureDialog({
+export function PhotoCaptureDialog({
   open,
   uploading,
   camera,
   onClose,
   onCapture,
+  onSkip,
+  title,
 }: {
   open: boolean;
   uploading: boolean;
   camera: ReturnType<typeof useCameraStream>;
   onClose: () => void;
   onCapture: (file: File) => void | Promise<void>;
+  /** Si fourni : bouton « continuer sans photo » (avant capture). */
+  onSkip?: () => void;
+  title?: string;
 }) {
   const { supported, active, starting, error, onVideoRef, start } = camera;
   const theme = useTheme();
@@ -126,7 +131,7 @@ function PhotoCaptureDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="sm" dir="rtl" disableEnforceFocus>
-      <DialogTitle>{he.mediaCapturePhotoTitle}</DialogTitle>
+      <DialogTitle>{title ?? he.mediaCapturePhotoTitle}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1, overflowY: "auto" }}>
         {hasPreview && previewBlob ? (
           <PhotoAnnotationCanvas ref={annotationRef} imageBlob={previewBlob} />
@@ -162,6 +167,11 @@ function PhotoCaptureDialog({
         <Button onClick={onClose} disabled={capturing || uploading || confirming}>
           {he.cancel}
         </Button>
+        {onSkip && !hasPreview && (
+          <Button onClick={onSkip} disabled={capturing || uploading || confirming}>
+            {he.newTaskSkipPhoto}
+          </Button>
+        )}
         {error && !hasPreview && (
           <Button onClick={() => void start()} disabled={capturing || uploading || confirming}>
             {he.mediaCaptureRetry}

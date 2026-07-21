@@ -234,8 +234,19 @@ export default function ManagerDashboardPage() {
           )}
 
           <Box display="flex" gap={2} flexWrap="wrap">
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate("/manager/tasks")}>
-              {he.dashboardCreateTask}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate("/manager/tasks", { state: { openNewTask: true } })}
+            >
+              {he.newTask}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => navigate("/manager/tasks", { state: { openGalleryTask: true } })}
+            >
+              {he.newTaskFromGallery}
             </Button>
             <Button variant="outlined" startIcon={<TaskAltIcon />} onClick={() => navigate("/manager/tasks")}>
               {he.dashboardViewTasks}

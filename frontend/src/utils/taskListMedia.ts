@@ -42,3 +42,9 @@ export function hasDeferredTaskMedia(task: Parameters<typeof taskMediaFlags>[0])
     f.hasCompletionAudio
   );
 }
+
+/** Médias de référence à voir en ouvrant la tâche (photo / vidéo / audio). */
+export function taskHasOpenableReferenceMedia(task: Parameters<typeof taskMediaFlags>[0]): boolean {
+  const f = taskMediaFlags(task);
+  return f.hasReferencePhoto || f.hasReferenceVideo || f.hasReferenceAudio;
+}

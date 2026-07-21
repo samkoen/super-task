@@ -1,30 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   Drawer,
   IconButton,
-  TextField,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
+import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import TaskOccurrenceCard from "../tasks/TaskOccurrenceCard";
 import TaskCompletionReviewDialog from "../tasks/TaskCompletionReviewDialog";
-import TaskReferenceMediaEditor, {
+import NewTaskPhotoStep from "../tasks/NewTaskPhotoStep";
+import NewTaskFormDialog, { type NewTaskFormSubmitPayload } from "../tasks/NewTaskFormDialog";
+import TaskGalleryPickerDialog from "../tasks/TaskGalleryPickerDialog";
+import GalleryQuickAssignDialog, {
+  type GalleryQuickAssignPayload,
+} from "../tasks/GalleryQuickAssignDialog";
+import {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
 } from "../tasks/TaskReferenceMediaEditor";
-import { ApiError } from "../../services/api";
+import { ApiError, type User } from "../../services/api";
+import type { TaskGalleryItem } from "../../services/taskGalleryService";
 import { useFeedback } from "../../context/FeedbackContext";
 import type { TeamMember } from "../../services/dashboardService";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
@@ -33,7 +36,7 @@ import { datetimeLocalForNewTask, formatHebrewDayShort } from "../../utils/dateV
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { filterTasksForEmployee } from "../../utils/employeeDrawerTasks";
 import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
-import { appendDescriptionBlock } from "../../utils/photoAnnotation";
+import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 
 const EMPTY_REFERENCE_MEDIA: TaskReferenceMediaValue = {
@@ -41,16 +44,6 @@ const EMPTY_REFERENCE_MEDIA: TaskReferenceMediaValue = {
   reference_video_url: "",
   reference_audio_url: "",
 };
-
-function revokeMediaBlobs(media: TaskReferenceMediaValue) {
-  for (const url of [
-    media.reference_photo_url,
-    media.reference_video_url,
-    media.reference_audio_url,
-  ]) {
-    if (url.startsWith("blob:")) URL.revokeObjectURL(url);
-  }
-}
 
 export interface EmployeeTasksDrawerProps {
   member: TeamMember | null;
@@ -72,13 +65,32 @@ export default function EmployeeTasksDrawer({
   const open = Boolean(member);
   const [tasks, setTasks] = useState<TaskOccurrence[]>([]);
   const [loading, setLoading] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [photoStepOpen, setPhotoStepOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMedia, setFormMedia] = useState<TaskReferenceMediaValue>(EMPTY_REFERENCE_MEDIA);
+  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
+  const [galleryAssignItem, setGalleryAssignItem] = useState<TaskGalleryItem | null>(null);
+
+  const lockedEmployee = useMemo((): User[] => {
+    if (!member) return [];
+    return [
+      {
+        id: member.user_id,
+        email: "",
+        first_name: "",
+        last_name: "",
+        full_name: member.full_name,
+        role: "employee",
+        phone: null,
+        job_function: null,
+        network_id: null,
+        branch_id: branchId,
+        is_active: true,
+        email_verified: true,
+      },
+    ];
+  }, [member, branchId]);
   const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const [referenceMedia, setReferenceMedia] =
-    useState<TaskReferenceMediaValue>(EMPTY_REFERENCE_MEDIA);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
 
   const loadTasks = useCallback(async () => {
@@ -112,41 +124,55 @@ export default function EmployeeTasksDrawer({
     }, [open, loadTasks]),
   );
 
-  const handleCloseCreate = () => {
+  const openForm = (media?: TaskReferenceMediaValue) => {
+    setFormMedia(media ?? EMPTY_REFERENCE_MEDIA);
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
     if (saving) return;
-    revokeMediaBlobs(referenceMedia);
-    setReferenceMedia(EMPTY_REFERENCE_MEDIA);
-    setCreateOpen(false);
+    revokeTaskMediaBlobs(formMedia);
+    setFormMedia(EMPTY_REFERENCE_MEDIA);
+    setFormOpen(false);
   };
 
-  const handleOpenCreate = () => {
-    revokeMediaBlobs(referenceMedia);
-    setTitle("");
-    setDescription("");
-    setDueAt(datetimeLocalForNewTask(dueOn));
-    setReferenceMedia(EMPTY_REFERENCE_MEDIA);
-    setCreateOpen(true);
-  };
-
-  const handleCreate = async () => {
+  const handleCreate = async (payload: NewTaskFormSubmitPayload) => {
     if (!member || !branchId) return;
     setSaving(true);
     try {
-      const resolvedTitle = await ensureTaskTitle(title, description);
-      const media = await resolveTaskReferenceMedia(referenceMedia);
-      const res = await taskService.createAdHoc({
-        branch_id: branchId,
-        title: resolvedTitle,
-        description,
-        due_at: new Date(dueAt).toISOString(),
-        assignee_user_id: member.user_id,
-        photo_required: true,
-        ...media,
-      });
-      revokeMediaBlobs(referenceMedia);
-      setReferenceMedia(EMPTY_REFERENCE_MEDIA);
-      setCreateOpen(false);
-      showSuccess(res.message);
+      const title = await ensureTaskTitle(payload.title, payload.description);
+      const media = await resolveTaskReferenceMedia(payload.media);
+      if (payload.task_kind === "fixed") {
+        const res = await taskService.createTemplate({
+          branch_id: branchId,
+          title,
+          description: payload.description,
+          recurrence: payload.recurrence,
+          due_time: payload.due_time,
+          weekly_days:
+            payload.recurrence === "weekly" || payload.recurrence === "biweekly"
+              ? payload.weekly_days
+              : undefined,
+          monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
+          assignee_user_id: member.user_id,
+          ...media,
+        });
+        showSuccess(res.message);
+      } else {
+        const res = await taskService.createAdHoc({
+          branch_id: branchId,
+          title,
+          description: payload.description,
+          due_at: new Date(payload.due_at).toISOString(),
+          assignee_user_id: member.user_id,
+          photo_required: true,
+          ...media,
+        });
+        showSuccess(res.message);
+      }
+      revokeTaskMediaBlobs(formMedia);
+      setFormMedia(EMPTY_REFERENCE_MEDIA);
+      setFormOpen(false);
       await loadTasks();
       onChanged?.();
     } catch (e) {
@@ -155,6 +181,55 @@ export default function EmployeeTasksDrawer({
       } else {
         showError(e instanceof ApiError ? e.message : he.errorGeneric);
       }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGalleryQuickAssign = async ({
+    item,
+    due_at,
+  }: GalleryQuickAssignPayload) => {
+    if (!member || !branchId) return;
+    setSaving(true);
+    try {
+      const media = {
+        reference_photo_url: item.reference_photo_url || undefined,
+        reference_video_url: item.reference_video_url || undefined,
+        reference_audio_url: item.reference_audio_url || undefined,
+      };
+      if (item.task_kind === "fixed") {
+        const res = await taskService.createTemplate({
+          branch_id: branchId,
+          title: item.title,
+          description: item.description,
+          recurrence: (item.recurrence as "daily" | "weekly" | "biweekly" | "monthly") || "daily",
+          due_time: item.due_time || "09:00",
+          weekly_days: item.weekly_days || undefined,
+          monthly_day: item.monthly_day ?? undefined,
+          assignee_user_id: member.user_id,
+          source_gallery_item_id: item.id,
+          ...media,
+        });
+        showSuccess(res.message);
+      } else {
+        const res = await taskService.createAdHoc({
+          branch_id: branchId,
+          title: item.title,
+          description: item.description,
+          due_at: new Date(due_at).toISOString(),
+          assignee_user_id: member.user_id,
+          photo_required: true,
+          source_gallery_item_id: item.id,
+          ...media,
+        });
+        showSuccess(res.message);
+      }
+      setGalleryAssignItem(null);
+      await loadTasks();
+      onChanged?.();
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
@@ -227,8 +302,21 @@ export default function EmployeeTasksDrawer({
           </Box>
 
           <Box sx={{ px: 2, py: 1.5, display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={handleOpenCreate}>
-              {he.dashboardCreateTask}
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setPhotoStepOpen(true)}
+            >
+              {he.newTask}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<CollectionsBookmarkIcon />}
+              onClick={() => setGalleryPickerOpen(true)}
+            >
+              {he.newTaskFromGallery}
             </Button>
             <Button variant="outlined" size="small" startIcon={<OpenInNewIcon />} onClick={openFullTasks}>
               {he.dashboardEmployeeDrawerAllTasks}
@@ -261,59 +349,58 @@ export default function EmployeeTasksDrawer({
         </Box>
       </Drawer>
 
-      <Dialog open={createOpen} onClose={handleCloseCreate} fullWidth maxWidth="sm" dir="rtl">
-        <DialogTitle>{he.newAdHocTask}</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-          <TextField
-            label={he.assignee}
-            value={member?.full_name ?? ""}
-            fullWidth
-            disabled
-          />
-          <TextField
-            label={he.taskTitle}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            helperText={he.taskTitleOptionalHint}
-            fullWidth
-          />
-          <TextField
-            label={he.description}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            multiline
-            rows={2}
-            fullWidth
-          />
-          <TextField
-            label={he.dueAt}
-            type="datetime-local"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            required
-            fullWidth
-            dir="ltr"
-          />
-          <TaskReferenceMediaEditor
-            value={referenceMedia}
-            onChange={setReferenceMedia}
-            onDescriptionAppend={(transcript) =>
-              setDescription((prev) => appendDescriptionBlock(prev, transcript))
-            }
-            disabled={saving}
-            onError={showError}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCloseCreate} disabled={saving}>
-            {he.cancel}
-          </Button>
-          <Button variant="contained" onClick={() => void handleCreate()} disabled={saving || !dueAt}>
-            {saving ? <CircularProgress size={22} /> : he.submit}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <NewTaskPhotoStep
+        open={photoStepOpen}
+        onClose={() => setPhotoStepOpen(false)}
+        onSkip={() => {
+          setPhotoStepOpen(false);
+          openForm();
+        }}
+        onPhoto={(file) => {
+          setPhotoStepOpen(false);
+          openForm(mediaFromPhotoFile(file));
+        }}
+      />
+
+      <NewTaskFormDialog
+        open={formOpen}
+        onClose={closeForm}
+        onSubmit={handleCreate}
+        branches={[]}
+        employees={lockedEmployee}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId={branchId}
+        defaultDueAt={datetimeLocalForNewTask(dueOn)}
+        defaultAssigneeId={member?.user_id ?? ""}
+        lockAssignee
+        initialMedia={formMedia}
+        saving={saving}
+        onError={showError}
+      />
+
+      <TaskGalleryPickerDialog
+        open={galleryPickerOpen}
+        onClose={() => setGalleryPickerOpen(false)}
+        onSelect={(item) => {
+          setGalleryPickerOpen(false);
+          setGalleryAssignItem(item);
+        }}
+      />
+
+      <GalleryQuickAssignDialog
+        open={galleryAssignItem !== null}
+        item={galleryAssignItem}
+        branches={[]}
+        employees={lockedEmployee}
+        canPickBranch={false}
+        defaultBranchId={branchId}
+        defaultDueAt={datetimeLocalForNewTask(dueOn)}
+        defaultAssigneeId={member?.user_id ?? ""}
+        saving={saving}
+        onClose={() => setGalleryAssignItem(null)}
+        onSubmit={handleGalleryQuickAssign}
+      />
 
       <TaskCompletionReviewDialog
         task={reviewTarget}

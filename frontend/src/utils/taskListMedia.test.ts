@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasDeferredTaskMedia, taskMediaFlags } from "./taskListMedia";
+import { hasDeferredTaskMedia, taskHasOpenableReferenceMedia, taskMediaFlags } from "./taskListMedia";
 
 describe("taskListMedia", () => {
   it("detects only background photo as non-deferred heavy media", () => {
@@ -25,5 +25,11 @@ describe("taskListMedia", () => {
         completion: { photo_path: "/uploads/x.jpg", video_path: null, audio_path: null },
       })
     ).toBe(true);
+  });
+
+  it("taskHasOpenableReferenceMedia includes photo video audio", () => {
+    expect(taskHasOpenableReferenceMedia({ reference_photo_url: "https://x/a.jpg" })).toBe(true);
+    expect(taskHasOpenableReferenceMedia({ reference_video_url: "https://x/a.mp4" })).toBe(true);
+    expect(taskHasOpenableReferenceMedia({})).toBe(false);
   });
 });

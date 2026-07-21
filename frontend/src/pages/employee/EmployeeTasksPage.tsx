@@ -58,8 +58,9 @@ import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import CompletionMediaPreview from "../../components/tasks/CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
+import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
-import { hasDeferredTaskMedia } from "../../utils/taskListMedia";
+import { hasDeferredTaskMedia, taskHasOpenableReferenceMedia } from "../../utils/taskListMedia";
 import { isNativeApp } from "../../utils/isNativeApp";
 import TaskStatusChip from "../../components/tasks/TaskStatusChip";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
@@ -116,6 +117,7 @@ function TaskCard({
   speaking,
   onStart,
   onComplete,
+  onOpen,
   onListen,
   onStopListen,
 }: {
@@ -126,6 +128,7 @@ function TaskCard({
   speaking?: boolean;
   onStart: (task: EmployeeTaskCard) => void;
   onComplete: (task: EmployeeTaskCard) => void;
+  onOpen: (task: EmployeeTaskCard) => void;
   onListen: (task: EmployeeTaskCard) => void;
   onStopListen: () => void;
 }) {
@@ -156,7 +159,7 @@ function TaskCard({
     };
   }, [photoBg, native]);
   const showPhoto = Boolean(photoBg && photoReady);
-  const showExtraMediaHint = hasDeferredTaskMedia(task);
+  const showExtraMediaHint = hasDeferredTaskMedia(task) || taskHasOpenableReferenceMedia(task);
   return (
     <Card
       variant="outlined"
@@ -235,6 +238,9 @@ function TaskCard({
         </Button>
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2, flexDirection: "column", gap: 1 }}>
+        <Button fullWidth variant="outlined" size="large" onClick={() => onOpen(task)}>
+          {he.openTask}
+        </Button>
         {(task.status === "pending" || task.status === "overdue") && (
           <Button
             fullWidth
@@ -336,6 +342,7 @@ export default function EmployeeTasksPage() {
   const [dashboard, setDashboard] = useState<EmployeeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EmployeeTaskCard | null>(null);
+  const [detailTask, setDetailTask] = useState<EmployeeTaskCard | null>(null);
   const [note, setNote] = useState("");
   const [notDoneReason, setNotDoneReason] = useState("");
   const [done, setDone] = useState(true);
@@ -727,6 +734,7 @@ export default function EmployeeTasksPage() {
                   speaking={speakingId === task.id}
                   onStart={handleStart}
                   onComplete={openComplete}
+                  onOpen={setDetailTask}
                   onListen={handleListen}
                   onStopListen={stopSpeech}
                 />
@@ -762,6 +770,7 @@ export default function EmployeeTasksPage() {
                         speaking={speakingId === task.id}
                         onStart={handleStart}
                         onComplete={openComplete}
+                        onOpen={setDetailTask}
                         onListen={handleListen}
                         onStopListen={stopSpeech}
                       />
@@ -797,6 +806,7 @@ export default function EmployeeTasksPage() {
                   speaking={speakingId === task.id}
                   onStart={handleStart}
                   onComplete={openComplete}
+                  onOpen={setDetailTask}
                   onListen={handleListen}
                   onStopListen={stopSpeech}
                 />
@@ -816,6 +826,7 @@ export default function EmployeeTasksPage() {
                   speaking={speakingId === task.id}
                   onStart={handleStart}
                   onComplete={openComplete}
+                  onOpen={setDetailTask}
                   onListen={handleListen}
                   onStopListen={stopSpeech}
                 />
@@ -830,12 +841,15 @@ export default function EmployeeTasksPage() {
                 <Card key={task.id} variant="outlined" sx={{ mb: 2, opacity: 0.9 }}>
                   <CardContent>
                     <EmployeeTaskTitle task={task} />
-                    <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
+                    <Box display="flex" gap={1} flexWrap="wrap" mt={1} mb={1}>
                       <Chip label={he.taskStatusLabels.pending_review} color="info" size="small" />
-                      {hasDeferredTaskMedia(task) && (
+                      {(hasDeferredTaskMedia(task) || taskHasOpenableReferenceMedia(task)) && (
                         <Chip label={he.taskExtraMediaHint} size="small" color="info" variant="outlined" />
                       )}
                     </Box>
+                    <Button size="small" variant="outlined" onClick={() => setDetailTask(task)}>
+                      {he.openTask}
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -860,6 +874,7 @@ export default function EmployeeTasksPage() {
                 speaking={speakingId === task.id}
                 onStart={handleStart}
                 onComplete={openComplete}
+                onOpen={setDetailTask}
                 onListen={handleListen}
                 onStopListen={stopSpeech}
               />
@@ -954,6 +969,29 @@ export default function EmployeeTasksPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <EmployeeTaskDetailDialog
+        task={detailTask}
+        titleNode={detailTask ? <EmployeeTaskTitle task={detailTask} variant="h6" /> : null}
+        onClose={() => setDetailTask(null)}
+        starting={detailTask ? startingId === detailTask.id : false}
+        onStart={
+          detailTask
+            ? () => {
+                void handleStart(detailTask);
+                setDetailTask(null);
+              }
+            : undefined
+        }
+        onComplete={
+          detailTask
+            ? () => {
+                openComplete(detailTask);
+                setDetailTask(null);
+              }
+            : undefined
+        }
+      />
 
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
         <DialogTitle sx={{ pb: selected && showsHebrewTitle(selected) ? 1 : undefined }}>

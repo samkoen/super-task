@@ -27,7 +27,8 @@ import { he } from "../../i18n/he";
 
 interface TaskGalleryPickerDialogProps {
   open: boolean;
-  taskKind: GalleryTaskKind;
+  /** Si omis : toutes les sortes (קבועה + מזדמנת). */
+  taskKind?: GalleryTaskKind;
   onClose: () => void;
   onSelect: (item: TaskGalleryItem) => void;
 }
