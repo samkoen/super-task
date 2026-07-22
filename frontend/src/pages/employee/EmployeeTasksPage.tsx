@@ -44,7 +44,6 @@ import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import {
   defaultRangeFrom,
   formatHebrewDay,
-  formatDueAt,
   groupTasksByDay,
   isToday,
   todayIso,
@@ -57,6 +56,8 @@ import CompletionMediaPreview from "../../components/tasks/CompletionMediaPrevie
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
+import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
+import { showsHebrewTitle } from "../../utils/employeeTaskCard";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {

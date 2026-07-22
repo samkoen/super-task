@@ -18,6 +18,7 @@ const barStyles: Record<
   completed: { bgcolor: healthDotColor("green") },
   in_progress: { bgcolor: healthDotColor("orange"), pulse: true },
   pending_review: { bgcolor: "#0288d1" },
+  awaiting_response: { bgcolor: "#ed6c02", pulse: true },
   upcoming: { bgcolor: "grey.400", dashed: true },
   overdue: { bgcolor: healthDotColor("red") },
 };
@@ -56,6 +57,24 @@ function StatusIcon({ kind }: { kind: TimelineRowKind }) {
           borderRadius: "50%",
           bgcolor: "#0288d1",
           flexShrink: 0,
+        }}
+      />
+    );
+  }
+  if (kind === "awaiting_response") {
+    return (
+      <Box
+        sx={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          bgcolor: "#ed6c02",
+          flexShrink: 0,
+          animation: "timelinePulse 1.6s ease-in-out infinite",
+          "@keyframes timelinePulse": {
+            "0%, 100%": { opacity: 1, transform: "scale(1)" },
+            "50%": { opacity: 0.5, transform: "scale(0.85)" },
+          },
         }}
       />
     );

@@ -98,7 +98,6 @@ export default function TaskOccurrenceCard({
   const isNative = isNativeApp();
   const visual = taskStatusVisual(task.status);
   const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
-  const videoSrc = mediaUrl(task.reference_video_url ?? null);
   const audioSrc = mediaUrl(task.reference_audio_url ?? null);
   const urgency = taskUrgencyLevel(task.status, task.due_at);
   const carryOver = isCarryOver(task);
@@ -241,7 +240,7 @@ export default function TaskOccurrenceCard({
               />
               <Box
                 component="img"
-                src={photoBg}
+                src={photoBg ?? undefined}
                 alt=""
                 sx={{
                   position: "relative",
