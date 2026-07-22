@@ -24,6 +24,7 @@ import CategoryIcon from "@mui/icons-material/Category";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
+import RepeatIcon from "@mui/icons-material/Repeat";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import LogoutIcon from "@mui/icons-material/Logout";
 import StorefrontIcon from "@mui/icons-material/Storefront";
@@ -41,6 +42,11 @@ import {
 } from "../../styles/hebrewAlign";
 import { isNativeApp } from "../../utils/isNativeApp";
 import { shouldUseMainNavOverlay } from "../../utils/mainNavOverlay";
+import { shouldShowAppBack } from "../../utils/navigationBack";
+import BackButton from "../ui/BackButton";
+import ManagerBottomNav from "./ManagerBottomNav";
+import ManagerNewTaskFab from "./ManagerNewTaskFab";
+import { shouldShowManagerChrome } from "../../utils/managerBottomNav";
 
 const SIDEBAR_BG = "#0B1220";
 const SIDEBAR_ACCENT = "#1A9B86";
@@ -82,6 +88,8 @@ function Layout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const overlayNav = shouldUseMainNavOverlay(isNativeApp());
+  const showBack = shouldShowAppBack(location.pathname, user?.role);
+  const showManagerChrome = shouldShowManagerChrome(user?.role);
 
   const closeMainNav = () => setMobileOpen(false);
 
@@ -95,6 +103,7 @@ function Layout() {
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/admin/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/admin/products" },
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/admin/tasks" },
+        { text: he.managerFixedTasks, icon: <RepeatIcon />, path: "/admin/fixed-tasks" },
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/admin/gallery" },
         { text: he.adminUsers, icon: <PeopleIcon />, path: "/admin/users" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/admin/invitations" },
@@ -112,6 +121,7 @@ function Layout() {
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/manager/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/manager/products" },
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/manager/tasks" },
+        { text: he.managerFixedTasks, icon: <RepeatIcon />, path: "/manager/fixed-tasks" },
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/manager/gallery" },
         { text: he.managerIssues, icon: <ReportProblemIcon />, path: "/manager/issues" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
@@ -355,6 +365,7 @@ function Layout() {
           </Box>
         </Box>
         <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 2.5 }, maxWidth: 960, mx: "auto" }}>
+          {showBack && <BackButton />}
           <OutletSuspense />
         </Box>
       </Box>
@@ -437,13 +448,25 @@ function Layout() {
           overscrollBehavior: "contain",
           px: { xs: 1.5, sm: 3, md: 4 },
           py: { xs: 2.5, sm: 3.5 },
-          pb: { xs: 10, sm: 3.5 },
+          pb: showManagerChrome
+            ? overlayNav
+              ? 14
+              : { xs: 14, sm: 3.5 }
+            : { xs: 10, sm: 3.5 },
         }}
       >
         <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
+          {showBack && <BackButton />}
           <OutletSuspense />
         </Box>
       </Box>
+
+      {showManagerChrome && (
+        <>
+          <ManagerNewTaskFab forceVisible={overlayNav} />
+          <ManagerBottomNav forceVisible={overlayNav} />
+        </>
+      )}
     </Box>
   );
 }

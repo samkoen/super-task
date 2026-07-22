@@ -8,14 +8,15 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
   Typography,
 } from "@mui/material";
 import { ApiError } from "../../services/api";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
+import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
+import { canComposeTaskChat } from "../../utils/taskChatCompose";
 
 interface TaskCompletionReviewDialogProps {
   task: TaskOccurrence | null;
@@ -28,16 +29,16 @@ export default function TaskCompletionReviewDialog({
   onClose,
   onDone,
 }: TaskCompletionReviewDialogProps) {
-  const [rejectionNote, setRejectionNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const completion = task?.completion;
   const open = Boolean(task);
+  const isAwaiting = task?.status === "awaiting_response";
+  const isReview = task?.status === "pending_review";
 
   const handleClose = () => {
     if (saving) return;
-    setRejectionNote("");
     setError("");
     onClose();
   };
@@ -57,26 +58,11 @@ export default function TaskCompletionReviewDialog({
     }
   };
 
-  const handleReopen = async () => {
-    if (!task) return;
-    setSaving(true);
-    setError("");
-    try {
-      await taskService.reopen(task.id, {
-        rejection_note: rejectionNote.trim() || undefined,
-      });
-      onDone(he.taskReopenedSuccess);
-      handleClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" dir="rtl">
-      <DialogTitle>{he.taskReviewTitle}</DialogTitle>
+      <DialogTitle>
+        {isAwaiting ? he.taskChatTitle : he.taskReviewTitle}
+      </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         {task && (
           <Typography variant="subtitle1" fontWeight={700}>
@@ -90,7 +76,7 @@ export default function TaskCompletionReviewDialog({
             reference_audio_url={task.reference_audio_url}
           />
         )}
-        {completion?.note && (
+        {isReview && completion?.note && (
           <Box>
             <Typography variant="caption" color="text.secondary" display="block">
               {he.note}
@@ -98,7 +84,7 @@ export default function TaskCompletionReviewDialog({
             <Typography variant="body2">{completion.note}</Typography>
           </Box>
         )}
-        {completion && (
+        {isReview && completion && (
           <CompletionMediaPreview
             photo_path={completion.photo_path}
             video_path={completion.video_path}
@@ -106,32 +92,35 @@ export default function TaskCompletionReviewDialog({
             audio_transcript={completion.audio_transcript}
           />
         )}
-        <TextField
-          label={he.taskReopenNote}
-          value={rejectionNote}
-          onChange={(e) => setRejectionNote(e.target.value)}
-          fullWidth
-          multiline
-          rows={2}
-          placeholder={he.taskReopenNoteHint}
-        />
+
+        {task && (
+          <TaskChatPanel
+            key={task.id}
+            occurrenceId={task.id}
+            compact
+            composeEnabled={canComposeTaskChat(task.status, false)}
+            onOccurrenceUpdated={() => {
+              onDone(he.taskChatSent);
+            }}
+          />
+        )}
+
         {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
         <Button onClick={handleClose} disabled={saving}>
           {he.cancel}
         </Button>
-        <Button
-          variant="outlined"
-          color="warning"
-          onClick={() => void handleReopen()}
-          disabled={saving}
-        >
-          {saving ? <CircularProgress size={22} color="inherit" /> : he.taskReopen}
-        </Button>
-        <Button variant="contained" color="success" onClick={() => void handleApprove()} disabled={saving}>
-          {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
-        </Button>
+        {isReview && (
+          <Button
+            variant="contained"
+            color="success"
+            onClick={() => void handleApprove()}
+            disabled={saving}
+          >
+            {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

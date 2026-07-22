@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from app.db import mappers as mp
 from app.domain import task_recurrence
+from app.domain.ops_category import normalize_ops_category
 from app.domain.task_kind import FIXED
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
@@ -59,6 +60,7 @@ class TaskTemplateService:
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
         source_gallery_item_id: str | None = None,
+        ops_category: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
@@ -78,6 +80,7 @@ class TaskTemplateService:
                 raise ValueError("יום בחודש חייב להיות בין 1 ל-31")
             parsed_monthly_day = int(raw_day)
 
+        category = normalize_ops_category(ops_category)
         anchor = datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None
         photo, video, audio = self._isolate_external_media(
             reference_photo_url, reference_video_url, reference_audio_url
@@ -101,6 +104,7 @@ class TaskTemplateService:
             reference_video_url=video,
             reference_audio_url=audio,
             source_gallery_item_id=gallery_id,
+            ops_category=category,
         )
         created_occurrence = None
         if recurrence in task_recurrence.RECURRING:
@@ -127,6 +131,8 @@ class TaskTemplateService:
         reference_photo_url: str | None = None,
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
+        ops_category: str | None = None,
+        update_ops_category: bool = False,
     ) -> dict:
         existing = self._templates.find_by_id(template_id)
         if not existing:
@@ -135,6 +141,9 @@ class TaskTemplateService:
             raise PermissionError("אין הרשאה לערוך משימות")
         self._validate_branch(actor, existing.branch_id)
         self._validate_assignment(existing.branch_id, assignee_user_id, department_id)
+        category = (
+            normalize_ops_category(ops_category) if update_ops_category else existing.ops_category
+        )
         updated = self._templates.update(
             template_id,
             title=title,
@@ -147,6 +156,8 @@ class TaskTemplateService:
             reference_photo_url=reference_photo_url,
             reference_video_url=reference_video_url,
             reference_audio_url=reference_audio_url,
+            ops_category=category,
+            update_ops_category=update_ops_category,
         )
         assert updated is not None
         return self._to_api(updated)
@@ -194,8 +205,13 @@ class TaskTemplateService:
         if template.department_id:
             m = self._department.find_by_id(template.department_id)
             department_name = m.name if m else None
+        assignee_name = None
+        if template.assignee_user_id:
+            u = self._users.find_by_id(template.assignee_user_id)
+            assignee_name = u.full_name if u else None
         return mp.task_template_domain_to_api(
             template,
             branch_name=branch.name if branch else None,
             department_name=department_name,
+            assignee_name=assignee_name,
         )

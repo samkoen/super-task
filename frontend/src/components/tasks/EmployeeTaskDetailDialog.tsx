@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   Box,
   Button,
@@ -12,9 +12,11 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
+import TaskChatPanel from "./TaskChatPanel";
 import TaskStatusChip from "./TaskStatusChip";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
+import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import type { TaskCompletion, TaskStatus } from "../../services/taskService";
 
 export interface EmployeeTaskDetailTask {
@@ -35,16 +37,18 @@ export interface EmployeeTaskDetailDialogProps {
   onClose: () => void;
   onStart?: () => void;
   onComplete?: () => void;
+  onChatUpdated?: () => void;
   starting?: boolean;
 }
 
-/** Ouverture tâche côté oved : tous les médias de référence (photo / vidéo / audio). */
+/** Ouverture tâche côté oved : médias + chat toujours visible (comme הוראות). */
 export default function EmployeeTaskDetailDialog({
   task,
   titleNode,
   onClose,
   onStart,
   onComplete,
+  onChatUpdated,
   starting = false,
 }: EmployeeTaskDetailDialogProps) {
   if (!task) return null;
@@ -97,6 +101,13 @@ export default function EmployeeTaskDetailDialog({
               {he.taskNoReferenceMedia}
             </Typography>
           )}
+        <TaskChatPanel
+          key={task.id}
+          occurrenceId={task.id}
+          compact
+          composeEnabled={canComposeTaskChat(task.status, true)}
+          onOccurrenceUpdated={() => onChatUpdated?.()}
+        />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
         <Button onClick={onClose}>{he.close}</Button>

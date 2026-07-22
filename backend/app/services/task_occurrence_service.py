@@ -281,6 +281,33 @@ class TaskOccurrenceService:
         assert updated is not None
         return self._to_api(updated)
 
+    def set_manager_next(
+        self,
+        actor: ActorContext,
+        occurrence_id: str,
+        *,
+        enabled: bool,
+    ) -> dict:
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לסמן משימה הבאה")
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_branch_access(actor, occurrence.branch_id)
+        if not occurrence.assignee_user_id:
+            raise ValueError("יש לשייך עובד לפני סימון המשימה הבאה")
+        if occurrence.status in task_status.TERMINAL or occurrence.status == task_status.PENDING_REVIEW:
+            raise ValueError("לא ניתן לסמן משימה זו כהבאה")
+        if enabled:
+            self._occurrences.clear_manager_next_for_assignee(occurrence.assignee_user_id)
+            updated = self._occurrences.set_manager_next(
+                occurrence_id, manager_next_at=datetime.now(TZ)
+            )
+        else:
+            updated = self._occurrences.set_manager_next(occurrence_id, manager_next_at=None)
+        assert updated is not None
+        return self._to_api(updated)
+
     async def complete_occurrence(
         self,
         actor: ActorContext,
@@ -305,10 +332,10 @@ class TaskOccurrenceService:
             task_status.IN_PROGRESS,
         }:
             raise ValueError("יש להתחיל את המשימה לפני הסיום")
-        if completion_status not in {task_status.COMPLETION_DONE, task_status.COMPLETION_NOT_DONE}:
+        if completion_status == task_status.COMPLETION_NOT_DONE:
+            raise ValueError("לא ניתן לסמן לא בוצע — שלחו שאלה בצ׳אט המשימה")
+        if completion_status != task_status.COMPLETION_DONE:
             raise ValueError("סטטוס סיום לא תקין")
-        if completion_status == task_status.COMPLETION_NOT_DONE and not (not_completed_reason or "").strip():
-            raise ValueError("נדרשת סיבה אם המשימה לא בוצעה")
         requires_visual_media = actor.role == roles.EMPLOYEE or occurrence.photo_required
         if (
             completion_status == task_status.COMPLETION_DONE
@@ -380,9 +407,7 @@ class TaskOccurrenceService:
                 if updated_completion:
                     completion = updated_completion
 
-        if completion_status == task_status.COMPLETION_NOT_DONE:
-            new_status = task_status.CANCELLED
-        elif needs_review:
+        if needs_review:
             new_status = task_status.PENDING_REVIEW
         else:
             new_status = task_status.COMPLETED

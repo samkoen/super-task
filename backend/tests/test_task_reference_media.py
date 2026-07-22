@@ -63,6 +63,26 @@ def test_generate_from_template_copies_reference_media(monkeypatch):
     assert kwargs["reference_video_url"] == "copied:task_videos:/uploads/task_videos/ref.mp4"
     assert kwargs["reference_audio_url"] == "copied:task_audio:/uploads/task_audio/ref.webm"
     assert kwargs["template_id"] == template.id
+    assert kwargs["ops_category"] is None
+
+
+def test_generate_from_template_copies_ops_category(monkeypatch):
+    template = _template(ops_category="cleaning")
+    occurrence_repo = MagicMock()
+    occurrence_repo.exists_for_template_on_date.return_value = False
+    scheduler = TaskSchedulerService(MagicMock(), occurrence_repo)
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.task_recurrence.should_generate_on_date",
+        lambda *args, **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.blob_storage.copy_media_url",
+        lambda url, folder: url,
+    )
+
+    ok = scheduler.generate_from_template(template, on_date=date(2026, 7, 14))
+    assert ok is not None
+    assert occurrence_repo.create.call_args.kwargs["ops_category"] == "cleaning"
 
 
 def test_create_once_occurrence_copies_reference_media(monkeypatch):

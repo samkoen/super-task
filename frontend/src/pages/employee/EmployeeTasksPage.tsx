@@ -6,9 +6,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -20,9 +17,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
-import StopIcon from "@mui/icons-material/Stop";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
@@ -41,12 +35,15 @@ import { employeeActivityService } from "../../services/employeeActivityService"
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { playTaskEndSound } from "../../utils/notificationSounds";
+import {
+  sortEmployeeOpenFocus,
+  sortInProgressFocusFirst,
+} from "../../utils/employeeTaskFocus";
+import { employeeCardToOccurrence } from "../../utils/employeeTaskCard";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import {
   defaultRangeFrom,
-  dueDateIso,
   formatHebrewDay,
-  formatHebrewDayShort,
   formatDueAt,
   groupTasksByDay,
   isToday,
@@ -57,13 +54,9 @@ import { useTaskSpeech } from "../../hooks/useTaskSpeech";
 import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import CompletionMediaPreview from "../../components/tasks/CompletionMediaPreview";
-import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
-import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
-import { hasDeferredTaskMedia, taskHasOpenableReferenceMedia } from "../../utils/taskListMedia";
-import { isNativeApp } from "../../utils/isNativeApp";
-import TaskStatusChip from "../../components/tasks/TaskStatusChip";
-import { taskStatusVisual } from "../../constants/taskStatusVisual";
+import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
+import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
@@ -77,190 +70,6 @@ function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
   const labels = he.jobFunctionLabels as Record<string, string>;
   return labels[jobFunction] ?? jobFunction;
-}
-
-function showsHebrewTitle(task: EmployeeTaskCard): boolean {
-  return Boolean(
-    task.title_he &&
-      task.title_he !== task.title &&
-      task.display_language &&
-      task.display_language !== "he"
-  );
-}
-
-function EmployeeTaskTitle({
-  task,
-  variant = "h6",
-  fontWeight = 700,
-}: {
-  task: EmployeeTaskCard;
-  variant?: "h6" | "body1";
-  fontWeight?: number | string;
-}) {
-  return (
-    <Box>
-      <Typography variant={variant} fontWeight={fontWeight}>{task.title}</Typography>
-      {showsHebrewTitle(task) && (
-        <Typography variant="body2" color="text.secondary" dir="rtl" sx={{ mt: 0.25 }}>
-          {he.taskTitleHebrew}: {task.title_he}
-        </Typography>
-      )}
-    </Box>
-  );
-}
-
-function TaskCard({
-  task,
-  urgent,
-  carryOver,
-  starting,
-  speaking,
-  onStart,
-  onComplete,
-  onOpen,
-  onListen,
-  onStopListen,
-}: {
-  task: EmployeeTaskCard;
-  urgent?: boolean;
-  carryOver?: boolean;
-  starting?: boolean;
-  speaking?: boolean;
-  onStart: (task: EmployeeTaskCard) => void;
-  onComplete: (task: EmployeeTaskCard) => void;
-  onOpen: (task: EmployeeTaskCard) => void;
-  onListen: (task: EmployeeTaskCard) => void;
-  onStopListen: () => void;
-}) {
-  const rejectionNote = task.completion?.rejection_note;
-  const visual = taskStatusVisual(task.status);
-  const photoBg = taskCardBackgroundUrl(task.reference_photo_url);
-  const [photoReady, setPhotoReady] = useState(false);
-  const native = isNativeApp();
-  useEffect(() => {
-    setPhotoReady(false);
-    if (!photoBg) return;
-    let cancelled = false;
-    const img = new Image();
-    img.decoding = "async";
-    const start = () => {
-      img.onload = () => {
-        if (!cancelled) setPhotoReady(true);
-      };
-      img.onerror = () => {
-        if (!cancelled) setPhotoReady(false);
-      };
-      img.src = photoBg;
-    };
-    const t = window.setTimeout(start, native ? 100 : 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [photoBg, native]);
-  const showPhoto = Boolean(photoBg && photoReady);
-  const showExtraMediaHint = hasDeferredTaskMedia(task) || taskHasOpenableReferenceMedia(task);
-  return (
-    <Card
-      variant="outlined"
-      sx={{
-        mb: 2,
-        border: "2px solid",
-        borderColor: urgent || carryOver ? visual.bar : visual.border,
-        bgcolor: showPhoto ? undefined : visual.surface,
-        position: "relative",
-        overflow: "hidden",
-        ...(showPhoto
-          ? {
-              backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.72) 100%), url(${photoBg})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              color: "#fff",
-              "& .MuiTypography-root": { color: "inherit" },
-              "& .MuiTypography-caption, & .MuiTypography-body2": { color: "rgba(255,255,255,0.85)" },
-            }
-          : {}),
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          insetInlineStart: 0,
-          top: 0,
-          bottom: 0,
-          width: 5,
-          bgcolor: visual.bar,
-        },
-      }}
-    >
-      <CardContent sx={{ position: "relative", zIndex: 1 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1} mb={1}>
-          <EmployeeTaskTitle task={task} />
-          <TaskStatusChip status={task.status} />
-        </Box>
-        <Box display="flex" gap={1} flexWrap="wrap" mb={1}>
-          <Chip label={he.taskKindLabels[task.task_kind]} size="small" />
-          {task.department_name && <Chip label={task.department_name} size="small" variant="outlined" />}
-          {urgent && <Chip label={he.employeeUrgentTasks} color="error" size="small" />}
-          {carryOver && (
-            <Chip
-              label={
-                task.created_at
-                  ? he.employeeTaskCreatedOn(formatHebrewDayShort(dueDateIso(task.created_at)))
-                  : he.employeeCarryOverTask
-              }
-              color="warning"
-              size="small"
-            />
-          )}
-          {showExtraMediaHint && (
-            <Chip label={he.taskExtraMediaHint} size="small" color="info" variant="outlined" />
-          )}
-        </Box>
-        {task.description && (
-          <Typography variant="body2" color="text.secondary" mb={1}>{task.description}</Typography>
-        )}
-        <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
-          {he.dueAt}: {formatDueAt(task.due_at)}
-        </Typography>
-        <Typography variant="caption" color="warning.main" display="block">{he.photoRequired}</Typography>
-        {rejectionNote && (
-          <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
-            {he.taskRejectedReopen}: {rejectionNote}
-          </Alert>
-        )}
-        <Button
-          size="small"
-          variant="text"
-          startIcon={speaking ? <StopIcon /> : <VolumeUpIcon />}
-          onClick={() => (speaking ? onStopListen() : onListen(task))}
-          sx={{ mt: 1, alignSelf: "flex-start" }}
-        >
-          {speaking ? he.taskListenStop : he.taskListen}
-        </Button>
-      </CardContent>
-      <CardActions sx={{ px: 2, pb: 2, flexDirection: "column", gap: 1 }}>
-        <Button fullWidth variant="outlined" size="large" onClick={() => onOpen(task)}>
-          {he.openTask}
-        </Button>
-        {(task.status === "pending" || task.status === "overdue") && (
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            startIcon={starting ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
-            onClick={() => onStart(task)}
-            disabled={starting}
-          >
-            {he.startTask}
-          </Button>
-        )}
-        {task.status === "in_progress" && (
-          <Button fullWidth variant="contained" color="success" size="large" onClick={() => onComplete(task)}>
-            {he.markDone}
-          </Button>
-        )}
-      </CardActions>
-    </Card>
-  );
 }
 
 function mergeTaskTranslations<T extends EmployeeTaskCard>(
@@ -291,6 +100,10 @@ function mergeDashboardTranslations(
     ...dashboard,
     urgent_tasks: mergeTaskTranslations(dashboard.urgent_tasks, translations),
     in_progress_tasks: mergeTaskTranslations(dashboard.in_progress_tasks, translations),
+    awaiting_response_tasks: mergeTaskTranslations(
+      dashboard.awaiting_response_tasks ?? [],
+      translations,
+    ),
     pending_review_tasks: mergeTaskTranslations(dashboard.pending_review_tasks, translations),
     today_tasks: mergeTaskTranslations(dashboard.today_tasks, translations),
     completed_tasks: mergeTaskTranslations(dashboard.completed_tasks, translations),
@@ -309,10 +122,6 @@ function collectPendingIds(tasks: EmployeeTaskCard[], language: EmployeeLanguage
     .map((task) => task.id);
 }
 
-function isRolledFromPreviousDay(task: Pick<EmployeeTaskCard, "created_at" | "due_at">): boolean {
-  return Boolean(task.created_at && dueDateIso(task.created_at) < dueDateIso(task.due_at));
-}
-
 function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
   return {
     id: task.id,
@@ -328,11 +137,13 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     reference_audio_url: task.reference_audio_url ?? null,
     department_name: task.department_name ?? null,
     started_at: task.started_at,
-    spoken_text: (task as TaskOccurrence & { spoken_text?: string }).spoken_text,
-    display_language: (task as TaskOccurrence & { display_language?: string }).display_language,
-    translation_pending: (task as TaskOccurrence & { translation_pending?: boolean }).translation_pending,
-    title_he: (task as TaskOccurrence & { title_he?: string }).title_he,
+    spoken_text: task.spoken_text,
+    display_language: task.display_language,
+    translation_pending: task.translation_pending,
+    title_he: task.title_he,
     completion: task.completion ?? null,
+    manager_next_at: task.manager_next_at,
+    is_manager_next: task.is_manager_next,
   };
 }
 
@@ -344,8 +155,6 @@ export default function EmployeeTasksPage() {
   const [selected, setSelected] = useState<EmployeeTaskCard | null>(null);
   const [detailTask, setDetailTask] = useState<EmployeeTaskCard | null>(null);
   const [note, setNote] = useState("");
-  const [notDoneReason, setNotDoneReason] = useState("");
-  const [done, setDone] = useState(true);
   const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
   const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
   const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
@@ -410,6 +219,7 @@ export default function EmployeeTasksPage() {
         const allTasks = [
           ...data.urgent_tasks,
           ...data.in_progress_tasks,
+          ...(data.awaiting_response_tasks ?? []),
           ...data.pending_review_tasks,
           ...data.today_tasks,
           ...data.completed_tasks,
@@ -488,8 +298,6 @@ export default function EmployeeTasksPage() {
     clearCompletionMedia();
     setSelected(task);
     setNote("");
-    setNotDoneReason("");
-    setDone(true);
   };
 
   const handleListen = async (task: EmployeeTaskCard) => {
@@ -528,8 +336,8 @@ export default function EmployeeTasksPage() {
   }, []);
 
   const hasVisualMedia = Boolean(pendingPhoto || pendingVideo);
-  const requiresMedia = Boolean(done);
-  const canSubmitDone = !requiresMedia || hasVisualMedia;
+  const requiresMedia = true;
+  const canSubmitDone = hasVisualMedia;
 
   const openReport = () => {
     setReportText("");
@@ -585,29 +393,20 @@ export default function EmployeeTasksPage() {
     if (!selected) return;
     setSaving(true);
     try {
-      const photo_path = done
-        ? await uploadPendingMedia(pendingPhoto, taskService.uploadPhoto)
-        : undefined;
-      const video_path = done
-        ? await uploadPendingMedia(pendingVideo, taskService.uploadVideo)
-        : undefined;
-      const audio_path = done
-        ? await uploadPendingMedia(pendingAudio, taskService.uploadAudio)
-        : undefined;
+      const photo_path = await uploadPendingMedia(pendingPhoto, taskService.uploadPhoto);
+      const video_path = await uploadPendingMedia(pendingVideo, taskService.uploadVideo);
+      const audio_path = await uploadPendingMedia(pendingAudio, taskService.uploadAudio);
       await taskService.complete(selected.id, {
-        status: done ? "completed" : "not_completed",
+        status: "completed",
         note: note || undefined,
         photo_path,
         video_path,
         audio_path,
-        not_completed_reason: done ? undefined : notDoneReason,
       });
       clearCompletionMedia();
       setSelected(null);
-      if (done) {
-        playTaskEndSound();
-        showSuccess(he.taskSubmitSuccess);
-      }
+      playTaskEndSound();
+      showSuccess(he.taskSubmitSuccess);
       await load();
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -631,23 +430,83 @@ export default function EmployeeTasksPage() {
     }
   };
 
-  const urgentTasks = dashboard?.urgent_tasks ?? [];
-  const inProgressTasks = dashboard?.in_progress_tasks ?? [];
+  const urgentTasks = useMemo(
+    () => sortEmployeeOpenFocus(dashboard?.urgent_tasks ?? [], (dashboard?.in_progress_tasks ?? []).length > 0),
+    [dashboard?.urgent_tasks, dashboard?.in_progress_tasks],
+  );
+  const inProgressTasks = useMemo(
+    () => sortInProgressFocusFirst(dashboard?.in_progress_tasks ?? []),
+    [dashboard?.in_progress_tasks],
+  );
+  const awaitingResponseTasks = dashboard?.awaiting_response_tasks ?? [];
   const pendingReviewTasks = dashboard?.pending_review_tasks ?? [];
-  const todayTasks = dashboard?.today_tasks ?? [];
+  const todayTasks = useMemo(
+    () => sortEmployeeOpenFocus(dashboard?.today_tasks ?? [], (dashboard?.in_progress_tasks ?? []).length > 0),
+    [dashboard?.today_tasks, dashboard?.in_progress_tasks],
+  );
   const completedTasks = dashboard?.completed_tasks ?? [];
 
   const progress = dashboard?.progress_percent ?? 0;
-  const openCount = urgentTasks.length + todayTasks.length + inProgressTasks.length;
+  const openCount =
+    urgentTasks.length +
+    todayTasks.length +
+    inProgressTasks.length +
+    awaitingResponseTasks.length;
   const dayTasksLabel = isToday(filterDay)
     ? he.employeeTodayTasks
     : `${he.tasksForSelectedDay} · ${formatHebrewDay(filterDay)}`;
 
   const rangeGroups = useMemo(() => groupTasksByDay(rangeTasks), [rangeTasks]);
   const rangeInProgress = useMemo(
-    () => rangeTasks.filter((t) => t.status === "in_progress"),
-    [rangeTasks]
+    () => sortInProgressFocusFirst(rangeTasks.filter((t) => t.status === "in_progress")),
+    [rangeTasks],
   );
+
+  const cardById = useMemo(() => {
+    const map = new Map<string, EmployeeTaskCard>();
+    for (const task of [
+      ...urgentTasks,
+      ...inProgressTasks,
+      ...awaitingResponseTasks,
+      ...pendingReviewTasks,
+      ...todayTasks,
+      ...completedTasks,
+      ...rangeTasks,
+    ]) {
+      map.set(task.id, task);
+    }
+    return map;
+  }, [
+    urgentTasks,
+    inProgressTasks,
+    awaitingResponseTasks,
+    pendingReviewTasks,
+    todayTasks,
+    completedTasks,
+    rangeTasks,
+  ]);
+
+  const withCard = (occ: TaskOccurrence, fn: (card: EmployeeTaskCard) => void) => {
+    const card = cardById.get(occ.id);
+    if (card) fn(card);
+  };
+
+  const employeeGridProps = {
+    layout: "stack" as const,
+    startingId,
+    speakingId: speakingId ?? null,
+    onOpen: (occ: TaskOccurrence) => withCard(occ, setDetailTask),
+    onStart: (occ: TaskOccurrence) => withCard(occ, (c) => void handleStart(c)),
+    onComplete: (occ: TaskOccurrence) => withCard(occ, openComplete),
+    onListen: speechSupported
+      ? (occ: TaskOccurrence) => withCard(occ, (c) => void handleListen(c))
+      : undefined,
+    onStopListen: speechSupported ? stopSpeech : undefined,
+    onChatUpdated: () => {
+      void load();
+      showSuccess(he.taskChatSent);
+    },
+  };
 
   const headerName = dashboard?.employee?.full_name ?? user?.full_name;
   const headerBranch = dashboard?.employee?.branch_name;
@@ -655,7 +514,7 @@ export default function EmployeeTasksPage() {
   const onShift = dateViewMode === "day" ? dashboard?.on_shift : rangeInProgress.length > 0;
 
   return (
-    <Box sx={{ maxWidth: 520, mx: "auto", pb: 14 }}>
+    <Box sx={{ maxWidth: 760, mx: "auto", pb: 14, px: { xs: 1, sm: 2 } }}>
       <Box
         mb={2.5}
         sx={{
@@ -726,19 +585,10 @@ export default function EmployeeTasksPage() {
           {rangeInProgress.length > 0 && (
             <Box mb={2}>
               <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.tasksInProgress}</Typography>
-              {rangeInProgress.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  starting={startingId === task.id}
-                  speaking={speakingId === task.id}
-                  onStart={handleStart}
-                  onComplete={openComplete}
-                  onOpen={setDetailTask}
-                  onListen={handleListen}
-                  onStopListen={stopSpeech}
-                />
-              ))}
+              <TaskOccurrenceGrid
+                tasks={rangeInProgress.map(employeeCardToOccurrence)}
+                {...employeeGridProps}
+              />
             </Box>
           )}
           {rangeGroups.length === 0 ? (
@@ -750,8 +600,14 @@ export default function EmployeeTasksPage() {
             />
           ) : (
             rangeGroups.map(([day, dayTasks]) => {
-              const open = dayTasks.filter(
-                (t) => t.status !== "completed" && t.status !== "cancelled" && t.status !== "in_progress"
+              const open = sortEmployeeOpenFocus(
+                dayTasks.filter(
+                  (t) =>
+                    t.status !== "completed" &&
+                    t.status !== "cancelled" &&
+                    t.status !== "in_progress",
+                ),
+                rangeInProgress.length > 0,
               );
               const done = dayTasks.filter((t) => t.status === "completed");
               return (
@@ -761,29 +617,17 @@ export default function EmployeeTasksPage() {
                   </Typography>
                   {open.length === 0 && done.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" mb={1}>{he.noTasks}</Typography>
-                  ) : (
-                    open.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        starting={startingId === task.id}
-                        speaking={speakingId === task.id}
-                        onStart={handleStart}
-                        onComplete={openComplete}
-                        onOpen={setDetailTask}
-                        onListen={handleListen}
-                        onStopListen={stopSpeech}
-                      />
-                    ))
+                  ) : open.length > 0 ? (
+                    <TaskOccurrenceGrid
+                      tasks={open.map(employeeCardToOccurrence)}
+                      {...employeeGridProps}
+                    />
+                  ) : null}
+                  {done.length > 0 && (
+                    <Box mt={open.length ? 2 : 0}>
+                      <TaskOccurrenceGrid tasks={done.map(employeeCardToOccurrence)} onOpen={employeeGridProps.onOpen} />
+                    </Box>
                   )}
-                  {done.map((task) => (
-                    <Card key={task.id} variant="outlined" sx={{ mb: 1, opacity: 0.85 }}>
-                      <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                        <EmployeeTaskTitle task={task} variant="body1" fontWeight={600} />
-                        <Chip label={he.taskCompleted} color="success" size="small" sx={{ mt: 0.5 }} />
-                      </CardContent>
-                    </Card>
-                  ))}
                 </Box>
               );
             })
@@ -791,68 +635,48 @@ export default function EmployeeTasksPage() {
         </>
       ) : (
         <>
+          {inProgressTasks.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.tasksInProgress}</Typography>
+              <TaskOccurrenceGrid
+                tasks={inProgressTasks.map(employeeCardToOccurrence)}
+                {...employeeGridProps}
+              />
+            </Box>
+          )}
+
+          {awaitingResponseTasks.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle1" fontWeight={800} color="warning.main" mb={1}>
+                {he.employeeAwaitingResponseTasks}
+              </Typography>
+              <TaskOccurrenceGrid
+                tasks={awaitingResponseTasks.map(employeeCardToOccurrence)}
+                {...employeeGridProps}
+              />
+            </Box>
+          )}
+
           {urgentTasks.length > 0 && (
             <Box mb={2}>
               <Typography variant="subtitle1" fontWeight={800} color="error.main" mb={1}>
                 {he.employeeUrgentTasks}
               </Typography>
-              {urgentTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  urgent
-                  carryOver={isRolledFromPreviousDay(task)}
-                  starting={startingId === task.id}
-                  speaking={speakingId === task.id}
-                  onStart={handleStart}
-                  onComplete={openComplete}
-                  onOpen={setDetailTask}
-                  onListen={handleListen}
-                  onStopListen={stopSpeech}
-                />
-              ))}
-            </Box>
-          )}
-
-          {inProgressTasks.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.tasksInProgress}</Typography>
-              {inProgressTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  carryOver={isRolledFromPreviousDay(task)}
-                  starting={startingId === task.id}
-                  speaking={speakingId === task.id}
-                  onStart={handleStart}
-                  onComplete={openComplete}
-                  onOpen={setDetailTask}
-                  onListen={handleListen}
-                  onStopListen={stopSpeech}
-                />
-              ))}
+              <TaskOccurrenceGrid
+                tasks={urgentTasks.map(employeeCardToOccurrence)}
+                urgentIds={new Set(urgentTasks.map((t) => t.id))}
+                {...employeeGridProps}
+              />
             </Box>
           )}
 
           {pendingReviewTasks.length > 0 && (
             <Box mb={2}>
               <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.taskPendingReview}</Typography>
-              {pendingReviewTasks.map((task) => (
-                <Card key={task.id} variant="outlined" sx={{ mb: 2, opacity: 0.9 }}>
-                  <CardContent>
-                    <EmployeeTaskTitle task={task} />
-                    <Box display="flex" gap={1} flexWrap="wrap" mt={1} mb={1}>
-                      <Chip label={he.taskStatusLabels.pending_review} color="info" size="small" />
-                      {(hasDeferredTaskMedia(task) || taskHasOpenableReferenceMedia(task)) && (
-                        <Chip label={he.taskExtraMediaHint} size="small" color="info" variant="outlined" />
-                      )}
-                    </Box>
-                    <Button size="small" variant="outlined" onClick={() => setDetailTask(task)}>
-                      {he.openTask}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+              <TaskOccurrenceGrid
+                tasks={pendingReviewTasks.map(employeeCardToOccurrence)}
+                onOpen={employeeGridProps.onOpen}
+              />
             </Box>
           )}
 
@@ -864,22 +688,12 @@ export default function EmployeeTasksPage() {
               icon={<TaskAltOutlinedIcon fontSize="inherit" />}
               compact
             />
-          ) : (
-            todayTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                carryOver={isRolledFromPreviousDay(task)}
-                starting={startingId === task.id}
-                speaking={speakingId === task.id}
-                onStart={handleStart}
-                onComplete={openComplete}
-                onOpen={setDetailTask}
-                onListen={handleListen}
-                onStopListen={stopSpeech}
-              />
-            ))
-          )}
+          ) : todayTasks.length > 0 ? (
+            <TaskOccurrenceGrid
+              tasks={todayTasks.map(employeeCardToOccurrence)}
+              {...employeeGridProps}
+            />
+          ) : null}
 
           {completedTasks.length > 0 && (
             <Accordion expanded={showCompleted} onChange={() => setShowCompleted((v) => !v)} sx={{ mt: 2, boxShadow: 0, border: 1, borderColor: "divider" }}>
@@ -889,14 +703,10 @@ export default function EmployeeTasksPage() {
                 </Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ pt: 0 }}>
-                {completedTasks.map((task) => (
-                  <Card key={task.id} variant="outlined" sx={{ mb: 1, opacity: 0.85 }}>
-                    <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                      <Typography fontWeight={600}>{task.title}</Typography>
-                      <Chip label={he.taskCompleted} color="success" size="small" sx={{ mt: 0.5 }} />
-                    </CardContent>
-                  </Card>
-                ))}
+                <TaskOccurrenceGrid
+                  tasks={completedTasks.map(employeeCardToOccurrence)}
+                  onOpen={employeeGridProps.onOpen}
+                />
               </AccordionDetails>
             </Accordion>
           )}
@@ -991,6 +801,11 @@ export default function EmployeeTasksPage() {
               }
             : undefined
         }
+        onChatUpdated={() => {
+          void load();
+          setDetailTask(null);
+          showSuccess(he.taskChatSent);
+        }}
       />
 
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
@@ -1005,45 +820,39 @@ export default function EmployeeTasksPage() {
               reference_audio_url={selected.reference_audio_url}
             />
           )}
-          <Button variant={done ? "contained" : "outlined"} color="success" size="large" onClick={() => setDone(true)}>{he.taskCompleted}</Button>
-          <Button variant={!done ? "contained" : "outlined"} color="warning" size="large" onClick={() => setDone(false)}>{he.taskNotCompleted}</Button>
-          {!done && (
-            <TextField label={he.notCompletedReason} value={notDoneReason} onChange={(e) => setNotDoneReason(e.target.value)} required fullWidth multiline rows={2} />
-          )}
+          <Typography variant="body2" color="text.secondary">
+            {he.taskChatHint}
+          </Typography>
           <TextField label={he.note} value={note} onChange={(e) => setNote(e.target.value)} fullWidth multiline rows={3} placeholder={he.completionMediaHint} />
-          {done && (
-            <>
-              <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
-              <MediaCaptureActions
-                photoAdded={Boolean(pendingPhoto)}
-                videoAdded={Boolean(pendingVideo)}
-                audioAdded={Boolean(pendingAudio)}
-                uploadingKind={null}
-                disabled={saving}
-                onCapture={(file, kind: MediaKind) => handleCapture(file, kind)}
-              />
-              <CompletionMediaPreview
-                photo_path={pendingPhoto?.previewUrl}
-                video_path={pendingVideo?.previewUrl}
-                audio_path={pendingAudio?.previewUrl}
-                disabled={saving}
-                onRemovePhoto={() => {
-                  revokePendingMedia(pendingPhoto);
-                  setPendingPhoto(null);
-                }}
-                onRemoveVideo={() => {
-                  revokePendingMedia(pendingVideo);
-                  setPendingVideo(null);
-                }}
-                onRemoveAudio={() => {
-                  revokePendingMedia(pendingAudio);
-                  setPendingAudio(null);
-                }}
-              />
-              {requiresMedia && !hasVisualMedia && (
-                <Typography variant="caption" color="warning.main">{he.photoRequired}</Typography>
-              )}
-            </>
+          <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
+          <MediaCaptureActions
+            photoAdded={Boolean(pendingPhoto)}
+            videoAdded={Boolean(pendingVideo)}
+            audioAdded={Boolean(pendingAudio)}
+            uploadingKind={null}
+            disabled={saving}
+            onCapture={(file, kind: MediaKind) => handleCapture(file, kind)}
+          />
+          <CompletionMediaPreview
+            photo_path={pendingPhoto?.previewUrl}
+            video_path={pendingVideo?.previewUrl}
+            audio_path={pendingAudio?.previewUrl}
+            disabled={saving}
+            onRemovePhoto={() => {
+              revokePendingMedia(pendingPhoto);
+              setPendingPhoto(null);
+            }}
+            onRemoveVideo={() => {
+              revokePendingMedia(pendingVideo);
+              setPendingVideo(null);
+            }}
+            onRemoveAudio={() => {
+              revokePendingMedia(pendingAudio);
+              setPendingAudio(null);
+            }}
+          />
+          {requiresMedia && !hasVisualMedia && (
+            <Typography variant="caption" color="warning.main">{he.photoRequired}</Typography>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -1059,7 +868,7 @@ export default function EmployeeTasksPage() {
           <Button
             variant="contained"
             onClick={() => void handleSubmit()}
-            disabled={saving || (!done && !notDoneReason.trim()) || !canSubmitDone}
+            disabled={saving || !canSubmitDone}
           >
             {saving ? <CircularProgress size={22} color="inherit" /> : he.submit}
           </Button>

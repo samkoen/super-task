@@ -83,19 +83,19 @@ export default function CompletionMediaPreview({
             {he.taskReferenceAudio}
           </Typography>
           <Box component="audio" src={audioSrc} controls sx={{ width: "100%", display: "block" }} />
-          {resolvedTranscript && (
-            <Box sx={{ mt: 1, p: 1.25, bgcolor: "action.hover", borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-                {he.completionAudioTranscript}
-              </Typography>
-              <Typography variant="body2">{resolvedTranscript}</Typography>
-            </Box>
-          )}
           {onRemoveAudio && (
             <Button size="small" color="inherit" disabled={disabled} onClick={onRemoveAudio} sx={{ mt: 0.5 }}>
               {he.removeMedia}
             </Button>
           )}
+        </Box>
+      )}
+      {resolvedTranscript && (
+        <Box sx={{ p: 1.25, bgcolor: "action.hover", borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+            {he.completionAudioTranscript}
+          </Typography>
+          <Typography variant="body2">{resolvedTranscript}</Typography>
         </Box>
       )}
     </Box>

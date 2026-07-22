@@ -8,6 +8,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -31,6 +33,8 @@ interface MediaCaptureActionsProps {
   audioAdded: boolean;
   uploadingKind: MediaKind | null;
   disabled?: boolean;
+  /** Boutons texte (défaut) ou petites icônes discrètes (chat). */
+  density?: "default" | "icon";
   onCapture: (file: File, kind: MediaKind) => void | Promise<void>;
 }
 
@@ -468,6 +472,7 @@ export default function MediaCaptureActions({
   audioAdded,
   uploadingKind,
   disabled = false,
+  density = "default",
   onCapture,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream();
@@ -478,6 +483,7 @@ export default function MediaCaptureActions({
   const captureSupported = isMediaCaptureSupported();
 
   const busy = disabled || uploadingKind !== null;
+  const captureDisabled = busy || !captureSupported;
 
   const openPhotoCapture = useCallback(() => {
     setPhotoOpen(true);
@@ -503,13 +509,72 @@ export default function MediaCaptureActions({
     videoRecorder.cleanup();
   }, [videoRecorder.cleanup]);
 
-  return (
-    <>
+  const iconActions = (
+    <Box display="flex" alignItems="center" gap={0.25} sx={{ opacity: 0.75 }}>
+      <Tooltip title={audioAdded ? he.audioAdded : he.addAudio}>
+        <span>
+          <IconButton
+            size="small"
+            aria-label={he.addAudio}
+            color={audioAdded ? "primary" : "default"}
+            onClick={() => setAudioOpen(true)}
+            disabled={captureDisabled}
+            sx={{ p: 0.5 }}
+          >
+            {uploadingKind === "audio" ? (
+              <CircularProgress size={16} />
+            ) : (
+              <MicIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title={photoAdded ? he.photoAdded : he.addPhoto}>
+        <span>
+          <IconButton
+            size="small"
+            aria-label={he.addPhoto}
+            color={photoAdded ? "primary" : "default"}
+            onClick={openPhotoCapture}
+            disabled={captureDisabled}
+            sx={{ p: 0.5 }}
+          >
+            {uploadingKind === "photo" ? (
+              <CircularProgress size={16} />
+            ) : (
+              <PhotoCameraIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title={videoAdded ? he.videoAdded : he.addVideo}>
+        <span>
+          <IconButton
+            size="small"
+            aria-label={he.addVideo}
+            color={videoAdded ? "primary" : "default"}
+            onClick={openVideoCapture}
+            disabled={captureDisabled}
+            sx={{ p: 0.5 }}
+          >
+            {uploadingKind === "video" ? (
+              <CircularProgress size={16} />
+            ) : (
+              <VideocamIcon sx={{ fontSize: 18 }} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+    </Box>
+  );
+
+  const defaultActions = (
+    <Box display="flex" flexWrap="wrap" gap={1}>
       <Button
         startIcon={<PhotoCameraIcon />}
         variant={photoAdded ? "contained" : "outlined"}
         onClick={openPhotoCapture}
-        disabled={busy || !captureSupported}
+        disabled={captureDisabled}
       >
         {uploadingKind === "photo" ? he.loading : photoAdded ? he.photoAdded : he.addPhoto}
       </Button>
@@ -517,7 +582,7 @@ export default function MediaCaptureActions({
         startIcon={<VideocamIcon />}
         variant={videoAdded ? "contained" : "outlined"}
         onClick={openVideoCapture}
-        disabled={busy || !captureSupported}
+        disabled={captureDisabled}
       >
         {uploadingKind === "video" ? he.loading : videoAdded ? he.videoAdded : he.addVideo}
       </Button>
@@ -525,10 +590,16 @@ export default function MediaCaptureActions({
         startIcon={<MicIcon />}
         variant={audioAdded ? "contained" : "outlined"}
         onClick={() => setAudioOpen(true)}
-        disabled={busy || !captureSupported}
+        disabled={captureDisabled}
       >
         {uploadingKind === "audio" ? he.loading : audioAdded ? he.audioAdded : he.addAudio}
       </Button>
+    </Box>
+  );
+
+  return (
+    <>
+      {density === "icon" ? iconActions : defaultActions}
       {!captureSupported && (
         <Typography variant="caption" color="warning.main">
           {he.mediaCaptureUnsupported}

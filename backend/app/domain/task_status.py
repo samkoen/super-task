@@ -3,11 +3,12 @@
 PENDING = "pending"
 IN_PROGRESS = "in_progress"
 PENDING_REVIEW = "pending_review"
+AWAITING_RESPONSE = "awaiting_response"  # ממתין לתגובה (chat)
 COMPLETED = "completed"
 OVERDUE = "overdue"
 CANCELLED = "cancelled"
 
-ACTIVE = {PENDING, IN_PROGRESS, OVERDUE, PENDING_REVIEW}
+ACTIVE = {PENDING, IN_PROGRESS, OVERDUE, PENDING_REVIEW, AWAITING_RESPONSE}
 TERMINAL = {COMPLETED, CANCELLED}
 
 COMPLETION_DONE = "completed"

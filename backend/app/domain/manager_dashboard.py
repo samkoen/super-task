@@ -7,7 +7,7 @@ from app.domain import task_status
 from app.models.task_completion import TaskCompletion
 from app.models.task_occurrence import TaskOccurrence
 
-TimelineSegment = str  # completed | in_progress | pending_review | upcoming | overdue
+TimelineSegment = str  # completed | in_progress | pending_review | awaiting_response | upcoming | overdue
 
 
 def parse_dt(value: str, tz) -> datetime:
@@ -30,6 +30,8 @@ def timeline_segment(task: TaskOccurrence, *, now: datetime, tz) -> TimelineSegm
         return "completed"
     if task.status == task_status.PENDING_REVIEW:
         return "pending_review"
+    if task.status == task_status.AWAITING_RESPONSE:
+        return "awaiting_response"
     if task.status == task_status.IN_PROGRESS:
         return "in_progress"
     if task.status == task_status.OVERDUE:
@@ -73,12 +75,18 @@ def build_timeline_item(
         "department_name": department_name,
         "assignee_name": assignee_name,
         "task_kind": task.task_kind,
+        "manager_next_at": task.manager_next_at,
+        "is_manager_next": bool(task.manager_next_at),
     }
 
 
 def sort_timeline_tasks(tasks: list[TaskOccurrence], tz) -> list[TaskOccurrence]:
     def key(task: TaskOccurrence) -> tuple:
-        if task.status in {task_status.IN_PROGRESS, task_status.PENDING_REVIEW}:
+        if task.status in {
+            task_status.IN_PROGRESS,
+            task_status.PENDING_REVIEW,
+            task_status.AWAITING_RESPONSE,
+        }:
             return (0, task.started_at or task.due_at)
         if task.status == task_status.COMPLETED:
             return (1, task.started_at or task.due_at)
@@ -93,7 +101,7 @@ def task_queue_bucket(status: str) -> str | None:
         return None
     if status == task_status.COMPLETED:
         return "completed"
-    if status == task_status.PENDING_REVIEW:
+    if status in {task_status.PENDING_REVIEW, task_status.AWAITING_RESPONSE}:
         return "pending_review"
     if status == task_status.IN_PROGRESS:
         return "in_progress"

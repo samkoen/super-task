@@ -25,6 +25,8 @@ class TaskOccurrence:
     created_at: str
     updated_at: str
     source_gallery_item_id: str | None = None
+    ops_category: str | None = None
+    manager_next_at: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -38,6 +40,7 @@ class TaskOccurrence:
             "assignee_user_id": self.assignee_user_id,
             "department_id": self.department_id,
             "task_kind": self.task_kind,
+            "ops_category": self.ops_category,
             "manager_user_id": self.manager_user_id,
             "photo_required": self.photo_required,
             "reference_photo_url": self.reference_photo_url,
@@ -47,9 +50,11 @@ class TaskOccurrence:
             "source_gallery_item_id": self.source_gallery_item_id,
             "started_at": self.started_at,
             "started_by_id": self.started_by_id,
+            "manager_next_at": self.manager_next_at,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "is_manager_next": bool(self.manager_next_at),
         }
 
     @property

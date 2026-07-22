@@ -64,6 +64,7 @@ class TaskSchedulerService:
             reference_video_url=video,
             reference_audio_url=audio,
             created_by_id=template.created_by_id,
+            ops_category=getattr(template, "ops_category", None),
         )
 
     def create_once_occurrence(self, template, *, due_at: datetime | None = None) -> None:
@@ -86,6 +87,7 @@ class TaskSchedulerService:
             reference_audio_url=audio,
             created_by_id=template.created_by_id,
             source_gallery_item_id=getattr(template, "source_gallery_item_id", None),
+            ops_category=getattr(template, "ops_category", None),
         )
 
     def _copy_reference_media(self, template) -> tuple[str | None, str | None, str | None]:

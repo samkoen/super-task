@@ -91,3 +91,46 @@ def test_manager_allowed_when_url_in_gallery():
             )
             is True
         )
+
+
+def test_manager_allowed_when_url_in_task_message():
+    db = MagicMock()
+    miss = MagicMock()
+    miss.first.return_value = None
+    hit = MagicMock()
+    hit.first.return_value = ("msg-1",)
+    # occurrence, completion, template, issue, gallery miss ; chat message hit
+    db.execute.side_effect = [miss, miss, miss, miss, miss, hit]
+    branch_id = "11111111-1111-1111-1111-111111111111"
+    with patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=[branch_id],
+    ):
+        assert (
+            actor_can_access_media_url(
+                db,
+                _actor(roles.BRANCH_MANAGER, branch_id=branch_id),
+                "/uploads/chat_photos/q.jpg",
+            )
+            is True
+        )
+
+
+def test_admin_allowed_when_url_only_on_task_message():
+    db = MagicMock()
+    miss = MagicMock()
+    miss.first.return_value = None
+    hit = MagicMock()
+    hit.first.return_value = ("msg-1",)
+    # occurrence, completion, template, issue, gallery miss ; message hit
+    db.execute.side_effect = [miss, miss, miss, miss, miss, hit]
+    with patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=None,
+    ):
+        assert (
+            actor_can_access_media_url(
+                db, _actor(roles.ADMIN, branch_id=None), "/uploads/chat_photos/q.jpg"
+            )
+            is True
+        )

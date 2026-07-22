@@ -47,6 +47,9 @@ def _url_exists(db: Session, url: str) -> bool:
         or db.execute(
             select(orm.TaskGalleryItem.id).where(_gallery_media_match(url)).limit(1)
         ).first()
+        or db.execute(
+            select(orm.TaskMessage.id).where(_message_media_match(url)).limit(1)
+        ).first()
     )
 
 
@@ -88,6 +91,16 @@ def _url_exists_in_branches(
             .limit(1)
         ).first()
         or _gallery_url_in_scope(db, url, uuids, network_id)
+        or db.execute(
+            select(orm.TaskMessage.id)
+            .join(
+                orm.TaskOccurrence,
+                orm.TaskOccurrence.id == orm.TaskMessage.occurrence_id,
+            )
+            .where(orm.TaskOccurrence.branch_id.in_(uuids))
+            .where(_message_media_match(url))
+            .limit(1)
+        ).first()
     ):
         return True
     return False
@@ -152,4 +165,12 @@ def _gallery_media_match(url: str):
         orm.TaskGalleryItem.reference_photo_url == url,
         orm.TaskGalleryItem.reference_video_url == url,
         orm.TaskGalleryItem.reference_audio_url == url,
+    )
+
+
+def _message_media_match(url: str):
+    return or_(
+        orm.TaskMessage.photo_url == url,
+        orm.TaskMessage.video_url == url,
+        orm.TaskMessage.audio_url == url,
     )

@@ -1,5 +1,6 @@
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
@@ -14,6 +15,7 @@ const STATUS_ICON: Record<TaskStatus, SvgIconComponent> = {
   pending: HourglassEmptyIcon,
   in_progress: PlayCircleOutlineIcon,
   pending_review: RateReviewOutlinedIcon,
+  awaiting_response: ForumOutlinedIcon,
   completed: CheckCircleOutlineIcon,
   overdue: WarningAmberOutlinedIcon,
   cancelled: BlockOutlinedIcon,
@@ -24,7 +26,8 @@ export interface TaskStatusChipProps {
 }
 
 export default function TaskStatusChip({ status }: TaskStatusChipProps) {
-  const Icon = STATUS_ICON[status];
+  const Icon = STATUS_ICON[status] ?? HourglassEmptyIcon;
+  const label = he.taskStatusLabels[status] ?? status;
   return (
     <Chip
       label={
@@ -38,7 +41,7 @@ export default function TaskStatusChip({ status }: TaskStatusChipProps) {
           }}
         >
           <Icon sx={{ fontSize: "1rem", flexShrink: 0 }} />
-          <Box component="span">{he.taskStatusLabels[status]}</Box>
+          <Box component="span">{label}</Box>
         </Box>
       }
       color={taskStatusChipColor(status)}

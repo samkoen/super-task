@@ -17,8 +17,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useNavigate } from "react-router-dom";
 import type { UnfinishedTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
-import { formatTime } from "../../utils/dashboardTime";
-import { dueDateIso } from "../../utils/dateView";
+import { dueDateIso, formatDueAt } from "../../utils/dateView";
 
 export interface UnfinishedTasksPanelProps {
   tasks: UnfinishedTask[];
@@ -81,7 +80,7 @@ export default function UnfinishedTasksPanel({ tasks }: UnfinishedTasksPanelProp
                       <TableCell>{task.assignee_name || "—"}</TableCell>
                       <TableCell>{task.department_name || he.noDepartment}</TableCell>
                       <TableCell>
-                        {formatTime(task.due_at)}
+                        <Typography fontWeight={600}>{formatDueAt(task.due_at)}</Typography>
                         <Typography variant="caption" display="block" color="text.secondary">
                           {dueDateIso(task.due_at)}
                         </Typography>

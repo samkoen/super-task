@@ -101,6 +101,7 @@ class TaskOccurrenceRepository:
         reference_audio_url: str | None = None,
         created_by_id: str | None = None,
         source_gallery_item_id: str | None = None,
+        ops_category: str | None = None,
     ) -> TaskOccurrence:
         import uuid
 
@@ -115,6 +116,7 @@ class TaskOccurrenceRepository:
             assignee_user_id=mp.parse_uuid(assignee_user_id) if assignee_user_id else None,
             department_id=mp.parse_uuid(department_id) if department_id else None,
             task_kind=task_kind,
+            ops_category=ops_category,
             manager_user_id=mp.parse_uuid(manager_user_id) if manager_user_id else None,
             photo_required=photo_required,
             reference_photo_url=(reference_photo_url or "").strip() or None,
@@ -136,6 +138,8 @@ class TaskOccurrenceRepository:
         if not row:
             return None
         row.status = status
+        if status in task_status.TERMINAL:
+            row.manager_next_at = None
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
@@ -146,6 +150,35 @@ class TaskOccurrenceRepository:
         row.status = task_status.IN_PROGRESS
         row.started_by_id = mp.parse_uuid(started_by_id)
         row.started_at = started_at
+        row.manager_next_at = None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def clear_manager_next_for_assignee(self, assignee_user_id: str) -> None:
+        uid = mp.parse_uuid(assignee_user_id)
+        rows = (
+            self._db.query(orm.TaskOccurrence)
+            .filter(
+                orm.TaskOccurrence.assignee_user_id == uid,
+                orm.TaskOccurrence.manager_next_at.isnot(None),
+            )
+            .all()
+        )
+        for row in rows:
+            row.manager_next_at = None
+        if rows:
+            self._db.flush()
+
+    def set_manager_next(
+        self,
+        id_: str,
+        *,
+        manager_next_at: datetime | None,
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.manager_next_at = manager_next_at
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

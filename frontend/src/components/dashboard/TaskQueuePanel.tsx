@@ -16,6 +16,7 @@ import {
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import type { TaskQueues, TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
+import { formatDueAt } from "../../utils/dateView";
 import { formatDurationMinutes, formatTime } from "../../utils/dashboardTime";
 import {
   isLongInProgress,
@@ -65,7 +66,7 @@ function QueueItem({
       secondaryParts.push(formatDurationMinutes(task.elapsed_minutes));
     }
   } else {
-    secondaryParts.push(`${he.dashboardDueAt} ${formatTime(task.due_at)}`);
+    secondaryParts.push(`${he.dashboardDueAt} ${formatDueAt(task.due_at)}`);
   }
 
   return (

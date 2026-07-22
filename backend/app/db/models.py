@@ -175,6 +175,7 @@ class TaskTemplate(Base):
         Uuid(as_uuid=True), ForeignKey("departments.id"), nullable=True
     )
     task_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="fixed")
+    ops_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     photo_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reference_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -218,6 +219,7 @@ class TaskOccurrence(Base):
         Uuid(as_uuid=True), ForeignKey("departments.id"), nullable=True
     )
     task_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="fixed")
+    ops_category: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     manager_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
@@ -237,6 +239,9 @@ class TaskOccurrence(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_by_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    manager_next_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -297,6 +302,33 @@ class TaskCompletion(Base):
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TaskMessage(Base):
+    __tablename__ = "task_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    occurrence_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("task_occurrences.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sender_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    body: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    body_translated: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    audio_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    audio_transcript_sender: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

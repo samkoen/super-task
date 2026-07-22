@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { Box } from "@mui/material";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
@@ -21,6 +21,7 @@ const AdminProductsPage = lazy(() => import("./pages/admin/AdminProductsPage"));
 const ManagerTasksPage = lazy(() => import("./pages/manager/ManagerTasksPage"));
 const ManagerIssuesPage = lazy(() => import("./pages/manager/ManagerIssuesPage"));
 const ManagerTaskGalleryPage = lazy(() => import("./pages/manager/ManagerTaskGalleryPage"));
+const ManagerFixedTasksPage = lazy(() => import("./pages/manager/ManagerFixedTasksPage"));
 const ManagerEmployeesPage = lazy(() => import("./pages/manager/ManagerEmployeesPage"));
 const EmployeeTasksPage = lazy(() => import("./pages/employee/EmployeeTasksPage"));
 
@@ -156,6 +157,14 @@ export default function App() {
               </LazyPage>
             }
           />
+          <Route
+            path="/admin/fixed-tasks"
+            element={
+              <LazyPage>
+                <ManagerFixedTasksPage />
+              </LazyPage>
+            }
+          />
         </Route>
         <Route element={<ProtectedRoute roles={["network_manager", "branch_manager"]} />}>
           <Route
@@ -195,6 +204,14 @@ export default function App() {
             element={
               <LazyPage>
                 <ManagerTaskGalleryPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/fixed-tasks"
+            element={
+              <LazyPage>
+                <ManagerFixedTasksPage />
               </LazyPage>
             }
           />

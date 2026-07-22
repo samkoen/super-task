@@ -87,6 +87,7 @@ class TaskTemplateRepository:
         reference_audio_url: str | None = None,
         biweekly_anchor: datetime | None = None,
         source_gallery_item_id: str | None = None,
+        ops_category: str | None = None,
     ) -> TaskTemplate:
         import uuid
 
@@ -102,6 +103,7 @@ class TaskTemplateRepository:
             assignee_user_id=mp.parse_uuid(assignee_user_id) if assignee_user_id else None,
             department_id=mp.parse_uuid(department_id) if department_id else None,
             task_kind=task_kind,
+            ops_category=ops_category,
             photo_required=photo_required,
             reference_photo_url=(reference_photo_url or "").strip() or None,
             reference_video_url=(reference_video_url or "").strip() or None,
@@ -133,6 +135,8 @@ class TaskTemplateRepository:
         reference_photo_url: str | None = None,
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
+        ops_category: str | None = None,
+        update_ops_category: bool = False,
     ) -> TaskTemplate | None:
         row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
         if not row:
@@ -144,6 +148,8 @@ class TaskTemplateRepository:
         row.assignee_user_id = mp.parse_uuid(assignee_user_id) if assignee_user_id else None
         row.department_id = mp.parse_uuid(department_id) if department_id else None
         row.is_active = is_active
+        if update_ops_category:
+            row.ops_category = ops_category
         if reference_photo_url is not None:
             row.reference_photo_url = reference_photo_url.strip() or None
         if reference_video_url is not None:

@@ -45,7 +45,13 @@ export interface TimelineTask {
   id: string;
   title: string;
   status: TaskStatus;
-  segment: "completed" | "in_progress" | "pending_review" | "upcoming" | "overdue";
+  segment:
+    | "completed"
+    | "in_progress"
+    | "pending_review"
+    | "awaiting_response"
+    | "upcoming"
+    | "overdue";
   due_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -54,6 +60,8 @@ export interface TimelineTask {
   department_name: string | null;
   assignee_name: string | null;
   task_kind: TaskKind;
+  manager_next_at?: string | null;
+  is_manager_next?: boolean;
 }
 
 export interface TeamMember {
@@ -99,11 +107,28 @@ export interface BranchSummary {
   completion_rate: number;
 }
 
+export type OpsCategory = "cleaning" | "fronts_signage";
+
+export interface StoreCategoryKpi {
+  category: OpsCategory;
+  total: number;
+  reported: number;
+  approved: number;
+  report_pct: number;
+  approval_pct: number;
+}
+
+export interface StoreKpis {
+  cleaning: StoreCategoryKpi;
+  fronts_signage: StoreCategoryKpi;
+}
+
 export interface ManagerDashboard {
   due_on: string;
   branch: { id: string; name: string; network_id: string } | null;
   health: HealthLevel;
   counts: DashboardCounts;
+  store_kpis?: StoreKpis | null;
   by_department: DepartmentSummary[] | null;
   team: TeamMember[] | null;
   task_queues: TaskQueues | null;
@@ -131,6 +156,8 @@ export interface EmployeeTaskCard {
   display_language?: string;
   translation_pending?: boolean;
   title_he?: string;
+  manager_next_at?: string | null;
+  is_manager_next?: boolean;
 }
 
 export interface EmployeeDashboard {
@@ -148,6 +175,7 @@ export interface EmployeeDashboard {
   counts: DashboardCounts;
   urgent_tasks: EmployeeTaskCard[];
   in_progress_tasks: EmployeeTaskCard[];
+  awaiting_response_tasks: EmployeeTaskCard[];
   pending_review_tasks: EmployeeTaskCard[];
   today_tasks: EmployeeTaskCard[];
   completed_tasks: EmployeeTaskCard[];
@@ -172,6 +200,8 @@ export const dashboardService = {
       ...data,
       urgent_tasks: data.urgent_tasks ?? [],
       in_progress_tasks: data.in_progress_tasks ?? [],
+      awaiting_response_tasks: data.awaiting_response_tasks ?? [],
+      pending_review_tasks: data.pending_review_tasks ?? [],
       today_tasks: data.today_tasks ?? [],
       completed_tasks: data.completed_tasks ?? [],
     };

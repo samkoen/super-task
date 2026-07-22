@@ -19,7 +19,8 @@ import TaskReferenceMediaEditor, {
   type TaskReferenceMediaValue,
 } from "./TaskReferenceMediaEditor";
 import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
-import type { TaskRecurrence } from "../../services/taskService";
+import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
+import type { OpsCategory, TaskRecurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
 
 const RECURRENCES: TaskRecurrence[] = ["daily", "weekly", "biweekly", "monthly"];
@@ -53,6 +54,7 @@ export interface NewTaskFormSubmitPayload {
   weekly_days: string;
   monthly_day: number;
   media: TaskReferenceMediaValue;
+  ops_category?: OpsCategory | null;
 }
 
 export interface NewTaskFormDialogProps {
@@ -67,6 +69,8 @@ export interface NewTaskFormDialogProps {
   defaultDueAt: string;
   defaultAssigneeId?: string;
   lockAssignee?: boolean;
+  /** Force le type (ex. page משימות קבועות). */
+  forcedTaskKind?: NewTaskKind;
   initialMedia?: TaskReferenceMediaValue;
   /** Prefill titre/description/assignee (ex. issue report). */
   initialPrefill?: Partial<Pick<NewTaskFormSubmitPayload, "title" | "description" | "assignee_user_id">>;
@@ -86,12 +90,13 @@ export default function NewTaskFormDialog({
   defaultDueAt,
   defaultAssigneeId = "",
   lockAssignee = false,
+  forcedTaskKind,
   initialMedia,
   initialPrefill,
   saving = false,
   onError,
 }: NewTaskFormDialogProps) {
-  const [taskKind, setTaskKind] = useState<NewTaskKind>("ad_hoc");
+  const [taskKind, setTaskKind] = useState<NewTaskKind>(forcedTaskKind ?? "ad_hoc");
   const [branchId, setBranchId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -101,6 +106,7 @@ export default function NewTaskFormDialog({
   const [dueTime, setDueTime] = useState("09:00");
   const [weeklyDays, setWeeklyDays] = useState("0");
   const [monthlyDay, setMonthlyDay] = useState(1);
+  const [opsCategory, setOpsCategory] = useState<OpsCategory | "">("");
   const [media, setMedia] = useState<TaskReferenceMediaValue>(EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
   const wasOpenRef = useRef(false);
@@ -110,7 +116,7 @@ export default function NewTaskFormDialog({
     const justOpened = open && !wasOpenRef.current;
     wasOpenRef.current = open;
     if (!justOpened) return;
-    setTaskKind("ad_hoc");
+    setTaskKind(forcedTaskKind ?? "ad_hoc");
     setBranchId(defaultBranchId);
     setTitle(initialPrefill?.title ?? "");
     setDescription(initialPrefill?.description ?? "");
@@ -122,6 +128,7 @@ export default function NewTaskFormDialog({
     setDueTime("09:00");
     setWeeklyDays("0");
     setMonthlyDay(1);
+    setOpsCategory("");
     setMedia(initialMedia ?? EMPTY_MEDIA);
     setLocalError("");
     // Snapshot à l'ouverture seulement
@@ -130,7 +137,11 @@ export default function NewTaskFormDialog({
 
   const branchEmployees = useMemo(() => {
     const base = branchId ? employees.filter((u) => u.branch_id === branchId) : employees;
-    if (assigneeUserId && !base.some((u) => u.id === assigneeUserId)) {
+    if (
+      assigneeUserId &&
+      !isAssignToGallery(assigneeUserId) &&
+      !base.some((u) => u.id === assigneeUserId)
+    ) {
       const hit = employees.find((u) => u.id === assigneeUserId);
       if (hit) return [hit, ...base];
     }
@@ -165,6 +176,8 @@ export default function NewTaskFormDialog({
     }
   };
 
+  const toGallery = isAssignToGallery(assigneeUserId);
+
   const handleSubmit = async () => {
     if (!assigneeUserId.trim()) {
       setLocalError(he.newTaskAssigneeRequired);
@@ -172,6 +185,9 @@ export default function NewTaskFormDialog({
     }
     if (!branchId.trim()) {
       setLocalError(he.taskVoiceNeedBranch);
+      return;
+    }
+    if (!toGallery && taskKind === "ad_hoc" && !dueAt) {
       return;
     }
     setLocalError("");
@@ -186,6 +202,7 @@ export default function NewTaskFormDialog({
       due_time: dueTime,
       weekly_days: weeklyDays,
       monthly_day: monthlyDay,
+      ops_category: taskKind === "fixed" ? opsCategory || null : null,
       media,
     });
   };
@@ -193,7 +210,7 @@ export default function NewTaskFormDialog({
   const canSubmit =
     Boolean(assigneeUserId.trim()) &&
     Boolean(branchId.trim()) &&
-    (taskKind === "fixed" || Boolean(dueAt)) &&
+    (toGallery || taskKind === "fixed" || Boolean(dueAt)) &&
     !saving;
 
   return (
@@ -204,24 +221,26 @@ export default function NewTaskFormDialog({
           : he.newTask}
       </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-        <Box>
-          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-            {he.taskKind}
-          </Typography>
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={taskKind}
-            onChange={(_, v: NewTaskKind | null) => {
-              if (v) setTaskKind(v);
-            }}
-            disabled={saving}
-          >
-            <ToggleButton value="ad_hoc">{he.taskKindLabels.ad_hoc}</ToggleButton>
-            <ToggleButton value="fixed">{he.taskKindLabels.fixed}</ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
+        {!forcedTaskKind && (
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+              {he.taskKind}
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={taskKind}
+              onChange={(_, v: NewTaskKind | null) => {
+                if (v) setTaskKind(v);
+              }}
+              disabled={saving}
+            >
+              <ToggleButton value="ad_hoc">{he.taskKindLabels.ad_hoc}</ToggleButton>
+              <ToggleButton value="fixed">{he.taskKindLabels.fixed}</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        )}
 
         {canPickBranch && (
           <TextField
@@ -254,7 +273,28 @@ export default function NewTaskFormDialog({
           fullWidth
         />
 
-        {taskKind === "ad_hoc" ? (
+        <TextField
+          select
+          label={he.assignee}
+          value={assigneeUserId}
+          onChange={(e) => setAssigneeUserId(e.target.value)}
+          required
+          fullWidth
+          disabled={lockAssignee || saving}
+          error={Boolean(localError && !assigneeUserId)}
+          helperText={toGallery ? he.assignToGalleryHint : undefined}
+        >
+          {!lockAssignee && forcedTaskKind !== "fixed" && (
+            <MenuItem value={ASSIGN_TO_GALLERY}>
+              <Box component="span" fontWeight={700}>{he.assignToGallery}</Box>
+            </MenuItem>
+          )}
+          {branchEmployees.map((u) => (
+            <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+          ))}
+        </TextField>
+
+        {taskKind === "ad_hoc" && !toGallery ? (
           <TextField
             label={he.dueAt}
             type="datetime-local"
@@ -265,7 +305,8 @@ export default function NewTaskFormDialog({
             fullWidth
             dir="ltr"
           />
-        ) : (
+        ) : null}
+        {taskKind === "fixed" ? (
           <>
             <TextField
               select
@@ -313,23 +354,19 @@ export default function NewTaskFormDialog({
                 ))}
               </TextField>
             )}
+            <TextField
+              select
+              label={he.opsCategory}
+              value={opsCategory}
+              onChange={(e) => setOpsCategory(e.target.value as OpsCategory | "")}
+              fullWidth
+            >
+              <MenuItem value="">{he.opsCategoryNone}</MenuItem>
+              <MenuItem value="cleaning">{he.opsCategoryLabels.cleaning}</MenuItem>
+              <MenuItem value="fronts_signage">{he.opsCategoryLabels.fronts_signage}</MenuItem>
+            </TextField>
           </>
-        )}
-
-        <TextField
-          select
-          label={he.assignee}
-          value={assigneeUserId}
-          onChange={(e) => setAssigneeUserId(e.target.value)}
-          required
-          fullWidth
-          disabled={lockAssignee || saving}
-          error={Boolean(localError && !assigneeUserId)}
-        >
-          {branchEmployees.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
-          ))}
-        </TextField>
+        ) : null}
 
         <TaskReferenceMediaEditor
           value={media}

@@ -24,6 +24,7 @@ class TaskTemplate:
     created_at: str
     updated_at: str
     source_gallery_item_id: str | None = None
+    ops_category: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -38,6 +39,7 @@ class TaskTemplate:
             "assignee_user_id": self.assignee_user_id,
             "department_id": self.department_id,
             "task_kind": self.task_kind,
+            "ops_category": self.ops_category,
             "photo_required": self.photo_required,
             "reference_photo_url": self.reference_photo_url,
             "reference_video_url": self.reference_video_url,

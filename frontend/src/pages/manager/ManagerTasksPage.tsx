@@ -34,7 +34,9 @@ import TaskReferenceMediaEditor, {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
+import TaskChatPanel from "../../components/tasks/TaskChatPanel";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
+import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import PageHeader from "../../components/ui/PageHeader";
@@ -61,6 +63,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
+import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
 import { he } from "../../i18n/he";
 
 const SAVED_FILTERS_EXPANDED_KEY = "super:saved-filters:manager_tasks:expanded";
@@ -316,21 +319,39 @@ export default function ManagerTasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
-  const handleAddToGallery = async (task: TaskOccurrence) => {
-    try {
-      const res = await taskGalleryService.createFromOccurrence(task.id);
-      showSuccess(res.message || he.taskGalleryAdded);
-      await load(true);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    }
-  };
-
   const handleCreateTask = async (payload: NewTaskFormSubmitPayload) => {
     setSaving(true);
     try {
       const title = await ensureTaskTitle(payload.title, payload.description);
       const media = await resolveTaskReferenceMedia(payload.media);
+      if (isAssignToGallery(payload.assignee_user_id)) {
+        const res = await taskGalleryService.create({
+          branch_id: payload.branch_id,
+          title,
+          description: payload.description,
+          task_kind: payload.task_kind,
+          recurrence: payload.task_kind === "fixed" ? payload.recurrence : null,
+          due_time: payload.task_kind === "fixed" ? payload.due_time : null,
+          weekly_days:
+            payload.task_kind === "fixed" &&
+            (payload.recurrence === "weekly" || payload.recurrence === "biweekly")
+              ? payload.weekly_days
+              : null,
+          monthly_day:
+            payload.task_kind === "fixed" && payload.recurrence === "monthly"
+              ? payload.monthly_day
+              : null,
+          photo_required: true,
+          ...media,
+        });
+        revokeTaskMediaBlobs(formMedia);
+        setFormOpen(false);
+        setFormMedia(EMPTY_REFERENCE_MEDIA);
+        setFormPrefill(undefined);
+        showSuccess(res.message || he.taskGalleryAdded);
+        await load();
+        return;
+      }
       if (payload.task_kind === "fixed") {
         const res = await taskService.createTemplate({
           branch_id: payload.branch_id,
@@ -344,6 +365,7 @@ export default function ManagerTasksPage() {
               : undefined,
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
           assignee_user_id: payload.assignee_user_id,
+          ops_category: payload.ops_category,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);
@@ -437,6 +459,16 @@ export default function ManagerTasksPage() {
     }
   };
 
+  const handleSetManagerNext = async (task: TaskOccurrence, enabled: boolean) => {
+    try {
+      const res = await taskService.setManagerNext(task.id, enabled);
+      showSuccess(res.message || (enabled ? he.managerNextTaskSet : he.managerNextTaskCleared));
+      await load(true);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
   const handleOpenEdit = async (task: TaskOccurrence) => {
     setEditTarget(null);
     setEditLoading(true);
@@ -467,11 +499,14 @@ export default function ManagerTasksPage() {
     if (!editTarget) return;
     setSaving(true);
     try {
+      const moveToGallery = isAssignToGallery(editForm.assignee_user_id);
       const payload: Parameters<typeof taskService.updateOccurrence>[1] = {
         title: editForm.title.trim(),
         description: editForm.description,
         due_at: new Date(editForm.due_at).toISOString(),
-        assignee_user_id: editForm.assignee_user_id || undefined,
+        assignee_user_id: moveToGallery
+          ? editTarget.assignee_user_id || undefined
+          : editForm.assignee_user_id || undefined,
         photo_required: editTarget.task_kind === "ad_hoc" ? editForm.photo_required : undefined,
       };
       if (editReferenceMediaDirty) {
@@ -480,10 +515,18 @@ export default function ManagerTasksPage() {
         payload.reference_video_url = media.reference_video_url || null;
         payload.reference_audio_url = media.reference_audio_url || null;
       }
-      const res = await taskService.updateOccurrence(editTarget.id, payload);
-      setEditTarget(null);
-      setEditReferenceMediaDirty(false);
-      showSuccess(res.message);
+      await taskService.updateOccurrence(editTarget.id, payload);
+      if (moveToGallery) {
+        await taskGalleryService.createFromOccurrence(editTarget.id);
+        await taskService.cancel(editTarget.id);
+        setEditTarget(null);
+        setEditReferenceMediaDirty(false);
+        showSuccess(he.taskMovedToGallery);
+      } else {
+        setEditTarget(null);
+        setEditReferenceMediaDirty(false);
+        showSuccess(he.taskUpdated);
+      }
       await load();
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -639,9 +682,10 @@ export default function ManagerTasksPage() {
           emptyDescription={hasListFilters ? he.noTasksFilteredHint : he.noTasksHint}
           isBranchManager={isBranchManager}
           onEdit={canManageTasks ? handleOpenEdit : undefined}
-          onCancel={handleCancel}
+          onCancel={canManageTasks ? handleCancel : undefined}
           onReview={canManageTasks ? setReviewTarget : undefined}
-          onAddToGallery={canManageTasks ? handleAddToGallery : undefined}
+          onSetManagerNext={canManageTasks ? handleSetManagerNext : undefined}
+          onChatUpdated={canManageTasks ? () => void load(true) : undefined}
         />
       ) : (
         <TaskOccurrenceGrid
@@ -650,9 +694,10 @@ export default function ManagerTasksPage() {
           emptyDescription={hasListFilters ? he.noTasksFilteredHint : he.noTasksHint}
           isBranchManager={isBranchManager}
           onEdit={canManageTasks ? handleOpenEdit : undefined}
-          onCancel={handleCancel}
+          onCancel={canManageTasks ? handleCancel : undefined}
           onReview={canManageTasks ? setReviewTarget : undefined}
-          onAddToGallery={canManageTasks ? handleAddToGallery : undefined}
+          onSetManagerNext={canManageTasks ? handleSetManagerNext : undefined}
+          onChatUpdated={canManageTasks ? () => void load(true) : undefined}
         />
       )}
 
@@ -772,7 +817,15 @@ export default function ManagerTasksPage() {
               onChange={(e) => setEditForm({ ...editForm, assignee_user_id: e.target.value })}
               required={editTarget?.task_kind === "ad_hoc"}
               fullWidth
+              helperText={
+                isAssignToGallery(editForm.assignee_user_id) ? he.assignToGalleryHint : undefined
+              }
             >
+              {editTarget?.can_add_to_gallery !== false && (
+                <MenuItem value={ASSIGN_TO_GALLERY}>
+                  <Box component="span" fontWeight={700}>{he.assignToGallery}</Box>
+                </MenuItem>
+              )}
               <MenuItem value="">{he.noAssignee}</MenuItem>
               {editEmployees.map((u) => (
                 <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
@@ -815,6 +868,16 @@ export default function ManagerTasksPage() {
             }
             disabled={saving}
             onError={showError}
+          />
+          <TaskChatPanel
+            key={`chat-${editTarget.id}`}
+            occurrenceId={editTarget.id}
+            compact
+            composeEnabled={canComposeTaskChat(editTarget.status, false)}
+            onOccurrenceUpdated={() => {
+              showSuccess(he.taskChatSent);
+              void load(true);
+            }}
           />
             </>
           ) : null}

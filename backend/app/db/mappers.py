@@ -11,6 +11,7 @@ from app.models.invitation import UserInvitation
 from app.models.network import Network
 from app.models.product import Product
 from app.models.task_completion import TaskCompletion
+from app.models.task_message import TaskMessage
 from app.models.task_occurrence import TaskOccurrence
 from app.models.task_template import TaskTemplate
 from app.models.user import User
@@ -215,6 +216,7 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
             if getattr(row, "source_gallery_item_id", None)
             else None
         ),
+        ops_category=getattr(row, "ops_category", None),
     )
 
 
@@ -256,6 +258,12 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
             if getattr(row, "source_gallery_item_id", None)
             else None
         ),
+        ops_category=getattr(row, "ops_category", None),
+        manager_next_at=(
+            parse_datetime_iso(row.manager_next_at)
+            if getattr(row, "manager_next_at", None)
+            else None
+        ),
     )
 
 
@@ -291,3 +299,27 @@ def task_completion_orm_to_domain(row: orm.TaskCompletion | None) -> TaskComplet
 
 def task_completion_domain_to_api(c: TaskCompletion) -> dict:
     return c.to_dict()
+
+
+def task_message_orm_to_domain(row: orm.TaskMessage | None) -> TaskMessage | None:
+    if row is None:
+        return None
+    return TaskMessage(
+        id=str(row.id),
+        occurrence_id=str(row.occurrence_id),
+        sender_user_id=str(row.sender_user_id),
+        body=row.body,
+        body_translated=getattr(row, "body_translated", None),
+        photo_url=row.photo_url,
+        video_url=row.video_url,
+        audio_url=row.audio_url,
+        audio_transcript=getattr(row, "audio_transcript", None),
+        audio_transcript_sender=getattr(row, "audio_transcript_sender", None),
+        created_at=parse_datetime_iso(row.created_at),
+    )
+
+
+def task_message_domain_to_api(message: TaskMessage, **extra) -> dict:
+    data = message.to_dict()
+    data.update(extra)
+    return data

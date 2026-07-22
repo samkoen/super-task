@@ -155,6 +155,7 @@ export default function EmployeeTasksDrawer({
               : undefined,
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
           assignee_user_id: member.user_id,
+          ops_category: payload.ops_category,
           ...media,
         });
         showSuccess(res.message);
@@ -341,6 +342,7 @@ export default function EmployeeTasksDrawer({
                     index={index}
                     onCancel={handleCancel}
                     onReview={setReviewTarget}
+                    onChatUpdated={() => void loadTasks()}
                   />
                 ))}
               </Box>

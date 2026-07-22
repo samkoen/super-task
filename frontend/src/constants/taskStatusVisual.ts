@@ -38,6 +38,12 @@ export const TASK_STATUS_VISUAL: Record<TaskStatus, TaskStatusVisual> = {
     border: "#4FC3F7",
     surface: "#E1F5FE",
   },
+  awaiting_response: {
+    chip: "warning",
+    bar: "#E65100",
+    border: "#FF9800",
+    surface: "#FFF3E0",
+  },
   completed: {
     chip: "success",
     bar: "#2E7D32",
@@ -59,9 +65,9 @@ export const TASK_STATUS_VISUAL: Record<TaskStatus, TaskStatusVisual> = {
 };
 
 export function taskStatusVisual(status: TaskStatus): TaskStatusVisual {
-  return TASK_STATUS_VISUAL[status];
+  return TASK_STATUS_VISUAL[status] ?? TASK_STATUS_VISUAL.pending;
 }
 
 export function taskStatusChipColor(status: TaskStatus): TaskStatusChipColor {
-  return TASK_STATUS_VISUAL[status].chip;
+  return taskStatusVisual(status).chip;
 }

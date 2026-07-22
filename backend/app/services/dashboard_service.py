@@ -25,6 +25,11 @@ from app.domain.manager_dashboard import (
     sort_timeline_tasks,
     task_queue_bucket,
 )
+from app.domain.employee_task_focus import (
+    sort_employee_open_focus,
+    sort_in_progress_focus_first,
+)
+from app.domain.store_kpis import build_store_kpis
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -78,6 +83,8 @@ def _count_by_status(tasks: list[TaskOccurrence]) -> dict[str, int]:
         elif task.status == task_status.IN_PROGRESS:
             counts["tasks_in_progress"] += 1
         elif task.status == task_status.PENDING_REVIEW:
+            counts["tasks_pending_review"] += 1
+        elif task.status == task_status.AWAITING_RESPONSE:
             counts["tasks_pending_review"] += 1
         elif task.status == task_status.OVERDUE:
             counts["tasks_overdue"] += 1
@@ -159,16 +166,22 @@ class DashboardService:
         user = self._users.find_by_id(actor.user_id)
         branch_name = self._occurrences.get_branch_name(actor.branch_id)
 
-        in_progress = [t for t in all_assigned if t.status == task_status.IN_PROGRESS]
+        in_progress = sort_in_progress_focus_first(
+            [t for t in all_assigned if t.status == task_status.IN_PROGRESS]
+        )
+        awaiting_response = [
+            t for t in all_assigned if t.status == task_status.AWAITING_RESPONSE
+        ]
         pending_review = [t for t in tasks_today if t.status == task_status.PENDING_REVIEW]
         completed = [t for t in tasks_today if t.status == task_status.COMPLETED]
         counts = _count_by_status(tasks_today)
+        has_in_progress = len(in_progress) > 0
 
         urgent: list[TaskOccurrence] = []
         seen: set[str] = set()
-        for task in sorted(
+        for task in sort_employee_open_focus(
             [t for t in all_assigned if t.status in {task_status.OVERDUE, task_status.PENDING}],
-            key=lambda t: t.due_at,
+            has_in_progress=has_in_progress,
         ):
             if task.id in seen or task.status == task_status.IN_PROGRESS:
                 continue
@@ -176,20 +189,24 @@ class DashboardService:
             is_urgent = (
                 task.status == task_status.OVERDUE
                 or task.task_kind == "ad_hoc"
+                or bool(task.manager_next_at)
                 or (task.status == task_status.PENDING and due <= now + URGENT_EMPLOYEE_WINDOW)
             )
             if is_urgent:
                 urgent.append(task)
                 seen.add(task.id)
 
-        today_open = [
-            t for t in tasks_today
-            if t.status in {task_status.PENDING, task_status.OVERDUE}
-            and t.id not in seen
-        ]
+        today_open = sort_employee_open_focus(
+            [
+                t
+                for t in tasks_today
+                if t.status in {task_status.PENDING, task_status.OVERDUE} and t.id not in seen
+            ],
+            has_in_progress=has_in_progress,
+        )
 
         progress = int(round(counts["completion_rate"] * 100))
-        on_shift = len(in_progress) > 0
+        on_shift = len(in_progress) > 0 or len(awaiting_response) > 0
         language = user.preferred_language if user else "he"
 
         async def localize_cards(tasks: list[TaskOccurrence]) -> list[dict]:
@@ -213,6 +230,7 @@ class DashboardService:
             "counts": counts,
             "urgent_tasks": await localize_cards(urgent),
             "in_progress_tasks": await localize_cards(in_progress),
+            "awaiting_response_tasks": await localize_cards(awaiting_response),
             "pending_review_tasks": await localize_cards(pending_review),
             "today_tasks": await localize_cards(today_open),
             "completed_tasks": await localize_cards(completed),
@@ -282,6 +300,7 @@ class DashboardService:
         )
         task_queues = self._task_queues(tasks_today, completion_map, now)
         unfinished = self._unfinished_tasks(overdue_branch, day, now)
+        store_kpis = build_store_kpis(tasks_today)
 
         alerts = self._build_alerts(overdue_branch, tasks_today, now)
 
@@ -299,6 +318,7 @@ class DashboardService:
                 "employees_active": sum(1 for m in team if m["is_active"]),
                 "overdue_open": len(overdue_branch),
             },
+            "store_kpis": store_kpis,
             "by_department": by_department,
             "team": team,
             "task_queues": task_queues,
@@ -368,6 +388,7 @@ class DashboardService:
                 "employees_active": 0,
                 "overdue_open": total_counts["tasks_overdue"],
             },
+            "store_kpis": None,
             "by_department": None,
             "team": None,
             "task_queues": None,
@@ -635,6 +656,8 @@ class DashboardService:
             "reference_audio_url": task.reference_audio_url,
             "department_name": self._occurrences.get_department_name(task.department_id),
             "started_at": task.started_at,
+            "manager_next_at": task.manager_next_at,
+            "is_manager_next": bool(task.manager_next_at),
         }
         if completion:
             card["completion"] = mp.task_completion_domain_to_api(completion)

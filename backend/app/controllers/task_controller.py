@@ -12,6 +12,7 @@ from app.repositories.department_repository import DepartmentRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
+from app.repositories.task_message_repository import TaskMessageRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
@@ -20,6 +21,7 @@ from app.realtime.task_events import notify_task_change
 from app.services.media_upload_service import upload_attachment
 from app.services.employee_activity_service import EmployeeActivityService
 from app.services.notification_service import NotificationService
+from app.services.task_message_service import TaskMessageService
 from app.services.task_occurrence_service import TaskOccurrenceService
 from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
@@ -124,6 +126,16 @@ def get_scheduler(db: Session = Depends(get_db)) -> TaskSchedulerService:
     return TaskSchedulerService(template_repo, TaskOccurrenceRepository(db))
 
 
+def get_message_service(db: Session = Depends(get_db)) -> TaskMessageService:
+    return TaskMessageService(
+        TaskMessageRepository(db),
+        TaskOccurrenceRepository(db),
+        UserRepository(db),
+        BranchRepository(db),
+        TaskCompletionRepository(db),
+    )
+
+
 @router.get("/templates")
 @handle_controller_errors
 def list_templates(
@@ -162,6 +174,7 @@ def create_template(
         reference_video_url=payload.get("reference_video_url"),
         reference_audio_url=payload.get("reference_audio_url"),
         source_gallery_item_id=payload.get("source_gallery_item_id"),
+        ops_category=payload.get("ops_category"),
     )
     emit_item = _sse_payload_from_create_template(item)
     _emit_task_event(db, "task_created", emit_item)
@@ -192,6 +205,8 @@ def update_template(
         reference_photo_url=payload.get("reference_photo_url"),
         reference_video_url=payload.get("reference_video_url"),
         reference_audio_url=payload.get("reference_audio_url"),
+        ops_category=payload.get("ops_category"),
+        update_ops_category="ops_category" in payload,
     )
     return {"message": "המשימה עודכנה", "template": item}
 
@@ -310,6 +325,26 @@ def start_occurrence(
     return {"message": "המשימה התחילה", "occurrence": item}
 
 
+@router.post("/occurrences/{occurrence_id}/manager-next")
+@handle_controller_errors
+def set_manager_next(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    enabled = bool(payload.get("enabled", True))
+    item = service.set_manager_next(actor, occurrence_id, enabled=enabled)
+    _emit_task_event(db, "task_manager_next", item)
+    return {
+        "message": "המשימה סומנה כהבאה" if enabled else "סימון המשימה הבאה בוטל",
+        "occurrence": item,
+    }
+
+
 @router.post("/occurrences/{occurrence_id}/delegate")
 @handle_controller_errors
 def delegate_occurrence(
@@ -369,22 +404,63 @@ def approve_occurrence(
 
 @router.post("/occurrences/{occurrence_id}/reopen")
 @handle_controller_errors
-def reopen_occurrence(
+async def reopen_occurrence(
     occurrence_id: str,
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
-    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    messages: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    """Compat : reject photo → message chat + retour in_progress."""
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    note = (payload.get("rejection_note") or "").strip() or "נא לתקן לפי ההודעה"
+    result = await messages.post_message(actor, occurrence_id, body=note)
+    _emit_task_event(db, result["event_type"], result["occurrence"])
+    return {
+        "message": "הודעה נשלחה והמשימה נפתחה מחדש",
+        "occurrence": result["occurrence"],
+        "chat_message": result["message"],
+    }
+
+
+@router.get("/occurrences/{occurrence_id}/messages")
+@handle_controller_errors
+def list_task_messages(
+    occurrence_id: str,
+    request: Request,
+    service: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    return service.list_messages(actor, occurrence_id)
+
+
+@router.post("/occurrences/{occurrence_id}/messages", status_code=201)
+@handle_controller_errors
+async def post_task_message(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskMessageService = Depends(get_message_service),
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
-    item = service.reopen_occurrence(
+    result = await service.post_message(
         actor,
         occurrence_id,
-        rejection_note=payload.get("rejection_note"),
+        body=payload.get("body"),
+        photo_url=payload.get("photo_url"),
+        video_url=payload.get("video_url"),
+        audio_url=payload.get("audio_url"),
     )
-    _emit_task_event(db, "task_reopened", item)
-    return {"message": "המשימה נפתחה מחדש לעובד", "occurrence": item}
+    _emit_task_event(db, result["event_type"], result["occurrence"])
+    return {
+        "message": "ההודעה נשלחה",
+        "chat_message": result["message"],
+        "occurrence": result["occurrence"],
+    }
 
 
 @router.post("/occurrences/{occurrence_id}/update")
