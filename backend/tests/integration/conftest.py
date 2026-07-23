@@ -1,4 +1,4 @@
-"""Infra tests d'intégration : SQLite + 2 sessions (employé / manager)."""
+"""Infra tests d'intégration : SQLite + sessions authentifiées."""
 from __future__ import annotations
 
 import io
@@ -35,11 +35,14 @@ TZ = ZoneInfo("Asia/Jerusalem")
 PASSWORD = "ChatTest123!"
 MGR_EMAIL = "chat.mgr@test.local"
 EMP_EMAIL = "chat.emp@test.local"
+MGR_B_EMAIL = "chat.mgr.b@test.local"
+EMP_B_EMAIL = "chat.emp.b@test.local"
+UNVERIFIED_EMAIL = "unverified@test.local"
 
 
 @pytest.fixture()
 def sqlite_url(tmp_path: Path) -> str:
-    return f"sqlite:///{(tmp_path / 'chat_integration.db').as_posix()}"
+    return f"sqlite:///{(tmp_path / 'integration.db').as_posix()}"
 
 
 @pytest.fixture()
@@ -66,8 +69,7 @@ def app_env(monkeypatch: pytest.MonkeyPatch, sqlite_url: str, uploads_dir: Path)
     monkeypatch.setattr("app.main.UPLOADS_DIR", uploads_dir)
     monkeypatch.setattr("app.services.blob_storage.UPLOADS_DIR", uploads_dir)
     db_session.reset_engine()
-    engine = db_session.get_engine()
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(db_session.get_engine())
     yield
     db_session.reset_engine()
 
@@ -93,21 +95,35 @@ def app(app_env):
     application.dependency_overrides.clear()
 
 
-@pytest.fixture()
-def chat_seed(app_env) -> dict[str, str]:
-    assert db_session.SessionLocal is not None
-    db = db_session.SessionLocal()
-    try:
-        return _seed_chat_world(db)
-    finally:
-        db.close()
+def _create_user(
+    db,
+    *,
+    email: str,
+    role: str,
+    language: str,
+    network_id: str | None,
+    branch_id: str | None,
+    first_name: str,
+    email_verified: bool = True,
+):
+    return UserRepository(db).create_user(
+        email=email,
+        password=PASSWORD,
+        first_name=first_name,
+        last_name="Test",
+        role=role,
+        email_verified=email_verified,
+        network_id=network_id,
+        branch_id=branch_id,
+        preferred_language=language,
+    )
 
 
-def _seed_chat_world(db) -> dict[str, str]:
-    net = NetworkRepository(db).create(name="Chat Net")
+def _seed_world(db) -> dict[str, str]:
+    net = NetworkRepository(db).create(name="Test Net")
     branch = BranchRepository(db).create(
         network_id=net.id,
-        name="Chat Branch",
+        name="Branch A",
         address="",
         city="",
         postal_code="",
@@ -130,60 +146,106 @@ def _seed_chat_world(db) -> dict[str, str]:
         branch_id=branch.id,
         first_name="Oved",
     )
-    occ = TaskOccurrenceRepository(db).create(
-        template_id=None,
-        branch_id=branch.id,
-        title="משימת צ'אט",
-        description="",
-        due_at=datetime.now(TZ) + timedelta(hours=2),
-        assignee_user_id=emp.id,
-        department_id=None,
-        status=task_status.IN_PROGRESS,
-        task_kind="ad_hoc",
-        manager_user_id=mgr.id,
-        created_by_id=mgr.id,
-    )
     db.commit()
     return {
-        "occurrence_id": occ.id,
+        "network_id": net.id,
+        "branch_id": branch.id,
         "manager_id": mgr.id,
         "employee_id": emp.id,
-        "branch_id": branch.id,
-        "network_id": net.id,
     }
 
 
-def _create_user(db, *, email, role, language, network_id, branch_id, first_name):
-    return UserRepository(db).create_user(
-        email=email,
-        password=PASSWORD,
-        first_name=first_name,
-        last_name="Chat",
-        role=role,
-        email_verified=True,
-        network_id=network_id,
-        branch_id=branch_id,
-        preferred_language=language,
-    )
+@pytest.fixture()
+def world_seed(app_env) -> dict[str, str]:
+    assert db_session.SessionLocal is not None
+    db = db_session.SessionLocal()
+    try:
+        return _seed_world(db)
+    finally:
+        db.close()
 
 
-def _login(client: TestClient, email: str) -> None:
+@pytest.fixture()
+def chat_seed(world_seed) -> dict[str, str]:
+    assert db_session.SessionLocal is not None
+    db = db_session.SessionLocal()
+    try:
+        occ = TaskOccurrenceRepository(db).create(
+            template_id=None,
+            branch_id=world_seed["branch_id"],
+            title="משימת צ'אט",
+            description="",
+            due_at=datetime.now(TZ) + timedelta(hours=2),
+            assignee_user_id=world_seed["employee_id"],
+            department_id=None,
+            status=task_status.IN_PROGRESS,
+            task_kind="ad_hoc",
+            manager_user_id=world_seed["manager_id"],
+            created_by_id=world_seed["manager_id"],
+        )
+        db.commit()
+        return {**world_seed, "occurrence_id": occ.id}
+    finally:
+        db.close()
+
+
+@pytest.fixture()
+def second_branch_seed(world_seed) -> dict[str, str]:
+    """Branche B + manager/employé isolés (même réseau)."""
+    assert db_session.SessionLocal is not None
+    db = db_session.SessionLocal()
+    try:
+        branch_b = BranchRepository(db).create(
+            network_id=world_seed["network_id"],
+            name="Branch B",
+            address="",
+            city="",
+            postal_code="",
+        )
+        mgr_b = _create_user(
+            db,
+            email=MGR_B_EMAIL,
+            role=roles.BRANCH_MANAGER,
+            language="he",
+            network_id=world_seed["network_id"],
+            branch_id=branch_b.id,
+            first_name="MgrB",
+        )
+        emp_b = _create_user(
+            db,
+            email=EMP_B_EMAIL,
+            role=roles.EMPLOYEE,
+            language="he",
+            network_id=world_seed["network_id"],
+            branch_id=branch_b.id,
+            first_name="EmpB",
+        )
+        db.commit()
+        return {
+            **world_seed,
+            "branch_b_id": branch_b.id,
+            "manager_b_id": mgr_b.id,
+            "employee_b_id": emp_b.id,
+        }
+    finally:
+        db.close()
+
+
+def login_client(app, email: str) -> TestClient:
+    client = TestClient(app)
     response = client.post("/api/auth/login", json={"email": email, "password": PASSWORD})
     assert response.status_code == 200, response.text
-
-
-@pytest.fixture()
-def client_emp(app, chat_seed) -> TestClient:
-    client = TestClient(app)
-    _login(client, EMP_EMAIL)
     return client
 
 
 @pytest.fixture()
-def client_mgr(app, chat_seed) -> TestClient:
-    client = TestClient(app)
-    _login(client, MGR_EMAIL)
-    return client
+def client_emp(app, world_seed) -> TestClient:
+    return login_client(app, EMP_EMAIL)
+
+
+@pytest.fixture()
+def client_mgr(app, world_seed) -> TestClient:
+    return login_client(app, MGR_EMAIL)
 
 
 @pytest.fixture()
@@ -193,7 +255,7 @@ def occurrence_id(chat_seed) -> str:
 
 @pytest.fixture()
 def mock_i18n(monkeypatch: pytest.MonkeyPatch):
-    """Traduction / transcription déterministes (pas d'API externes)."""
+    """Traduction / transcription déterministes (chat)."""
 
     async def localize(text: str, *, source_language: str, target_language: str) -> str:
         return f"{text}->{target_language}"
@@ -216,3 +278,7 @@ def jpeg_bytes() -> bytes:
     buf = io.BytesIO()
     Image.new("RGB", (32, 32), (40, 120, 200)).save(buf, format="JPEG")
     return buf.getvalue()
+
+
+def due_at_iso(hours: int = 2) -> str:
+    return (datetime.now(TZ) + timedelta(hours=hours)).isoformat()
