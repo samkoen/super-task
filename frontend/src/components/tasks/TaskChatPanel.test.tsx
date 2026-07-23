@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
+import { TASK_CHANGE_EVENT } from "../../constants/events";
 import { taskService } from "../../services/taskService";
 
 vi.mock("../../context/AuthContext", () => ({
@@ -63,13 +64,47 @@ describe("TaskChatPanel", () => {
       },
     ]);
 
-    render(<TaskChatPanel occurrenceId="occ-1" />);
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
 
     await waitFor(() => {
       expect(screen.getByText("שאלה שלי")).toBeTruthy();
       expect(screen.getByText("תשובה")).toBeTruthy();
     });
     expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
+  });
+
+  it("reloads the thread when a chat SSE event arrives", async () => {
+    vi.mocked(taskService.listMessages)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "m2",
+          occurrence_id: "occ-1",
+          sender_user_id: "mgr-1",
+          sender_role: "branch_manager",
+          sender_name: "מנהל",
+          body: "תשובת מנהל",
+          display_body: "תשובת מנהל",
+          photo_url: null,
+          video_url: null,
+          audio_url: null,
+          created_at: "2026-07-22T10:05:00.000Z",
+        },
+      ]);
+
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
+    await waitFor(() => expect(screen.getByText(he.taskChatEmpty)).toBeTruthy());
+
+    window.dispatchEvent(
+      new CustomEvent(TASK_CHANGE_EVENT, {
+        detail: { type: "task_message_manager", occurrence_id: "occ-1" },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("תשובת מנהל")).toBeTruthy();
+      expect(taskService.listMessages).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("posts text then reloads thread so both sides see the message", async () => {
@@ -102,7 +137,9 @@ describe("TaskChatPanel", () => {
     } as never);
 
     const onUpdated = vi.fn();
-    render(<TaskChatPanel occurrenceId="occ-1" onOccurrenceUpdated={onUpdated} />);
+    render(
+      <TaskChatPanel occurrenceId="occ-1" onOccurrenceUpdated={onUpdated} pollMs={false} />,
+    );
     await waitFor(() => expect(screen.getByText(he.taskChatEmpty)).toBeTruthy());
 
     fireEvent.change(screen.getByPlaceholderText(he.taskChatPlaceholder), {

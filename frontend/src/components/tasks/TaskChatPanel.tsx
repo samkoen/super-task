@@ -19,6 +19,7 @@ import {
   uploadPendingMedia,
   type PendingMedia,
 } from "../../utils/pendingMedia";
+import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 
@@ -28,6 +29,11 @@ interface TaskChatPanelProps {
   compact?: boolean;
   /** Si false : fil visible, pas de composition (statut terminé / annulé…). */
   composeEnabled?: boolean;
+  /**
+   * Poll de secours du fil (ms). Défaut 10s ; `false` pour désactiver ;
+   * sinon `VITE_TASK_CHAT_POLL_MS`.
+   */
+  pollMs?: number | false;
 }
 
 function normalizeMessages(data: unknown): TaskMessage[] {
@@ -43,6 +49,7 @@ export default function TaskChatPanel({
   onOccurrenceUpdated,
   compact = false,
   composeEnabled = true,
+  pollMs,
 }: TaskChatPanelProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<TaskMessage[]>([]);
@@ -76,22 +83,33 @@ export default function TaskChatPanel({
     setPendingAudio(null);
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const load = useCallback(async (opts?: { quiet?: boolean }) => {
+    const quiet = Boolean(opts?.quiet);
+    if (!quiet) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const data = await taskService.listMessages(occurrenceId);
       setMessages(normalizeMessages(data));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      if (!quiet) {
+        setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      }
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [occurrenceId]);
+
+  const refreshQuiet = useCallback(() => {
+    void load({ quiet: true });
+  }, [load]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useTaskChatLiveSync(occurrenceId, refreshQuiet, { pollMs });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
