@@ -5,7 +5,11 @@ import pytest
 
 from app.domain import ops_category, task_status
 from app.domain.ops_category import normalize_ops_category
-from app.domain.store_kpis import build_store_kpis, compute_category_kpi
+from app.domain.store_kpis import (
+    build_store_kpis,
+    compute_category_kpi,
+    compute_overall_kpi,
+)
 from app.models.task_occurrence import TaskOccurrence
 
 
@@ -51,6 +55,10 @@ def test_normalize_ops_category_rejects_unknown():
         normalize_ops_category("inventory")
 
 
+def test_normalize_ops_category_accepts_orders():
+    assert normalize_ops_category("orders") == "orders"
+
+
 def test_compute_category_kpi_nominal_full_day():
     tasks = [
         _task(id="1", status=task_status.COMPLETED),
@@ -91,6 +99,7 @@ def test_build_store_kpis_both_categories():
         _task(id="1", ops_category=ops_category.CLEANING, status=task_status.COMPLETED),
         _task(id="2", ops_category=ops_category.FRONTS_SIGNAGE, status=task_status.PENDING_REVIEW),
         _task(id="3", ops_category=ops_category.FRONTS_SIGNAGE, status=task_status.PENDING),
+        _task(id="4", ops_category=ops_category.ORDERS, status=task_status.PENDING),
     ]
     result = build_store_kpis(tasks)
     assert result["cleaning"]["total"] == 1
@@ -98,3 +107,23 @@ def test_build_store_kpis_both_categories():
     assert result["fronts_signage"]["total"] == 2
     assert result["fronts_signage"]["report_pct"] == 50
     assert result["fronts_signage"]["approval_pct"] == 0
+    assert result["orders"]["total"] == 1
+    assert result["orders"]["remaining"] == 1
+    assert result["general"]["total"] == 4
+    assert result["general"]["remaining"] == 3
+    assert result["general"]["open_pct"] == 75
+
+
+def test_compute_overall_kpi_all_open_tasks_today():
+    tasks = [
+        _task(id="1", ops_category=ops_category.CLEANING, status=task_status.COMPLETED),
+        _task(id="2", ops_category=None, status=task_status.IN_PROGRESS),
+        _task(id="3", ops_category=ops_category.ORDERS, status=task_status.PENDING),
+        _task(id="4", status=task_status.CANCELLED),
+    ]
+    kpi = compute_overall_kpi(tasks)
+    assert kpi["category"] == "general"
+    assert kpi["total"] == 3
+    assert kpi["remaining"] == 2
+    assert kpi["open_pct"] == 67
+    assert kpi["approval_pct"] == 33

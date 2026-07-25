@@ -2,7 +2,7 @@ import api from "./api";
 
 export type TaskRecurrence = "daily" | "weekly" | "biweekly" | "monthly";
 export type TaskKind = "fixed" | "ad_hoc";
-export type OpsCategory = "cleaning" | "fronts_signage";
+export type OpsCategory = "cleaning" | "fronts_signage" | "orders";
 export type TaskStatus =
   | "pending"
   | "in_progress"

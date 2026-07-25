@@ -105,6 +105,7 @@ def test_build_timeline_item_elapsed_for_in_progress():
     )
     assert item["elapsed_minutes"] == 30
     assert item["segment"] == "in_progress"
+    assert "reference_photo_url" in item
 
 
 def test_sort_timeline_in_progress_first():

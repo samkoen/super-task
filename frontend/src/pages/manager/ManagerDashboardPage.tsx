@@ -21,19 +21,29 @@ import {
 } from "../../services/dashboardService";
 import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
 import HealthBadge from "../../components/dashboard/HealthBadge";
-import ManagerDayNav from "../../components/dashboard/ManagerDayNav";
 import StoreStatusKpiRow from "../../components/dashboard/StoreStatusKpiRow";
 import ActionRequiredCarousel from "../../components/dashboard/ActionRequiredCarousel";
 import PendingTasksCarousel from "../../components/dashboard/PendingTasksCarousel";
 import StaffProgressOverview from "../../components/dashboard/StaffProgressOverview";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
+import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
 import PageHeader from "../../components/ui/PageHeader";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
-import { todayIso } from "../../utils/dateView";
+import { formatHebrewDay, todayIso } from "../../utils/dateView";
+
+/** Masqué temporairement — remettre à true pour réafficher. */
+const SHOW_STAFF_PROGRESS = false;
+const SHOW_DEPARTMENT_PROGRESS = false;
+
+function dashboardTitle(branchName: string | undefined): string {
+  const day = formatHebrewDay(todayIso());
+  if (branchName) return `${he.branch}: ${branchName} · ${day}`;
+  return `${he.dashboardNetworkOverview} · ${day}`;
+}
 
 export default function ManagerDashboardPage() {
   const { user } = useAuth();
@@ -41,11 +51,11 @@ export default function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboard | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState("");
-  const [selectedDay, setSelectedDay] = useState(todayIso());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
@@ -57,13 +67,13 @@ export default function ManagerDashboardPage() {
     }
     try {
       const branchId = canPickBranch ? selectedBranch || undefined : undefined;
-      setData(await dashboardService.getManager(branchId, selectedDay));
+      setData(await dashboardService.getManager(branchId, todayIso()));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [canPickBranch, selectedBranch, selectedDay]);
+  }, [canPickBranch, selectedBranch]);
 
   useTaskChangeListener(useCallback(() => {
     load(true);
@@ -109,27 +119,26 @@ export default function ManagerDashboardPage() {
   return (
     <Box>
       <PageHeader
-        title={data?.branch ? `${he.branch}: ${data.branch.name}` : he.dashboardNetworkOverview}
+        title={dashboardTitle(data?.branch?.name)}
         subtitle={user?.full_name ? he.welcome(user.full_name) : undefined}
         action={
-          <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-            {data && <HealthBadge level={data.health} size="medium" />}
-            {canPickBranch && (
-              <TextField
-                select
-                size="small"
-                label={he.dashboardSelectBranch}
-                value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
-                sx={{ minWidth: 180 }}
-              >
-                <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
-                {branches.map((b) => (
-                  <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
-                ))}
-              </TextField>
-            )}
-          </Box>
+          canPickBranch ? (
+            <TextField
+              select
+              size="small"
+              label={he.dashboardSelectBranch}
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
+              {branches.map((b) => (
+                <MenuItem key={b.id} value={b.id}>
+                  {b.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : undefined
         }
       />
 
@@ -168,10 +177,6 @@ export default function ManagerDashboardPage() {
 
       {data?.branch && (
         <>
-          <Box mb={2}>
-            <ManagerDayNav day={selectedDay} onDayChange={setSelectedDay} />
-          </Box>
-
           <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
             {he.dashboardToday}
           </Typography>
@@ -181,13 +186,20 @@ export default function ManagerDashboardPage() {
             queues={data.task_queues}
             onReviewTask={handleReviewTask}
           />
-          <PendingTasksCarousel queues={data.task_queues} />
+          <PendingTasksCarousel
+            queues={data.task_queues}
+            onOpenTask={(task) => setEditOccurrenceId(task.id)}
+          />
 
-          <StaffProgressOverview team={data.team ?? []} onChanged={() => void load(true)} />
-
-          {data.by_department && data.by_department.length > 0 && (
-            <DepartmentProgressGrid departments={data.by_department} />
+          {SHOW_STAFF_PROGRESS && (
+            <StaffProgressOverview team={data.team ?? []} onChanged={() => void load(true)} />
           )}
+
+          {SHOW_DEPARTMENT_PROGRESS &&
+            data.by_department &&
+            data.by_department.length > 0 && (
+              <DepartmentProgressGrid departments={data.by_department} />
+            )}
 
           <Box display="flex" gap={2} flexWrap="wrap">
             <Button
@@ -215,6 +227,14 @@ export default function ManagerDashboardPage() {
         task={reviewTarget}
         onClose={() => setReviewTarget(null)}
         onDone={(message) => {
+          setSuccess(message);
+          void load(true);
+        }}
+      />
+      <TaskOccurrenceEditDialog
+        occurrenceId={editOccurrenceId}
+        onClose={() => setEditOccurrenceId(null)}
+        onSaved={(message) => {
           setSuccess(message);
           void load(true);
         }}

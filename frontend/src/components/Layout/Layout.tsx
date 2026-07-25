@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Drawer,
-  Fab,
   List,
   ListItemButton,
   ListItemIcon,
@@ -14,7 +13,6 @@ import {
   Typography,
 } from "@mui/material";
 import ListSkeleton from "../ui/ListSkeleton";
-import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
@@ -46,7 +44,11 @@ import { shouldShowAppBack } from "../../utils/navigationBack";
 import BackButton from "../ui/BackButton";
 import ManagerBottomNav from "./ManagerBottomNav";
 import ManagerNewTaskFab from "./ManagerNewTaskFab";
-import { shouldShowManagerChrome } from "../../utils/managerBottomNav";
+import MobileMenuTopBar from "./MobileMenuTopBar";
+import {
+  managerBottomContentPadCss,
+  shouldShowManagerChrome,
+} from "../../utils/managerBottomNav";
 
 const SIDEBAR_BG = "#0B1220";
 const SIDEBAR_ACCENT = "#1A9B86";
@@ -374,26 +376,6 @@ function Layout() {
 
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden" }}>
-      <Fab
-        size="small"
-        color="primary"
-        aria-label={he.mainMenu}
-        onClick={() => setMobileOpen(true)}
-        sx={{
-          position: "fixed",
-          top: 16,
-          right: 16,
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          // Natif / mobile : FAB toujours ; desktop web : seulement xs
-          display: overlayNav ? "inline-flex" : { xs: "inline-flex", sm: "none" },
-          // Force paint WebView (sinon le FAB n’apparaît qu’après un tap)
-          transform: "translateZ(0)",
-          WebkitBackfaceVisibility: "hidden",
-        }}
-      >
-        <MenuIcon />
-      </Fab>
-
       <Drawer
         variant="temporary"
         anchor="left"
@@ -447,17 +429,33 @@ function Layout() {
           touchAction: "pan-y",
           overscrollBehavior: "contain",
           px: { xs: 1.5, sm: 3, md: 4 },
-          py: { xs: 2.5, sm: 3.5 },
-          pb: showManagerChrome
-            ? overlayNav
-              ? 14
-              : { xs: 14, sm: 3.5 }
-            : { xs: 10, sm: 3.5 },
+          pt: { xs: 1, sm: 3.5 },
+          // pb sur le scroller est souvent ignoré par WebView Android → spacer ci-dessous
+          pb: showManagerChrome ? { xs: 0, sm: overlayNav ? 0 : 3.5 } : { xs: 10, sm: 3.5 },
         }}
       >
         <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
-          {showBack && <BackButton />}
+          <MobileMenuTopBar
+            showBack={showBack}
+            forceVisible={overlayNav}
+            onOpenMenu={() => setMobileOpen(true)}
+          />
+          {showBack && (
+            <Box sx={{ display: overlayNav ? "none" : { xs: "none", sm: "block" } }}>
+              <BackButton />
+            </Box>
+          )}
           <OutletSuspense />
+          {showManagerChrome && (
+            <Box
+              aria-hidden
+              sx={{
+                display: overlayNav ? "block" : { xs: "block", sm: "none" },
+                height: managerBottomContentPadCss(),
+                flexShrink: 0,
+              }}
+            />
+          )}
         </Box>
       </Box>
 

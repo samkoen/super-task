@@ -1,5 +1,20 @@
 export type ManagerBottomTab = "home" | "tasks" | "archive";
 
+/** Hauteur barre bas (px), hors safe-area système Android/iOS. */
+export const MANAGER_BOTTOM_NAV_HEIGHT_PX = 64;
+/** Marge sous le dernier contenu pour ne pas être masqué par la barre / FAB. */
+export const MANAGER_BOTTOM_CONTENT_GAP_PX = 48;
+
+/** Padding bas du scroll : barre + gap + safe-area (WebView Android). */
+export function managerBottomContentPadCss(): string {
+  return `calc(${MANAGER_BOTTOM_NAV_HEIGHT_PX + MANAGER_BOTTOM_CONTENT_GAP_PX}px + env(safe-area-inset-bottom, 0px))`;
+}
+
+/** Position verticale du FAB au-dessus de la barre. */
+export function managerFabBottomCss(): string {
+  return `calc(${MANAGER_BOTTOM_NAV_HEIGHT_PX + 12}px + env(safe-area-inset-bottom, 0px))`;
+}
+
 export const MANAGER_BOTTOM_NAV_ITEMS: {
   tab: ManagerBottomTab;
   path: string;

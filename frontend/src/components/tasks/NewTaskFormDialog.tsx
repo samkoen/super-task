@@ -364,6 +364,7 @@ export default function NewTaskFormDialog({
               <MenuItem value="">{he.opsCategoryNone}</MenuItem>
               <MenuItem value="cleaning">{he.opsCategoryLabels.cleaning}</MenuItem>
               <MenuItem value="fronts_signage">{he.opsCategoryLabels.fronts_signage}</MenuItem>
+              <MenuItem value="orders">{he.opsCategoryLabels.orders}</MenuItem>
             </TextField>
           </>
         ) : null}

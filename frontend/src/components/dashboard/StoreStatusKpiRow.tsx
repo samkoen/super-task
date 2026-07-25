@@ -1,49 +1,122 @@
-import { useState } from "react";
-import { Alert, Grid, Snackbar } from "@mui/material";
+import { useState, type ReactNode } from "react";
+import { Alert, Box, Snackbar } from "@mui/material";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import ViewWeekIcon from "@mui/icons-material/ViewWeek";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import type { StoreKpis } from "../../services/dashboardService";
+import type { StoreCategoryKpi, StoreKpis } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
-import { resolveStoreKpis } from "../../utils/storeKpis";
+import { remainingCount, resolveStoreKpis } from "../../utils/storeKpis";
 import StoreStatusKpiCard from "./StoreStatusKpiCard";
 
 interface StoreStatusKpiRowProps {
   storeKpis: StoreKpis | null | undefined;
 }
 
+function KpiSlide({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        minWidth: 260,
+        maxWidth: 280,
+        width: "78%",
+        flex: "0 0 auto",
+        scrollSnapAlign: "start",
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function categoryCard(
+  title: string,
+  kpi: StoreCategoryKpi,
+  icon: ReactNode,
+  accent: string,
+) {
+  return (
+    <StoreStatusKpiCard
+      title={title}
+      approvalPct={kpi.approval_pct}
+      reportPct={kpi.report_pct}
+      approvalLabel={he.dashboardKpiApprovalLabel}
+      reportLabel={he.dashboardKpiReportLabel}
+      totalLabel={he.dashboardKpiTasksCount(kpi.total)}
+      icon={icon}
+      accent={accent}
+    />
+  );
+}
+
 export default function StoreStatusKpiRow({ storeKpis }: StoreStatusKpiRowProps) {
   const kpis = resolveStoreKpis(storeKpis);
   const [showSoon, setShowSoon] = useState(false);
+  const generalRemaining = remainingCount(kpis.general);
+  const generalOpenPct =
+    typeof kpis.general.open_pct === "number"
+      ? kpis.general.open_pct
+      : kpis.general.total > 0
+        ? Math.round((generalRemaining * 100) / kpis.general.total)
+        : 0;
 
   return (
     <>
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={4}>
+      <Box
+        mb={3}
+        sx={{
+          display: "flex",
+          gap: 1.5,
+          overflowX: "auto",
+          pb: 1,
+          mx: -0.5,
+          px: 0.5,
+          scrollSnapType: "x mandatory",
+          "&::-webkit-scrollbar": { height: 6 },
+          "&::-webkit-scrollbar-thumb": {
+            bgcolor: "action.disabled",
+            borderRadius: 3,
+          },
+        }}
+      >
+        <KpiSlide>
           <StoreStatusKpiCard
-            title={he.dashboardKpiCleaning}
-            approvalPct={kpis.cleaning.approval_pct}
-            reportPct={kpis.cleaning.report_pct}
-            approvalLabel={he.dashboardKpiApprovalLabel}
-            reportLabel={he.dashboardKpiReportLabel}
-            totalLabel={he.dashboardKpiTasksCount(kpis.cleaning.total)}
-            icon={<CleaningServicesIcon />}
-            accent="#0A6B5C"
+            title={he.dashboardKpiGeneral}
+            approvalPct={generalOpenPct}
+            reportPct={kpis.general.approval_pct}
+            approvalLabel={he.dashboardKpiRemainingLabel}
+            reportLabel={he.dashboardKpiCompletedLabel}
+            totalLabel={he.dashboardKpiRemainingCount(generalRemaining)}
+            icon={<AssessmentIcon />}
+            accent="#5e35b1"
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <StoreStatusKpiCard
-            title={he.dashboardKpiFronts}
-            approvalPct={kpis.fronts_signage.approval_pct}
-            reportPct={kpis.fronts_signage.report_pct}
-            approvalLabel={he.dashboardKpiApprovalLabel}
-            reportLabel={he.dashboardKpiReportLabel}
-            totalLabel={he.dashboardKpiTasksCount(kpis.fronts_signage.total)}
-            icon={<ViewWeekIcon />}
-            accent="#1565c0"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        </KpiSlide>
+        <KpiSlide>
+          {categoryCard(
+            he.dashboardKpiCleaning,
+            kpis.cleaning,
+            <CleaningServicesIcon />,
+            "#0A6B5C",
+          )}
+        </KpiSlide>
+        <KpiSlide>
+          {categoryCard(
+            he.dashboardKpiFronts,
+            kpis.fronts_signage,
+            <ViewWeekIcon />,
+            "#1565c0",
+          )}
+        </KpiSlide>
+        <KpiSlide>
+          {categoryCard(
+            he.dashboardKpiOrders,
+            kpis.orders,
+            <ShoppingCartIcon />,
+            "#ef6c00",
+          )}
+        </KpiSlide>
+        <KpiSlide>
           <StoreStatusKpiCard
             title={he.dashboardKpiGoals}
             approvalPct={0}
@@ -56,8 +129,8 @@ export default function StoreStatusKpiRow({ storeKpis }: StoreStatusKpiRowProps)
             disabled
             onClick={() => setShowSoon(true)}
           />
-        </Grid>
-      </Grid>
+        </KpiSlide>
+      </Box>
 
       <Snackbar
         open={showSoon}

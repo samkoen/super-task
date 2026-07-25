@@ -2,10 +2,11 @@
 
 CLEANING = "cleaning"
 FRONTS_SIGNAGE = "fronts_signage"
+ORDERS = "orders"
 
-ALL = {CLEANING, FRONTS_SIGNAGE}
+ALL = {CLEANING, FRONTS_SIGNAGE, ORDERS}
 
-KPI_CATEGORIES = (CLEANING, FRONTS_SIGNAGE)
+KPI_CATEGORIES = (CLEANING, FRONTS_SIGNAGE, ORDERS)
 
 
 def normalize_ops_category(value: str | None) -> str | None:

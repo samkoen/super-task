@@ -2,7 +2,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { Fab } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { he } from "../../i18n/he";
-import { managerNewTaskNavigation } from "../../utils/managerBottomNav";
+import { managerFabBottomCss, managerNewTaskNavigation } from "../../utils/managerBottomNav";
 
 interface ManagerNewTaskFabProps {
   forceVisible?: boolean;
@@ -21,7 +21,7 @@ export default function ManagerNewTaskFab({ forceVisible = false }: ManagerNewTa
       }}
       sx={{
         position: "fixed",
-        bottom: forceVisible ? 80 : { xs: 80, sm: 24 },
+        bottom: forceVisible ? managerFabBottomCss() : { xs: managerFabBottomCss(), sm: 24 },
         insetInlineEnd: 16,
         zIndex: (t) => t.zIndex.appBar + 1,
         display: forceVisible ? "inline-flex" : { xs: "inline-flex", sm: "none" },

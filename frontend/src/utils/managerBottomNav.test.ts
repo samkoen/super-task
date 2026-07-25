@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  managerBottomContentPadCss,
+  managerFabBottomCss,
   managerNewTaskNavigation,
   resolveManagerBottomTab,
   shouldShowManagerChrome,
@@ -27,5 +29,11 @@ describe("managerBottomNav", () => {
       pathname: "/manager/tasks",
       state: { openNewTask: true },
     });
+  });
+
+  it("includes safe-area in bottom chrome spacing css", () => {
+    expect(managerBottomContentPadCss()).toContain("env(safe-area-inset-bottom");
+    expect(managerBottomContentPadCss()).toContain("112px");
+    expect(managerFabBottomCss()).toContain("76px");
   });
 });

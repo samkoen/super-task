@@ -541,6 +541,7 @@ class DashboardService:
             bucket = task_queue_bucket(task.status)
             if not bucket:
                 continue
+            task = self._with_reference_media(task)
             item = build_timeline_item(
                 task,
                 now=now,

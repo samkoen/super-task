@@ -62,6 +62,7 @@ export interface TimelineTask {
   task_kind: TaskKind;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  reference_photo_url?: string | null;
 }
 
 export interface TeamMember {
@@ -107,20 +108,27 @@ export interface BranchSummary {
   completion_rate: number;
 }
 
-export type OpsCategory = "cleaning" | "fronts_signage";
+export type OpsCategory = "cleaning" | "fronts_signage" | "orders";
+
+/** Catégorie KPI dashboard (inclut l'agrégat « general », hors ops_category tâche). */
+export type StoreKpiKey = OpsCategory | "general";
 
 export interface StoreCategoryKpi {
-  category: OpsCategory;
+  category: StoreKpiKey;
   total: number;
   reported: number;
   approved: number;
+  remaining?: number;
   report_pct: number;
   approval_pct: number;
+  open_pct?: number;
 }
 
 export interface StoreKpis {
+  general: StoreCategoryKpi;
   cleaning: StoreCategoryKpi;
   fronts_signage: StoreCategoryKpi;
+  orders: StoreCategoryKpi;
 }
 
 export interface ManagerDashboard {

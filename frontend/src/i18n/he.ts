@@ -144,6 +144,7 @@ export const he = {
   opsCategoryLabels: {
     cleaning: "ניקיון וסדר",
     fronts_signage: "פרונטים ושילוט",
+    orders: "הזמנות",
   },
   newTask: "משימה חדשה",
   newTaskFromGallery: "משימה מהגלריה",
@@ -332,13 +333,23 @@ export const he = {
   dashboardCompletion: "משימות שבוצעו",
   dashboardActiveEmployees: "עובדים פעילים",
   dashboardOverdue: "משימות באיחור",
+  dashboardKpiGeneral: "מצב כללי",
   dashboardKpiCleaning: "ניקיון וסדר בסניף",
   dashboardKpiFronts: "פרונטים ושילוט מחירים",
+  dashboardKpiOrders: "הזמנות להיום",
   dashboardKpiGoals: "יעדים (מכירות וכוח אדם)",
   dashboardKpiApprovalLabel: "אישור מנהל (תקן חנות)",
   dashboardKpiReportLabel: "דיווח שטח",
+  dashboardKpiRemainingLabel: "נותרו לביצוע היום",
+  dashboardKpiCompletedLabel: "הושלמו היום",
   dashboardKpiTasksCount: (total: number) =>
     total === 1 ? "משימה אחת להיום" : `${total} משימות להיום`,
+  dashboardKpiRemainingCount: (remaining: number) =>
+    remaining === 0
+      ? "אין משימות פתוחות להיום"
+      : remaining === 1
+        ? "נותרה משימה אחת להיום"
+        : `נותרו ${remaining} משימות להיום`,
   dashboardKpiUnderConstructionShort: "בקרוב",
   dashboardKpiUnderConstruction: "רכיב זה בבנייה ויהיה זמין בהמשך",
   dashboardActionQueue: "תור טיפול ואישור",

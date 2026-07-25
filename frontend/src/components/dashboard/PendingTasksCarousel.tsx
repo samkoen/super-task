@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
-import type { TaskQueues } from "../../services/dashboardService";
+import { Box, Chip, Typography } from "@mui/material";
+import type { TaskQueues, TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
-import { formatDueAt } from "../../utils/dateView";
 import {
   buildPendingTasks,
   filterPendingTasks,
@@ -10,18 +9,17 @@ import {
   uniqueAssignees,
   uniqueDepartments,
 } from "../../utils/dashboardCarousels";
+import PendingTaskMediaCard from "./PendingTaskMediaCard";
 
 interface PendingTasksCarouselProps {
   queues: TaskQueues | null | undefined;
+  onOpenTask?: (task: TimelineTask) => void;
 }
 
-function statusAccent(status: string): string {
-  if (status === "overdue") return "#d32f2f";
-  if (status === "in_progress") return "#ed6c02";
-  return "#757575";
-}
-
-export default function PendingTasksCarousel({ queues }: PendingTasksCarouselProps) {
+export default function PendingTasksCarousel({
+  queues,
+  onOpenTask,
+}: PendingTasksCarouselProps) {
   const all = useMemo(() => buildPendingTasks(queues), [queues]);
   const [department, setDepartment] = useState<string | null>(null);
   const [assignee, setAssignee] = useState<string | null>(null);
@@ -114,45 +112,9 @@ export default function PendingTasksCarousel({ queues }: PendingTasksCarouselPro
             },
           }}
         >
-          {filtered.map((task) => {
-            const border = statusAccent(task.status);
-            return (
-              <Paper
-                key={task.id}
-                variant="outlined"
-                sx={{
-                  minWidth: 240,
-                  maxWidth: 260,
-                  flex: "0 0 auto",
-                  p: 2,
-                  scrollSnapAlign: "start",
-                  borderColor: alpha(border, 0.45),
-                  borderInlineStartWidth: 4,
-                  borderInlineStartColor: border,
-                }}
-              >
-                <Typography fontWeight={800} mb={0.5} noWrap title={task.title}>
-                  {task.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {[task.assignee_name, task.department_name].filter(Boolean).join(" · ") || "—"}
-                </Typography>
-                <Box display="flex" gap={0.75} flexWrap="wrap" mt={1}>
-                  <Chip
-                    size="small"
-                    label={`${he.dashboardDueAt} ${formatDueAt(task.due_at)}`}
-                    variant="outlined"
-                  />
-                  {task.status === "overdue" && (
-                    <Chip size="small" color="error" label={he.timelineSegmentOverdue} />
-                  )}
-                  {task.status === "in_progress" && (
-                    <Chip size="small" color="warning" label={he.timelineSegmentInProgress} />
-                  )}
-                </Box>
-              </Paper>
-            );
-          })}
+          {filtered.map((task) => (
+            <PendingTaskMediaCard key={task.id} task={task} onOpen={onOpenTask} />
+          ))}
         </Box>
       )}
     </Box>

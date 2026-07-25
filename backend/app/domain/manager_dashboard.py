@@ -77,6 +77,7 @@ def build_timeline_item(
         "task_kind": task.task_kind,
         "manager_next_at": task.manager_next_at,
         "is_manager_next": bool(task.manager_next_at),
+        "reference_photo_url": task.reference_photo_url,
     }
 
 

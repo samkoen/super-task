@@ -6,6 +6,7 @@ import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import { useLocation, useNavigate } from "react-router-dom";
 import { he } from "../../i18n/he";
 import {
+  MANAGER_BOTTOM_NAV_HEIGHT_PX,
   MANAGER_BOTTOM_NAV_ITEMS,
   resolveManagerBottomTab,
   type ManagerBottomTab,
@@ -48,6 +49,7 @@ export default function ManagerBottomNav({ forceVisible = false }: ManagerBottom
         borderColor: "divider",
         // Force paint WebView
         transform: "translateZ(0)",
+        pb: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       <BottomNavigation
@@ -57,7 +59,7 @@ export default function ManagerBottomNav({ forceVisible = false }: ManagerBottom
           const item = MANAGER_BOTTOM_NAV_ITEMS.find((i) => i.tab === value);
           if (item) navigate(item.path);
         }}
-        sx={{ height: 64 }}
+        sx={{ height: MANAGER_BOTTOM_NAV_HEIGHT_PX }}
       >
         {MANAGER_BOTTOM_NAV_ITEMS.map((item) => (
           <BottomNavigationAction

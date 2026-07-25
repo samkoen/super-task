@@ -3,15 +3,8 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  FormControlLabel,
-  DialogTitle,
   MenuItem,
   Paper,
-  Switch,
   TextField,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -21,6 +14,7 @@ import { branchService, type Branch } from "../../services/branchService";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import TaskOccurrenceGridByDay from "../../components/tasks/TaskOccurrenceGridByDay";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
+import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
 import TaskGalleryPickerDialog from "../../components/tasks/TaskGalleryPickerDialog";
 import GalleryQuickAssignDialog, {
   type GalleryQuickAssignPayload,
@@ -30,13 +24,10 @@ import NewTaskFormDialog, {
   type NewTaskFormSubmitPayload,
 } from "../../components/tasks/NewTaskFormDialog";
 import { taskGalleryService, type TaskGalleryItem } from "../../services/taskGalleryService";
-import TaskReferenceMediaEditor, {
+import {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
-import TaskChatPanel from "../../components/tasks/TaskChatPanel";
-import { appendDescriptionBlock } from "../../utils/photoAnnotation";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import PageHeader from "../../components/ui/PageHeader";
@@ -48,7 +39,6 @@ import {
   datetimeLocalForNewTask,
   defaultRangeFrom,
   todayIso,
-  toDatetimeLocal,
   type TaskDateViewMode,
 } from "../../utils/dateView";
 import {
@@ -63,7 +53,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
-import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
+import { isAssignToGallery } from "../../constants/taskAssignment";
 import { he } from "../../i18n/he";
 
 const SAVED_FILTERS_EXPANDED_KEY = "super:saved-filters:manager_tasks:expanded";
@@ -95,22 +85,8 @@ export default function ManagerTasksPage() {
   >(undefined);
   const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
   const [galleryAssignItem, setGalleryAssignItem] = useState<TaskGalleryItem | null>(null);
-  const [editTarget, setEditTarget] = useState<TaskOccurrence | null>(null);
+  const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editReferenceMediaDirty, setEditReferenceMediaDirty] = useState(false);
-  const [editForm, setEditForm] = useState({
-    title: "",
-    description: "",
-    due_at: "",
-    assignee_user_id: "",
-    photo_required: true,
-    reference_photo_url: "",
-    reference_video_url: "",
-    reference_audio_url: "",
-    pending_photo: null as File | null,
-    pending_video: null as File | null,
-  });
   const [saving, setSaving] = useState(false);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("");
@@ -469,76 +445,9 @@ export default function ManagerTasksPage() {
     }
   };
 
-  const handleOpenEdit = async (task: TaskOccurrence) => {
-    setEditTarget(null);
-    setEditLoading(true);
-    setEditReferenceMediaDirty(false);
-    try {
-      const fresh = await taskService.getOccurrence(task.id);
-      setEditTarget(fresh);
-      setEditForm({
-        title: fresh.title,
-        description: fresh.description,
-        due_at: toDatetimeLocal(fresh.due_at),
-        assignee_user_id: fresh.assignee_user_id ?? "",
-        photo_required: fresh.photo_required,
-        reference_photo_url: fresh.reference_photo_url ?? "",
-        reference_video_url: fresh.reference_video_url ?? "",
-        reference_audio_url: fresh.reference_audio_url ?? "",
-        pending_photo: null,
-        pending_video: null,
-      });
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setEditLoading(false);
-    }
+  const handleOpenEdit = (task: TaskOccurrence) => {
+    setEditOccurrenceId(task.id);
   };
-
-  const handleSaveEdit = async () => {
-    if (!editTarget) return;
-    setSaving(true);
-    try {
-      const moveToGallery = isAssignToGallery(editForm.assignee_user_id);
-      const payload: Parameters<typeof taskService.updateOccurrence>[1] = {
-        title: editForm.title.trim(),
-        description: editForm.description,
-        due_at: new Date(editForm.due_at).toISOString(),
-        assignee_user_id: moveToGallery
-          ? editTarget.assignee_user_id || undefined
-          : editForm.assignee_user_id || undefined,
-        photo_required: editTarget.task_kind === "ad_hoc" ? editForm.photo_required : undefined,
-      };
-      if (editReferenceMediaDirty) {
-        const media = await resolveTaskReferenceMedia(editForm);
-        payload.reference_photo_url = media.reference_photo_url || null;
-        payload.reference_video_url = media.reference_video_url || null;
-        payload.reference_audio_url = media.reference_audio_url || null;
-      }
-      await taskService.updateOccurrence(editTarget.id, payload);
-      if (moveToGallery) {
-        await taskGalleryService.createFromOccurrence(editTarget.id);
-        await taskService.cancel(editTarget.id);
-        setEditTarget(null);
-        setEditReferenceMediaDirty(false);
-        showSuccess(he.taskMovedToGallery);
-      } else {
-        setEditTarget(null);
-        setEditReferenceMediaDirty(false);
-        showSuccess(he.taskUpdated);
-      }
-      await load();
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const editEmployees = useMemo(
-    () => (editTarget ? employees.filter((u) => u.branch_id === editTarget.branch_id) : employees),
-    [employees, editTarget]
-  );
 
   return (
     <Box>
@@ -765,143 +674,14 @@ export default function ManagerTasksPage() {
         onSubmit={handleGalleryQuickAssign}
       />
 
-      <Dialog
-        open={!!editTarget || editLoading}
-        onClose={() => {
-          if (saving || editLoading) return;
-          setEditTarget(null);
-          setEditLoading(false);
+      <TaskOccurrenceEditDialog
+        occurrenceId={editOccurrenceId}
+        employees={employees}
+        onClose={() => setEditOccurrenceId(null)}
+        onSaved={() => {
+          void load(true);
         }}
-        fullWidth
-        maxWidth="sm"
-        dir="rtl"
-      >
-        <DialogTitle>{he.editTask}</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-          {editLoading ? (
-            <Box display="flex" justifyContent="center" py={4}>
-              <CircularProgress />
-            </Box>
-          ) : editTarget ? (
-            <>
-          <TextField
-            label={he.taskTitle}
-            value={editForm.title}
-            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-            required
-            fullWidth
-          />
-          <TextField
-            label={he.description}
-            value={editForm.description}
-            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-            multiline
-            rows={2}
-            fullWidth
-          />
-          <TextField
-            label={he.dueAt}
-            type="datetime-local"
-            value={editForm.due_at}
-            onChange={(e) => setEditForm({ ...editForm, due_at: e.target.value })}
-            InputLabelProps={{ shrink: true }}
-            required
-            fullWidth
-            dir="ltr"
-          />
-          {(isBranchManager || Boolean(editForm.assignee_user_id)) && (
-            <TextField
-              select
-              label={he.assignee}
-              value={editForm.assignee_user_id}
-              onChange={(e) => setEditForm({ ...editForm, assignee_user_id: e.target.value })}
-              required={editTarget?.task_kind === "ad_hoc"}
-              fullWidth
-              helperText={
-                isAssignToGallery(editForm.assignee_user_id) ? he.assignToGalleryHint : undefined
-              }
-            >
-              {editTarget?.can_add_to_gallery !== false && (
-                <MenuItem value={ASSIGN_TO_GALLERY}>
-                  <Box component="span" fontWeight={700}>{he.assignToGallery}</Box>
-                </MenuItem>
-              )}
-              <MenuItem value="">{he.noAssignee}</MenuItem>
-              {editEmployees.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
-              ))}
-            </TextField>
-          )}
-          {editTarget?.task_kind === "ad_hoc" && (
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={editForm.photo_required}
-                  onChange={(e) => setEditForm({ ...editForm, photo_required: e.target.checked })}
-                />
-              }
-              label={he.photoRequired}
-            />
-          )}
-          <TaskReferenceMediaEditor
-            key={editTarget?.id}
-            value={{
-              reference_photo_url: editForm.reference_photo_url,
-              reference_video_url: editForm.reference_video_url,
-              reference_audio_url: editForm.reference_audio_url,
-              pending_photo: editForm.pending_photo,
-              pending_video: editForm.pending_video,
-            }}
-            onChange={(media) => {
-              setEditReferenceMediaDirty(true);
-              setEditForm({
-                ...editForm,
-                reference_photo_url: media.reference_photo_url,
-                reference_video_url: media.reference_video_url,
-                reference_audio_url: media.reference_audio_url,
-                pending_photo: media.pending_photo ?? null,
-                pending_video: media.pending_video ?? null,
-              });
-            }}
-            onDescriptionAppend={(transcript) =>
-              setEditForm((f) => ({ ...f, description: appendDescriptionBlock(f.description, transcript) }))
-            }
-            disabled={saving}
-            onError={showError}
-          />
-          <TaskChatPanel
-            key={`chat-${editTarget.id}`}
-            occurrenceId={editTarget.id}
-            compact
-            composeEnabled={canComposeTaskChat(editTarget.status, false)}
-            onOccurrenceUpdated={() => {
-              showSuccess(he.taskChatSent);
-              void load(true);
-            }}
-          />
-            </>
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => {
-              setEditTarget(null);
-              setEditLoading(false);
-            }}
-            disabled={saving || editLoading}
-          >
-            {he.cancel}
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => void handleSaveEdit()}
-            disabled={saving || editLoading || !editForm.title.trim() || !editForm.due_at}
-          >
-            {saving ? <CircularProgress size={22} /> : he.submit}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
+      />
     </Box>
   );
 }
