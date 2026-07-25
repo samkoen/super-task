@@ -5,6 +5,7 @@ from app.domain import roles
 from app.models.task_occurrence import TaskOccurrence
 from app.models.task_template import TaskTemplate
 from app.services.task_occurrence_service import TaskOccurrenceService
+from tests.occurrence_batch_stubs import stub_occurrence_batch_lookups
 
 
 def _occurrence(**overrides) -> TaskOccurrence:
@@ -78,6 +79,7 @@ def test_get_occurrence_merges_template_media_without_persisting():
 
     completion_repo = MagicMock()
     completion_repo.find_by_occurrence.return_value = None
+    stub_occurrence_batch_lookups(occurrence_repo, completion_repo, template_repo)
 
     svc = TaskOccurrenceService(
         occurrence_repo,

@@ -1,8 +1,14 @@
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import StaffProgressOverview from "./StaffProgressOverview";
+import { FeedbackProvider } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
 import type { TeamMember } from "../../services/dashboardService";
+
+function renderWithFeedback(ui: ReactNode) {
+  return render(<FeedbackProvider>{ui}</FeedbackProvider>);
+}
 
 const member: TeamMember = {
   user_id: "u1",
@@ -50,7 +56,7 @@ const member: TeamMember = {
 
 describe("StaffProgressOverview", () => {
   it("shows employee presence and expands task accordion", () => {
-    render(<StaffProgressOverview team={[member]} />);
+    renderWithFeedback(<StaffProgressOverview team={[member]} />);
     expect(screen.getByText(he.dashboardStaffOverview)).toBeTruthy();
     expect(screen.getByText(/יוסי כהן/)).toBeTruthy();
     expect(screen.getByText(he.jobFunctionLabels.stockers, { exact: false })).toBeTruthy();
@@ -61,7 +67,7 @@ describe("StaffProgressOverview", () => {
   });
 
   it("shows empty hint when no employees", () => {
-    render(<StaffProgressOverview team={[]} />);
+    renderWithFeedback(<StaffProgressOverview team={[]} />);
     expect(screen.getByText(he.dashboardStaffOverviewEmpty)).toBeTruthy();
   });
 });

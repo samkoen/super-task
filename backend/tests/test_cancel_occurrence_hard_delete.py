@@ -9,6 +9,7 @@ from app.domain import roles, task_status
 from app.models.task_completion import TaskCompletion
 from app.models.task_occurrence import TaskOccurrence
 from app.services.task_occurrence_service import TaskOccurrenceService
+from tests.occurrence_batch_stubs import stub_occurrence_batch_lookups
 
 
 def _occurrence(**overrides) -> TaskOccurrence:
@@ -82,6 +83,7 @@ def test_cancel_deletes_media_completion_and_occurrence(monkeypatch):
         reference_video_url=None,
         reference_audio_url=None,
     )
+    stub_occurrence_batch_lookups(occurrence_repo, completion_repo, template_repo)
     svc = TaskOccurrenceService(
         occurrence_repo,
         completion_repo,

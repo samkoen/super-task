@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 from app.domain import roles
 from app.services.task_occurrence_service import TaskOccurrenceService, _UNSET
+from tests.occurrence_batch_stubs import stub_occurrence_batch_lookups
 
 
 def test_update_occurrence_skips_reference_media_when_unset():
@@ -14,6 +15,8 @@ def test_update_occurrence_skips_reference_media_when_unset():
     occurrence.task_kind = "ad_hoc"
     occurrence.assignee_user_id = "u1"
     occurrence.template_id = None
+    occurrence.department_id = None
+    occurrence.manager_user_id = None
 
     employee = MagicMock()
     employee.role = roles.EMPLOYEE
@@ -22,13 +25,21 @@ def test_update_occurrence_skips_reference_media_when_unset():
     repo = MagicMock()
     repo.find_by_id.return_value = occurrence
     repo.update_details.return_value = occurrence
+    repo.get_branch_name.return_value = "Branch"
+    repo.get_department_name.return_value = None
+    repo.get_assignee_name.return_value = "Worker"
+    repo.get_manager_name.return_value = None
 
     users = MagicMock()
     users.find_by_id.return_value = employee
 
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    stub_occurrence_batch_lookups(repo, completion_repo)
+
     svc = TaskOccurrenceService(
         repo,
-        MagicMock(),
+        completion_repo,
         MagicMock(),
         users,
     )
