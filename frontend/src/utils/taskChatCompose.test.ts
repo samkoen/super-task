@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { canComposeTaskChat } from "./taskChatCompose";
 
 describe("canComposeTaskChat", () => {
-  it("allows oved while working or waiting for reply", () => {
+  it("allows oved before start, while working, or waiting for reply", () => {
+    expect(canComposeTaskChat("pending", true)).toBe(true);
     expect(canComposeTaskChat("in_progress", true)).toBe(true);
     expect(canComposeTaskChat("overdue", true)).toBe(true);
     expect(canComposeTaskChat("awaiting_response", true)).toBe(true);
   });
 
-  it("blocks oved when pending or done", () => {
-    expect(canComposeTaskChat("pending", true)).toBe(false);
+  it("blocks oved when done or in photo review", () => {
     expect(canComposeTaskChat("completed", true)).toBe(false);
     expect(canComposeTaskChat("pending_review", true)).toBe(false);
   });

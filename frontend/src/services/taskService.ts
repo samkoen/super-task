@@ -98,6 +98,8 @@ export interface TaskOccurrence {
   title: string;
   description: string;
   due_at: string;
+  /** Date d'ouverture YYYY-MM-DD (immuable). due_at = exécution. */
+  opened_on?: string | null;
   status: TaskStatus;
   assignee_user_id: string | null;
   department_id: string | null;

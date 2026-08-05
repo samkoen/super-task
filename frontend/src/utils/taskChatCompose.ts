@@ -2,6 +2,7 @@ import type { TaskStatus } from "../services/taskService";
 
 /** Statuts où l’oved peut envoyer un message (miroir backend domain/task_chat). */
 const EMPLOYEE_COMPOSE: ReadonlySet<TaskStatus> = new Set([
+  "pending",
   "in_progress",
   "overdue",
   "awaiting_response",

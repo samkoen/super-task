@@ -153,10 +153,7 @@ class DashboardService:
         self._occurrences.mark_overdue_before(now)
         day = date.fromisoformat(due_on) if due_on else now.date()
 
-        all_assigned = self._occurrences.list_occurrences(
-            branch_id=actor.branch_id,
-            for_employee_user_id=actor.user_id,
-        )
+        # Même règle que le menahel : après rollover, le jour d'exécution (due_on).
         tasks_today = self._occurrences.list_occurrences(
             branch_id=actor.branch_id,
             for_employee_user_id=actor.user_id,
@@ -167,10 +164,10 @@ class DashboardService:
         branch_name = self._occurrences.get_branch_name(actor.branch_id)
 
         in_progress = sort_in_progress_focus_first(
-            [t for t in all_assigned if t.status == task_status.IN_PROGRESS]
+            [t for t in tasks_today if t.status == task_status.IN_PROGRESS]
         )
         awaiting_response = [
-            t for t in all_assigned if t.status == task_status.AWAITING_RESPONSE
+            t for t in tasks_today if t.status == task_status.AWAITING_RESPONSE
         ]
         pending_review = [t for t in tasks_today if t.status == task_status.PENDING_REVIEW]
         completed = [t for t in tasks_today if t.status == task_status.COMPLETED]
@@ -180,10 +177,10 @@ class DashboardService:
         urgent: list[TaskOccurrence] = []
         seen: set[str] = set()
         for task in sort_employee_open_focus(
-            [t for t in all_assigned if t.status in {task_status.OVERDUE, task_status.PENDING}],
+            [t for t in tasks_today if t.status in {task_status.OVERDUE, task_status.PENDING}],
             has_in_progress=has_in_progress,
         ):
-            if task.id in seen or task.status == task_status.IN_PROGRESS:
+            if task.id in seen:
                 continue
             due = _parse_due_at(task.due_at)
             is_urgent = (
@@ -648,6 +645,7 @@ class DashboardService:
             "title": task.title,
             "description": task.description,
             "due_at": task.due_at,
+            "opened_on": task.opened_on,
             "created_at": task.created_at,
             "status": task.status,
             "task_kind": task.task_kind,

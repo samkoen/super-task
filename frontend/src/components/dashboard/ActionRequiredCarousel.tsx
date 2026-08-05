@@ -4,33 +4,62 @@ import type { TaskQueues } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { formatTime } from "../../utils/dashboardTime";
-import { buildActionQueue, type ActionQueueItem } from "../../utils/dashboardCarousels";
+import {
+  buildActionQueue,
+  buildPendingReviewQueue,
+  buildQuestionsQueue,
+  type ActionQueueItem,
+} from "../../utils/dashboardCarousels";
 import DashboardCarousel from "./DashboardCarousel";
 
 const BORDER: Record<ActionQueueItem["reason"], string> = {
-  awaiting_response: "#e65100",
+  awaiting_response: "#c62828",
   pending_review: "#1565c0",
 };
 
+export type ActionCarouselMode = "all" | "questions" | "reviews";
+
 interface ActionRequiredCarouselProps {
   queues: TaskQueues | null | undefined;
+  mode?: ActionCarouselMode;
+  title?: string;
+  emptyLabel?: string;
   onReviewTask?: (taskId: string) => void;
   onOpenChat?: (taskId: string) => void;
 }
 
+function itemsForMode(queues: TaskQueues | null | undefined, mode: ActionCarouselMode) {
+  if (mode === "questions") return buildQuestionsQueue(queues);
+  if (mode === "reviews") return buildPendingReviewQueue(queues);
+  return buildActionQueue(queues);
+}
+
 export default function ActionRequiredCarousel({
   queues,
+  mode = "all",
+  title,
+  emptyLabel,
   onReviewTask,
   onOpenChat,
 }: ActionRequiredCarouselProps) {
-  const items = buildActionQueue(queues);
+  const items = itemsForMode(queues, mode);
+  const resolvedTitle =
+    title ??
+    (mode === "questions"
+      ? he.dashboardQuestionsRow
+      : mode === "reviews"
+        ? he.dashboardReviewRow
+        : he.dashboardActionQueue);
+  const resolvedEmpty =
+    emptyLabel ??
+    (mode === "questions"
+      ? he.dashboardQuestionsRowEmpty
+      : mode === "reviews"
+        ? he.dashboardReviewRowEmpty
+        : he.dashboardActionQueueEmpty);
 
   return (
-    <DashboardCarousel
-      title={he.dashboardActionQueue}
-      count={items.length}
-      emptyLabel={he.dashboardActionQueueEmpty}
-    >
+    <DashboardCarousel title={resolvedTitle} count={items.length} emptyLabel={resolvedEmpty}>
       {items.map(({ task, reason }) => {
         const border = BORDER[reason];
         return (
@@ -38,10 +67,10 @@ export default function ActionRequiredCarousel({
             key={task.id}
             variant="outlined"
             sx={{
-              minWidth: 260,
-              maxWidth: 280,
+              minWidth: 220,
+              maxWidth: 260,
               flex: "0 0 auto",
-              p: 2,
+              p: 1.5,
               scrollSnapAlign: "start",
               borderWidth: 2,
               borderColor: border,
@@ -56,23 +85,19 @@ export default function ActionRequiredCarousel({
                     ? he.dashboardActionAwaitingResponse
                     : he.dashboardQueuePendingReview
                 }
-                sx={{
-                  bgcolor: alpha(border, 0.12),
-                  color: border,
-                  fontWeight: 700,
-                }}
+                sx={{ bgcolor: alpha(border, 0.12), color: border, fontWeight: 700 }}
               />
             </Box>
             <Typography fontWeight={800} mb={0.5} noWrap title={task.title}>
-              {task.title}
+              {reason === "awaiting_response"
+                ? he.dashboardQuestionCard(task.assignee_name || task.title)
+                : task.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={1.5}>
               {[
-                task.assignee_name,
+                reason === "awaiting_response" ? task.title : task.assignee_name,
                 task.department_name,
-                task.completed_at
-                  ? formatTime(task.completed_at)
-                  : formatDueAt(task.due_at),
+                task.completed_at ? formatTime(task.completed_at) : formatDueAt(task.due_at),
               ]
                 .filter(Boolean)
                 .join(" · ")}

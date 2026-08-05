@@ -29,19 +29,22 @@ const queues: TaskQueues = {
 describe("ActionRequiredCarousel", () => {
   it("renders review cards and calls onReviewTask", () => {
     const onReview = vi.fn();
-    render(<ActionRequiredCarousel queues={queues} onReviewTask={onReview} />);
-    expect(screen.getByText(he.dashboardActionQueue)).toBeTruthy();
+    render(
+      <ActionRequiredCarousel queues={queues} mode="reviews" onReviewTask={onReview} />,
+    );
+    expect(screen.getByText(he.dashboardReviewRow)).toBeTruthy();
     expect(screen.getByText("ניקוי מדף")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: he.taskReviewAction }));
     expect(onReview).toHaveBeenCalledWith("pr1");
   });
 
-  it("shows empty state", () => {
+  it("shows empty state for questions row", () => {
     render(
       <ActionRequiredCarousel
+        mode="questions"
         queues={{ completed: [], in_progress: [], pending_review: [], upcoming: [] }}
       />,
     );
-    expect(screen.getByText(he.dashboardActionQueueEmpty)).toBeTruthy();
+    expect(screen.getByText(he.dashboardQuestionsRowEmpty)).toBeTruthy();
   });
 });

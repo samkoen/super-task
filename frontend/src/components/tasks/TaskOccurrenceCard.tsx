@@ -73,8 +73,16 @@ const URGENCY_COLOR: Record<TaskUrgencyLevel, "error" | "warning" | "default" | 
   done: "success",
 };
 
+function openingDayIso(task: TaskOccurrence): string | null {
+  if (task.opened_on) return task.opened_on.slice(0, 10);
+  if (task.created_at) return dueDateIso(task.created_at);
+  return null;
+}
+
+/** Carry-over : date d'ouverture < date d'exécution (après rollover). */
 function isCarryOver(task: TaskOccurrence): boolean {
-  return Boolean(task.created_at && dueDateIso(task.created_at) < dueDateIso(task.due_at));
+  const opened = openingDayIso(task);
+  return Boolean(opened && opened < dueDateIso(task.due_at));
 }
 
 export default function TaskOccurrenceCard({
@@ -411,8 +419,8 @@ export default function TaskOccurrenceCard({
                 size="small"
                 color="warning"
                 label={
-                  task.created_at
-                    ? he.employeeTaskCreatedOn(formatHebrewDayShort(dueDateIso(task.created_at)))
+                  openingDayIso(task)
+                    ? he.employeeTaskCreatedOn(formatHebrewDayShort(openingDayIso(task)!))
                     : he.employeeCarryOverTask
                 }
               />
@@ -576,6 +584,22 @@ export default function TaskOccurrenceCard({
       <Dialog open={infoOpen} onClose={() => setInfoOpen(false)} fullWidth maxWidth="xs" dir="rtl">
         <DialogTitle>{he.taskInfo}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+          {openingDayIso(task) && (
+            <Typography variant="body2">
+              <Box component="span" color="text.secondary">
+                {he.openedOn}:{" "}
+              </Box>
+              {formatHebrewDayShort(openingDayIso(task)!)}
+            </Typography>
+          )}
+          <Typography variant="body2">
+            <Box component="span" color="text.secondary">
+              {he.dueAt}:{" "}
+            </Box>
+            <Box component="span" dir="ltr">
+              {formatDueAt(task.due_at)}
+            </Box>
+          </Typography>
           <Typography variant="body2">
             <Box component="span" color="text.secondary">
               {he.taskInfoCreatedAt}{" "}

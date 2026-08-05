@@ -90,6 +90,7 @@ def test_rollover_open_tasks_to_day_updates_due_at():
     row = MagicMock()
     row.status = task_status.OVERDUE
     row.due_at = datetime(2026, 1, 1, 14, 0, tzinfo=TZ)
+    row.opened_on = date(2026, 1, 1)
 
     db = MagicMock()
     scalars = MagicMock()
@@ -105,5 +106,43 @@ def test_rollover_open_tasks_to_day_updates_due_at():
     assert count == 1
     assert row.due_at.date() == date(2026, 1, 2)
     assert row.due_at.hour == 14
+    assert row.opened_on == date(2026, 1, 1)
     assert row.status == task_status.PENDING
     db.flush.assert_called_once()
+
+
+def test_rollover_preserves_awaiting_response_status():
+    row = MagicMock()
+    row.status = task_status.AWAITING_RESPONSE
+    row.due_at = datetime(2026, 1, 1, 14, 0, tzinfo=TZ)
+    row.opened_on = date(2026, 1, 1)
+
+    db = MagicMock()
+    scalars = MagicMock()
+    scalars.all.return_value = [row]
+    execute_result = MagicMock()
+    execute_result.scalars.return_value = scalars
+    db.execute.return_value = execute_result
+
+    repo = TaskOccurrenceRepository(db)
+    now = datetime(2026, 1, 2, 10, 0, tzinfo=TZ)
+    repo.rollover_open_tasks_to_day(date(2026, 1, 2), now=now)
+
+    assert row.due_at.date() == date(2026, 1, 2)
+    assert row.opened_on == date(2026, 1, 1)
+    assert row.status == task_status.AWAITING_RESPONSE
+
+
+def test_has_rolled_execution():
+    from app.domain.employee_task_carry_over import has_rolled_execution
+
+    rolled = _task(
+        due_at="2026-07-17T12:00:00+03:00",
+        opened_on="2026-07-16",
+    )
+    fresh = _task(
+        due_at="2026-07-17T12:00:00+03:00",
+        opened_on="2026-07-17",
+    )
+    assert has_rolled_execution(rolled, tz=TZ) is True
+    assert has_rolled_execution(fresh, tz=TZ) is False

@@ -15,6 +15,11 @@ describe("soundKindFromNotificationKind", () => {
     expect(soundKindFromNotificationKind("employee_idle_no_tasks")).toBe("alert");
   });
 
+  it("maps employee questions to manager_question sound", () => {
+    expect(soundKindFromNotificationKind("task_message_employee")).toBe("manager_question");
+    expect(soundKindFromNotificationKind("awaiting_response")).toBe("manager_question");
+  });
+
   it("playNotificationSound is a no-op for none without throwing", () => {
     expect(() => playNotificationSound("none")).not.toThrow();
     expect(() => playNotificationSound(undefined)).not.toThrow();

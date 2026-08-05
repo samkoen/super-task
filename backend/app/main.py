@@ -27,6 +27,7 @@ from app.controllers import (
     network_controller,
     notification_controller,
     product_controller,
+    promotion_stage_controller,
     task_controller,
     task_gallery_controller,
     user_controller,
@@ -124,6 +125,11 @@ def create_app() -> FastAPI:
     app.include_router(branch_controller.router, prefix="/api/branches", tags=["branches"])
     app.include_router(department_controller.router, prefix="/api/departments", tags=["departments"])
     app.include_router(product_controller.router, prefix="/api/products", tags=["products"])
+    app.include_router(
+        promotion_stage_controller.router,
+        prefix="/api/promotion-stages",
+        tags=["promotion-stages"],
+    )
     app.include_router(task_controller.router, prefix="/api/tasks", tags=["tasks"])
     app.include_router(
         task_gallery_controller.router, prefix="/api/task-gallery", tags=["task-gallery"]

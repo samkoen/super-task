@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -153,6 +153,37 @@ class Product(Base):
     )
 
 
+class PromotionStage(Base):
+    """במת מבצע — hierarch מחלקה ◄ במה ◄ עובד."""
+
+    __tablename__ = "promotion_stages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=False, index=True
+    )
+    department_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("departments.id"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    location_label: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
+    lead_product_name: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    stock_pct: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    signage_status: Mapped[str] = mapped_column(String(32), nullable=False, default="ok")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class TaskTemplate(Base):
     __tablename__ = "task_templates"
 
@@ -211,6 +242,8 @@ class TaskOccurrence(Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str] = mapped_column(String(2000), nullable=False, default="")
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    # Date d'ouverture (immuable). due_at = date d'exécution (avance au rollover).
+    opened_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True

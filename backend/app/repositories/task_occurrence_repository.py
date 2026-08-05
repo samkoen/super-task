@@ -9,6 +9,7 @@ from app.db import mappers as mp
 from app.domain import task_status
 from app.domain.employee_task_carry_over import (
     ROLLOVER_STATUSES,
+    opened_on_from_due,
     rollover_due_datetime,
     start_of_day,
     status_after_rollover,
@@ -112,6 +113,7 @@ class TaskOccurrenceRepository:
             title=title.strip(),
             description=description.strip(),
             due_at=due_at,
+            opened_on=opened_on_from_due(due_at, _TZ),
             status=status,
             assignee_user_id=mp.parse_uuid(assignee_user_id) if assignee_user_id else None,
             department_id=mp.parse_uuid(department_id) if department_id else None,
@@ -283,7 +285,7 @@ class TaskOccurrenceRepository:
         now: datetime,
         branch_ids: list[str] | None = None,
     ) -> int:
-        """Avance due_at des tâches ouvertes échues avant `day` vers ce jour (même heure)."""
+        """Avance due_at (exécution) ; opened_on (ouverture) ne change jamais."""
         cutoff = start_of_day(day, _TZ)
         q = (
             select(orm.TaskOccurrence)
@@ -299,6 +301,8 @@ class TaskOccurrenceRepository:
         rows = self._db.execute(q).scalars().all()
         count = 0
         for row in rows:
+            if getattr(row, "opened_on", None) is None:
+                row.opened_on = opened_on_from_due(row.due_at, _TZ)
             new_due = rollover_due_datetime(row.due_at, to_day=day, tz=_TZ)
             row.due_at = new_due
             row.status = status_after_rollover(row.status, new_due_at=new_due, now=now)

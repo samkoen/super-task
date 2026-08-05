@@ -4,6 +4,7 @@ from __future__ import annotations
 from app.domain import roles, task_status
 
 EMPLOYEE_CHAT_STATUSES = {
+    task_status.PENDING,
     task_status.IN_PROGRESS,
     task_status.OVERDUE,
     task_status.AWAITING_RESPONSE,

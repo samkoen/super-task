@@ -27,6 +27,8 @@ class TaskOccurrence:
     source_gallery_item_id: str | None = None
     ops_category: str | None = None
     manager_next_at: str | None = None
+    # Date d'ouverture (YYYY-MM-DD), immuable. due_at = exécution.
+    opened_on: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -36,6 +38,7 @@ class TaskOccurrence:
             "title": self.title,
             "description": self.description,
             "due_at": self.due_at,
+            "opened_on": self.opened_on,
             "status": self.status,
             "assignee_user_id": self.assignee_user_id,
             "department_id": self.department_id,

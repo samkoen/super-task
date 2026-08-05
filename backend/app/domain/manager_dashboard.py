@@ -21,6 +21,15 @@ def _due_day(task: TaskOccurrence, tz) -> date:
     return parse_dt(task.due_at, tz).date()
 
 
+def _opened_day(task: TaskOccurrence, tz) -> date:
+    raw = getattr(task, "opened_on", None)
+    if isinstance(raw, date) and not isinstance(raw, datetime):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        return date.fromisoformat(raw[:10])
+    return _due_day(task, tz)
+
+
 def duration_minutes(start: datetime, end: datetime) -> int:
     return max(0, int((end - start).total_seconds() // 60))
 
@@ -68,6 +77,7 @@ def build_timeline_item(
         "status": task.status,
         "segment": segment,
         "due_at": task.due_at,
+        "opened_on": getattr(task, "opened_on", None),
         "started_at": started_at,
         "completed_at": completed_at,
         "duration_minutes": duration,
@@ -112,7 +122,8 @@ def task_queue_bucket(status: str) -> str | None:
 
 
 def overdue_days(task: TaskOccurrence, *, day: date, tz) -> int:
-    return max(0, (day - _due_day(task, tz)).days)
+    """Jours depuis la date d'ouverture (pas l'exécution déjà avancée)."""
+    return max(0, (day - _opened_day(task, tz)).days)
 
 
 def build_unfinished_item(
@@ -129,6 +140,7 @@ def build_unfinished_item(
         "title": task.title,
         "status": task.status,
         "due_at": task.due_at,
+        "opened_on": getattr(task, "opened_on", None),
         "overdue_days": overdue_days(task, day=day, tz=tz),
         "department_name": department_name,
         "assignee_name": assignee_name,

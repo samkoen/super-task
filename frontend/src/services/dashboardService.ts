@@ -53,6 +53,7 @@ export interface TimelineTask {
     | "upcoming"
     | "overdue";
   due_at: string;
+  opened_on?: string | null;
   started_at: string | null;
   completed_at: string | null;
   duration_minutes: number | null;
@@ -150,6 +151,7 @@ export interface EmployeeTaskCard {
   title: string;
   description: string;
   due_at: string;
+  opened_on?: string | null;
   created_at?: string | null;
   status: TaskStatus;
   task_kind: TaskKind;

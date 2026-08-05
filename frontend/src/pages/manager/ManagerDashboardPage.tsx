@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -19,12 +19,18 @@ import {
   dashboardService,
   type ManagerDashboard,
 } from "../../services/dashboardService";
+import {
+  promotionStageService,
+  type PromotionStage,
+} from "../../services/promotionStageService";
 import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
 import HealthBadge from "../../components/dashboard/HealthBadge";
 import StoreStatusKpiRow from "../../components/dashboard/StoreStatusKpiRow";
 import ActionRequiredCarousel from "../../components/dashboard/ActionRequiredCarousel";
 import PendingTasksCarousel from "../../components/dashboard/PendingTasksCarousel";
 import StaffProgressOverview from "../../components/dashboard/StaffProgressOverview";
+import StoreStatusAnalysisTable from "../../components/dashboard/StoreStatusAnalysisTable";
+import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
 import PageHeader from "../../components/ui/PageHeader";
@@ -34,6 +40,11 @@ import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
 import { formatHebrewDay, todayIso } from "../../utils/dateView";
+import {
+  bindNotificationAudioUnlock,
+  playManagerQuestionSound,
+} from "../../utils/notificationSounds";
+import { buildQuestionsQueue } from "../../utils/dashboardCarousels";
 
 /** Masqué temporairement — remettre à true pour réafficher. */
 const SHOW_STAFF_PROGRESS = false;
@@ -57,6 +68,9 @@ export default function ManagerDashboardPage() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [stages, setStages] = useState<PromotionStage[]>([]);
+  const prevQuestionCountRef = useRef<number | null>(null);
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
 
@@ -67,7 +81,18 @@ export default function ManagerDashboardPage() {
     }
     try {
       const branchId = canPickBranch ? selectedBranch || undefined : undefined;
-      setData(await dashboardService.getManager(branchId, todayIso()));
+      const dash = await dashboardService.getManager(branchId, todayIso());
+      setData(dash);
+      const bid = dash.branch?.id;
+      if (bid) {
+        try {
+          setStages(await promotionStageService.analysis(bid));
+        } catch {
+          setStages([]);
+        }
+      } else {
+        setStages([]);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
@@ -78,6 +103,18 @@ export default function ManagerDashboardPage() {
   useTaskChangeListener(useCallback(() => {
     load(true);
   }, [load]));
+
+  useEffect(() => bindNotificationAudioUnlock(), []);
+
+  useEffect(() => {
+    if (!data?.task_queues) return;
+    const count = buildQuestionsQueue(data.task_queues).length;
+    const prev = prevQuestionCountRef.current;
+    if (prev !== null && count > prev) {
+      playManagerQuestionSound();
+    }
+    prevQuestionCountRef.current = count;
+  }, [data?.task_queues]);
 
   useEffect(() => {
     if (!canPickBranch) {
@@ -182,13 +219,36 @@ export default function ManagerDashboardPage() {
           </Typography>
           <StoreStatusKpiRow storeKpis={data.store_kpis} />
 
+          {/* שורה 1 — שאלות עובדים */}
           <ActionRequiredCarousel
             queues={data.task_queues}
+            mode="questions"
             onReviewTask={handleReviewTask}
           />
+
+          {/* שורה 2 — משימות ממתינות + ניתוח מצב */}
           <PendingTasksCarousel
             queues={data.task_queues}
             onOpenTask={(task) => setEditOccurrenceId(task.id)}
+            onOpenStatusAnalysis={() => setShowAnalysis((v) => !v)}
+          />
+
+          {showAnalysis && (
+            <>
+              <StoreStatusAnalysisTable
+                team={data.team}
+                onOpenTask={(task) => setEditOccurrenceId(task.id)}
+                onClose={() => setShowAnalysis(false)}
+              />
+              <PromotionStagesAnalysisTable stages={stages} />
+            </>
+          )}
+
+          {/* שורה 3 — ממתינות לאישור */}
+          <ActionRequiredCarousel
+            queues={data.task_queues}
+            mode="reviews"
+            onReviewTask={handleReviewTask}
           />
 
           {SHOW_STAFF_PROGRESS && (

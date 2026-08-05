@@ -1,6 +1,11 @@
-/** Sons distincts pour l'employé (Web Audio — pas de fichiers). */
+/** Sons distincts pour l'employé / manager (Web Audio — pas de fichiers). */
 
-export type NotificationSoundKind = "new_task" | "task_end" | "alert" | "none";
+export type NotificationSoundKind =
+  | "new_task"
+  | "task_end"
+  | "alert"
+  | "manager_question"
+  | "none";
 
 type AudioContextCtor = typeof AudioContext;
 
@@ -110,6 +115,16 @@ export function playAlertSound(): void {
   ]);
 }
 
+/** שאלה ממתינה למנהל — signal distinct (urgence haute, SPEC שורה 1). */
+export function playManagerQuestionSound(): void {
+  void playToneSequence([
+    { freq: 440, start: 0, duration: 0.12, gain: 1 },
+    { freq: 880, start: 0.14, duration: 0.12, gain: 1 },
+    { freq: 440, start: 0.28, duration: 0.12, gain: 1 },
+    { freq: 880, start: 0.42, duration: 0.22, gain: 1 },
+  ]);
+}
+
 export function playNotificationSound(kind: NotificationSoundKind | string | undefined): void {
   if (!kind || kind === "none") return;
   if (kind === "new_task") {
@@ -122,6 +137,10 @@ export function playNotificationSound(kind: NotificationSoundKind | string | und
   }
   if (kind === "alert") {
     playAlertSound();
+    return;
+  }
+  if (kind === "manager_question") {
+    playManagerQuestionSound();
   }
 }
 
@@ -129,6 +148,7 @@ export function soundKindFromNotificationKind(kind: string | undefined): Notific
   if (!kind) return "none";
   if (kind === "task_created" || kind === "task_delegated") return "new_task";
   if (kind === "task_cancelled" || kind === "task_reopened") return "task_end";
+  if (kind === "task_message_employee" || kind === "awaiting_response") return "manager_question";
   if (kind.startsWith("employee_idle")) return "alert";
   return "none";
 }

@@ -17,18 +17,28 @@ export function isFilterAll(value: string | null): boolean {
   return !value;
 }
 
-/**
- * File Action Required : d'abord ממתין לתגובה, puis pending_review.
- * Le chat n'est pas encore livré → awaiting_response vide pour l'instant.
- */
-export function buildActionQueue(queues: TaskQueues | null | undefined): ActionQueueItem[] {
+/** שורה 1 SPEC — שאלות עובדים בלבד (ממתין לתגובה). */
+export function buildQuestionsQueue(queues: TaskQueues | null | undefined): ActionQueueItem[] {
   if (!queues) return [];
+  const fromReview = (queues.pending_review ?? []).filter(
+    (t) => t.status === "awaiting_response" || t.segment === "awaiting_response",
+  );
+  const fromUpcoming = (queues.upcoming ?? []).filter((t) => t.status === "awaiting_response");
+  const fromInProgress = (queues.in_progress ?? []).filter((t) => t.status === "awaiting_response");
+  const seen = new Set<string>();
+  const out: ActionQueueItem[] = [];
+  for (const task of [...fromReview, ...fromUpcoming, ...fromInProgress]) {
+    if (seen.has(task.id)) continue;
+    seen.add(task.id);
+    out.push({ task, reason: "awaiting_response" });
+  }
+  return out;
+}
 
-  const awaiting = (queues.pending_review ?? [])
-    .filter((t) => t.status === "awaiting_response" || t.segment === "awaiting_response")
-    .map((task) => ({ task, reason: "awaiting_response" as const }));
-
-  const reviews = (queues.pending_review ?? [])
+/** שורה 3 SPEC — משימות שבוצעו וממתינות לאישור מנהל. */
+export function buildPendingReviewQueue(queues: TaskQueues | null | undefined): ActionQueueItem[] {
+  if (!queues) return [];
+  return (queues.pending_review ?? [])
     .filter((t) => t.status !== "awaiting_response" && t.segment !== "awaiting_response")
     .sort(
       (a, b) =>
@@ -36,17 +46,14 @@ export function buildActionQueue(queues: TaskQueues | null | undefined): ActionQ
         new Date(a.completed_at ?? a.due_at).getTime(),
     )
     .map((task) => ({ task, reason: "pending_review" as const }));
+}
 
-  // Si le statut awaiting_response est un jour dans un autre bucket, on le récupère aussi.
-  const fromUpcoming = (queues.upcoming ?? [])
-    .filter((t) => t.status === "awaiting_response")
-    .map((task) => ({ task, reason: "awaiting_response" as const }));
-
-  const fromInProgress = (queues.in_progress ?? [])
-    .filter((t) => t.status === "awaiting_response")
-    .map((task) => ({ task, reason: "awaiting_response" as const }));
-
-  return [...awaiting, ...fromUpcoming, ...fromInProgress, ...reviews];
+/**
+ * File Action Required (legacy) : questions puis pending_review.
+ * Préférer buildQuestionsQueue / buildPendingReviewQueue pour le layout 3 rangées.
+ */
+export function buildActionQueue(queues: TaskQueues | null | undefined): ActionQueueItem[] {
+  return [...buildQuestionsQueue(queues), ...buildPendingReviewQueue(queues)];
 }
 
 /** Tâches du jour pas encore terminées (hors revue photo / terminées). */

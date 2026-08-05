@@ -10,6 +10,7 @@ from app.models.department import Department
 from app.models.invitation import UserInvitation
 from app.models.network import Network
 from app.models.product import Product
+from app.models.promotion_stage import PromotionStage
 from app.models.task_completion import TaskCompletion
 from app.models.task_message import TaskMessage
 from app.models.task_occurrence import TaskOccurrence
@@ -187,6 +188,40 @@ def product_domain_to_api(p: Product, *, department_name: str | None = None) -> 
     return data
 
 
+def promotion_stage_orm_to_domain(row: orm.PromotionStage | None) -> PromotionStage | None:
+    if row is None:
+        return None
+    return PromotionStage(
+        id=str(row.id),
+        branch_id=str(row.branch_id),
+        department_id=str(row.department_id),
+        name=row.name,
+        location_label=row.location_label or "",
+        assignee_user_id=str(row.assignee_user_id) if row.assignee_user_id else None,
+        lead_product_name=row.lead_product_name or "",
+        stock_pct=float(row.stock_pct),
+        signage_status=row.signage_status or "ok",
+        is_active=row.is_active,
+        created_at=parse_datetime_iso(row.created_at),
+        updated_at=parse_datetime_iso(row.updated_at),
+    )
+
+
+def promotion_stage_domain_to_api(
+    stage: PromotionStage,
+    *,
+    department_name: str | None = None,
+    assignee_name: str | None = None,
+    open_tasks: int = 0,
+) -> dict:
+    data = stage.to_dict()
+    data["department_name"] = department_name
+    data["assignee_name"] = assignee_name
+    data["open_tasks"] = open_tasks
+    data["needs_refill"] = float(stage.stock_pct) < 30
+    return data
+
+
 def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | None:
     if row is None:
         return None
@@ -229,6 +264,8 @@ def task_template_domain_to_api(t: TaskTemplate, **extra) -> dict:
 def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurrence | None:
     if row is None:
         return None
+    opened = getattr(row, "opened_on", None)
+    opened_on = opened.isoformat() if opened is not None else parse_datetime_iso(row.due_at)[:10]
     return TaskOccurrence(
         id=str(row.id),
         template_id=str(row.template_id) if row.template_id else None,
@@ -236,6 +273,7 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         title=row.title,
         description=row.description,
         due_at=parse_datetime_iso(row.due_at),
+        opened_on=opened_on,
         status=row.status,
         assignee_user_id=str(row.assignee_user_id) if row.assignee_user_id else None,
         department_id=str(row.department_id) if row.department_id else None,

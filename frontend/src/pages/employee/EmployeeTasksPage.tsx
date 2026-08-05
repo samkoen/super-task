@@ -57,7 +57,6 @@ import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailD
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
-import { showsHebrewTitle } from "../../utils/employeeTaskCard";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
@@ -129,6 +128,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     title: task.title,
     description: task.description,
     due_at: task.due_at,
+    opened_on: task.opened_on,
     created_at: task.created_at,
     status: task.status,
     task_kind: task.task_kind,
@@ -810,10 +810,11 @@ export default function EmployeeTasksPage() {
       />
 
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
-        <DialogTitle sx={{ pb: selected && showsHebrewTitle(selected) ? 1 : undefined }}>
-          {selected ? <EmployeeTaskTitle task={selected} variant="h6" /> : null}
-        </DialogTitle>
+        <DialogTitle>{he.markDone}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          {selected && (
+            <EmployeeTaskTitle task={selected} variant="subtitle1" />
+          )}
           {selected && (
             <TaskReferenceMediaDisplay
               reference_photo_url={selected.reference_photo_url}

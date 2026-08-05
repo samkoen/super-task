@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { TaskQueues, TimelineTask } from "../services/dashboardService";
 import {
   buildActionQueue,
+  buildPendingReviewQueue,
   buildPendingTasks,
+  buildQuestionsQueue,
   filterPendingTasks,
   uniqueAssignees,
   uniqueDepartments,
@@ -63,6 +65,28 @@ const queues: TaskQueues = {
     }),
   ],
 };
+
+describe("buildQuestionsQueue / buildPendingReviewQueue", () => {
+  it("splits questions and reviews into separate rows", () => {
+    const withQuestion: TaskQueues = {
+      ...queues,
+      upcoming: [
+        ...queues.upcoming,
+        task({
+          id: "q1",
+          status: "awaiting_response" as TimelineTask["status"],
+          segment: "upcoming",
+        }),
+      ],
+    };
+    expect(buildQuestionsQueue(withQuestion).map((i) => i.task.id)).toEqual(["q1"]);
+    expect(buildPendingReviewQueue(withQuestion).map((i) => i.task.id)).toEqual(["pr1"]);
+    expect(buildActionQueue(withQuestion).map((i) => i.reason)).toEqual([
+      "awaiting_response",
+      "pending_review",
+    ]);
+  });
+});
 
 describe("buildActionQueue", () => {
   it("lists pending_review items for manager action", () => {
