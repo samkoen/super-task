@@ -67,17 +67,18 @@ export default function ActionRequiredCarousel({
             key={task.id}
             variant="outlined"
             sx={{
-              minWidth: 220,
-              maxWidth: 260,
+              minWidth: 110,
+              maxWidth: 130,
+              width: 120,
               flex: "0 0 auto",
-              p: 1.5,
+              p: 0.75,
               scrollSnapAlign: "start",
               borderWidth: 2,
               borderColor: border,
               bgcolor: alpha(border, 0.04),
             }}
           >
-            <Box display="flex" gap={0.75} flexWrap="wrap" mb={1}>
+            <Box display="flex" gap={0.5} flexWrap="wrap" mb={0.5}>
               <Chip
                 size="small"
                 label={
@@ -85,15 +86,21 @@ export default function ActionRequiredCarousel({
                     ? he.dashboardActionAwaitingResponse
                     : he.dashboardQueuePendingReview
                 }
-                sx={{ bgcolor: alpha(border, 0.12), color: border, fontWeight: 700 }}
+                sx={{
+                  bgcolor: alpha(border, 0.12),
+                  color: border,
+                  fontWeight: 700,
+                  height: 20,
+                  "& .MuiChip-label": { px: 0.75, fontSize: 11 },
+                }}
               />
             </Box>
-            <Typography fontWeight={800} mb={0.5} noWrap title={task.title}>
+            <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
               {reason === "awaiting_response"
                 ? he.dashboardQuestionCard(task.assignee_name || task.title)
                 : task.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" mb={1.5}>
+            <Typography variant="caption" color="text.secondary" display="block" mb={0.75} noWrap>
               {[
                 reason === "awaiting_response" ? task.title : task.assignee_name,
                 task.department_name,
@@ -108,7 +115,15 @@ export default function ActionRequiredCarousel({
                 variant="contained"
                 startIcon={<RateReviewIcon />}
                 onClick={() => onReviewTask(task.id)}
-                sx={{ bgcolor: border, "&:hover": { bgcolor: border } }}
+                sx={{
+                  bgcolor: border,
+                  "&:hover": { bgcolor: border },
+                  minWidth: 0,
+                  px: 0.75,
+                  py: 0.15,
+                  fontSize: 11,
+                  "& .MuiButton-startIcon": { marginInlineEnd: 4 },
+                }}
               >
                 {he.taskReviewAction}
               </Button>
@@ -118,7 +133,14 @@ export default function ActionRequiredCarousel({
                 size="small"
                 variant="contained"
                 onClick={() => (onOpenChat ?? onReviewTask)?.(task.id)}
-                sx={{ bgcolor: border, "&:hover": { bgcolor: border } }}
+                sx={{
+                  bgcolor: border,
+                  "&:hover": { bgcolor: border },
+                  minWidth: 0,
+                  px: 0.75,
+                  py: 0.15,
+                  fontSize: 11,
+                }}
               >
                 {he.taskChatOpen}
               </Button>

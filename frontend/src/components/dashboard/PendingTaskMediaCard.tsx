@@ -60,7 +60,7 @@ function PhotoHalf({
   if (!(photoBg && ready)) {
     return (
       <Box sx={{ height: "100%", display: "grid", placeItems: "center" }}>
-        <Typography variant="h4" fontWeight={800} sx={{ color: border, opacity: 0.35 }}>
+        <Typography variant="h6" fontWeight={800} sx={{ color: border, opacity: 0.35 }}>
           {title.trim()[0]?.toUpperCase() ?? "?"}
         </Typography>
       </Box>
@@ -114,11 +114,11 @@ function PhotoHalf({
         sx={{
           position: "absolute",
           zIndex: 2,
-          insetInlineEnd: 8,
-          bottom: 8,
+          insetInlineEnd: 4,
+          bottom: 4,
           color: "#fff",
           opacity: 0.85,
-          fontSize: 18,
+          fontSize: 14,
         }}
       />
     </Box>
@@ -178,21 +178,21 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
       <Paper
         variant="outlined"
         sx={{
-          minWidth: 240,
-          maxWidth: 260,
-          width: 240,
+          minWidth: 120,
+          maxWidth: 130,
+          width: 120,
           flex: "0 0 auto",
           p: 0,
           overflow: "hidden",
           scrollSnapAlign: "start",
           borderColor: alpha(border, 0.45),
-          borderInlineStartWidth: 4,
+          borderInlineStartWidth: 3,
           borderInlineStartColor: border,
         }}
       >
         <Box
           sx={{
-            height: 120,
+            height: 60,
             bgcolor: alpha(border, 0.06),
             position: "relative",
             overflow: "hidden",
@@ -213,7 +213,7 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
           onClick={onOpen ? () => onOpen(task) : undefined}
           aria-label={onOpen ? `${he.openTask}: ${task.title}` : undefined}
           sx={{
-            p: 1.5,
+            p: 0.75,
             width: "100%",
             textAlign: "start",
             border: 0,
@@ -225,23 +225,34 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
             "&:hover": onOpen ? { bgcolor: "action.hover" } : undefined,
           }}
         >
-          <Typography fontWeight={800} mb={0.5} noWrap title={task.title}>
+          <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
             {task.title}
           </Typography>
-          <Typography variant="body2" color="text.secondary" noWrap>
+          <Typography variant="caption" color="text.secondary" noWrap display="block">
             {[task.assignee_name, task.department_name].filter(Boolean).join(" · ") || "—"}
           </Typography>
-          <Box display="flex" gap={0.75} flexWrap="wrap" mt={1}>
+          <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.5}>
             <Chip
               size="small"
               label={`${he.dashboardDueAt} ${formatDueAt(task.due_at)}`}
               variant="outlined"
+              sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
             />
             {task.status === "overdue" && (
-              <Chip size="small" color="error" label={he.timelineSegmentOverdue} />
+              <Chip
+                size="small"
+                color="error"
+                label={he.timelineSegmentOverdue}
+                sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
+              />
             )}
             {task.status === "in_progress" && (
-              <Chip size="small" color="warning" label={he.timelineSegmentInProgress} />
+              <Chip
+                size="small"
+                color="warning"
+                label={he.timelineSegmentInProgress}
+                sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
+              />
             )}
           </Box>
         </Box>
