@@ -308,6 +308,7 @@ class DashboardService:
                 "name": branch.name,
                 "network_id": branch.network_id,
             },
+            "network_name": self._branches.get_network_name(branch.network_id),
             "health": health,
             "counts": {
                 **counts,
@@ -378,6 +379,9 @@ class DashboardService:
         return {
             "due_on": day.isoformat(),
             "branch": None,
+            "network_name": (
+                self._branches.get_network_name(actor.network_id) if actor.network_id else None
+            ),
             "health": health,
             "counts": {
                 **total_counts,

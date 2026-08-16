@@ -62,3 +62,17 @@ def test_set_active_branch_rejects_manager():
     service = AuthService(repo)
     with pytest.raises(ValueError, match="עובדים"):
         service.set_active_branch("u1", "b1")
+
+
+def test_user_api_includes_network_name():
+    from app.models.network import Network
+
+    repo = MagicMock()
+    repo.find_by_id.return_value = _employee(role=roles.BRANCH_MANAGER)
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    service._networks = MagicMock()
+    service._networks.find_by_id.return_value = Network(id="n1", name="רשת בדיקה")
+    out = service.get_user_by_id("u1")
+    assert out is not None
+    assert out["network_name"] == "רשת בדיקה"

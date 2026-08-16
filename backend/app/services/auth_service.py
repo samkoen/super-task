@@ -6,6 +6,7 @@ from app.db import mappers as mp
 from app.domain import roles
 from app.domain.phone_login import login_key
 from app.domain.user_membership import resolve_active_branch_id
+from app.repositories.network_repository import NetworkRepository
 from app.repositories.user_branch_membership_repository import UserBranchMembershipRepository
 from app.repositories.user_repository import UserRepository
 from app.services.email import send_verification_email
@@ -17,6 +18,7 @@ class AuthService:
     def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
         self._memberships = UserBranchMembershipRepository(user_repository._db)
+        self._networks = NetworkRepository(user_repository._db)
 
     def try_login(self, email: str, password: str) -> tuple[Optional[dict], Optional[LoginError]]:
         plain = (password or "").strip()
@@ -124,6 +126,11 @@ class AuthService:
 
     def _user_api(self, user, *, active_branch_id: str | None = None) -> dict:
         payload = mp.user_domain_to_api(user)
+        if user.network_id:
+            network = self._networks.find_by_id(user.network_id)
+            payload["network_name"] = network.name if network else None
+        else:
+            payload["network_name"] = None
         if user.role != roles.EMPLOYEE:
             payload["branches"] = []
             payload["active_branch_id"] = user.branch_id

@@ -52,6 +52,7 @@ import {
   readManagerScopeBranchId,
   writeManagerScopeBranchId,
 } from "../../utils/managerScopeBranch";
+import { managerWelcomeSubtitle } from "../../utils/managerWelcomeSubtitle";
 
 /** Masqué temporairement — remettre à true pour réafficher. */
 const SHOW_STAFF_PROGRESS = false;
@@ -197,7 +198,10 @@ export default function ManagerDashboardPage() {
     <Box>
       <PageHeader
         title={dashboardTitle(data?.branch?.name)}
-        subtitle={user?.full_name ? he.welcome(user.full_name) : undefined}
+        subtitle={managerWelcomeSubtitle(
+          user?.full_name,
+          data?.network_name || user?.network_name || branches[0]?.network_name
+        )}
         action={
           canPickBranch ? (
             <TextField

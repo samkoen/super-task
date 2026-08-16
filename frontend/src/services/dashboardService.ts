@@ -135,6 +135,7 @@ export interface StoreKpis {
 export interface ManagerDashboard {
   due_on: string;
   branch: { id: string; name: string; network_id: string } | null;
+  network_name?: string | null;
   health: HealthLevel;
   counts: DashboardCounts;
   store_kpis?: StoreKpis | null;
