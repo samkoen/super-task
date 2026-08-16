@@ -22,6 +22,7 @@ import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
 import type { OpsCategory, TaskRecurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
+import { userBelongsToBranch } from "../../utils/userBranchMembership";
 
 const RECURRENCES: TaskRecurrence[] = ["daily", "weekly", "biweekly", "monthly"];
 const WEEKDAYS = [
@@ -136,7 +137,9 @@ export default function NewTaskFormDialog({
   }, [open]);
 
   const branchEmployees = useMemo(() => {
-    const base = branchId ? employees.filter((u) => u.branch_id === branchId) : employees;
+    const base = branchId
+      ? employees.filter((u) => userBelongsToBranch(u, branchId))
+      : employees;
     if (
       assigneeUserId &&
       !isAssignToGallery(assigneeUserId) &&

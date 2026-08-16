@@ -16,9 +16,15 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  setActiveBranch: (branchId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function persistUser(next: User | null) {
+  if (next) localStorage.setItem("user", JSON.stringify(next));
+  else localStorage.removeItem("user");
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -35,10 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await authService.getCurrentUser();
       setUser(res.user);
-      localStorage.setItem("user", JSON.stringify(res.user));
+      persistUser(res.user);
     } catch {
       setUser(null);
-      localStorage.removeItem("user");
+      persistUser(null);
     }
   }, []);
 
@@ -49,11 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await authService.login(email, password);
     setUser(res.user);
-    localStorage.setItem("user", JSON.stringify(res.user));
+    persistUser(res.user);
   }, []);
 
   const logout = useCallback(async () => {
-    localStorage.removeItem("user");
+    persistUser(null);
     setUser(null);
     try {
       await authService.logout();
@@ -63,9 +69,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.replace("/login");
   }, []);
 
+  const setActiveBranch = useCallback(async (branchId: string) => {
+    const res = await authService.setActiveBranch(branchId);
+    setUser(res.user);
+    persistUser(res.user);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, login, logout, refresh }),
-    [user, loading, login, logout, refresh]
+    () => ({ user, loading, login, logout, refresh, setActiveBranch }),
+    [user, loading, login, logout, refresh, setActiveBranch]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

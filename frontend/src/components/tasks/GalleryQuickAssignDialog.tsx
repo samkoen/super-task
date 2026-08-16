@@ -16,6 +16,7 @@ import type { Branch } from "../../services/branchService";
 import type { TaskGalleryItem } from "../../services/taskGalleryService";
 import { he } from "../../i18n/he";
 import { mediaUrl } from "../../utils/mediaUrl";
+import { userBelongsToBranch } from "../../utils/userBranchMembership";
 
 export interface GalleryQuickAssignPayload {
   item: TaskGalleryItem;
@@ -65,7 +66,7 @@ export default function GalleryQuickAssignDialog({
   }, [open, item, defaultBranchId, defaultDueAt, defaultAssigneeId]);
 
   const branchEmployees = useMemo(
-    () => (branchId ? employees.filter((u) => u.branch_id === branchId) : employees),
+    () => (branchId ? employees.filter((u) => userBelongsToBranch(u, branchId)) : employees),
     [employees, branchId],
   );
 

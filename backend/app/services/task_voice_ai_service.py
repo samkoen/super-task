@@ -89,7 +89,9 @@ class TaskVoiceAiService:
 
     def _branch_employees(self, actor: ActorContext, branch_id: str) -> list[dict]:
         branch_ids = visible_branch_ids_for_tasks(actor, self._branches)
-        users = self._users.list_users(role=roles.EMPLOYEE, branch_ids=[branch_id] if branch_id else branch_ids)
+        users = self._users.list_users(
+            role=roles.EMPLOYEE, branch_ids=[branch_id] if branch_id else branch_ids
+        )
         return [
             {
                 "id": u.id,
@@ -97,7 +99,6 @@ class TaskVoiceAiService:
                 "job_function": u.job_function,
             }
             for u in users
-            if not branch_id or u.branch_id == branch_id
         ]
 
     def _normalize_mime(self, mime_type: str) -> str:

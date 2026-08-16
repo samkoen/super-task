@@ -19,6 +19,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import { useAuth } from "../../context/AuthContext";
 import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
 import { he } from "../../i18n/he";
+import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import TaskChatPanel from "./TaskChatPanel";
@@ -88,7 +89,7 @@ export default function TaskOccurrenceEditDialog({
 
   const editEmployees = useMemo(() => {
     if (!target) return employees;
-    return employees.filter((u) => u.branch_id === target.branch_id);
+    return employees.filter((u) => userBelongsToBranch(u, target.branch_id));
   }, [employees, target]);
 
   const handleSave = async () => {
@@ -221,7 +222,7 @@ async function loadEditTarget(
     done({
       ok: true,
       fresh,
-      employees: team.filter((u) => u.branch_id === fresh.branch_id),
+      employees: team.filter((u) => userBelongsToBranch(u, fresh.branch_id)),
     });
   } catch (e) {
     done({ ok: false, error: e instanceof ApiError ? e.message : he.errorGeneric });

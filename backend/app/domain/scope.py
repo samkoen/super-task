@@ -11,6 +11,8 @@ class ActorContext:
     role: str
     network_id: str | None = None
     branch_id: str | None = None
+    """Tous les snifim dont l'acteur est membre (oved multi-snif)."""
+    membership_branch_ids: tuple[str, ...] = ()
 
 
 def can_manage_networks(actor: ActorContext) -> bool:
@@ -39,5 +41,9 @@ def assert_branch_visible(actor: ActorContext, branch_network_id: str, branch_id
     if actor.role == roles.NETWORK_MANAGER and actor.network_id == branch_network_id:
         return
     if actor.role == roles.BRANCH_MANAGER and actor.branch_id == branch_id:
+        return
+    if actor.role == roles.EMPLOYEE and (
+        branch_id == actor.branch_id or branch_id in actor.membership_branch_ids
+    ):
         return
     raise PermissionError("אין הרשאה לסניף זה")

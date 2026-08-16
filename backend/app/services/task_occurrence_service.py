@@ -20,12 +20,14 @@ from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
 from app.domain.task_title_from_description import resolve_create_title
+from app.domain.user_membership import employee_belongs_to_branch
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
+from app.repositories.user_branch_membership_repository import UserBranchMembershipRepository
 from app.repositories.user_repository import UserRepository
 from app.services import blob_storage
 from app.services.completion_audio_transcription_service import transcribe_completion_audio
@@ -590,7 +592,16 @@ class TaskOccurrenceService:
         if not self._users:
             raise RuntimeError("user repository required")
         user = self._users.find_by_id(assignee_user_id)
-        if not user or user.role != roles.EMPLOYEE or user.branch_id != branch_id:
+        if not user or user.role != roles.EMPLOYEE:
+            raise ValueError("עובד לא שייך לסניף")
+        member_ids = UserBranchMembershipRepository(self._users._db).list_branch_ids_for_user(
+            user.id
+        )
+        if not employee_belongs_to_branch(
+            primary_branch_id=user.branch_id,
+            membership_branch_ids=member_ids,
+            branch_id=branch_id,
+        ):
             raise ValueError("עובד לא שייך לסניף")
 
     def _assert_can_complete(self, actor: ActorContext, occurrence) -> None:

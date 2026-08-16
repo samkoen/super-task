@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Box,
   Button,
@@ -46,6 +47,11 @@ import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { mediaUrl } from "../../utils/mediaUrl";
+import {
+  parseBranchFromSearch,
+  readManagerScopeBranchId,
+  writeManagerScopeBranchId,
+} from "../../utils/managerScopeBranch";
 import { he } from "../../i18n/he";
 
 const EMPTY_MEDIA: TaskReferenceMediaValue = {
@@ -79,6 +85,7 @@ const EMPTY_FORM: FormState = {
 export default function ManagerTaskGalleryPage() {
   const { user } = useAuth();
   const { showError, showSuccess } = useFeedback();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<TaskGalleryItem[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +97,15 @@ export default function ManagerTaskGalleryPage() {
   const [deleteTarget, setDeleteTarget] = useState<TaskGalleryItem | null>(null);
 
   const canPickBranch = user?.role === "network_manager" || user?.role === "admin";
+  const scopeBranchId =
+    parseBranchFromSearch(searchParams) ||
+    readManagerScopeBranchId() ||
+    user?.branch_id ||
+    "";
+
+  useEffect(() => {
+    if (scopeBranchId) writeManagerScopeBranchId(scopeBranchId);
+  }, [scopeBranchId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,11 +127,18 @@ export default function ManagerTaskGalleryPage() {
     void load();
   }, [load]);
 
+  const visibleItems = useMemo(() => {
+    if (!canPickBranch || !scopeBranchId) return items;
+    return items.filter(
+      (item) => !item.branch_id || item.branch_id === scopeBranchId,
+    );
+  }, [items, canPickBranch, scopeBranchId]);
+
   const openCreate = () => {
     setEditing(null);
     setForm({
       ...EMPTY_FORM,
-      branch_id: user?.branch_id ?? "",
+      branch_id: scopeBranchId || user?.branch_id || "",
     });
     setMedia(EMPTY_MEDIA);
     setOpenForm(true);
@@ -224,7 +247,7 @@ export default function ManagerTaskGalleryPage() {
 
       {loading ? (
         <ListSkeleton variant="table" rows={5} />
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <EmptyState
           title={he.taskGalleryEmpty}
           description={he.taskGalleryEmptyHint}
@@ -243,7 +266,7 @@ export default function ManagerTaskGalleryPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {items.map((item) => {
+              {visibleItems.map((item) => {
                 const photoSrc = mediaUrl(item.reference_photo_url);
                 const videoSrc = mediaUrl(item.reference_video_url);
                 return (

@@ -25,4 +25,17 @@ describe("ManagerBottomNav", () => {
     fireEvent.click(screen.getByRole("button", { name: he.managerBottomNavTasks }));
     expect(navigate).toHaveBeenCalledWith("/manager/tasks");
   });
+
+  it("navigates to tasks with current snif when stored", () => {
+    navigate.mockClear();
+    sessionStorage.setItem("super.managerScopeBranch", "b42");
+    render(
+      <MemoryRouter initialEntries={["/manager"]}>
+        <ManagerBottomNav forceVisible />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.managerBottomNavTasks }));
+    expect(navigate).toHaveBeenCalledWith("/manager/tasks?branch=b42");
+    sessionStorage.removeItem("super.managerScopeBranch");
+  });
 });

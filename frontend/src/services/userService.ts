@@ -70,4 +70,12 @@ export const userService = {
     );
     return response.data;
   },
+
+  addTeamEmployeeMembership: async (id: string, branch_id: string) => {
+    const response = await api.post<{ user: User; message: string }>(
+      `/users/team/${id}/memberships`,
+      { branch_id }
+    );
+    return response.data;
+  },
 };

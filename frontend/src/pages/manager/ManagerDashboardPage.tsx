@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -45,6 +45,13 @@ import {
   playManagerQuestionSound,
 } from "../../utils/notificationSounds";
 import { buildQuestionsQueue } from "../../utils/dashboardCarousels";
+import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
+import { managerNewTaskNavigation } from "../../utils/managerBottomNav";
+import {
+  parseBranchFromSearch,
+  readManagerScopeBranchId,
+  writeManagerScopeBranchId,
+} from "../../utils/managerScopeBranch";
 
 /** Masqué temporairement — remettre à true pour réafficher. */
 const SHOW_STAFF_PROGRESS = false;
@@ -59,9 +66,12 @@ function dashboardTitle(branchName: string | undefined): string {
 export default function ManagerDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<ManagerDashboard | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    return parseBranchFromSearch(searchParams) || readManagerScopeBranchId();
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
@@ -73,6 +83,9 @@ export default function ManagerDashboardPage() {
   const prevQuestionCountRef = useRef<number | null>(null);
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
+  const scopeBranchId = canPickBranch
+    ? selectedBranch
+    : user?.branch_id || selectedBranch || "";
 
   const load = useCallback(async (silent = false) => {
     if (!silent) {
@@ -105,6 +118,20 @@ export default function ManagerDashboardPage() {
   }, [load]));
 
   useEffect(() => bindNotificationAudioUnlock(), []);
+
+  useEffect(() => {
+    writeManagerScopeBranchId(scopeBranchId);
+    if (!canPickBranch) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (selectedBranch) next.set("branch", selectedBranch);
+        else next.delete("branch");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [scopeBranchId, selectedBranch, canPickBranch, setSearchParams]);
 
   useEffect(() => {
     if (!data?.task_queues) return;
@@ -148,6 +175,19 @@ export default function ManagerDashboardPage() {
       setReviewLoading(false);
     }
   }, []);
+
+  const goTasks = (opts?: { openNewTask?: boolean; openGalleryTask?: boolean }) => {
+    const branchId = scopeBranchId || undefined;
+    if (opts?.openNewTask) {
+      const nav = managerNewTaskNavigation(branchId);
+      navigate(nav.pathname, { state: nav.state });
+      return;
+    }
+    navigate(
+      buildManagerTasksPath({ branchId }),
+      opts?.openGalleryTask ? { state: { openGalleryTask: true } } : undefined,
+    );
+  };
 
   if (loading && !data) {
     return <ListSkeleton variant="dashboard" />;
@@ -265,18 +305,18 @@ export default function ManagerDashboardPage() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => navigate("/manager/tasks", { state: { openNewTask: true } })}
+              onClick={() => goTasks({ openNewTask: true })}
             >
               {he.newTask}
             </Button>
             <Button
               variant="outlined"
               startIcon={<AddIcon />}
-              onClick={() => navigate("/manager/tasks", { state: { openGalleryTask: true } })}
+              onClick={() => goTasks({ openGalleryTask: true })}
             >
               {he.newTaskFromGallery}
             </Button>
-            <Button variant="outlined" startIcon={<TaskAltIcon />} onClick={() => navigate("/manager/tasks")}>
+            <Button variant="outlined" startIcon={<TaskAltIcon />} onClick={() => goTasks()}>
               {he.dashboardViewTasks}
             </Button>
           </Box>

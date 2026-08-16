@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -44,8 +44,15 @@ class UserRepository:
         if role:
             q = q.where(orm.User.role == role)
         if branch_ids is not None:
-            q = q.where(orm.User.branch_id.in_([mp.parse_uuid(i) for i in branch_ids]))
-        rows = self._db.execute(q).scalars().all()
+            uuids = [mp.parse_uuid(i) for i in branch_ids]
+            member_ids = (
+                select(orm.UserBranchMembership.user_id)
+                .where(orm.UserBranchMembership.branch_id.in_(uuids))
+            )
+            q = q.where(
+                or_(orm.User.branch_id.in_(uuids), orm.User.id.in_(member_ids))
+            )
+        rows = self._db.execute(q).scalars().unique().all()
         return [mp.user_orm_to_domain(r) for r in rows if r]
 
     def create_user(
@@ -82,6 +89,14 @@ class UserRepository:
         )
         self._db.add(row)
         self._db.flush()
+        if branch_id:
+            from app.repositories.user_branch_membership_repository import (
+                UserBranchMembershipRepository,
+            )
+
+            UserBranchMembershipRepository(self._db).ensure_membership(
+                str(row.id), branch_id, is_primary=True
+            )
         user = mp.user_orm_to_domain(row)
         assert user is not None
         return user
@@ -166,6 +181,14 @@ class UserRepository:
         row.network_id = mp.parse_uuid(network_id) if network_id else None
         row.branch_id = mp.parse_uuid(branch_id) if branch_id else None
         self._db.flush()
+        if branch_id:
+            from app.repositories.user_branch_membership_repository import (
+                UserBranchMembershipRepository,
+            )
+
+            UserBranchMembershipRepository(self._db).ensure_membership(
+                user_id, branch_id, is_primary=True
+            )
         return mp.user_orm_to_domain(row)
 
     def update_employee(
@@ -217,5 +240,28 @@ class UserRepository:
         if not row:
             return None
         row.password_hash = hash_password(password)
+        self._db.flush()
+        return mp.user_orm_to_domain(row)
+
+    def update_profile(
+        self,
+        user_id: str,
+        *,
+        first_name: str,
+        last_name: str,
+        phone: str | None = None,
+        email: str | None = None,
+    ) -> User | None:
+        try:
+            row = self._db.get(orm.User, mp.parse_uuid(user_id))
+        except ValueError:
+            return None
+        if not row:
+            return None
+        row.first_name = first_name
+        row.last_name = last_name
+        row.phone = phone
+        if email is not None:
+            row.email = email.lower().strip()
         self._db.flush()
         return mp.user_orm_to_domain(row)

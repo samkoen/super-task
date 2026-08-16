@@ -30,6 +30,31 @@ export const authService = {
     return response.data;
   },
 
+  setActiveBranch: async (branchId: string) => {
+    const response = await api.post<{ user: User }>("/auth/active-branch", {
+      branch_id: branchId,
+    });
+    return response.data;
+  },
+
+  updateProfile: async (payload: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+  }) => {
+    const response = await api.patch<{ user: User; message: string }>("/auth/me", payload);
+    return response.data;
+  },
+
+  changePassword: async (current_password: string, new_password: string) => {
+    const response = await api.post<{ message: string }>("/auth/change-password", {
+      current_password,
+      new_password,
+    });
+    return response.data;
+  },
+
   resendVerification: async (email: string) => {
     const response = await api.post<{ message: string }>("/auth/resend-verification", {
       email,

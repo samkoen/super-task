@@ -24,6 +24,12 @@ export type JobFunction = "head_cashier" | "stockers" | "warehouse_worker";
 
 export type EmployeeLanguage = "he" | "ar" | "th" | "fr" | "en";
 
+export interface UserBranchMembership {
+  branch_id: string;
+  branch_name: string;
+  is_primary: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -40,6 +46,10 @@ export interface User {
   is_active: boolean;
   email_verified: boolean;
   preferred_language?: EmployeeLanguage;
+  /** Memberships multi-snif (oved). */
+  branches?: UserBranchMembership[];
+  /** Snif actif à l'écran (oved). */
+  active_branch_id?: string | null;
 }
 
 export class ApiError extends Error {

@@ -150,6 +150,25 @@ def reset_team_employee_password(
     return {"message": "סיסמת העובד עודכנה", "user": user}
 
 
+@router.post("/team/{user_id}/memberships")
+@handle_controller_errors
+def add_team_employee_membership(
+    user_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    user = service.add_team_employee_branch(
+        actor,
+        user_id,
+        branch_id=str(payload.get("branch_id") or "").strip(),
+    )
+    return {"message": "הסניף נוסף לעובד", "user": user}
+
+
 @router.post("", status_code=201)
 @handle_controller_errors
 def create_user(

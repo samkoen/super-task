@@ -1,13 +1,34 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import {
   managerBottomContentPadCss,
+  managerBottomNavPath,
   managerFabBottomCss,
   managerNewTaskNavigation,
   resolveManagerBottomTab,
   shouldShowManagerChrome,
 } from "./managerBottomNav";
+import { MANAGER_SCOPE_BRANCH_STORAGE_KEY } from "./managerScopeBranch";
 
 describe("managerBottomNav", () => {
+  const store = new Map<string, string>();
+
+  beforeEach(() => {
+    store.clear();
+    vi.stubGlobal("sessionStorage", {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("resolves active tab from path", () => {
     expect(resolveManagerBottomTab("/manager")).toBe("home");
     expect(resolveManagerBottomTab("/manager/")).toBe("home");
@@ -27,6 +48,16 @@ describe("managerBottomNav", () => {
   it("opens new task via tasks page state", () => {
     expect(managerNewTaskNavigation()).toEqual({
       pathname: "/manager/tasks",
+      state: { openNewTask: true },
+    });
+  });
+
+  it("keeps current snif on bottom nav and new-task paths", () => {
+    store.set(MANAGER_SCOPE_BRANCH_STORAGE_KEY, "snif-1");
+    expect(managerBottomNavPath("/manager/tasks")).toBe("/manager/tasks?branch=snif-1");
+    expect(managerBottomNavPath("/manager/gallery")).toBe("/manager/gallery?branch=snif-1");
+    expect(managerNewTaskNavigation()).toEqual({
+      pathname: "/manager/tasks?branch=snif-1",
       state: { openNewTask: true },
     });
   });

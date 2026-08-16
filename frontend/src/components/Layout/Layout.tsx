@@ -26,6 +26,7 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import LogoutIcon from "@mui/icons-material/Logout";
 import StorefrontIcon from "@mui/icons-material/Storefront";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
@@ -45,6 +46,7 @@ import BackButton from "../ui/BackButton";
 import ManagerBottomNav from "./ManagerBottomNav";
 import ManagerNewTaskFab from "./ManagerNewTaskFab";
 import MobileMenuTopBar from "./MobileMenuTopBar";
+import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
 import {
   managerBottomContentPadCss,
   shouldShowManagerChrome,
@@ -127,6 +129,7 @@ function Layout() {
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/manager/gallery" },
         { text: he.managerIssues, icon: <ReportProblemIcon />, path: "/manager/issues" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
+        { text: he.myAccount, icon: <AccountCircleIcon />, path: "/manager/account" },
       );
       return items;
     }
@@ -215,6 +218,11 @@ function Layout() {
           </Box>
           <NotificationBell />
         </Box>
+        {isEmployee && (user?.branches?.length ?? 0) >= 2 && (
+          <Box mt={1.5}>
+            <EmployeeBranchSwitcher dense />
+          </Box>
+        )}
       </Box>
 
       <Typography

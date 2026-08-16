@@ -57,6 +57,7 @@ import {
   type FixedTemplateFilter,
 } from "../../utils/fixedTaskTemplates";
 import { he } from "../../i18n/he";
+import { userBelongsToBranch } from "../../utils/userBranchMembership";
 
 const WEEKDAYS = [
   { value: "0", label: he.weekdayMon },
@@ -232,7 +233,7 @@ export default function ManagerFixedTasksPage() {
 
   const editEmployees = useMemo(() => {
     if (!editing) return employees;
-    return employees.filter((u) => u.branch_id === editing.branch_id);
+    return employees.filter((u) => userBelongsToBranch(u, editing.branch_id));
   }, [employees, editing]);
 
   if (loading && templates.length === 0) {

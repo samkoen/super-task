@@ -30,3 +30,20 @@ def test_try_login_rejects_unverified():
 
     assert result is None
     assert err == "unverified"
+
+
+def test_try_login_normalizes_phone_identifier():
+    user = _user(verified=True)
+    user.email = "0528716886"
+    user.role = "admin"
+    repo = MagicMock()
+    repo.get_user_and_password_hash.return_value = (user, "hash")
+    service = AuthService(repo)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("app.services.auth_service.verify_password", lambda _p, _h: True)
+        result, err = service.try_login("052-871-6886", "123456")
+
+    assert err is None
+    assert result is not None
+    repo.get_user_and_password_hash.assert_called_once_with("0528716886")

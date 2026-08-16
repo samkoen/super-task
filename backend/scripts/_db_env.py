@@ -44,5 +44,10 @@ def _warn_if_urls_disagree(pooled: str, unpooled: str) -> None:
         )
 
 
-# Alias historique
-prefer_unpooled_database_url = resolve_database_url
+def is_production_target(url: str | None = None) -> bool:
+    """Neon / Vercel / ENVIRONMENT=production → cible sensible."""
+    if os.environ.get("ENVIRONMENT", "").strip().lower() == "production":
+        return True
+    chosen = (url or os.environ.get("DATABASE_URL") or "").lower()
+    return ".neon.tech" in chosen or "vercel" in chosen
+

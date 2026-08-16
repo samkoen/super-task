@@ -8,9 +8,11 @@ from app.domain.task_kind import FIXED
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.domain.task_title_from_description import resolve_create_title
+from app.domain.user_membership import employee_belongs_to_branch
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
+from app.repositories.user_branch_membership_repository import UserBranchMembershipRepository
 from app.repositories.user_repository import UserRepository
 from app.services import blob_storage
 from app.services.task_scheduler_service import TaskSchedulerService
@@ -192,7 +194,16 @@ class TaskTemplateService:
     ) -> None:
         if assignee_user_id:
             user = self._users.find_by_id(assignee_user_id)
-            if not user or user.branch_id != branch_id:
+            if not user:
+                raise ValueError("עובד לא שייך לסניף")
+            member_ids = UserBranchMembershipRepository(self._users._db).list_branch_ids_for_user(
+                user.id
+            )
+            if not employee_belongs_to_branch(
+                primary_branch_id=user.branch_id,
+                membership_branch_ids=member_ids,
+                branch_id=branch_id,
+            ):
                 raise ValueError("עובד לא שייך לסניף")
         if department_id:
             department = self._department.find_by_id(department_id)

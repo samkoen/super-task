@@ -6,6 +6,7 @@ from app.domain.scope import ActorContext, assert_branch_visible
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.network_repository import NetworkRepository
+from app.repositories.user_branch_membership_repository import UserBranchMembershipRepository
 from app.repositories.user_repository import UserRepository
 from app.services.email import send_verification_email
 from app.services.user_scope_service import UserScopeService
@@ -23,6 +24,7 @@ class UserService:
         self._scope = scope_service
         self._network = network_repo
         self._branch = branch_repo
+        self._memberships = UserBranchMembershipRepository(repository._db)
 
     def list_users(self, role: str | None = None) -> list[dict]:
         if role and not roles.is_valid_role(role):
@@ -214,19 +216,44 @@ class UserService:
         assert updated is not None
         return self._to_api(updated)
 
+    def add_team_employee_branch(
+        self, actor: ActorContext, user_id: str, *, branch_id: str
+    ) -> dict:
+        """Ajoute un snif secondaire à un oved (multi-snif)."""
+        target = self._repo.find_by_id(user_id)
+        if not target:
+            raise ValueError("משתמש לא נמצא")
+        self._assert_can_manage_team_member(actor, target)
+        bid = (branch_id or "").strip()
+        if not bid:
+            raise ValueError("נדרש סניף")
+        branch = self._branch.find_by_id(bid)
+        if not branch:
+            raise ValueError("סניף לא נמצא")
+        assert_branch_visible(actor, branch.network_id, branch.id)
+        self._memberships.ensure_membership(user_id, bid, is_primary=False)
+        return self._to_api(target)
+
     def _assert_can_manage_team_member(self, actor: ActorContext, target) -> None:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לנהל עובד זה")
         if target.role != roles.EMPLOYEE:
             raise PermissionError("ניתן לנהל רק עובדים")
-        if not target.branch_id:
-            raise PermissionError("אין הרשאה לנהל עובד זה")
         branch_ids = visible_branch_ids_for_tasks(actor, self._branch)
-        if branch_ids is not None and target.branch_id not in branch_ids:
+        member_ids = self._memberships.list_branch_ids_for_user(target.id)
+        if target.branch_id and target.branch_id not in member_ids:
+            member_ids = [target.branch_id, *member_ids]
+        if not member_ids:
             raise PermissionError("אין הרשאה לנהל עובד זה")
-        branch = self._branch.find_by_id(target.branch_id)
-        if branch:
-            assert_branch_visible(actor, branch.network_id, branch.id)
+        if branch_ids is not None and not any(b in branch_ids for b in member_ids):
+            raise PermissionError("אין הרשאה לנהל עובד זה")
+        # Visibilité réseau via un snif du membre
+        for bid in member_ids:
+            branch = self._branch.find_by_id(bid)
+            if branch and (branch_ids is None or bid in branch_ids):
+                assert_branch_visible(actor, branch.network_id, branch.id)
+                return
+        raise PermissionError("אין הרשאה לנהל עובד זה")
 
     def _validate_team_employee_fields(
         self,
@@ -256,6 +283,8 @@ class UserService:
         if user.branch_id:
             branch = self._branch.find_by_id(user.branch_id)
             data["branch_name"] = branch.name if branch else None
+        if user.role == roles.EMPLOYEE:
+            data["branches"] = self._memberships.list_for_user(user.id)
         return data
 
     def _validate_new_user(

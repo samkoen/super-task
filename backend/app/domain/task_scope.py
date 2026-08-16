@@ -15,8 +15,11 @@ def visible_branch_ids_for_tasks(actor: ActorContext, branch_repo) -> list[str] 
         return [s.id for s in branch_repo.list_branches(network_id=actor.network_id)]
     if actor.role == roles.BRANCH_MANAGER and actor.branch_id:
         return [actor.branch_id]
-    if actor.role == roles.EMPLOYEE and actor.branch_id:
-        return [actor.branch_id]
+    if actor.role == roles.EMPLOYEE:
+        # Écran filtré sur le snif actif (pas tous les memberships mélangés).
+        if actor.branch_id:
+            return [actor.branch_id]
+        return []
     return []
 
 

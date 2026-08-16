@@ -47,6 +47,8 @@ import {
   MANAGER_TASK_STATUS_FILTERS,
   parseManagerTasksSearchParams,
 } from "../../utils/managerTaskFilters";
+import { writeManagerScopeBranchId } from "../../utils/managerScopeBranch";
+import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
@@ -108,7 +110,7 @@ export default function ManagerTasksPage() {
   }, [canPickBranch, filterBranch, user?.branch_id]);
 
   const filterEmployees = useMemo(
-    () => (scopeBranchId ? employees.filter((u) => u.branch_id === scopeBranchId) : employees),
+    () => (scopeBranchId ? employees.filter((u) => userBelongsToBranch(u, scopeBranchId)) : employees),
     [employees, scopeBranchId]
   );
 
@@ -167,8 +169,12 @@ export default function ManagerTasksPage() {
     setDateViewMode(parsed.dateViewMode);
     setFilterFrom(parsed.rangeFrom);
     setFilterTo(parsed.rangeTo);
+    if (canPickBranch && parsed.branchId) {
+      setFilterBranch(parsed.branchId);
+      writeManagerScopeBranchId(parsed.branchId);
+    }
     setActiveSavedFilterId(null);
-  }, [location.search, searchParams]);
+  }, [location.search, searchParams, canPickBranch]);
 
   const syncFiltersToUrl = useCallback(
     (next: {
@@ -178,9 +184,14 @@ export default function ManagerTasksPage() {
       dateViewMode?: TaskDateViewMode;
       filterFrom?: string;
       filterTo?: string;
+      filterBranch?: string;
     }) => {
+      const branchId = canPickBranch
+        ? (next.filterBranch ?? filterBranch)
+        : undefined;
       navigate(
         buildManagerTasksPath({
+          branchId,
           employeeId: next.filterEmployee ?? filterEmployee,
           status: next.filterStatus ?? filterStatus,
           dueOn: next.filterDay ?? filterDay,
@@ -191,7 +202,17 @@ export default function ManagerTasksPage() {
         { replace: true }
       );
     },
-    [navigate, filterEmployee, filterStatus, filterDay, dateViewMode, filterFrom, filterTo]
+    [
+      navigate,
+      canPickBranch,
+      filterBranch,
+      filterEmployee,
+      filterStatus,
+      filterDay,
+      dateViewMode,
+      filterFrom,
+      filterTo,
+    ]
   );
 
   useEffect(() => {
@@ -505,8 +526,11 @@ export default function ManagerTasksPage() {
                   label={he.branch}
                   value={filterBranch}
                   onChange={(e) => {
-                    setFilterBranch(e.target.value);
+                    const value = e.target.value;
+                    setFilterBranch(value);
                     setActiveSavedFilterId(null);
+                    writeManagerScopeBranchId(value);
+                    syncFiltersToUrl({ filterBranch: value });
                   }}
                   sx={{ minWidth: 140 }}
                 >

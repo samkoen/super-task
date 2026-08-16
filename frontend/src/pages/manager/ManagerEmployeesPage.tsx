@@ -33,6 +33,7 @@ import { branchService, type Branch } from "../../services/branchService";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
 import { he } from "../../i18n/he";
+import { userBelongsToBranch, userBranchLabels } from "../../utils/userBranchMembership";
 
 const JOB_FUNCTIONS: JobFunction[] = ["head_cashier", "stockers", "warehouse_worker"];
 
@@ -68,6 +69,7 @@ export default function ManagerEmployeesPage() {
   const [form, setForm] = useState(emptyForm);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [addBranchId, setAddBranchId] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,18 +93,36 @@ export default function ManagerEmployeesPage() {
   }, [load]);
 
   const visibleEmployees = useMemo(
-    () => (filterBranch ? employees.filter((u) => u.branch_id === filterBranch) : employees),
+    () =>
+      filterBranch
+        ? employees.filter((u) => userBelongsToBranch(u, filterBranch))
+        : employees,
     [employees, filterBranch]
   );
 
+  const addableBranches = useMemo(() => {
+    if (!edit || !isNetworkManager) return [];
+    const existing = new Set(
+      (edit.branches ?? []).map((b) => b.branch_id).concat(edit.branch_id ? [edit.branch_id] : [])
+    );
+    return branches.filter((b) => !existing.has(b.id));
+  }, [edit, isNetworkManager, branches]);
+
+  const canAddMyBranch = useMemo(() => {
+    if (!edit || !isBranchManager || !user?.branch_id) return false;
+    return !userBelongsToBranch(edit, user.branch_id);
+  }, [edit, isBranchManager, user?.branch_id]);
+
   const openCreate = () => {
     setEdit(null);
+    setAddBranchId("");
     setForm({ ...emptyForm, branch_id: isBranchManager ? user?.branch_id ?? "" : "" });
     setOpen(true);
   };
 
   const openEdit = (employee: User) => {
     setEdit(employee);
+    setAddBranchId("");
     setForm({
       email: employee.email,
       password: "",
@@ -158,6 +178,25 @@ export default function ManagerEmployeesPage() {
       }
       setOpen(false);
       setEdit(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddBranch = async () => {
+    if (!edit) return;
+    const branchId = isBranchManager ? user?.branch_id : addBranchId;
+    if (!branchId) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await userService.addTeamEmployeeMembership(edit.id, branchId);
+      setSuccess(res.message || he.employeeBranchAdded);
+      setEdit(res.user);
+      setAddBranchId("");
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -277,7 +316,13 @@ export default function ManagerEmployeesPage() {
                     <TableCell dir="ltr">{u.phone || "—"}</TableCell>
                     <TableCell>{jobLabel(u.job_function)}</TableCell>
                     <TableCell>{languageLabel(u.preferred_language)}</TableCell>
-                    {isNetworkManager && <TableCell>{u.branch_name || "—"}</TableCell>}
+                    {isNetworkManager && (
+                      <TableCell>
+                        {userBranchLabels(u).length > 0
+                          ? userBranchLabels(u).join(", ")
+                          : u.branch_name || "—"}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Chip
                         label={u.is_active ? he.active : he.inactive}
@@ -352,6 +397,65 @@ export default function ManagerEmployeesPage() {
                 <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
               ))}
             </TextField>
+          )}
+          {edit && (
+            <Box>
+              <Typography variant="subtitle2" mb={1}>{he.employeeBranches}</Typography>
+              <Box display="flex" flexWrap="wrap" gap={0.75} mb={1.5}>
+                {(edit.branches ?? []).length > 0
+                  ? edit.branches!.map((b) => (
+                      <Chip
+                        key={b.branch_id}
+                        size="small"
+                        label={b.branch_name || b.branch_id}
+                        color={b.is_primary ? "primary" : "default"}
+                      />
+                    ))
+                  : (
+                      <Chip size="small" label={edit.branch_name || edit.branch_id || "—"} color="primary" />
+                    )}
+              </Box>
+              {isNetworkManager && (
+                addableBranches.length > 0 ? (
+                  <Box display="flex" gap={1} alignItems="flex-start">
+                    <TextField
+                      select
+                      size="small"
+                      fullWidth
+                      label={he.addEmployeeBranch}
+                      value={addBranchId}
+                      onChange={(e) => setAddBranchId(e.target.value)}
+                    >
+                      {addableBranches.map((b) => (
+                        <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+                      ))}
+                    </TextField>
+                    <Button
+                      variant="outlined"
+                      disabled={saving || !addBranchId}
+                      onClick={() => void handleAddBranch()}
+                      sx={{ whiteSpace: "nowrap", mt: 0.5 }}
+                    >
+                      {he.addEmployeeBranch}
+                    </Button>
+                  </Box>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    {he.noMoreBranchesToAdd}
+                  </Typography>
+                )
+              )}
+              {canAddMyBranch && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={saving}
+                  onClick={() => void handleAddBranch()}
+                >
+                  {he.addToMyBranch}
+                </Button>
+              )}
+            </Box>
           )}
           <TextField
             select

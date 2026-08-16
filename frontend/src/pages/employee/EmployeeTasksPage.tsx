@@ -240,7 +240,7 @@ export default function EmployeeTasksPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filterDay, filterFrom, filterTo, dateViewMode, translatePendingTasks, user?.preferred_language]);
+  }, [filterDay, filterFrom, filterTo, dateViewMode, translatePendingTasks, user?.preferred_language, user?.active_branch_id, user?.branch_id]);
 
   useEffect(() => {
     load();

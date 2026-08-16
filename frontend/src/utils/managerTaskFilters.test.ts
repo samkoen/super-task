@@ -63,10 +63,18 @@ describe("manager tasks URL helpers", () => {
     );
   });
 
-  it("builds employee deep link", () => {
-    expect(buildManagerTasksPath({ employeeId: "u1", dueOn: "2026-07-17" })).toBe(
-      "/manager/tasks?employee=u1&due_on=2026-07-17"
+  it("builds employee deep link with branch", () => {
+    expect(
+      buildManagerTasksPath({ employeeId: "u1", dueOn: "2026-07-17", branchId: "b1" }),
+    ).toBe("/manager/tasks?branch=b1&employee=u1&due_on=2026-07-17");
+  });
+
+  it("parses branch from search", () => {
+    const parsed = parseManagerTasksSearchParams(
+      new URLSearchParams("branch=snif-9&employee=emp-9&due_on=2026-07-17"),
     );
+    expect(parsed.branchId).toBe("snif-9");
+    expect(parsed.employeeId).toBe("emp-9");
   });
 
   it("parses overdue into a date range so past due tasks remain visible", () => {

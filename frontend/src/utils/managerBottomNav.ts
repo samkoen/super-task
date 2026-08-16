@@ -1,3 +1,5 @@
+import { withManagerBranchQuery } from "./managerScopeBranch";
+
 export type ManagerBottomTab = "home" | "tasks" | "archive";
 
 /** Hauteur barre bas (px), hors safe-area système Android/iOS. */
@@ -37,9 +39,14 @@ export function shouldShowManagerChrome(role: string | undefined | null): boolea
   return role === "branch_manager" || role === "network_manager";
 }
 
-export function managerNewTaskNavigation() {
+/** Path onglet bas avec snif courant (storage / param explicite). */
+export function managerBottomNavPath(tabPath: string, branchId?: string | null): string {
+  return withManagerBranchQuery(tabPath, branchId);
+}
+
+export function managerNewTaskNavigation(branchId?: string | null) {
   return {
-    pathname: "/manager/tasks",
+    pathname: withManagerBranchQuery("/manager/tasks", branchId),
     state: { openNewTask: true },
   } as const;
 }

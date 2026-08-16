@@ -253,6 +253,7 @@ export default function EmployeeTasksDrawer({
       buildManagerTasksPath({
         employeeId: member.user_id,
         dueOn,
+        branchId: branchId || undefined,
       }),
     );
   };

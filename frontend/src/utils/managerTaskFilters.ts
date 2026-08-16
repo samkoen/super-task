@@ -17,6 +17,7 @@ export type ManagerTasksUrlFilters = {
   dateViewMode: TaskDateViewMode;
   rangeFrom: string;
   rangeTo: string;
+  branchId: string;
 };
 
 export function filterManagerTaskOccurrences(
@@ -44,6 +45,7 @@ export function parseManagerTasksSearchParams(
   const statusRaw = (params.get("status") || "").trim();
   const status = isTaskStatus(statusRaw) ? statusRaw : "";
   const employeeId = (params.get("employee") || "").trim();
+  const branchId = (params.get("branch") || "").trim();
   const dueOn = (params.get("due_on") || "").trim() || fallbackDay;
   const modeRaw = (params.get("mode") || "").trim();
   let dateViewMode: TaskDateViewMode =
@@ -62,7 +64,7 @@ export function parseManagerTasksSearchParams(
     rangeTo = rangeTo || window.to;
   }
 
-  return { employeeId, status, dueOn, dateViewMode, rangeFrom, rangeTo };
+  return { employeeId, status, dueOn, dateViewMode, rangeFrom, rangeTo, branchId };
 }
 
 export function buildManagerTasksPath(filters: {
@@ -72,8 +74,10 @@ export function buildManagerTasksPath(filters: {
   dateViewMode?: TaskDateViewMode;
   rangeFrom?: string;
   rangeTo?: string;
+  branchId?: string;
 }): string {
   const params = new URLSearchParams();
+  if (filters.branchId) params.set("branch", filters.branchId);
   if (filters.employeeId) params.set("employee", filters.employeeId);
   if (filters.status) params.set("status", filters.status);
   if (filters.dueOn) params.set("due_on", filters.dueOn);

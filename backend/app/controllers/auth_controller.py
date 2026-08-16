@@ -119,6 +119,8 @@ def login(
         request.session["user_id"] = user["id"]
         request.session["user_role"] = user["role"]
         request.session["user_email"] = user["email"]
+        if user.get("active_branch_id"):
+            request.session["active_branch_id"] = user["active_branch_id"]
         return {"message": "התחברות הצליחה", "user": user}
     except OperationalError:
         traceback.print_exc()
@@ -155,7 +157,82 @@ def get_current_user(
     user_id = request.session.get("user_id")
     if not user_id:
         return JSONResponse({"error": "לא מחובר"}, status_code=401)
-    user = service.get_user_by_id(str(user_id))
+    user = service.get_user_by_id(
+        str(user_id),
+        active_branch_id=request.session.get("active_branch_id"),
+    )
     if not user:
         return JSONResponse({"error": "משתמש לא נמצא"}, status_code=404)
+    if user.get("active_branch_id"):
+        request.session["active_branch_id"] = user["active_branch_id"]
+    return {"user": user}
+
+
+@router.patch("/me")
+def update_current_user(
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: AuthService = Depends(get_auth_service),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse({"error": "לא מחובר"}, status_code=401)
+    payload = data or {}
+    try:
+        user = service.update_me(
+            str(user_id),
+            first_name=str(payload.get("first_name") or ""),
+            last_name=str(payload.get("last_name") or ""),
+            phone=(str(payload.get("phone")).strip() if payload.get("phone") else None),
+            email=str(payload.get("email") or ""),
+            active_branch_id=request.session.get("active_branch_id"),
+        )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    request.session["user_email"] = user["email"]
+    return {"message": "הפרופיל עודכן", "user": user}
+
+
+@router.post("/change-password")
+def change_password(
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: AuthService = Depends(get_auth_service),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse({"error": "לא מחובר"}, status_code=401)
+    payload = data or {}
+    try:
+        service.change_password(
+            str(user_id),
+            current_password=str(payload.get("current_password") or ""),
+            new_password=str(payload.get("new_password") or ""),
+        )
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"message": "הסיסמה עודכנה"}
+
+
+@router.post("/active-branch")
+def set_active_branch(
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: AuthService = Depends(get_auth_service),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse({"error": "לא מחובר"}, status_code=401)
+    branch_id = str((data or {}).get("branch_id") or "").strip()
+    if not branch_id:
+        return JSONResponse({"error": "נדרש סניף"}, status_code=400)
+    try:
+        user = service.set_active_branch(str(user_id), branch_id)
+    except PermissionError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    request.session["active_branch_id"] = user["active_branch_id"]
     return {"user": user}
