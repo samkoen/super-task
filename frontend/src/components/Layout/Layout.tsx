@@ -374,6 +374,18 @@ function Layout() {
             </Button>
           </Box>
         </Box>
+        {(user?.branches?.length ?? 0) >= 2 && (
+          <Box
+            sx={{
+              px: { xs: 2, sm: 2.5 },
+              py: 1.25,
+              bgcolor: SIDEBAR_BG,
+              borderBottom: `1px solid ${alpha("#fff", 0.06)}`,
+            }}
+          >
+            <EmployeeBranchSwitcher dense />
+          </Box>
+        )}
         <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 2.5 }, maxWidth: 960, mx: "auto" }}>
           {showBack && <BackButton />}
           <OutletSuspense />

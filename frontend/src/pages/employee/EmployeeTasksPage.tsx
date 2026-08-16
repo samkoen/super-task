@@ -57,6 +57,7 @@ import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailD
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
+import EmployeeBranchSwitcher from "../../components/Layout/EmployeeBranchSwitcher";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
@@ -532,6 +533,11 @@ export default function EmployeeTasksPage() {
           {headerBranch ? `${he.branch}: ${headerBranch}` : ""}
           {headerJob ? ` · ${jobLabel(headerJob)}` : ""}
         </Typography>
+        {(user?.branches?.length ?? 0) >= 2 && (
+          <Box mt={1.5} maxWidth={360}>
+            <EmployeeBranchSwitcher />
+          </Box>
+        )}
         <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" sx={{ mt: 1.25 }}>
           <Chip
             size="small"
