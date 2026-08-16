@@ -10,7 +10,6 @@ vi.mock("./api", () => ({
   },
 }));
 
-const mockGet = api.get as ReturnType<typeof vi.fn>;
 const mockPost = api.post as ReturnType<typeof vi.fn>;
 const mockPatch = api.patch as ReturnType<typeof vi.fn>;
 
