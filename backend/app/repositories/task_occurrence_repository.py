@@ -9,11 +9,13 @@ from app.db import mappers as mp
 from app.domain import task_status
 from app.domain.employee_task_carry_over import (
     ROLLOVER_STATUSES,
+    can_rollover_task_kind,
     opened_on_from_due,
     rollover_due_datetime,
     start_of_day,
     status_after_rollover,
 )
+from app.domain.task_kind import AD_HOC
 from app.models.task_occurrence import TaskOccurrence
 
 _TZ = ZoneInfo("Asia/Jerusalem")
@@ -285,11 +287,12 @@ class TaskOccurrenceRepository:
         now: datetime,
         branch_ids: list[str] | None = None,
     ) -> int:
-        """Avance due_at (exécution) ; opened_on (ouverture) ne change jamais."""
+        """Avance due_at des מזדמנות ouvertes ; קבועות non reportées (nouvelle gen. scheduler)."""
         cutoff = start_of_day(day, _TZ)
         q = (
             select(orm.TaskOccurrence)
             .where(orm.TaskOccurrence.status.in_(tuple(ROLLOVER_STATUSES)))
+            .where(orm.TaskOccurrence.task_kind == AD_HOC)
             .where(orm.TaskOccurrence.due_at < cutoff)
         )
         if branch_ids is not None:
@@ -301,6 +304,8 @@ class TaskOccurrenceRepository:
         rows = self._db.execute(q).scalars().all()
         count = 0
         for row in rows:
+            if not can_rollover_task_kind(getattr(row, "task_kind", None)):
+                continue
             if getattr(row, "opened_on", None) is None:
                 row.opened_on = opened_on_from_due(row.due_at, _TZ)
             new_due = rollover_due_datetime(row.due_at, to_day=day, tz=_TZ)

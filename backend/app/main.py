@@ -20,6 +20,7 @@ from app.controllers import (
     dashboard_controller,
     department_controller,
     employee_activity_controller,
+    employee_report_controller,
     events_controller,
     invitation_controller,
     issue_report_controller,
@@ -136,6 +137,9 @@ def create_app() -> FastAPI:
     )
     app.include_router(issue_report_controller.router, prefix="/api/issue-reports", tags=["issue-reports"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
+    app.include_router(
+        employee_report_controller.router, prefix="/api/reports", tags=["reports"]
+    )
     app.include_router(events_controller.router, prefix="/api/events", tags=["events"])
     app.include_router(notification_controller.router, prefix="/api/notifications", tags=["notifications"])
     app.include_router(

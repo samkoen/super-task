@@ -26,6 +26,7 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import LogoutIcon from "@mui/icons-material/Logout";
 import StorefrontIcon from "@mui/icons-material/Storefront";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
@@ -122,6 +123,7 @@ function Layout() {
       }
       items.push(
         { text: he.managerEmployees, icon: <PeopleIcon />, path: "/manager/employees" },
+        { text: he.managerReports, icon: <AssessmentIcon />, path: "/manager/reports" },
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/manager/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/manager/products" },
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/manager/tasks" },

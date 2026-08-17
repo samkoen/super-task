@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from app.domain import task_status
 from app.domain.employee_task_carry_over import (
+    can_rollover_task_kind,
     is_carry_over_task,
     rollover_due_datetime,
     select_carry_over_tasks,
@@ -43,9 +44,24 @@ def _task(**overrides) -> TaskOccurrence:
     return TaskOccurrence(**base)
 
 
+def test_can_rollover_only_ad_hoc():
+    assert can_rollover_task_kind("ad_hoc") is True
+    assert can_rollover_task_kind("fixed") is False
+    assert can_rollover_task_kind(None) is False
+
+
 def test_pending_yesterday_is_carry_over_today():
     task = _task(status=task_status.PENDING, due_at="2026-07-16T18:00:00+03:00")
     assert is_carry_over_task(task, day=date(2026, 7, 17), tz=TZ) is True
+
+
+def test_fixed_task_is_not_carry_over():
+    task = _task(
+        status=task_status.PENDING,
+        due_at="2026-07-16T18:00:00+03:00",
+        task_kind="fixed",
+    )
+    assert is_carry_over_task(task, day=date(2026, 7, 17), tz=TZ) is False
 
 
 def test_completed_yesterday_is_not_carry_over():
@@ -89,6 +105,7 @@ def test_status_after_rollover_stays_overdue_if_past():
 def test_rollover_open_tasks_to_day_updates_due_at():
     row = MagicMock()
     row.status = task_status.OVERDUE
+    row.task_kind = "ad_hoc"
     row.due_at = datetime(2026, 1, 1, 14, 0, tzinfo=TZ)
     row.opened_on = date(2026, 1, 1)
 
@@ -111,9 +128,35 @@ def test_rollover_open_tasks_to_day_updates_due_at():
     db.flush.assert_called_once()
 
 
+def test_rollover_skips_fixed_tasks_in_loop():
+    """Filet de sécurité si une קבועה arrive malgré le filtre SQL."""
+    row = MagicMock()
+    row.status = task_status.PENDING
+    row.task_kind = "fixed"
+    row.due_at = datetime(2026, 1, 1, 14, 0, tzinfo=TZ)
+    row.opened_on = date(2026, 1, 1)
+    original_due = row.due_at
+
+    db = MagicMock()
+    scalars = MagicMock()
+    scalars.all.return_value = [row]
+    execute_result = MagicMock()
+    execute_result.scalars.return_value = scalars
+    db.execute.return_value = execute_result
+
+    repo = TaskOccurrenceRepository(db)
+    now = datetime(2026, 1, 2, 10, 0, tzinfo=TZ)
+    count = repo.rollover_open_tasks_to_day(date(2026, 1, 2), now=now)
+
+    assert count == 0
+    assert row.due_at is original_due
+    db.flush.assert_not_called()
+
+
 def test_rollover_preserves_awaiting_response_status():
     row = MagicMock()
     row.status = task_status.AWAITING_RESPONSE
+    row.task_kind = "ad_hoc"
     row.due_at = datetime(2026, 1, 1, 14, 0, tzinfo=TZ)
     row.opened_on = date(2026, 1, 1)
 

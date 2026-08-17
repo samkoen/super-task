@@ -1,10 +1,15 @@
-"""Report des tâches non terminées : due_at (exécution) avance, opened_on reste."""
+"""Report des tâches non terminées : due_at (exécution) avance, opened_on reste.
+
+Uniquement les מזדמנות (ad_hoc). Les קבועות restent sur leur jour d'origine ;
+une nouvelle occurrence est générée par le scheduler.
+"""
 from __future__ import annotations
 
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from app.domain import task_status
+from app.domain.task_kind import AD_HOC
 from app.models.task_occurrence import TaskOccurrence
 
 # Statuts encore ouverts : on avance leur échéance d'exécution au jour courant.
@@ -17,6 +22,11 @@ ROLLOVER_STATUSES = frozenset(
         task_status.PENDING_REVIEW,
     }
 )
+
+
+def can_rollover_task_kind(task_kind: str | None) -> bool:
+    """Seules les tâches מזדמנות se reportent au jour suivant."""
+    return (task_kind or "").strip() == AD_HOC
 
 
 def parse_due_at(value: str | datetime, tz: ZoneInfo) -> datetime:
@@ -63,7 +73,9 @@ def status_after_rollover(status: str, *, new_due_at: datetime, now: datetime) -
 
 
 def is_carry_over_task(task: TaskOccurrence, *, day: date, tz: ZoneInfo) -> bool:
-    """True si encore ouverte et échéance d'exécution avant le jour affiché (avant rollover)."""
+    """True si מזדמנת encore ouverte et échéance d'exécution avant le jour affiché."""
+    if not can_rollover_task_kind(getattr(task, "task_kind", None)):
+        return False
     if task.status not in ROLLOVER_STATUSES:
         return False
     return parse_due_at(task.due_at, tz).date() < day

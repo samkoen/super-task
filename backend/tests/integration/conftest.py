@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import os
 from collections.abc import Generator
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -280,5 +280,15 @@ def jpeg_bytes() -> bytes:
     return buf.getvalue()
 
 
-def due_at_iso(hours: int = 2) -> str:
-    return (datetime.now(TZ) + timedelta(hours=hours)).isoformat()
+def due_at_iso(hours: int = 2, *, same_day: bool = True) -> str:
+    """Échéance future ; par défaut reste sur le jour calendaire courant (Asia/Jerusalem).
+
+    Évite les flaky tests après 22h quand now+2h bascule sur le lendemain alors
+    que les dashboards filtrent due_on=aujourd'hui.
+    """
+    now = datetime.now(TZ)
+    candidate = now + timedelta(hours=hours)
+    if same_day and candidate.date() != now.date():
+        end = datetime.combine(now.date(), time(23, 59, 0), tzinfo=TZ)
+        return (end if end > now else now).isoformat()
+    return candidate.isoformat()

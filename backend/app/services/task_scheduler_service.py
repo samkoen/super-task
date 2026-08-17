@@ -24,6 +24,7 @@ class TaskSchedulerService:
     def run_for_date(self, on_date: date | None = None) -> dict:
         day = on_date or datetime.now(TZ).date()
         now = datetime.now(TZ)
+        # קבועות : nouvelles occurrences. מזדמנות ouvertes : report due_at (pas les קבועות).
         generated = self._generate_occurrences(day)
         rolled = self._occurrences.rollover_open_tasks_to_day(day, now=now)
         overdue = self._mark_overdue()
