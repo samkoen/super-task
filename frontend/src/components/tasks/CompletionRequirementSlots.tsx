@@ -1,5 +1,5 @@
 import { Box, Button, Typography } from "@mui/material";
-import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
+import MediaCaptureActions from "../media/MediaCaptureActions";
 import { he } from "../../i18n/he";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import {
@@ -29,7 +29,7 @@ export default function CompletionRequirementSlots({
 }) {
   if (!requirements.length) return null;
 
-  const setSlot = (index: number, file: File, kind: MediaKind, durationSeconds?: number) => {
+  const setSlot = (index: number, file: File, durationSeconds?: number) => {
     const next = [...slots];
     next[index] = replacePendingMedia(slots[index] ?? null, file, durationSeconds ?? null);
     onChange(next);
@@ -62,7 +62,9 @@ export default function CompletionRequirementSlots({
               disabled={disabled}
               allowedKinds={[req.kind]}
               minVideoSeconds={req.kind === "video" ? req.min_seconds ?? null : null}
-              onCapture={(file, kind, meta) => setSlot(index, file, kind, meta?.durationSeconds)}
+              onCapture={(file, kind, meta) =>
+                setSlot(index, file, kind === "video" ? meta?.durationSeconds : undefined)
+              }
             />
             {media?.previewUrl && req.kind === "photo" && (
               <Box component="img" src={media.previewUrl} alt="" sx={{ mt: 1, maxWidth: "100%", maxHeight: 140, borderRadius: 1 }} />
