@@ -79,12 +79,15 @@ export default function EmployeeTaskDetailDialog({
         {task.completion &&
           (task.completion.photo_path ||
             task.completion.video_path ||
-            task.completion.audio_path) && (
+            task.completion.audio_path ||
+            (task.completion.completion_attachments &&
+              task.completion.completion_attachments.length > 0)) && (
             <CompletionMediaPreview
               viewer="employee"
               photo_path={task.completion.photo_path}
               video_path={task.completion.video_path}
               audio_path={task.completion.audio_path}
+              attachments={task.completion.completion_attachments}
               audio_transcript={task.completion.audio_transcript}
               audio_transcript_employee={task.completion.audio_transcript_employee}
             />

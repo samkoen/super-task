@@ -147,3 +147,38 @@ def test_apply_to_cards_translated_fetches_missing(monkeypatch):
     )
     assert result[0]["title"] == "Titre"
     assert result[0]["translation_pending"] is False
+
+
+def test_apply_to_cards_translated_keeps_transcript_description(monkeypatch):
+    service = TaskTranslationService(_FakeRepo())  # type: ignore[arg-type]
+
+    async def fake_translate(cards, *, language):
+        assert cards[0]["description"] == "תמלול מהמנהל"
+        return [
+            {
+                "id": "occ-fixed",
+                "title": "Nettoyage",
+                "description": "Transcription du manager",
+                "spoken_text": "Nettoyage. Transcription du manager",
+                "display_language": "fr",
+                "translation_pending": False,
+                "title_he": "ניקוי",
+            }
+        ]
+
+    monkeypatch.setattr(service, "translate_cards", fake_translate)
+    result = asyncio.run(
+        service.apply_to_cards_translated(
+            [
+                {
+                    "id": "occ-fixed",
+                    "title": "ניקוי",
+                    "description": "תמלול מהמנהל",
+                    "source_language": "he",
+                }
+            ],
+            language="fr",
+        )
+    )
+    assert result[0]["description"] == "Transcription du manager"
+    assert result[0]["title"] == "Nettoyage"

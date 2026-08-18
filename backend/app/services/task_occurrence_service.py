@@ -1,10 +1,23 @@
 from datetime import date, datetime
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from app.core import config
 from app.db import mappers as mp
 from app.domain import roles, task_status
-from app.domain.completion_media import has_required_completion_visual_media
+from app.domain.completion_media import (
+    assert_attachments_match,
+    assert_completion_media,
+    effective_requirements,
+    first_path_of_kind,
+    packed_media_fields,
+    parse_requirements_input,
+    resolve_completion_attachments,
+)
+from app.domain.audio_transcription_fallback import (
+    transcript_or_unavailable,
+    transcription_unavailable_message,
+)
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
 from app.domain.task_translation_source import task_source_language
@@ -19,7 +32,13 @@ from app.domain.task_scope import (
 from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
-from app.domain.task_title_from_description import resolve_create_title
+from app.domain.network_fixed_task import (
+    can_edit_network_fixed_group,
+    grouped_occurrence_ids,
+    pick_first_employee,
+    select_network_create_branches,
+    siblings_by_occurrence_content,
+)
 from app.domain.user_membership import employee_belongs_to_branch
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
@@ -188,10 +207,13 @@ class TaskOccurrenceService:
         due_at: str,
         assignee_user_id: str | None = None,
         photo_required: bool = True,
+        min_video_seconds: int | None = None,
+        completion_requirements: object | None = None,
         reference_photo_url: str | None = None,
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
         source_gallery_item_id: str | None = None,
+        network_group_id: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
@@ -210,6 +232,14 @@ class TaskOccurrenceService:
             reference_photo_url, reference_video_url, reference_audio_url
         )
         gallery_id = (source_gallery_item_id or "").strip() or None
+        media_fields = packed_media_fields(
+            parse_requirements_input(
+                completion_requirements,
+                provided=completion_requirements is not None,
+                photo_required=photo_required,
+                min_video_seconds=min_video_seconds,
+            )
+        )
         occurrence = self._occurrences.create(
             template_id=None,
             branch_id=branch_id,
@@ -220,12 +250,13 @@ class TaskOccurrenceService:
             department_id=None,
             task_kind=AD_HOC,
             manager_user_id=None,
-            photo_required=photo_required,
             reference_photo_url=photo,
             reference_video_url=video,
             reference_audio_url=audio,
             created_by_id=actor.user_id,
             source_gallery_item_id=gallery_id,
+            network_group_id=network_group_id,
+            **media_fields,
         )
         return self._to_api(occurrence, already_in_gallery=False)
 
@@ -247,6 +278,89 @@ class TaskOccurrenceService:
             _copy_if_issue(video, "task_videos"),
             _copy_if_issue(audio, "task_audio"),
         )
+
+    def create_ad_hoc_for_network(
+        self,
+        actor: ActorContext,
+        *,
+        title: str,
+        description: str = "",
+        due_at: str,
+        photo_required: bool = True,
+        min_video_seconds: int | None = None,
+        completion_requirements: object | None = None,
+        reference_photo_url: str | None = None,
+        reference_video_url: str | None = None,
+        reference_audio_url: str | None = None,
+        source_gallery_item_id: str | None = None,
+        branch_ids: list[str] | None = None,
+    ) -> dict:
+        """Duplique une מזדמנת (tous les snifim, ou une liste). 1er oved par snif."""
+        if actor.role not in {roles.NETWORK_MANAGER, roles.ADMIN}:
+            raise PermissionError("יצירה לכל הרשת למנהל רשת בלבד")
+        branches = select_network_create_branches(
+            self._network_branches(actor), branch_ids
+        )
+        if not branches:
+            raise ValueError("אין סניפים ברשת")
+        photo, video, audio = self._isolate_issue_media(
+            reference_photo_url, reference_video_url, reference_audio_url
+        )
+        group_id = str(uuid4())
+        created, skipped = self._create_network_ad_hoc_copies(
+            actor,
+            branches,
+            title=title,
+            description=description,
+            due_at=due_at,
+            photo_required=photo_required,
+            min_video_seconds=min_video_seconds,
+            completion_requirements=completion_requirements,
+            reference_photo_url=photo,
+            reference_video_url=video,
+            reference_audio_url=audio,
+            source_gallery_item_id=source_gallery_item_id,
+            network_group_id=group_id,
+        )
+        if not created:
+            raise ValueError("לא נוצרו משימות — אין עובדים בסניפים")
+        return {"occurrences": created, "skipped": skipped}
+
+    def _create_network_ad_hoc_copies(self, actor, branches, **fields) -> tuple[list, list]:
+        created: list[dict] = []
+        skipped: list[dict] = []
+        for branch in branches:
+            item = self._create_network_ad_hoc_copy(actor, branch, **fields)
+            if item is None:
+                skipped.append(
+                    {
+                        "branch_id": branch.id,
+                        "branch_name": branch.name,
+                        "reason": "אין עובד בסניף",
+                    }
+                )
+            else:
+                created.append(item)
+        return created, skipped
+
+    def _create_network_ad_hoc_copy(self, actor, branch, **fields) -> dict | None:
+        if not self._users:
+            raise RuntimeError("user repository required")
+        employees = self._users.list_users(role=roles.EMPLOYEE, branch_ids=[branch.id])
+        first = pick_first_employee(employees)
+        if not first:
+            return None
+        return self.create_ad_hoc(
+            actor, branch_id=branch.id, assignee_user_id=first.id, **fields
+        )
+
+    def _network_branches(self, actor: ActorContext) -> list:
+        visible = visible_branch_ids_for_tasks(actor, self._branch)
+        if visible is None:
+            return self._branch.list_branches()
+        if actor.network_id:
+            return self._branch.list_branches(network_id=actor.network_id)
+        return [b for bid in visible if (b := self._branch.find_by_id(bid))]
 
     def delegate_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, assignee_user_id: str
@@ -310,6 +424,53 @@ class TaskOccurrenceService:
         assert updated is not None
         return self._to_api(updated)
 
+    @staticmethod
+    def _pack_attachments(attachments: list) -> dict:
+        return {
+            "attachments": attachments,
+            "photo_path": first_path_of_kind(attachments, "photo"),
+            "video_path": first_path_of_kind(attachments, "video"),
+            "audio_path": first_path_of_kind(attachments, "audio"),
+        }
+
+    @staticmethod
+    def _validated_completion_media(
+        actor,
+        occurrence,
+        *,
+        photo_path,
+        video_path,
+        audio_path,
+        video_duration_seconds,
+        completion_attachments,
+    ) -> dict:
+        raw_reqs = getattr(occurrence, "completion_requirements", None)
+        attachments = resolve_completion_attachments(
+            effective_requirements(raw_reqs) if raw_reqs is not None else [],
+            attachments=completion_attachments,
+            photo_path=photo_path,
+            video_path=video_path,
+            audio_path=audio_path,
+            video_duration_seconds=video_duration_seconds,
+        )
+        if raw_reqs is not None:
+            assert_attachments_match(effective_requirements(raw_reqs), attachments)
+            return TaskOccurrenceService._pack_attachments(attachments)
+        requires_visual = actor.role == roles.EMPLOYEE or occurrence.photo_required
+        assert_completion_media(
+            photo_path=photo_path,
+            video_path=video_path,
+            min_video_seconds=occurrence.min_video_seconds,
+            video_duration_seconds=video_duration_seconds,
+            requires_visual=bool(requires_visual),
+        )
+        return {
+            "attachments": attachments,
+            "photo_path": photo_path,
+            "video_path": video_path,
+            "audio_path": audio_path,
+        }
+
     async def complete_occurrence(
         self,
         actor: ActorContext,
@@ -321,6 +482,8 @@ class TaskOccurrenceService:
         video_path: str | None = None,
         audio_path: str | None = None,
         not_completed_reason: str | None = None,
+        video_duration_seconds: object | None = None,
+        completion_attachments: object | None = None,
     ) -> dict:
         occurrence = self._occurrences.find_by_id(occurrence_id)
         if not occurrence:
@@ -338,13 +501,15 @@ class TaskOccurrenceService:
             raise ValueError("לא ניתן לסמן לא בוצע — שלחו שאלה בצ׳אט המשימה")
         if completion_status != task_status.COMPLETION_DONE:
             raise ValueError("סטטוס סיום לא תקין")
-        requires_visual_media = actor.role == roles.EMPLOYEE or occurrence.photo_required
-        if (
-            completion_status == task_status.COMPLETION_DONE
-            and requires_visual_media
-            and not has_required_completion_visual_media(photo_path, video_path)
-        ):
-            raise ValueError("נדרשת תמונה או וידאו לסיום המשימה (שמע אופציונלי)")
+        media = self._validated_completion_media(
+            actor,
+            occurrence,
+            photo_path=photo_path,
+            video_path=video_path,
+            audio_path=audio_path,
+            video_duration_seconds=video_duration_seconds,
+            completion_attachments=completion_attachments,
+        )
 
         note_clean = (note or "").strip() or None
         reason_clean = (not_completed_reason or "").strip() or None
@@ -359,9 +524,10 @@ class TaskOccurrenceService:
                 occurrence_id,
                 status=completion_status,
                 note=note_clean,
-                photo_path=photo_path,
-                video_path=video_path,
-                audio_path=audio_path,
+                photo_path=media["photo_path"],
+                video_path=media["video_path"],
+                audio_path=media["audio_path"],
+                completion_attachments=media["attachments"],
                 not_completed_reason=reason_clean,
                 completed_by_id=actor.user_id,
                 manager_review_status=task_status.REVIEW_PENDING if needs_review else None,
@@ -373,16 +539,17 @@ class TaskOccurrenceService:
                 occurrence_id=occurrence_id,
                 status=completion_status,
                 note=note_clean,
-                photo_path=photo_path,
-                video_path=video_path,
-                audio_path=audio_path,
+                photo_path=media["photo_path"],
+                video_path=media["video_path"],
+                audio_path=media["audio_path"],
+                completion_attachments=media["attachments"],
                 not_completed_reason=reason_clean,
                 completed_by_id=actor.user_id,
                 manager_review_status=task_status.REVIEW_PENDING if needs_review else None,
             )
         assert completion is not None
 
-        if employee_submission and (audio_path or "").strip():
+        if employee_submission and (media["audio_path"] or "").strip():
             manager_lang = self._manager_language(occurrence)
             employee_lang = "he"
             if self._users:
@@ -390,24 +557,26 @@ class TaskOccurrenceService:
                 if submitter and submitter.preferred_language:
                     employee_lang = submitter.preferred_language
             transcript = await transcribe_completion_audio(
-                audio_path,
+                media["audio_path"],
                 manager_language=manager_lang,
             )
-            employee_transcript = transcript
-            if transcript:
+            manager_text = transcript_or_unavailable(transcript, manager_lang)
+            if (transcript or "").strip():
                 employee_transcript = await localize_completion_transcript(
-                    transcript,
+                    manager_text,
                     source_language=normalize_employee_language(manager_lang),
                     target_language=normalize_employee_language(employee_lang),
                 )
-            if transcript or employee_transcript:
-                updated_completion = self._completions.update_audio_transcripts(
-                    occurrence_id,
-                    audio_transcript=transcript,
-                    audio_transcript_employee=employee_transcript,
-                )
-                if updated_completion:
-                    completion = updated_completion
+                employee_transcript = (employee_transcript or "").strip() or manager_text
+            else:
+                employee_transcript = transcription_unavailable_message(employee_lang)
+            updated_completion = self._completions.update_audio_transcripts(
+                occurrence_id,
+                audio_transcript=manager_text,
+                audio_transcript_employee=employee_transcript,
+            )
+            if updated_completion:
+                completion = updated_completion
 
         if needs_review:
             new_status = task_status.PENDING_REVIEW
@@ -477,7 +646,9 @@ class TaskOccurrenceService:
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
 
-    def cancel_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
+    def cancel_occurrence(
+        self, actor: ActorContext, occurrence_id: str, *, apply_to_network: bool = False
+    ) -> dict:
         """ביטול = suppression complète (DB + médias storage)."""
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לבטל משימות")
@@ -485,16 +656,42 @@ class TaskOccurrenceService:
         if not occurrence:
             raise ValueError("משימה לא נמצאה")
         self._assert_branch_access(actor, occurrence.branch_id)
+        targets = self._cancel_targets(actor, occurrence, apply_to_network)
+        snapshots: list[dict] = []
+        media: list[str] = []
+        for occ in targets:
+            snap = self._hard_delete_occurrence(occ)
+            media.extend(snap.pop("_media_to_delete", []) or [])
+            snapshots.append(snap)
+        primary = dict(snapshots[0])
+        primary["deleted"] = True
+        primary["deleted_count"] = len(snapshots)
+        primary["cancelled_occurrences"] = snapshots
+        primary["_media_to_delete"] = media
+        return primary
+
+    def _cancel_targets(self, actor, occurrence, apply_to_network: bool) -> list:
+        if apply_to_network and occurrence.task_kind == AD_HOC:
+            if not can_edit_network_fixed_group(actor.role):
+                raise PermissionError("מחיקה לכל הרשת למנהל רשת בלבד")
+            open_ones = [
+                o
+                for o in self._group_occurrences_in_scope(actor, occurrence)
+                if o.status not in task_status.TERMINAL
+            ]
+            if open_ones:
+                return open_ones
         if occurrence.status in task_status.TERMINAL:
             raise ValueError("המשימה כבר נסגרה")
+        return [occurrence]
 
+    def _hard_delete_occurrence(self, occurrence) -> dict:
         snapshot = self._to_api(occurrence)
-        # Collecter les URLs avant delete DB — purge storage après commit (évite perte si rollback).
-        media_to_delete = self._media_retention.collect_deletable_media_urls(occurrence_id)
-        self._completions.delete_by_occurrence(occurrence_id)
+        media_to_delete = self._media_retention.collect_deletable_media_urls(occurrence.id)
+        self._completions.delete_by_occurrence(occurrence.id)
         if self._notifications:
-            self._notifications.clear_occurrence_links(occurrence_id)
-        if not self._occurrences.delete(occurrence_id):
+            self._notifications.clear_occurrence_links(occurrence.id)
+        if not self._occurrences.delete(occurrence.id):
             raise ValueError("משימה לא נמצאה")
         snapshot["status"] = task_status.CANCELLED
         snapshot["deleted"] = True
@@ -511,10 +708,43 @@ class TaskOccurrenceService:
         due_at: str,
         assignee_user_id: str | None = None,
         photo_required: bool | None = None,
+        min_video_seconds: int | None = None,
+        update_min_video_seconds: bool = False,
+        completion_requirements: object | None = None,
+        update_completion_requirements: bool = False,
         reference_photo_url: str | None | object = _UNSET,
         reference_video_url: str | None | object = _UNSET,
         reference_audio_url: str | None | object = _UNSET,
+        apply_to_network: bool = False,
     ) -> dict:
+        occurrence = self._require_editable_occurrence(actor, occurrence_id, title)
+        parsed = datetime.fromisoformat(due_at)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=TZ)
+        details = self._edit_details(
+            occurrence,
+            title,
+            description,
+            parsed,
+            photo_required,
+            min_video_seconds,
+            update_min_video_seconds,
+            completion_requirements,
+            update_completion_requirements,
+            reference_photo_url,
+            reference_video_url,
+            reference_audio_url,
+        )
+        if apply_to_network and occurrence.task_kind == AD_HOC:
+            return self._update_network_ad_hoc(actor, occurrence, details, assignee_user_id)
+        assignee = self._resolve_edit_assignee(actor, occurrence, assignee_user_id)
+        updated = self._occurrences.update_details(
+            occurrence.id, assignee_user_id=assignee, **details
+        )
+        assert updated is not None
+        return self._to_api(updated)
+
+    def _require_editable_occurrence(self, actor, occurrence_id: str, title: str):
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לערוך משימות")
         occurrence = self._occurrences.find_by_id(occurrence_id)
@@ -527,39 +757,130 @@ class TaskOccurrenceService:
             raise ValueError("לא ניתן לערוך משימה שממתינה לאישור")
         if not (title or "").strip():
             raise ValueError("נדרש כותרת משימה")
+        return occurrence
 
-        parsed = datetime.fromisoformat(due_at)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=TZ)
+    @staticmethod
+    def _edit_details(
+        occurrence, title, description, due_at, photo_required, min_video_seconds,
+        update_min_video_seconds, completion_requirements, update_completion_requirements,
+        reference_photo_url, reference_video_url, reference_audio_url,
+    ) -> dict:
+        media = TaskOccurrenceService._edit_media_fields(
+            occurrence,
+            photo_required=photo_required,
+            min_video_seconds=min_video_seconds,
+            update_min_video_seconds=update_min_video_seconds,
+            completion_requirements=completion_requirements,
+            update_completion_requirements=update_completion_requirements,
+        )
+        return {
+            "title": title,
+            "description": description,
+            "due_at": due_at,
+            **media,
+            "reference_photo_url": (
+                reference_photo_url if reference_photo_url is not _UNSET else None
+            ),
+            "reference_video_url": (
+                reference_video_url if reference_video_url is not _UNSET else None
+            ),
+            "reference_audio_url": (
+                reference_audio_url if reference_audio_url is not _UNSET else None
+            ),
+            "update_reference_photo": reference_photo_url is not _UNSET,
+            "update_reference_video": reference_video_url is not _UNSET,
+            "update_reference_audio": reference_audio_url is not _UNSET,
+        }
 
+    @staticmethod
+    def _edit_media_fields(
+        occurrence,
+        *,
+        photo_required,
+        min_video_seconds,
+        update_min_video_seconds,
+        completion_requirements,
+        update_completion_requirements,
+    ) -> dict:
+        if update_completion_requirements:
+            reqs = parse_requirements_input(completion_requirements, provided=True)
+        elif update_min_video_seconds:
+            reqs = parse_requirements_input(
+                None,
+                provided=False,
+                photo_required=occurrence.photo_required if photo_required is None else photo_required,
+                min_video_seconds=min_video_seconds,
+            )
+        else:
+            return {
+                "photo_required": photo_required,
+                "min_video_seconds": None,
+                "update_min_video_seconds": False,
+                "completion_requirements": None,
+                "update_completion_requirements": False,
+            }
+        packed = packed_media_fields(reqs)
+        packed["update_min_video_seconds"] = True
+        packed["update_completion_requirements"] = True
+        return packed
+
+    def _resolve_edit_assignee(self, actor, occurrence, assignee_user_id: str | None):
         if occurrence.pending_delegation:
             if assignee_user_id:
                 self._validate_employee(occurrence.branch_id, assignee_user_id)
-            final_assignee = assignee_user_id
-        elif assignee_user_id:
+            return assignee_user_id
+        if assignee_user_id:
             self._validate_employee(occurrence.branch_id, assignee_user_id)
-            final_assignee = assignee_user_id
-        elif occurrence.task_kind == AD_HOC and actor.role == roles.BRANCH_MANAGER:
+            return assignee_user_id
+        if occurrence.task_kind == AD_HOC and actor.role == roles.BRANCH_MANAGER:
             raise ValueError("נדרש שיוך לעובד")
-        else:
-            final_assignee = occurrence.assignee_user_id
+        return occurrence.assignee_user_id
 
-        updated = self._occurrences.update_details(
-            occurrence_id,
-            title=title,
-            description=description,
-            due_at=parsed,
-            assignee_user_id=final_assignee,
-            photo_required=photo_required,
-            reference_photo_url=reference_photo_url if reference_photo_url is not _UNSET else None,
-            reference_video_url=reference_video_url if reference_video_url is not _UNSET else None,
-            reference_audio_url=reference_audio_url if reference_audio_url is not _UNSET else None,
-            update_reference_photo=reference_photo_url is not _UNSET,
-            update_reference_video=reference_video_url is not _UNSET,
-            update_reference_audio=reference_audio_url is not _UNSET,
+    def _update_network_ad_hoc(self, actor, existing, details: dict, assignee_user_id) -> dict:
+        if not can_edit_network_fixed_group(actor.role):
+            raise PermissionError("עדכון לכל הרשת למנהל רשת בלבד")
+        targets = [
+            o
+            for o in self._group_occurrences_in_scope(actor, existing)
+            if o.status not in task_status.TERMINAL
+            and o.status != task_status.PENDING_REVIEW
+        ]
+        primary = None
+        for sibling in targets:
+            keep = sibling.id != existing.id
+            assignee = sibling.assignee_user_id if keep else self._resolve_edit_assignee(
+                actor, existing, assignee_user_id
+            )
+            updated = self._occurrences.update_details(
+                sibling.id, assignee_user_id=assignee, **details
+            )
+            if sibling.id == existing.id:
+                primary = updated
+        if primary is None:
+            raise ValueError("לא ניתן לערוך משימה זו")
+        result = self._to_api(primary)
+        result["updated_count"] = len(targets)
+        return result
+
+    def _group_occurrences_in_scope(self, actor, existing) -> list:
+        visible = visible_branch_ids_for_tasks(actor, self._branch)
+        if existing.network_group_id:
+            siblings = self._occurrences.list_by_network_group(existing.network_group_id)
+            return self._visible_or_self(siblings, visible, existing)
+        parsed = datetime.fromisoformat(existing.due_at)
+        candidates = self._occurrences.list_occurrences(
+            branch_ids=visible,
+            task_kind=AD_HOC,
+            due_on=parsed.date(),
         )
-        assert updated is not None
-        return self._to_api(updated)
+        return siblings_by_occurrence_content(existing, candidates)
+
+    @staticmethod
+    def _visible_or_self(siblings, visible, existing) -> list:
+        if visible is None:
+            return siblings or [existing]
+        in_scope = [s for s in siblings if s.branch_id in visible]
+        return in_scope or [existing]
 
     def get_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
         if not can_manage_tasks(actor):
@@ -653,6 +974,7 @@ class TaskOccurrenceService:
             user_ids=user_ids,
         )
         rows: list[dict] = []
+        grouped = grouped_occurrence_ids(items)
         for occurrence in items:
             template = templates.get(occurrence.template_id) if occurrence.template_id else None
             occurrence = merge_occurrence_reference_media(occurrence, template)
@@ -685,6 +1007,7 @@ class TaskOccurrenceService:
                         source_gallery_item_id=occurrence.source_gallery_item_id,
                         already_in_gallery=already,
                     ),
+                    is_network_task=occurrence.id in grouped,
                 )
             )
         return rows

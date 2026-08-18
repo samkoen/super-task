@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Alert, Box, Snackbar } from "@mui/material";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import ViewWeekIcon from "@mui/icons-material/ViewWeek";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
@@ -114,6 +115,14 @@ export default function StoreStatusKpiRow({ storeKpis }: StoreStatusKpiRowProps)
             kpis.orders,
             <ShoppingCartIcon />,
             "#ef6c00",
+          )}
+        </KpiSlide>
+        <KpiSlide>
+          {categoryCard(
+            he.dashboardKpiInfoCollection,
+            kpis.info_collection,
+            <FactCheckIcon />,
+            "#00838f",
           )}
         </KpiSlide>
         <KpiSlide>

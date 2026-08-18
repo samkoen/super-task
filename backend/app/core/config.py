@@ -120,8 +120,14 @@ def assert_secure_runtime_config() -> None:
 # --- Fournisseur AI (gemini | opencode) ---
 AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini").strip().lower()
 
+DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+DEFAULT_GEMINI_FALLBACK_MODELS = "gemini-2.5-flash,gemini-2.5-flash-lite"
+DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS = (
+    "gemini-3.6-flash,gemini-2.5-flash,gemini-2.5-flash-lite"
+)
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip()
 GEMINI_TEMPERATURE = float(os.environ.get("GEMINI_TEMPERATURE", "0.3"))
 GEMINI_MAX_OUTPUT_TOKENS = int(os.environ.get("GEMINI_MAX_OUTPUT_TOKENS", "2048"))
 GEMINI_GENERATION_MAX_OUTPUT_TOKENS = int(
@@ -133,10 +139,10 @@ GEMINI_GENERATION_TIMEOUT_SECONDS = float(
     os.environ.get("GEMINI_GENERATION_TIMEOUT_SECONDS", "120")
 )
 GEMINI_FALLBACK_MODELS = os.environ.get(
-    "GEMINI_FALLBACK_MODELS", "gemini-2.0-flash,gemini-2.5-flash-lite"
+    "GEMINI_FALLBACK_MODELS", DEFAULT_GEMINI_FALLBACK_MODELS
 )
 GEMINI_GENERATION_FALLBACK_MODELS = os.environ.get(
-    "GEMINI_GENERATION_FALLBACK_MODELS", "gemini-2.0-flash,gemini-2.5-flash-lite"
+    "GEMINI_GENERATION_FALLBACK_MODELS", DEFAULT_GEMINI_GENERATION_FALLBACK_MODELS
 )
 GEMINI_RETRY_COUNT = int(os.environ.get("GEMINI_RETRY_COUNT", "2"))
 GEMINI_RETRY_DELAY_SECONDS = float(os.environ.get("GEMINI_RETRY_DELAY_SECONDS", "2"))

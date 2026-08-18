@@ -47,6 +47,11 @@ const baseTarget = {
 describe("taskOccurrenceEditForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(taskService.updateOccurrence).mockResolvedValue({
+      message: he.taskUpdated,
+      occurrence: baseTarget as never,
+      updated_count: 1,
+    });
   });
 
   it("maps occurrence into edit form", () => {
@@ -72,7 +77,11 @@ describe("taskOccurrenceEditForm", () => {
     expect(msg).toBe(he.taskUpdated);
     expect(taskService.updateOccurrence).toHaveBeenCalledWith(
       "occ-1",
-      expect.objectContaining({ title: "Updated", assignee_user_id: "u2" }),
+      expect.objectContaining({
+        title: "Updated",
+        assignee_user_id: "u2",
+        apply_to_network: false,
+      }),
     );
     expect(taskGalleryService.createFromOccurrence).not.toHaveBeenCalled();
   });
@@ -88,5 +97,26 @@ describe("taskOccurrenceEditForm", () => {
     expect(msg).toBe(he.taskMovedToGallery);
     expect(taskGalleryService.createFromOccurrence).toHaveBeenCalledWith("occ-1");
     expect(taskService.cancel).toHaveBeenCalledWith("occ-1");
+  });
+
+  it("sends apply_to_network when editing the whole group", async () => {
+    vi.mocked(taskService.updateOccurrence).mockResolvedValue({
+      message: "ok",
+      occurrence: baseTarget as never,
+      updated_count: 3,
+    });
+    const form = {
+      ...emptyOccurrenceEditForm(),
+      title: "Updated",
+      due_at: "2026-07-25T10:00",
+      assignee_user_id: "u2",
+      apply_to_network: true,
+    };
+    const msg = await saveOccurrenceEdit(baseTarget as never, form, false);
+    expect(msg).toBe(he.managerAdHocSavedNetwork(3));
+    expect(taskService.updateOccurrence).toHaveBeenCalledWith(
+      "occ-1",
+      expect.objectContaining({ apply_to_network: true }),
+    );
   });
 });

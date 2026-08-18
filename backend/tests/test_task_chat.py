@@ -198,3 +198,32 @@ def test_list_messages_returns_display_body_for_manager():
     items = service.list_messages(actor, "occ-1")
     assert items[0]["display_body"] == "שלום"
     assert items[0]["body"] == "sawasdee"
+
+
+def test_chat_audio_pair_keeps_audio_with_fallback_when_gemini_fails():
+    from app.domain.audio_transcription_fallback import transcription_unavailable_message
+    from app.services.task_message_service import _chat_audio_pair
+
+    with patch(
+        "app.services.task_message_service.transcribe_completion_audio",
+        AsyncMock(return_value=None),
+    ):
+        recipient, sender = asyncio.run(
+            _chat_audio_pair("https://blob/a.webm", sender_lang="he", recipient_lang="th")
+        )
+    assert recipient == transcription_unavailable_message("th")
+    assert sender == transcription_unavailable_message("he")
+
+
+def test_chat_audio_pair_keeps_real_transcript():
+    from app.services.task_message_service import _chat_audio_pair
+
+    with patch(
+        "app.services.task_message_service.transcribe_completion_audio",
+        AsyncMock(return_value="  נקה את המדף  "),
+    ):
+        recipient, sender = asyncio.run(
+            _chat_audio_pair("https://blob/a.webm", sender_lang="he", recipient_lang="he")
+        )
+    assert recipient == "נקה את המדף"
+    assert sender == "נקה את המדף"

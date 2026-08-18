@@ -34,6 +34,19 @@ def parse_datetime_iso(dt: datetime | None) -> str:
     return dt.replace(tzinfo=None).isoformat()
 
 
+def parse_json_list(value) -> list | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str) and value.strip():
+        import json
+
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, list) else None
+    return None
+
+
 def user_orm_to_domain(row: orm.User | None) -> User | None:
     if row is None:
         return None
@@ -252,6 +265,12 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
             else None
         ),
         ops_category=getattr(row, "ops_category", None),
+        min_video_seconds=getattr(row, "min_video_seconds", None),
+        completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
+        is_work_start=bool(getattr(row, "is_work_start", False)),
+        network_group_id=(
+            str(row.network_group_id) if getattr(row, "network_group_id", None) else None
+        ),
     )
 
 
@@ -302,6 +321,12 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
             if getattr(row, "manager_next_at", None)
             else None
         ),
+        min_video_seconds=getattr(row, "min_video_seconds", None),
+        completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
+        is_work_start=bool(getattr(row, "is_work_start", False)),
+        network_group_id=(
+            str(row.network_group_id) if getattr(row, "network_group_id", None) else None
+        ),
     )
 
 
@@ -323,6 +348,7 @@ def task_completion_orm_to_domain(row: orm.TaskCompletion | None) -> TaskComplet
         photo_path=row.photo_path,
         video_path=row.video_path,
         audio_path=row.audio_path,
+        completion_attachments=parse_json_list(getattr(row, "completion_attachments", None)),
         audio_transcript=row.audio_transcript,
         audio_transcript_employee=getattr(row, "audio_transcript_employee", None),
         not_completed_reason=row.not_completed_reason,

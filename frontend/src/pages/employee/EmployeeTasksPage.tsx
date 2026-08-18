@@ -52,7 +52,7 @@ import {
 import { useTaskSpeech } from "../../hooks/useTaskSpeech";
 import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
-import CompletionMediaPreview from "../../components/tasks/CompletionMediaPreview";
+import CompletionRequirementSlots from "../../components/tasks/CompletionRequirementSlots";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
@@ -62,15 +62,43 @@ import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
   type PendingMedia,
-  replacePendingMedia,
   revokePendingMedia,
   uploadPendingMedia,
 } from "../../utils/pendingMedia";
+import {
+  effectiveRequirements,
+  meetsCompletionRequirements,
+} from "../../utils/completionMedia";
 
 function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
   const labels = he.jobFunctionLabels as Record<string, string>;
   return labels[jobFunction] ?? jobFunction;
+}
+
+async function uploadRequirementSlots(
+  requirements: ReturnType<typeof effectiveRequirements>,
+  slots: Array<PendingMedia | null>,
+) {
+  const attachments = [];
+  for (let i = 0; i < requirements.length; i += 1) {
+    const req = requirements[i];
+    const media = slots[i];
+    const upload =
+      req.kind === "photo"
+        ? taskService.uploadPhoto
+        : req.kind === "video"
+          ? taskService.uploadVideo
+          : taskService.uploadAudio;
+    const url = await uploadPendingMedia(media, upload);
+    if (!url) continue;
+    attachments.push({
+      kind: req.kind,
+      url,
+      duration_seconds: media?.durationSeconds ?? undefined,
+    });
+  }
+  return attachments;
 }
 
 function mergeTaskTranslations<T extends EmployeeTaskCard>(
@@ -134,6 +162,9 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     status: task.status,
     task_kind: task.task_kind,
     photo_required: task.photo_required,
+    min_video_seconds: task.min_video_seconds ?? null,
+    completion_requirements: task.completion_requirements ?? [],
+    is_work_start: task.is_work_start,
     reference_photo_url: task.reference_photo_url ?? null,
     reference_video_url: task.reference_video_url ?? null,
     reference_audio_url: task.reference_audio_url ?? null,
@@ -157,9 +188,7 @@ export default function EmployeeTasksPage() {
   const [selected, setSelected] = useState<EmployeeTaskCard | null>(null);
   const [detailTask, setDetailTask] = useState<EmployeeTaskCard | null>(null);
   const [note, setNote] = useState("");
-  const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
-  const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
-  const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
+  const [slotMedia, setSlotMedia] = useState<Array<PendingMedia | null>>([]);
   const [saving, setSaving] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -281,23 +310,16 @@ export default function EmployeeTasksPage() {
   };
 
   const clearCompletionMedia = useCallback(() => {
-    setPendingPhoto((prev) => {
-      revokePendingMedia(prev);
-      return null;
-    });
-    setPendingVideo((prev) => {
-      revokePendingMedia(prev);
-      return null;
-    });
-    setPendingAudio((prev) => {
-      revokePendingMedia(prev);
-      return null;
+    setSlotMedia((prev) => {
+      prev.forEach((item) => revokePendingMedia(item));
+      return [];
     });
   }, []);
 
   const openComplete = (task: EmployeeTaskCard) => {
     stopSpeech();
     clearCompletionMedia();
+    setSlotMedia(effectiveRequirements(task).map(() => null));
     setSelected(task);
     setNote("");
   };
@@ -325,21 +347,16 @@ export default function EmployeeTasksPage() {
     }
   }, [user?.preferred_language]);
 
-  const handleCapture = useCallback((file: File, kind: MediaKind) => {
-    if (kind === "photo") {
-      setPendingPhoto((prev) => replacePendingMedia(prev, file));
-      return;
-    }
-    if (kind === "video") {
-      setPendingVideo((prev) => replacePendingMedia(prev, file));
-      return;
-    }
-    setPendingAudio((prev) => replacePendingMedia(prev, file));
-  }, []);
-
-  const hasVisualMedia = Boolean(pendingPhoto || pendingVideo);
-  const requiresMedia = true;
-  const canSubmitDone = hasVisualMedia;
+  const requirements = useMemo(
+    () => (selected ? effectiveRequirements(selected) : []),
+    [selected],
+  );
+  const canSubmitDone = meetsCompletionRequirements(
+    requirements,
+    slotMedia.map((item, i) =>
+      item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
+    ),
+  );
 
   const openReport = () => {
     setReportText("");
@@ -395,15 +412,11 @@ export default function EmployeeTasksPage() {
     if (!selected) return;
     setSaving(true);
     try {
-      const photo_path = await uploadPendingMedia(pendingPhoto, taskService.uploadPhoto);
-      const video_path = await uploadPendingMedia(pendingVideo, taskService.uploadVideo);
-      const audio_path = await uploadPendingMedia(pendingAudio, taskService.uploadAudio);
+      const attachments = await uploadRequirementSlots(requirements, slotMedia);
       await taskService.complete(selected.id, {
         status: "completed",
         note: note || undefined,
-        photo_path,
-        video_path,
-        audio_path,
+        completion_attachments: attachments,
       });
       clearCompletionMedia();
       setSelected(null);
@@ -833,34 +846,18 @@ export default function EmployeeTasksPage() {
           </Typography>
           <TextField label={he.note} value={note} onChange={(e) => setNote(e.target.value)} fullWidth multiline rows={3} placeholder={he.completionMediaHint} />
           <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
-          <MediaCaptureActions
-            photoAdded={Boolean(pendingPhoto)}
-            videoAdded={Boolean(pendingVideo)}
-            audioAdded={Boolean(pendingAudio)}
-            uploadingKind={null}
-            disabled={saving}
-            onCapture={(file, kind: MediaKind) => handleCapture(file, kind)}
-          />
-          <CompletionMediaPreview
-            photo_path={pendingPhoto?.previewUrl}
-            video_path={pendingVideo?.previewUrl}
-            audio_path={pendingAudio?.previewUrl}
-            disabled={saving}
-            onRemovePhoto={() => {
-              revokePendingMedia(pendingPhoto);
-              setPendingPhoto(null);
-            }}
-            onRemoveVideo={() => {
-              revokePendingMedia(pendingVideo);
-              setPendingVideo(null);
-            }}
-            onRemoveAudio={() => {
-              revokePendingMedia(pendingAudio);
-              setPendingAudio(null);
-            }}
-          />
-          {requiresMedia && !hasVisualMedia && (
-            <Typography variant="caption" color="warning.main">{he.photoRequired}</Typography>
+          {requirements.length > 0 ? (
+            <CompletionRequirementSlots
+              requirements={requirements}
+              slots={slotMedia}
+              onChange={setSlotMedia}
+              disabled={saving}
+            />
+          ) : null}
+          {!canSubmitDone && (
+            <Typography variant="caption" color="warning.main">
+              {he.completionFillSlotsHint}
+            </Typography>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

@@ -47,3 +47,66 @@ export function opsCategoryLabel(category: OpsCategory | null | undefined): stri
   if (!category) return he.opsCategoryNone;
   return he.opsCategoryLabels[category] ?? category;
 }
+
+export function defaultApplyEditToNetwork(
+  template: Pick<TaskTemplate, "network_group_id" | "is_network_task"> & { id?: string },
+  canPickBranch: boolean,
+  networkIds?: Set<string>,
+): boolean {
+  return Boolean(canPickBranch && isNetworkFixedTemplate(template, networkIds));
+}
+
+export function isNetworkFixedTemplate(
+  template: Pick<TaskTemplate, "network_group_id" | "is_network_task"> & { id?: string },
+  networkIds?: Set<string>,
+): boolean {
+  if (template.network_group_id || template.is_network_task) return true;
+  return Boolean(template.id && networkIds?.has(template.id));
+}
+
+export function networkFixedTemplateIds(templates: TaskTemplate[]): Set<string> {
+  const ids = new Set<string>();
+  const byKey = new Map<string, TaskTemplate[]>();
+  for (const t of templates) {
+    if (t.network_group_id || t.is_network_task) ids.add(t.id);
+    const key = templateContentKey(t);
+    const list = byKey.get(key) ?? [];
+    list.push(t);
+    byKey.set(key, list);
+  }
+  for (const list of byKey.values()) {
+    if (new Set(list.map((row) => row.branch_id)).size >= 2) {
+      list.forEach((row) => ids.add(row.id));
+    }
+  }
+  return ids;
+}
+
+function templateContentKey(t: TaskTemplate): string {
+  return [t.title, t.recurrence, t.due_time, t.weekly_days ?? "", t.monthly_day ?? ""].join("\0");
+}
+
+export function networkGroupSize(tpl: TaskTemplate, templates: TaskTemplate[]): number {
+  if (tpl.network_group_id) {
+    return new Set(
+      templates
+        .filter((t) => t.network_group_id === tpl.network_group_id)
+        .map((t) => t.branch_id),
+    ).size;
+  }
+  const key = templateContentKey(tpl);
+  return new Set(
+    templates.filter((t) => templateContentKey(t) === key).map((t) => t.branch_id),
+  ).size;
+}
+
+export function networkFixedChipLabel(
+  tpl: TaskTemplate,
+  templates: TaskTemplate[],
+  allBranchCount: number,
+): string {
+  const n = networkGroupSize(tpl, templates);
+  if (allBranchCount > 0 && n >= allBranchCount) return he.fixedTaskNetworkChip;
+  if (n >= 2) return he.fixedTaskNetworkChipCount(n);
+  return he.fixedTaskNetworkChip;
+}

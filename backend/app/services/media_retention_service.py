@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.core import config
+from app.domain.completion_media import attachment_urls
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -57,6 +58,7 @@ class MediaRetentionService:
             urls.extend(
                 [completion.photo_path, completion.video_path, completion.audio_path]
             )
+            urls.extend(attachment_urls(getattr(completion, "completion_attachments", None)))
         return [u for u in urls if u and u not in protected]
 
     def delete_stored_media(self, occurrence_id: str) -> list[str]:

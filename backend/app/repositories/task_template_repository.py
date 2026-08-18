@@ -67,6 +67,15 @@ class TaskTemplateRepository:
         rows = self._db.execute(q).scalars().all()
         return [t for row in rows if (t := mp.task_template_orm_to_domain(row))]
 
+    def list_by_network_group(self, network_group_id: str) -> list[TaskTemplate]:
+        try:
+            gid = mp.parse_uuid(network_group_id)
+        except ValueError:
+            return []
+        q = select(orm.TaskTemplate).where(orm.TaskTemplate.network_group_id == gid)
+        rows = self._db.execute(q).scalars().all()
+        return [t for row in rows if (t := mp.task_template_orm_to_domain(row))]
+
     def create(
         self,
         *,
@@ -88,6 +97,10 @@ class TaskTemplateRepository:
         biweekly_anchor: datetime | None = None,
         source_gallery_item_id: str | None = None,
         ops_category: str | None = None,
+        min_video_seconds: int | None = None,
+        completion_requirements: list | None = None,
+        is_work_start: bool = False,
+        network_group_id: str | None = None,
     ) -> TaskTemplate:
         import uuid
 
@@ -104,6 +117,10 @@ class TaskTemplateRepository:
             department_id=mp.parse_uuid(department_id) if department_id else None,
             task_kind=task_kind,
             ops_category=ops_category,
+            min_video_seconds=min_video_seconds,
+            completion_requirements=completion_requirements,
+            is_work_start=bool(is_work_start),
+            network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             photo_required=photo_required,
             reference_photo_url=(reference_photo_url or "").strip() or None,
             reference_video_url=(reference_video_url or "").strip() or None,
@@ -137,6 +154,12 @@ class TaskTemplateRepository:
         reference_audio_url: str | None = None,
         ops_category: str | None = None,
         update_ops_category: bool = False,
+        min_video_seconds: int | None = None,
+        update_min_video_seconds: bool = False,
+        completion_requirements: list | None = None,
+        update_completion_requirements: bool = False,
+        photo_required: bool | None = None,
+        is_work_start: bool | None = None,
     ) -> TaskTemplate | None:
         row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
         if not row:
@@ -150,6 +173,14 @@ class TaskTemplateRepository:
         row.is_active = is_active
         if update_ops_category:
             row.ops_category = ops_category
+        if update_min_video_seconds:
+            row.min_video_seconds = min_video_seconds
+        if update_completion_requirements:
+            row.completion_requirements = completion_requirements
+        if photo_required is not None:
+            row.photo_required = bool(photo_required)
+        if is_work_start is not None:
+            row.is_work_start = bool(is_work_start)
         if reference_photo_url is not None:
             row.reference_photo_url = reference_photo_url.strip() or None
         if reference_video_url is not None:
@@ -158,3 +189,11 @@ class TaskTemplateRepository:
             row.reference_audio_url = reference_audio_url.strip() or None
         self._db.flush()
         return mp.task_template_orm_to_domain(row)
+
+    def delete(self, id_: str) -> bool:
+        row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
+        if not row:
+            return False
+        self._db.delete(row)
+        self._db.flush()
+        return True

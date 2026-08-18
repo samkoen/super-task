@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveTaskReferenceMedia } from "./TaskReferenceMediaEditor";
+import {
+  referenceAudioPlaybackSrc,
+  resolveTaskReferenceMedia,
+} from "./TaskReferenceMediaEditor";
 
 vi.mock("../../services/taskService", () => ({
   taskService: {
@@ -36,5 +39,24 @@ describe("resolveTaskReferenceMedia", () => {
     expect(taskService.uploadPhoto).not.toHaveBeenCalled();
     expect(resolved.reference_photo_url).toBe("https://blob.example/existing.jpg");
     expect(resolved.reference_audio_url).toBe("/uploads/task_audio/a.webm");
+  });
+});
+
+describe("referenceAudioPlaybackSrc", () => {
+  it("prefers the local blob preview over the remote blob URL", () => {
+    expect(
+      referenceAudioPlaybackSrc({
+        reference_audio_url: "https://x.private.blob.vercel-storage.com/task_audio/a.webm",
+        pending_audio_preview: "blob:http://localhost/audio",
+      }),
+    ).toBe("blob:http://localhost/audio");
+  });
+
+  it("returns null when there is no audio", () => {
+    expect(
+      referenceAudioPlaybackSrc({
+        reference_audio_url: "",
+      }),
+    ).toBeNull();
   });
 });

@@ -87,6 +87,26 @@ def test_employee_card_merges_blob_media_from_template():
     tpl_repo.find_by_id.assert_called_once_with("tpl-1")
 
 
+def test_employee_card_fills_empty_description_from_template():
+    occ_repo = MagicMock()
+    occ_repo.get_department_name.return_value = None
+    tpl_repo = MagicMock()
+    tpl_repo.find_by_id.return_value = _tpl(description="תמלול קבוע")
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+
+    svc = DashboardService(
+        occ_repo,
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        completion_repo,
+        template_repo=tpl_repo,
+    )
+    card = svc._employee_task_card(_occ(description=""))
+    assert card["description"] == "תמלול קבוע"
+
+
 def test_employee_card_without_template_keeps_occurrence_blob_urls():
     occ_repo = MagicMock()
     occ_repo.get_department_name.return_value = None

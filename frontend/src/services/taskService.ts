@@ -1,8 +1,16 @@
 import api from "./api";
+import type { CompletionAttachment, CompletionRequirement } from "../utils/completionMedia";
 
 export type TaskRecurrence = "daily" | "weekly" | "biweekly" | "monthly";
 export type TaskKind = "fixed" | "ad_hoc";
-export type OpsCategory = "cleaning" | "fronts_signage" | "orders";
+export type OpsCategory = "cleaning" | "fronts_signage" | "orders" | "info_collection";
+
+export const OPS_CATEGORIES: OpsCategory[] = [
+  "cleaning",
+  "fronts_signage",
+  "orders",
+  "info_collection",
+];
 export type TaskStatus =
   | "pending"
   | "in_progress"
@@ -46,6 +54,11 @@ export interface TaskTemplate {
   task_kind: TaskKind;
   ops_category?: OpsCategory | null;
   photo_required: boolean;
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  is_work_start?: boolean;
+  network_group_id?: string | null;
+  is_network_task?: boolean;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
@@ -70,6 +83,10 @@ export interface UpdateTaskTemplatePayload {
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
   ops_category?: OpsCategory | null;
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  is_work_start?: boolean;
+  apply_to_network?: boolean;
 }
 
 export interface TaskCompletion {
@@ -80,6 +97,7 @@ export interface TaskCompletion {
   photo_path: string | null;
   video_path: string | null;
   audio_path: string | null;
+  completion_attachments?: CompletionAttachment[];
   audio_transcript?: string | null;
   audio_transcript_employee?: string | null;
   not_completed_reason: string | null;
@@ -107,6 +125,9 @@ export interface TaskOccurrence {
   ops_category?: OpsCategory | null;
   manager_user_id: string | null;
   photo_required: boolean;
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  is_work_start?: boolean;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
@@ -128,26 +149,34 @@ export interface TaskOccurrence {
   can_add_to_gallery?: boolean;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  network_group_id?: string | null;
+  is_network_task?: boolean;
 }
 
 export interface CreateTaskTemplatePayload {
-  branch_id: string;
+  branch_id?: string;
   title: string;
   description?: string;
   recurrence: TaskRecurrence;
   due_time?: string;
   weekly_days?: string;
   monthly_day?: number;
-  assignee_user_id: string;
+  assignee_user_id?: string;
   reference_photo_url?: string;
   reference_video_url?: string;
   reference_audio_url?: string;
   source_gallery_item_id?: string;
   ops_category?: OpsCategory | null;
+  /** Network manager : duplique sur tous les snifim, ou branch_ids. */
+  apply_to_network?: boolean;
+  branch_ids?: string[];
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  is_work_start?: boolean;
 }
 
 export interface CreateAdHocPayload {
-  branch_id: string;
+  branch_id?: string;
   title: string;
   description?: string;
   due_at: string;
@@ -157,6 +186,10 @@ export interface CreateAdHocPayload {
   reference_video_url?: string;
   reference_audio_url?: string;
   source_gallery_item_id?: string;
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  apply_to_network?: boolean;
+  branch_ids?: string[];
 }
 
 export interface CompleteTaskPayload {
@@ -166,6 +199,8 @@ export interface CompleteTaskPayload {
   video_path?: string;
   audio_path?: string;
   not_completed_reason?: string;
+  video_duration_seconds?: number;
+  completion_attachments?: CompletionAttachment[];
 }
 
 async function uploadTaskFile(file: File, kind: "photo" | "video" | "audio") {
@@ -193,26 +228,40 @@ export const taskService = {
   },
 
   createTemplate: async (payload: CreateTaskTemplatePayload) => {
-    const response = await api.post<{ message: string; template: TaskTemplate }>(
-      "/tasks/templates",
-      payload
-    );
+    const response = await api.post<{
+      message: string;
+      template?: TaskTemplate;
+      templates?: TaskTemplate[];
+      skipped?: { branch_id: string; branch_name: string; reason: string }[];
+    }>("/tasks/templates", payload);
     return response.data;
   },
 
   updateTemplate: async (templateId: string, payload: UpdateTaskTemplatePayload) => {
-    const response = await api.patch<{ message: string; template: TaskTemplate }>(
+    const response = await api.patch<{
+      message: string;
+      template: TaskTemplate;
+      updated_count?: number;
+    }>(`/tasks/templates/${templateId}`, payload);
+    return response.data;
+  },
+
+  deleteTemplate: async (templateId: string, applyToNetwork = false) => {
+    const params = applyToNetwork ? { apply_to_network: true } : undefined;
+    const response = await api.delete<{ message: string; deleted_count: number }>(
       `/tasks/templates/${templateId}`,
-      payload,
+      { params },
     );
     return response.data;
   },
 
   createAdHoc: async (payload: CreateAdHocPayload) => {
-    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
-      "/tasks/ad-hoc",
-      payload
-    );
+    const response = await api.post<{
+      message: string;
+      occurrence?: TaskOccurrence;
+      occurrences?: TaskOccurrence[];
+      skipped?: { branch_id: string; branch_name: string; reason: string }[];
+    }>("/tasks/ad-hoc", payload);
     return response.data;
   },
 
@@ -319,12 +368,14 @@ export const taskService = {
     return response.data;
   },
 
-  cancel: async (occurrenceId: string) => {
+  cancel: async (occurrenceId: string, applyToNetwork = false) => {
+    const params = applyToNetwork ? { apply_to_network: true } : undefined;
     const response = await api.post<{
       message: string;
       occurrence: TaskOccurrence;
       deleted?: boolean;
-    }>(`/tasks/occurrences/${occurrenceId}/cancel`);
+      deleted_count?: number;
+    }>(`/tasks/occurrences/${occurrenceId}/cancel`, undefined, { params });
     return response.data;
   },
 
@@ -336,12 +387,19 @@ export const taskService = {
       due_at: string;
       assignee_user_id?: string;
       photo_required?: boolean;
+      min_video_seconds?: number | null;
+      completion_requirements?: CompletionRequirement[];
       reference_photo_url?: string | null;
       reference_video_url?: string | null;
       reference_audio_url?: string | null;
+      apply_to_network?: boolean;
     }
   ) => {
-    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+    const response = await api.post<{
+      message: string;
+      occurrence: TaskOccurrence;
+      updated_count?: number;
+    }>(
       `/tasks/occurrences/${occurrenceId}/update`,
       payload
     );

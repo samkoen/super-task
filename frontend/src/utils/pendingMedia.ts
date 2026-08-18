@@ -3,10 +3,14 @@
 export type PendingMedia = {
   file: File;
   previewUrl: string;
+  durationSeconds?: number | null;
 };
 
-export function createPendingMedia(file: File): PendingMedia {
-  return { file, previewUrl: URL.createObjectURL(file) };
+export function createPendingMedia(
+  file: File,
+  durationSeconds?: number | null,
+): PendingMedia {
+  return { file, previewUrl: URL.createObjectURL(file), durationSeconds };
 }
 
 export function revokePendingMedia(media: PendingMedia | null | undefined): void {
@@ -18,9 +22,10 @@ export function revokePendingMedia(media: PendingMedia | null | undefined): void
 export function replacePendingMedia(
   previous: PendingMedia | null | undefined,
   file: File,
+  durationSeconds?: number | null,
 ): PendingMedia {
   revokePendingMedia(previous);
-  return createPendingMedia(file);
+  return createPendingMedia(file, durationSeconds);
 }
 
 export async function uploadPendingMedia(

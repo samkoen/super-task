@@ -3,9 +3,16 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
   MenuItem,
   Paper,
   TextField,
+  Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
@@ -56,6 +63,13 @@ import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
 import { isAssignToGallery } from "../../constants/taskAssignment";
+import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
+import {
+  defaultApplyAdHocEditToNetwork,
+  isNetworkAdHocOccurrence,
+  networkAdHocChipLabel,
+  networkAdHocIds,
+} from "../../utils/adHocNetworkTasks";
 import { he } from "../../i18n/he";
 
 const SAVED_FILTERS_EXPANDED_KEY = "super:saved-filters:manager_tasks:expanded";
@@ -89,6 +103,9 @@ export default function ManagerTasksPage() {
   const [galleryAssignItem, setGalleryAssignItem] = useState<TaskGalleryItem | null>(null);
   const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
+  const [deleting, setDeleting] = useState<TaskOccurrence | null>(null);
+  const [deleteAllBranches, setDeleteAllBranches] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("");
@@ -116,8 +133,9 @@ export default function ManagerTasksPage() {
 
   const displayedOccurrences = useMemo(
     () => filterManagerTaskOccurrences(occurrences, { employeeId: filterEmployee, status: filterStatus }),
-    [occurrences, filterEmployee, filterStatus]
+    [occurrences, filterEmployee, filterStatus],
   );
+  const networkIds = useMemo(() => networkAdHocIds(occurrences), [occurrences]);
 
   const hasListFilters = Boolean(filterEmployee || filterStatus || filterBranch);
 
@@ -351,7 +369,7 @@ export default function ManagerTasksPage() {
       }
       if (payload.task_kind === "fixed") {
         const res = await taskService.createTemplate({
-          branch_id: payload.branch_id,
+          ...groupedCreateApiFields(payload),
           title,
           description: payload.description,
           recurrence: payload.recurrence,
@@ -361,30 +379,43 @@ export default function ManagerTasksPage() {
               ? payload.weekly_days
               : undefined,
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
-          assignee_user_id: payload.assignee_user_id,
           ops_category: payload.ops_category,
+          min_video_seconds: payload.min_video_seconds,
+          completion_requirements: payload.completion_requirements,
+          is_work_start: payload.is_work_start,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);
         setFormOpen(false);
         setFormMedia(EMPTY_REFERENCE_MEDIA);
         setFormPrefill(undefined);
-        showSuccess(res.message);
+        const createdCount = res.templates?.length ?? (res.template ? 1 : 0);
+        showSuccess(
+          payload.apply_to_network
+            ? he.managerFixedTasksCreatedNetwork(createdCount)
+            : res.message,
+        );
       } else {
         const res = await taskService.createAdHoc({
-          branch_id: payload.branch_id,
+          ...groupedCreateApiFields(payload),
           title,
           description: payload.description,
           due_at: new Date(payload.due_at).toISOString(),
-          assignee_user_id: payload.assignee_user_id,
           photo_required: true,
+          min_video_seconds: payload.min_video_seconds,
+          completion_requirements: payload.completion_requirements,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);
         setFormOpen(false);
         setFormMedia(EMPTY_REFERENCE_MEDIA);
         setFormPrefill(undefined);
-        showSuccess(res.message);
+        const createdCount = res.occurrences?.length ?? (res.occurrence ? 1 : 0);
+        showSuccess(
+          payload.apply_to_network
+            ? he.managerAdHocCreatedNetwork(createdCount)
+            : res.message,
+        );
       }
       await load();
     } catch (e) {
@@ -447,12 +478,33 @@ export default function ManagerTasksPage() {
     }
   };
 
-  const handleCancel = async (task: TaskOccurrence) => {
+  const handleCancel = (task: TaskOccurrence) => {
+    if (canPickBranch && isNetworkAdHocOccurrence(task, networkIds)) {
+      setDeleting(task);
+      setDeleteAllBranches(defaultApplyAdHocEditToNetwork(task, canPickBranch, networkIds));
+      return;
+    }
+    void confirmCancel(task, false);
+  };
+
+  const confirmCancel = async (task: TaskOccurrence, applyToNetwork: boolean) => {
     try {
-      await taskService.cancel(task.id);
+      const res = await taskService.cancel(task.id, applyToNetwork);
+      showSuccess(he.managerAdHocDeletedNetwork(res.deleted_count ?? 1));
       await load();
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleting) return;
+    setDeleteSaving(true);
+    try {
+      await confirmCancel(deleting, deleteAllBranches);
+      setDeleting(null);
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -619,6 +671,9 @@ export default function ManagerTasksPage() {
           onReview={canManageTasks ? setReviewTarget : undefined}
           onSetManagerNext={canManageTasks ? handleSetManagerNext : undefined}
           onChatUpdated={canManageTasks ? () => void load(true) : undefined}
+          networkChipFor={(task) =>
+            networkAdHocChipLabel(task, displayedOccurrences, branches.length)
+          }
         />
       ) : (
         <TaskOccurrenceGrid
@@ -631,6 +686,9 @@ export default function ManagerTasksPage() {
           onReview={canManageTasks ? setReviewTarget : undefined}
           onSetManagerNext={canManageTasks ? handleSetManagerNext : undefined}
           onChatUpdated={canManageTasks ? () => void load(true) : undefined}
+          networkChipFor={(task) =>
+            networkAdHocChipLabel(task, displayedOccurrences, branches.length)
+          }
         />
       )}
 
@@ -706,6 +764,42 @@ export default function ManagerTasksPage() {
           void load(true);
         }}
       />
+
+      <Dialog
+        open={Boolean(deleting)}
+        onClose={() => !deleteSaving && setDeleting(null)}
+        fullWidth
+        maxWidth="xs"
+        dir="rtl"
+      >
+        <DialogTitle>{he.managerAdHocDelete}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
+          <Typography>{he.managerAdHocDeleteConfirm}</Typography>
+          {deleting && canPickBranch && isNetworkAdHocOccurrence(deleting, networkIds) && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteAllBranches}
+                  onChange={(e) => setDeleteAllBranches(e.target.checked)}
+                  disabled={deleteSaving}
+                />
+              }
+              label={he.managerFixedTasksDeleteAllBranches}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleting(null)} disabled={deleteSaving}>{he.cancel}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void handleConfirmDelete()}
+            disabled={deleteSaving}
+          >
+            {he.taskDeleteConfirm}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -15,7 +15,7 @@ from app.domain.reference_audio_transcription import (
     build_reference_audio_transcription_prompt,
 )
 from app.services import blob_storage
-from app.services.ai.gemini_client import GeminiError, generate_from_audio
+from app.services.ai.gemini_client import generate_from_audio
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ async def transcribe_audio_url(
             prompt,
             system_instruction=system_instruction,
         )
-    except GeminiError as exc:
+    except Exception as exc:
         logger.warning("%s transcription failed: %s", log_label, exc)
         return None
     text = (raw or "").strip()

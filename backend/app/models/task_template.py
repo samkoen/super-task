@@ -25,6 +25,10 @@ class TaskTemplate:
     updated_at: str
     source_gallery_item_id: str | None = None
     ops_category: str | None = None
+    min_video_seconds: int | None = None
+    completion_requirements: list | None = None
+    is_work_start: bool = False
+    network_group_id: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -40,6 +44,10 @@ class TaskTemplate:
             "department_id": self.department_id,
             "task_kind": self.task_kind,
             "ops_category": self.ops_category,
+            "min_video_seconds": self.min_video_seconds,
+            "completion_requirements": self.completion_requirements or [],
+            "is_work_start": self.is_work_start,
+            "network_group_id": self.network_group_id,
             "photo_required": self.photo_required,
             "reference_photo_url": self.reference_photo_url,
             "reference_video_url": self.reference_video_url,

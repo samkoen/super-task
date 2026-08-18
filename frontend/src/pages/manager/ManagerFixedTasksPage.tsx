@@ -7,6 +7,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Checkbox,
   FormControlLabel,
   IconButton,
   MenuItem,
@@ -25,6 +26,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import RepeatIcon from "@mui/icons-material/Repeat";
 import { ApiError } from "../../services/api";
@@ -36,6 +38,7 @@ import {
   type TaskTemplate,
 } from "../../services/taskService";
 import { userService } from "../../services/userService";
+import CompletionRequirementsEditor from "../../components/tasks/CompletionRequirementsEditor";
 import NewTaskFormDialog, {
   type NewTaskFormSubmitPayload,
 } from "../../components/tasks/NewTaskFormDialog";
@@ -54,10 +57,17 @@ import {
   formatTemplateSchedule,
   opsCategoryLabel,
   sortFixedTemplates,
+  defaultApplyEditToNetwork,
+  isNetworkFixedTemplate,
+  networkFixedChipLabel,
+  networkFixedTemplateIds,
   type FixedTemplateFilter,
 } from "../../utils/fixedTaskTemplates";
+import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { he } from "../../i18n/he";
+import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
 
 const WEEKDAYS = [
   { value: "0", label: he.weekdayMon },
@@ -77,6 +87,9 @@ type EditForm = {
   assignee_user_id: string;
   is_active: boolean;
   ops_category: OpsCategory | "";
+  completion_requirements: CompletionRequirement[];
+  is_work_start: boolean;
+  apply_to_network: boolean;
 };
 
 export default function ManagerFixedTasksPage() {
@@ -98,6 +111,9 @@ export default function ManagerFixedTasksPage() {
     reference_audio_url: "",
   });
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<TaskTemplate | null>(null);
+  const [deleteAllBranches, setDeleteAllBranches] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   const canPickBranch = user?.role === "network_manager" || user?.role === "admin";
   const isBranchManager = user?.role === "branch_manager";
@@ -129,6 +145,7 @@ export default function ManagerFixedTasksPage() {
     () => sortFixedTemplates(filterFixedTemplates(templates, filter)),
     [templates, filter],
   );
+  const networkIds = useMemo(() => networkFixedTemplateIds(templates), [templates]);
 
   const openEdit = (tpl: TaskTemplate) => {
     setEditing(tpl);
@@ -140,6 +157,9 @@ export default function ManagerFixedTasksPage() {
       assignee_user_id: tpl.assignee_user_id ?? "",
       is_active: tpl.is_active,
       ops_category: tpl.ops_category ?? "",
+      completion_requirements: effectiveRequirements(tpl),
+      is_work_start: Boolean(tpl.is_work_start),
+      apply_to_network: defaultApplyEditToNetwork(tpl, canPickBranch, networkIds),
     });
     setEditMedia({
       reference_photo_url: tpl.reference_photo_url ?? "",
@@ -152,26 +172,53 @@ export default function ManagerFixedTasksPage() {
     setCreateSaving(true);
     try {
       const media = await resolveTaskReferenceMedia(payload.media);
-      await taskService.createTemplate({
-        branch_id: payload.branch_id,
+      const res = await taskService.createTemplate({
+        ...groupedCreateApiFields(payload),
         title: payload.title,
         description: payload.description,
         recurrence: payload.recurrence,
         due_time: payload.due_time,
         weekly_days: payload.weekly_days,
         monthly_day: payload.monthly_day,
-        assignee_user_id: payload.assignee_user_id,
         ops_category: payload.ops_category,
+        completion_requirements: payload.completion_requirements,
+        is_work_start: payload.is_work_start,
         ...media,
       });
       setCreateOpen(false);
-      showSuccess(he.managerFixedTasksCreated);
+      const createdCount = res.templates?.length ?? (res.template ? 1 : 0);
+      showSuccess(
+        payload.apply_to_network
+          ? he.managerFixedTasksCreatedNetwork(createdCount)
+          : he.managerFixedTasksCreated,
+      );
       await load();
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
       throw e;
     } finally {
       setCreateSaving(false);
+    }
+  };
+
+  const handleEditTranscript = async (transcript: string) => {
+    if (!editForm) return;
+    try {
+      const applied = await applyReferenceTranscript({
+        transcript,
+        currentTitle: editForm.title,
+        currentDescription: editForm.description,
+        currentAssigneeId: editForm.assignee_user_id,
+        employees: employees.map((u) => ({ id: u.id, full_name: u.full_name })),
+        lockAssignee: true,
+      });
+      setEditForm((f) =>
+        f
+          ? { ...f, title: applied.title, description: applied.description }
+          : f,
+      );
+    } catch {
+      /* keep current fields if title AI fails */
     }
   };
 
@@ -184,7 +231,7 @@ export default function ManagerFixedTasksPage() {
     setSaving(true);
     try {
       const media = await resolveTaskReferenceMedia(editMedia);
-      await taskService.updateTemplate(editing.id, {
+      const res = await taskService.updateTemplate(editing.id, {
         title: editForm.title,
         description: editForm.description,
         due_time: editForm.due_time,
@@ -196,16 +243,41 @@ export default function ManagerFixedTasksPage() {
         department_id: editing.department_id,
         is_active: editForm.is_active,
         ops_category: editForm.ops_category || null,
+        completion_requirements: editForm.completion_requirements,
+        is_work_start: editForm.is_work_start,
+        apply_to_network: editForm.apply_to_network,
         ...media,
       });
       setEditing(null);
       setEditForm(null);
-      showSuccess(he.managerFixedTasksSaved);
+      showSuccess(he.managerFixedTasksSavedNetwork(res.updated_count ?? 1));
       await load();
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openDelete = (tpl: TaskTemplate) => {
+    setDeleting(tpl);
+    setDeleteAllBranches(defaultApplyEditToNetwork(tpl, canPickBranch, networkIds));
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleting) return;
+    setDeleteSaving(true);
+    try {
+      const res = await taskService.deleteTemplate(deleting.id, deleteAllBranches);
+      setDeleting(null);
+      setEditing(null);
+      setEditForm(null);
+      showSuccess(he.managerFixedTasksDeletedNetwork(res.deleted_count ?? 1));
+      await load();
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -220,6 +292,8 @@ export default function ManagerFixedTasksPage() {
         department_id: tpl.department_id,
         is_active: !tpl.is_active,
         ops_category: tpl.ops_category ?? null,
+        completion_requirements: effectiveRequirements(tpl),
+        is_work_start: Boolean(tpl.is_work_start),
         reference_photo_url: tpl.reference_photo_url,
         reference_video_url: tpl.reference_video_url,
         reference_audio_url: tpl.reference_audio_url,
@@ -306,7 +380,16 @@ export default function ManagerFixedTasksPage() {
               {rows.map((tpl) => (
                 <TableRow key={tpl.id} hover>
                   <TableCell>
-                    <Typography fontWeight={700}>{tpl.title}</Typography>
+                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                      <Typography fontWeight={700}>{tpl.title}</Typography>
+                      {isNetworkFixedTemplate(tpl, networkIds) && (
+                        <Chip
+                          size="small"
+                          color="info"
+                          label={networkFixedChipLabel(tpl, templates, branches.length)}
+                        />
+                      )}
+                    </Box>
                     {tpl.branch_name && (
                       <Typography variant="caption" color="text.secondary" display="block">
                         {tpl.branch_name}
@@ -332,6 +415,11 @@ export default function ManagerFixedTasksPage() {
                     <Tooltip title={he.edit}>
                       <IconButton size="small" onClick={() => openEdit(tpl)}>
                         <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={he.managerFixedTasksDelete}>
+                      <IconButton size="small" onClick={() => openDelete(tpl)}>
+                        <DeleteOutlineIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title={he.managerFixedTasksToggleActive}>
@@ -435,10 +523,48 @@ export default function ManagerFixedTasksPage() {
               fullWidth
             >
               <MenuItem value="">{he.opsCategoryNone}</MenuItem>
-              <MenuItem value="cleaning">{he.opsCategoryLabels.cleaning}</MenuItem>
-              <MenuItem value="fronts_signage">{he.opsCategoryLabels.fronts_signage}</MenuItem>
-              <MenuItem value="orders">{he.opsCategoryLabels.orders}</MenuItem>
+              {(
+                ["cleaning", "fronts_signage", "orders", "info_collection"] as OpsCategory[]
+              ).map((key) => (
+                <MenuItem key={key} value={key}>
+                  {he.opsCategoryLabels[key]}
+                </MenuItem>
+              ))}
             </TextField>
+            <CompletionRequirementsEditor
+              value={editForm.completion_requirements}
+              onChange={(completion_requirements) =>
+                setEditForm({ ...editForm, completion_requirements })
+              }
+              disabled={saving}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editForm.is_work_start}
+                  onChange={(e) => setEditForm({ ...editForm, is_work_start: e.target.checked })}
+                />
+              }
+              label={he.workStartTask}
+            />
+            {canPickBranch && isNetworkFixedTemplate(editing, networkIds) && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={editForm.apply_to_network}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, apply_to_network: e.target.checked })
+                    }
+                  />
+                }
+                label={he.fixedTaskUpdateAllBranches}
+              />
+            )}
+            {canPickBranch && isNetworkFixedTemplate(editing, networkIds) && editForm.apply_to_network && (
+              <Typography variant="caption" color="text.secondary">
+                {he.fixedTaskUpdateAllBranchesHint}
+              </Typography>
+            )}
             <FormControlLabel
               control={
                 <Switch
@@ -451,15 +577,61 @@ export default function ManagerFixedTasksPage() {
             <TaskReferenceMediaEditor
               value={editMedia}
               onChange={setEditMedia}
+              onDescriptionAppend={(transcript) => {
+                void handleEditTranscript(transcript);
+              }}
               disabled={saving}
               onError={showError}
             />
           </DialogContent>
         )}
         <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            color="error"
+            onClick={() => editing && openDelete(editing)}
+            disabled={saving}
+          >
+            {he.managerFixedTasksDelete}
+          </Button>
           <Button onClick={() => setEditing(null)} disabled={saving}>{he.cancel}</Button>
           <Button variant="contained" onClick={() => void handleSaveEdit()} disabled={saving}>
             {he.submit}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleting)}
+        onClose={() => !deleteSaving && setDeleting(null)}
+        fullWidth
+        maxWidth="xs"
+        dir="rtl"
+      >
+        <DialogTitle>{he.managerFixedTasksDelete}</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
+          <Typography>{he.managerFixedTasksDeleteConfirm}</Typography>
+          {deleting && canPickBranch && isNetworkFixedTemplate(deleting, networkIds) && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={deleteAllBranches}
+                  onChange={(e) => setDeleteAllBranches(e.target.checked)}
+                  disabled={deleteSaving}
+                />
+              }
+              label={he.managerFixedTasksDeleteAllBranches}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleting(null)} disabled={deleteSaving}>{he.cancel}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void handleConfirmDelete()}
+            disabled={deleteSaving}
+          >
+            {he.taskDeleteConfirm}
           </Button>
         </DialogActions>
       </Dialog>

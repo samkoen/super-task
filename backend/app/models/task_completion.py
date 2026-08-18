@@ -19,6 +19,7 @@ class TaskCompletion:
     manager_reviewed_by_id: str | None = None
     manager_reviewed_at: str | None = None
     rejection_note: str | None = None
+    completion_attachments: list | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -29,6 +30,7 @@ class TaskCompletion:
             "photo_path": self.photo_path,
             "video_path": self.video_path,
             "audio_path": self.audio_path,
+            "completion_attachments": self.completion_attachments or [],
             "audio_transcript": self.audio_transcript,
             "audio_transcript_employee": self.audio_transcript_employee,
             "not_completed_reason": self.not_completed_reason,

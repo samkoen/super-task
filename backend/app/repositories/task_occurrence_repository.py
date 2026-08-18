@@ -85,6 +85,37 @@ class TaskOccurrenceRepository:
         rows = self._db.execute(q).scalars().all()
         return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
 
+    def list_by_network_group(self, network_group_id: str) -> list[TaskOccurrence]:
+        try:
+            gid = mp.parse_uuid(network_group_id)
+        except ValueError:
+            return []
+        q = select(orm.TaskOccurrence).where(orm.TaskOccurrence.network_group_id == gid)
+        rows = self._db.execute(q).scalars().all()
+        return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
+
+    def list_by_template_id(self, template_id: str) -> list[TaskOccurrence]:
+        try:
+            tid = mp.parse_uuid(template_id)
+        except ValueError:
+            return []
+        q = select(orm.TaskOccurrence).where(orm.TaskOccurrence.template_id == tid)
+        rows = self._db.execute(q).scalars().all()
+        return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
+
+    def clear_template_id(self, template_id: str) -> int:
+        try:
+            tid = mp.parse_uuid(template_id)
+        except ValueError:
+            return 0
+        result = self._db.execute(
+            update(orm.TaskOccurrence)
+            .where(orm.TaskOccurrence.template_id == tid)
+            .values(template_id=None)
+        )
+        self._db.flush()
+        return int(result.rowcount or 0)
+
     def create(
         self,
         *,
@@ -105,6 +136,10 @@ class TaskOccurrenceRepository:
         created_by_id: str | None = None,
         source_gallery_item_id: str | None = None,
         ops_category: str | None = None,
+        min_video_seconds: int | None = None,
+        completion_requirements: list | None = None,
+        is_work_start: bool = False,
+        network_group_id: str | None = None,
     ) -> TaskOccurrence:
         import uuid
 
@@ -121,6 +156,10 @@ class TaskOccurrenceRepository:
             department_id=mp.parse_uuid(department_id) if department_id else None,
             task_kind=task_kind,
             ops_category=ops_category,
+            min_video_seconds=min_video_seconds,
+            completion_requirements=completion_requirements,
+            is_work_start=bool(is_work_start),
+            network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             manager_user_id=mp.parse_uuid(manager_user_id) if manager_user_id else None,
             photo_required=photo_required,
             reference_photo_url=(reference_photo_url or "").strip() or None,
@@ -202,6 +241,17 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
+    def update_title_description(
+        self, id_: str, *, title: str, description: str
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.title = title.strip()
+        row.description = description.strip()
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
     def update_details(
         self,
         id_: str,
@@ -217,6 +267,10 @@ class TaskOccurrenceRepository:
         update_reference_photo: bool = False,
         update_reference_video: bool = False,
         update_reference_audio: bool = False,
+        min_video_seconds: int | None = None,
+        update_min_video_seconds: bool = False,
+        completion_requirements: list | None = None,
+        update_completion_requirements: bool = False,
     ) -> TaskOccurrence | None:
         row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
         if not row:
@@ -227,6 +281,10 @@ class TaskOccurrenceRepository:
         row.assignee_user_id = mp.parse_uuid(assignee_user_id) if assignee_user_id else None
         if photo_required is not None:
             row.photo_required = photo_required
+        if update_min_video_seconds:
+            row.min_video_seconds = min_video_seconds
+        if update_completion_requirements:
+            row.completion_requirements = completion_requirements
         if update_reference_photo:
             row.reference_photo_url = (reference_photo_url or "").strip() or None
         if update_reference_video:

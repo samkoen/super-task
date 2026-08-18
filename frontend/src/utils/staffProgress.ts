@@ -68,11 +68,21 @@ export function computeStaffSegments(tasks: TimelineTask[]): StaffSegments {
   return segments;
 }
 
-/** Arrivée = début de la 1ʳᵉ tâche acceptée (started_at le plus tôt). */
+/** Arrivée = tâche שעון נוכחות fermée (started_at), sinon plus tôt started_at. */
 export function computeArrivedAt(tasks: TimelineTask[]): string | null {
+  const flagged = tasks.filter((t) => t.is_work_start);
+  const pool = flagged.length
+    ? flagged.filter(
+        (t) =>
+          t.status === "completed" ||
+          t.status === "pending_review" ||
+          t.segment === "completed" ||
+          t.segment === "pending_review",
+      )
+    : tasks;
   let earliest: string | null = null;
   let earliestMs = Number.POSITIVE_INFINITY;
-  for (const task of tasks) {
+  for (const task of pool) {
     if (!task.started_at) continue;
     const ms = new Date(task.started_at).getTime();
     if (Number.isNaN(ms) || ms >= earliestMs) continue;

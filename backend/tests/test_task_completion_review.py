@@ -241,3 +241,54 @@ def test_employee_cannot_complete_while_pending_review():
         asyncio.run(
             svc.complete_occurrence(actor, "occ-1", completion_status=task_status.COMPLETION_DONE)
         )
+
+
+def test_employee_complete_requires_min_video_duration():
+    occurrence = _occurrence(min_video_seconds=8)
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    svc = _service(occurrence_repo, MagicMock())
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+
+    with pytest.raises(ValueError, match="8"):
+        asyncio.run(
+            svc.complete_occurrence(
+                actor,
+                "occ-1",
+                completion_status=task_status.COMPLETION_DONE,
+                photo_path="/uploads/p.jpg",
+                video_path="/uploads/v.mp4",
+                video_duration_seconds=3,
+            )
+        )
+
+
+def test_employee_complete_requires_each_listed_video():
+    occurrence = _occurrence(
+        completion_requirements=[
+            {"kind": "video", "min_seconds": 8},
+            {"kind": "video", "min_seconds": 5},
+        ]
+    )
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    svc = _service(occurrence_repo, MagicMock())
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+
+    with pytest.raises(ValueError, match="וידאו"):
+        asyncio.run(
+            svc.complete_occurrence(
+                actor,
+                "occ-1",
+                completion_status=task_status.COMPLETION_DONE,
+                completion_attachments=[
+                    {"kind": "video", "url": "/uploads/v1.mp4", "duration_seconds": 9},
+                ],
+            )
+        )

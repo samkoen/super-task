@@ -66,6 +66,22 @@ def test_merge_occurrence_reference_media_fills_missing_from_template():
     assert merged.reference_audio_url == "/uploads/task_audio/tpl.webm"
 
 
+def test_merge_fills_empty_description_from_template():
+    merged = merge_occurrence_reference_media(
+        _occurrence(description=""),
+        _template(description="תמלול מהמנהל"),
+    )
+    assert merged.description == "תמלול מהמנהל"
+
+
+def test_merge_keeps_occurrence_description():
+    merged = merge_occurrence_reference_media(
+        _occurrence(description="טקסט על המופע"),
+        _template(description="תבנית"),
+    )
+    assert merged.description == "טקסט על המופע"
+
+
 def test_merge_occurrence_reference_media_keeps_occurrence_values():
     merged = merge_occurrence_reference_media(
         _occurrence(reference_photo_url="/uploads/task_photos/occ.jpg"),

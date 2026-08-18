@@ -308,6 +308,7 @@ export default function TaskChatPanel({
               video_path={pendingVideo?.previewUrl}
               audio_path={pendingAudio?.previewUrl}
               disabled={sending}
+              transcriptFallback={false}
               onRemovePhoto={() => {
                 revokePendingMedia(pendingPhoto);
                 setPendingPhoto(null);

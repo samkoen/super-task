@@ -14,6 +14,8 @@ export interface TaskReferenceMediaValue {
   /** Fichier local — upload seulement à la soumission du formulaire. */
   pending_photo?: File | null;
   pending_video?: File | null;
+  /** Aperçu local (blob:) — le proxy média refuse l’URL Blob tant que la tâche n’est pas sauvée. */
+  pending_audio_preview?: string;
 }
 
 interface TaskReferenceMediaEditorProps {
@@ -28,6 +30,14 @@ function revokeIfBlob(url: string | undefined): void {
   if (url?.startsWith("blob:")) {
     URL.revokeObjectURL(url);
   }
+}
+
+/** Lecture locale si dispo, sinon proxy — évite un 403 juste après l’upload. */
+export function referenceAudioPlaybackSrc(
+  value: Pick<TaskReferenceMediaValue, "reference_audio_url" | "pending_audio_preview">,
+): string | null {
+  if (value.pending_audio_preview) return value.pending_audio_preview;
+  return mediaUrl(value.reference_audio_url || null);
 }
 
 /** Upload les fichiers locaux et renvoie des URLs serveur prêtes à persister. */
@@ -70,6 +80,7 @@ export default function TaskReferenceMediaEditor({
 }: TaskReferenceMediaEditorProps) {
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [transcribingAudio, setTranscribingAudio] = useState(false);
+  const [transcriptionFailed, setTranscriptionFailed] = useState(false);
 
   const handleCapture = useCallback(
     async (file: File, kind: MediaKind) => {
@@ -95,19 +106,25 @@ export default function TaskReferenceMediaEditor({
       setUploadingKind("audio");
       try {
         const res = await taskService.uploadAudio(file);
+        revokeIfBlob(value.pending_audio_preview);
+        setTranscriptionFailed(false);
         onChange({
           ...value,
           reference_audio_url: res.url,
+          pending_audio_preview: URL.createObjectURL(file),
         });
+        setUploadingKind(null);
         if (onDescriptionAppend) {
           setTranscribingAudio(true);
           try {
             const { transcript } = await aiService.transcribeReferenceAudio(res.url);
             if (transcript.trim()) {
               onDescriptionAppend(transcript);
+            } else {
+              setTranscriptionFailed(true);
             }
-          } catch (e) {
-            onError?.(e instanceof ApiError ? e.message : he.errorGeneric);
+          } catch {
+            setTranscriptionFailed(true);
           } finally {
             setTranscribingAudio(false);
           }
@@ -123,7 +140,7 @@ export default function TaskReferenceMediaEditor({
 
   const photoSrc = mediaUrl(value.reference_photo_url || null);
   const videoSrc = mediaUrl(value.reference_video_url || null);
-  const audioSrc = mediaUrl(value.reference_audio_url || null);
+  const audioSrc = referenceAudioPlaybackSrc(value);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -202,11 +219,24 @@ export default function TaskReferenceMediaEditor({
             {he.taskReferenceAudio}
           </Typography>
           <Box component="audio" src={audioSrc} controls sx={{ width: "100%", display: "block" }} />
+          {transcriptionFailed && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+              {he.audioTranscriptionFailed}
+            </Typography>
+          )}
           <Button
             size="small"
             color="inherit"
             disabled={disabled}
-            onClick={() => onChange({ ...value, reference_audio_url: "" })}
+            onClick={() => {
+              revokeIfBlob(value.pending_audio_preview);
+              setTranscriptionFailed(false);
+              onChange({
+                ...value,
+                reference_audio_url: "",
+                pending_audio_preview: undefined,
+              });
+            }}
             sx={{ mt: 0.5 }}
           >
             {he.removeMedia}

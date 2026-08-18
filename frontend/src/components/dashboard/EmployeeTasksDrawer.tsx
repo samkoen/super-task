@@ -156,6 +156,9 @@ export default function EmployeeTasksDrawer({
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
           assignee_user_id: member.user_id,
           ops_category: payload.ops_category,
+          min_video_seconds: payload.min_video_seconds,
+          completion_requirements: payload.completion_requirements,
+          is_work_start: payload.is_work_start,
           ...media,
         });
         showSuccess(res.message);
@@ -167,6 +170,8 @@ export default function EmployeeTasksDrawer({
           due_at: new Date(payload.due_at).toISOString(),
           assignee_user_id: member.user_id,
           photo_required: true,
+          min_video_seconds: payload.min_video_seconds,
+          completion_requirements: payload.completion_requirements,
           ...media,
         });
         showSuccess(res.message);

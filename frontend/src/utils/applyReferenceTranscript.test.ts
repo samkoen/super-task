@@ -60,4 +60,19 @@ describe("applyReferenceTranscript", () => {
     expect(out.assignee_user_id).toBe("");
     expect(out.assigneeMatched).toBe(false);
   });
+
+  it("appends transcript on fixed-task edit without changing assignee", async () => {
+    generateTaskTitle.mockResolvedValue({ title: "כותרת קיימת" });
+    const out = await applyReferenceTranscript({
+      transcript: "יש לנקות את המדף",
+      currentTitle: "כותרת קיימת",
+      currentDescription: "",
+      currentAssigneeId: "u2",
+      employees: team,
+      lockAssignee: true,
+    });
+    expect(out.description).toContain("יש לנקות את המדף");
+    expect(out.title).toBe("כותרת קיימת");
+    expect(out.assignee_user_id).toBe("u2");
+  });
 });

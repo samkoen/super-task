@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -208,6 +208,12 @@ class TaskTemplate(Base):
     task_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="fixed")
     ops_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     photo_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
+    completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    network_group_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True, index=True
+    )
     reference_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -257,6 +263,12 @@ class TaskOccurrence(Base):
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
     photo_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
+    completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    network_group_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True, index=True
+    )
     reference_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -320,6 +332,7 @@ class TaskCompletion(Base):
     photo_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     video_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     audio_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    completion_attachments: Mapped[list | None] = mapped_column(JSON, nullable=True)
     audio_transcript: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     audio_transcript_employee: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     not_completed_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)

@@ -3,6 +3,8 @@ import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { isAssignToGallery } from "../../constants/taskAssignment";
 import { he } from "../../i18n/he";
 import { toDatetimeLocal } from "../../utils/dateView";
+import type { CompletionRequirement } from "../../utils/completionMedia";
+import { effectiveRequirements } from "../../utils/completionMedia";
 import {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
@@ -14,6 +16,8 @@ export type OccurrenceEditForm = {
   due_at: string;
   assignee_user_id: string;
   photo_required: boolean;
+  completion_requirements: CompletionRequirement[];
+  apply_to_network: boolean;
 } & TaskReferenceMediaValue;
 
 export function emptyOccurrenceEditForm(): OccurrenceEditForm {
@@ -23,6 +27,8 @@ export function emptyOccurrenceEditForm(): OccurrenceEditForm {
     due_at: "",
     assignee_user_id: "",
     photo_required: true,
+    completion_requirements: [],
+    apply_to_network: false,
     reference_photo_url: "",
     reference_video_url: "",
     reference_audio_url: "",
@@ -38,6 +44,8 @@ export function formFromOccurrence(fresh: TaskOccurrence): OccurrenceEditForm {
     due_at: toDatetimeLocal(fresh.due_at),
     assignee_user_id: fresh.assignee_user_id ?? "",
     photo_required: fresh.photo_required,
+    completion_requirements: effectiveRequirements(fresh),
+    apply_to_network: false,
     reference_photo_url: fresh.reference_photo_url ?? "",
     reference_video_url: fresh.reference_video_url ?? "",
     reference_audio_url: fresh.reference_audio_url ?? "",
@@ -60,6 +68,8 @@ export async function saveOccurrenceEdit(
       ? target.assignee_user_id || undefined
       : form.assignee_user_id || undefined,
     photo_required: target.task_kind === "ad_hoc" ? form.photo_required : undefined,
+    completion_requirements: form.completion_requirements,
+    apply_to_network: moveToGallery ? false : form.apply_to_network,
   };
   if (mediaDirty) {
     const media = await resolveTaskReferenceMedia(form);
@@ -67,8 +77,10 @@ export async function saveOccurrenceEdit(
     payload.reference_video_url = media.reference_video_url || null;
     payload.reference_audio_url = media.reference_audio_url || null;
   }
-  await taskService.updateOccurrence(target.id, payload);
-  if (!moveToGallery) return he.taskUpdated;
+  const res = await taskService.updateOccurrence(target.id, payload);
+  if (!moveToGallery) {
+    return he.managerAdHocSavedNetwork(res.updated_count ?? 1);
+  }
   await taskGalleryService.createFromOccurrence(target.id);
   await taskService.cancel(target.id);
   return he.taskMovedToGallery;

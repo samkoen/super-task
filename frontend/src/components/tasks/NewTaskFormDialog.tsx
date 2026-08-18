@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   TextField,
   ToggleButton,
@@ -15,14 +17,20 @@ import {
 } from "@mui/material";
 import type { User } from "../../services/api";
 import type { Branch } from "../../services/branchService";
+import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
+import BranchChecklist from "./BranchChecklist";
 import TaskReferenceMediaEditor, {
   type TaskReferenceMediaValue,
 } from "./TaskReferenceMediaEditor";
 import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
-import type { OpsCategory, TaskRecurrence } from "../../services/taskService";
+import { OPS_CATEGORIES, type OpsCategory, type TaskRecurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import type { CompletionRequirement } from "../../utils/completionMedia";
+import {
+  createFieldsFromBranchSelection,
+} from "../../utils/fixedTaskCreateScope";
 
 const RECURRENCES: TaskRecurrence[] = ["daily", "weekly", "biweekly", "monthly"];
 const WEEKDAYS = [
@@ -56,6 +64,11 @@ export interface NewTaskFormSubmitPayload {
   monthly_day: number;
   media: TaskReferenceMediaValue;
   ops_category?: OpsCategory | null;
+  apply_to_network?: boolean;
+  branch_ids?: string[];
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  is_work_start?: boolean;
 }
 
 export interface NewTaskFormDialogProps {
@@ -108,6 +121,9 @@ export default function NewTaskFormDialog({
   const [weeklyDays, setWeeklyDays] = useState("0");
   const [monthlyDay, setMonthlyDay] = useState(1);
   const [opsCategory, setOpsCategory] = useState<OpsCategory | "">("");
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [completionRequirements, setCompletionRequirements] = useState<CompletionRequirement[]>([]);
+  const [isWorkStart, setIsWorkStart] = useState(false);
   const [media, setMedia] = useState<TaskReferenceMediaValue>(EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
   const wasOpenRef = useRef(false);
@@ -130,15 +146,25 @@ export default function NewTaskFormDialog({
     setWeeklyDays("0");
     setMonthlyDay(1);
     setOpsCategory("");
+    setSelectedBranchIds(defaultBranchId ? [defaultBranchId] : []);
+    setCompletionRequirements([]);
+    setIsWorkStart(false);
     setMedia(initialMedia ?? EMPTY_MEDIA);
     setLocalError("");
     // Snapshot à l'ouverture seulement
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const allBranchIds = useMemo(() => branches.map((b) => b.id), [branches]);
+  const branchScope = canPickBranch
+    ? createFieldsFromBranchSelection(selectedBranchIds, allBranchIds)
+    : { grouped: false, apply_to_network: false, branch_id: branchId };
+  const groupedCreate = branchScope.grouped;
+  const effectiveBranchId = branchScope.branch_id || branchId;
+
   const branchEmployees = useMemo(() => {
-    const base = branchId
-      ? employees.filter((u) => userBelongsToBranch(u, branchId))
+    const base = effectiveBranchId
+      ? employees.filter((u) => userBelongsToBranch(u, effectiveBranchId))
       : employees;
     if (
       assigneeUserId &&
@@ -149,10 +175,10 @@ export default function NewTaskFormDialog({
       if (hit) return [hit, ...base];
     }
     return base;
-  }, [employees, branchId, assigneeUserId]);
+  }, [employees, effectiveBranchId, assigneeUserId]);
 
   const branchName =
-    branches.find((b) => b.id === branchId)?.name || "";
+    branches.find((b) => b.id === effectiveBranchId)?.name || "";
 
   const fieldsRef = useRef({ title, description, assigneeUserId, employees, lockAssignee });
   fieldsRef.current = { title, description, assigneeUserId, employees, lockAssignee };
@@ -182,11 +208,40 @@ export default function NewTaskFormDialog({
   const toGallery = isAssignToGallery(assigneeUserId);
 
   const handleSubmit = async () => {
+    if (canPickBranch && selectedBranchIds.length < 1) {
+      setLocalError(he.fixedTaskSelectBranchesRequired);
+      return;
+    }
+    if (groupedCreate) {
+      if (taskKind === "ad_hoc" && !dueAt) {
+        return;
+      }
+      setLocalError("");
+      await onSubmit({
+        task_kind: taskKind,
+        branch_id: "",
+        title,
+        description,
+        assignee_user_id: "",
+        due_at: dueAt,
+        recurrence,
+        due_time: dueTime,
+        weekly_days: weeklyDays,
+        monthly_day: monthlyDay,
+        ops_category: opsCategory || null,
+        apply_to_network: true,
+        branch_ids: branchScope.branch_ids,
+        completion_requirements: completionRequirements,
+        is_work_start: isWorkStart,
+        media,
+      });
+      return;
+    }
     if (!assigneeUserId.trim()) {
       setLocalError(he.newTaskAssigneeRequired);
       return;
     }
-    if (!branchId.trim()) {
+    if (!effectiveBranchId.trim()) {
       setLocalError(he.taskVoiceNeedBranch);
       return;
     }
@@ -196,7 +251,7 @@ export default function NewTaskFormDialog({
     setLocalError("");
     await onSubmit({
       task_kind: taskKind,
-      branch_id: branchId,
+      branch_id: effectiveBranchId,
       title,
       description,
       assignee_user_id: assigneeUserId,
@@ -206,14 +261,18 @@ export default function NewTaskFormDialog({
       weekly_days: weeklyDays,
       monthly_day: monthlyDay,
       ops_category: taskKind === "fixed" ? opsCategory || null : null,
+      apply_to_network: false,
+      completion_requirements: completionRequirements,
+      is_work_start: taskKind === "fixed" ? isWorkStart : false,
       media,
     });
   };
 
   const canSubmit =
-    Boolean(assigneeUserId.trim()) &&
-    Boolean(branchId.trim()) &&
-    (toGallery || taskKind === "fixed" || Boolean(dueAt)) &&
+    (groupedCreate
+      ? selectedBranchIds.length > 0 && (taskKind === "fixed" || Boolean(dueAt))
+      : Boolean(assigneeUserId.trim()) && Boolean(effectiveBranchId.trim()) &&
+        (toGallery || taskKind === "fixed" || Boolean(dueAt))) &&
     !saving;
 
   return (
@@ -246,18 +305,19 @@ export default function NewTaskFormDialog({
         )}
 
         {canPickBranch && (
-          <TextField
-            select
-            label={he.branch}
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            required
-            fullWidth
-          >
-            {branches.map((s) => (
-              <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-            ))}
-          </TextField>
+          <Box>
+            <BranchChecklist
+              branches={branches}
+              selectedIds={selectedBranchIds}
+              onChange={setSelectedBranchIds}
+              disabled={saving}
+            />
+            {groupedCreate && (
+              <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
+                {he.fixedTaskApplyToNetworkHint}
+              </Typography>
+            )}
+          </Box>
         )}
 
         <TextField
@@ -276,6 +336,7 @@ export default function NewTaskFormDialog({
           fullWidth
         />
 
+        {!groupedCreate && (
         <TextField
           select
           label={he.assignee}
@@ -296,6 +357,7 @@ export default function NewTaskFormDialog({
             <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
           ))}
         </TextField>
+        )}
 
         {taskKind === "ad_hoc" && !toGallery ? (
           <TextField
@@ -365,12 +427,37 @@ export default function NewTaskFormDialog({
               fullWidth
             >
               <MenuItem value="">{he.opsCategoryNone}</MenuItem>
-              <MenuItem value="cleaning">{he.opsCategoryLabels.cleaning}</MenuItem>
-              <MenuItem value="fronts_signage">{he.opsCategoryLabels.fronts_signage}</MenuItem>
-              <MenuItem value="orders">{he.opsCategoryLabels.orders}</MenuItem>
+              {OPS_CATEGORIES.map((key) => (
+                <MenuItem key={key} value={key}>
+                  {he.opsCategoryLabels[key]}
+                </MenuItem>
+              ))}
             </TextField>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isWorkStart}
+                  onChange={(e) => setIsWorkStart(e.target.checked)}
+                  disabled={saving}
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2">{he.workStartTask}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {he.workStartTaskHint}
+                  </Typography>
+                </Box>
+              }
+            />
           </>
         ) : null}
+
+        <CompletionRequirementsEditor
+          value={completionRequirements}
+          onChange={setCompletionRequirements}
+          disabled={saving}
+        />
 
         <TaskReferenceMediaEditor
           value={media}

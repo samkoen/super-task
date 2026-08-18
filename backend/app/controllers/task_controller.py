@@ -59,6 +59,13 @@ def _sse_payload_from_create_template(item: dict) -> dict:
     }
 
 
+def _parse_optional_ids(raw: Any) -> list[str] | None:
+    if not isinstance(raw, list):
+        return None
+    ids = [str(i).strip() for i in raw if str(i).strip()]
+    return ids or None
+
+
 _UNSET = object()
 
 
@@ -105,6 +112,9 @@ def get_template_service(db: Session = Depends(get_db)) -> TaskTemplateService:
         DepartmentRepository(db),
         UserRepository(db),
         scheduler,
+        occurrence_repo=occurrence_repo,
+        completion_repo=TaskCompletionRepository(db),
+        notification_repo=NotificationRepository(db),
     )
 
 
@@ -158,6 +168,33 @@ def create_template(
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
+    if payload.get("apply_to_network"):
+        result = service.create_templates_for_network(
+            actor,
+            title=str(payload.get("title") or ""),
+            description=str(payload.get("description") or ""),
+            recurrence=str(payload.get("recurrence") or "daily"),
+            due_time=str(payload.get("due_time") or "23:59"),
+            weekly_days=payload.get("weekly_days"),
+            monthly_day=payload.get("monthly_day"),
+            reference_photo_url=payload.get("reference_photo_url"),
+            reference_video_url=payload.get("reference_video_url"),
+            reference_audio_url=payload.get("reference_audio_url"),
+            source_gallery_item_id=payload.get("source_gallery_item_id"),
+            ops_category=payload.get("ops_category"),
+            min_video_seconds=payload.get("min_video_seconds"),
+            completion_requirements=payload.get("completion_requirements"),
+            is_work_start=bool(payload.get("is_work_start")),
+            branch_ids=_parse_optional_ids(payload.get("branch_ids")),
+        )
+        for item in result["templates"]:
+            emit_item = _sse_payload_from_create_template(item)
+            _emit_task_event(db, "task_created", emit_item)
+        return {
+            "message": f"נוצרו {len(result['templates'])} משימות קבועות ברשת",
+            "templates": result["templates"],
+            "skipped": result["skipped"],
+        }
     item = service.create_template(
         actor,
         branch_id=str(payload.get("branch_id") or ""),
@@ -175,6 +212,9 @@ def create_template(
         reference_audio_url=payload.get("reference_audio_url"),
         source_gallery_item_id=payload.get("source_gallery_item_id"),
         ops_category=payload.get("ops_category"),
+        min_video_seconds=payload.get("min_video_seconds"),
+        completion_requirements=payload.get("completion_requirements"),
+        is_work_start=bool(payload.get("is_work_start")),
     )
     emit_item = _sse_payload_from_create_template(item)
     _emit_task_event(db, "task_created", emit_item)
@@ -207,8 +247,46 @@ def update_template(
         reference_audio_url=payload.get("reference_audio_url"),
         ops_category=payload.get("ops_category"),
         update_ops_category="ops_category" in payload,
+        min_video_seconds=payload.get("min_video_seconds"),
+        update_min_video_seconds="min_video_seconds" in payload,
+        completion_requirements=payload.get("completion_requirements"),
+        update_completion_requirements="completion_requirements" in payload,
+        is_work_start=payload.get("is_work_start") if "is_work_start" in payload else None,
+        apply_to_network=bool(payload.get("apply_to_network")),
     )
-    return {"message": "המשימה עודכנה", "template": item}
+    count = item.pop("updated_count", 1)
+    if bool(payload.get("apply_to_network")) and count > 1:
+        return {
+            "message": f"עודכנו {count} משימות קבועות ברשת",
+            "template": item,
+            "updated_count": count,
+        }
+    return {"message": "המשימה עודכנה", "template": item, "updated_count": count}
+
+
+@router.delete("/templates/{template_id}")
+@handle_controller_errors
+def delete_template(
+    template_id: str,
+    request: Request,
+    apply_to_network: bool = Query(False),
+    service: TaskTemplateService = Depends(get_template_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    result = service.delete_template(
+        actor, template_id, apply_to_network=apply_to_network
+    )
+    for occ in result["cancelled_occurrences"]:
+        _emit_task_event(db, "task_cancelled", occ, occurrence_id=None)
+    if not result["cancelled_occurrences"]:
+        db.commit()
+    count = result["deleted_count"]
+    if apply_to_network and count > 1:
+        message = f"נמחקו {count} משימות קבועות ברשת"
+    else:
+        message = "המשימה הקבועה נמחקה"
+    return {"message": message, "deleted_count": count}
 
 
 @router.post("/ad-hoc", status_code=201)
@@ -221,6 +299,29 @@ def create_ad_hoc_task(
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
+    if payload.get("apply_to_network"):
+        result = service.create_ad_hoc_for_network(
+            actor,
+            title=str(payload.get("title") or ""),
+            description=str(payload.get("description") or ""),
+            due_at=str(payload.get("due_at") or ""),
+            photo_required=bool(payload.get("photo_required", True)),
+            min_video_seconds=payload.get("min_video_seconds"),
+            completion_requirements=payload.get("completion_requirements"),
+            reference_photo_url=payload.get("reference_photo_url"),
+            reference_video_url=payload.get("reference_video_url"),
+            reference_audio_url=payload.get("reference_audio_url"),
+            source_gallery_item_id=payload.get("source_gallery_item_id"),
+            branch_ids=_parse_optional_ids(payload.get("branch_ids")),
+        )
+        for item in result["occurrences"]:
+            _emit_task_event(db, "task_created", item)
+        count = len(result["occurrences"])
+        return {
+            "message": f"נוצרו {count} משימות מזדמנות ברשת",
+            "occurrences": result["occurrences"],
+            "skipped": result["skipped"],
+        }
     item = service.create_ad_hoc(
         actor,
         branch_id=str(payload.get("branch_id") or ""),
@@ -229,6 +330,8 @@ def create_ad_hoc_task(
         due_at=str(payload.get("due_at") or ""),
         assignee_user_id=payload.get("assignee_user_id"),
         photo_required=bool(payload.get("photo_required", True)),
+        min_video_seconds=payload.get("min_video_seconds"),
+        completion_requirements=payload.get("completion_requirements"),
         reference_photo_url=payload.get("reference_photo_url"),
         reference_video_url=payload.get("reference_video_url"),
         reference_audio_url=payload.get("reference_audio_url"),
@@ -383,6 +486,8 @@ async def complete_occurrence(
         video_path=payload.get("video_path"),
         audio_path=payload.get("audio_path"),
         not_completed_reason=payload.get("not_completed_reason"),
+        video_duration_seconds=payload.get("video_duration_seconds"),
+        completion_attachments=payload.get("completion_attachments") or payload.get("attachments"),
     )
     _emit_task_event(db, "task_completed", item)
     return {"message": "המשימה עודכנה", "occurrence": item}
@@ -487,11 +592,23 @@ def update_occurrence(
         due_at=str(payload.get("due_at") or ""),
         assignee_user_id=payload.get("assignee_user_id"),
         photo_required=payload.get("photo_required"),
+        min_video_seconds=payload.get("min_video_seconds") if "min_video_seconds" in payload else None,
+        update_min_video_seconds="min_video_seconds" in payload,
+        completion_requirements=payload.get("completion_requirements"),
+        update_completion_requirements="completion_requirements" in payload,
+        apply_to_network=bool(payload.get("apply_to_network")),
         **ref_kwargs,
     )
+    count = item.pop("updated_count", 1)
     event_type = "task_delegated" if item.get("assignee_user_id") else "task_updated"
     _emit_task_event(db, event_type, item)
-    return {"message": "המשימה עודכנה", "occurrence": item}
+    if bool(payload.get("apply_to_network")) and count > 1:
+        return {
+            "message": f"עודכנו {count} משימות מזדמנות ברשת",
+            "occurrence": item,
+            "updated_count": count,
+        }
+    return {"message": "המשימה עודכנה", "occurrence": item, "updated_count": count}
 
 
 @router.post("/occurrences/{occurrence_id}/cancel")
@@ -499,19 +616,33 @@ def update_occurrence(
 def cancel_occurrence(
     occurrence_id: str,
     request: Request,
+    apply_to_network: bool = Query(False),
     service: TaskOccurrenceService = Depends(get_occurrence_service),
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
-    item = service.cancel_occurrence(actor, occurrence_id)
+    item = service.cancel_occurrence(
+        actor, occurrence_id, apply_to_network=apply_to_network
+    )
     media_to_delete = item.pop("_media_to_delete", []) or []
-    _emit_task_event(db, "task_cancelled", item, occurrence_id=None)
-    # Après commit : suppression storage (DB déjà cohérente).
+    snaps = item.pop("cancelled_occurrences", None) or [item]
+    for snap in snaps:
+        _emit_task_event(db, "task_cancelled", snap, occurrence_id=None)
     from app.services import blob_storage
 
     for url in media_to_delete:
         blob_storage.delete_media_url(url)
-    return {"message": "המשימה נמחקה", "occurrence": item, "deleted": True}
+    count = item.get("deleted_count", len(snaps))
+    if apply_to_network and count > 1:
+        message = f"נמחקו {count} משימות מזדמנות ברשת"
+    else:
+        message = "המשימה נמחקה"
+    return {
+        "message": message,
+        "occurrence": snaps[0],
+        "deleted": True,
+        "deleted_count": count,
+    }
 
 
 @router.post("/upload-photo")

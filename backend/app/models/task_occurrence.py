@@ -29,6 +29,10 @@ class TaskOccurrence:
     manager_next_at: str | None = None
     # Date d'ouverture (YYYY-MM-DD), immuable. due_at = exécution.
     opened_on: str | None = None
+    min_video_seconds: int | None = None
+    completion_requirements: list | None = None
+    is_work_start: bool = False
+    network_group_id: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +49,10 @@ class TaskOccurrence:
             "task_kind": self.task_kind,
             "ops_category": self.ops_category,
             "manager_user_id": self.manager_user_id,
+            "min_video_seconds": self.min_video_seconds,
+            "completion_requirements": self.completion_requirements or [],
+            "is_work_start": self.is_work_start,
+            "network_group_id": self.network_group_id,
             "photo_required": self.photo_required,
             "reference_photo_url": self.reference_photo_url,
             "reference_video_url": self.reference_video_url,

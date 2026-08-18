@@ -92,6 +92,39 @@ describe("staffProgress segments", () => {
     expect(progress.arrivedAt).toBe("2026-07-14T08:15:00+03:00");
   });
 
+  it("uses closed work-start task for clock-in", () => {
+    const tasks = [
+      task({
+        id: "other",
+        status: "in_progress",
+        segment: "in_progress",
+        started_at: "2026-07-14T07:00:00+03:00",
+      }),
+      task({
+        id: "punch",
+        status: "completed",
+        segment: "completed",
+        started_at: "2026-07-14T08:40:00+03:00",
+        is_work_start: true,
+      }),
+    ];
+    expect(computeArrivedAt(tasks)).toBe("2026-07-14T08:40:00+03:00");
+  });
+
+  it("ignores work-start task until it is closed", () => {
+    expect(
+      computeArrivedAt([
+        task({
+          id: "punch",
+          status: "in_progress",
+          segment: "in_progress",
+          started_at: "2026-07-14T08:40:00+03:00",
+          is_work_start: true,
+        }),
+      ]),
+    ).toBeNull();
+  });
+
   it("returns not arrived when no started_at", () => {
     expect(computeArrivedAt([task({ id: "1", status: "pending", segment: "upcoming" })])).toBeNull();
     expect(

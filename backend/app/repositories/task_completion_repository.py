@@ -50,6 +50,7 @@ class TaskCompletionRepository:
         not_completed_reason: str | None,
         completed_by_id: str,
         manager_review_status: str | None = None,
+        completion_attachments: list | None = None,
     ) -> TaskCompletion:
         import uuid
 
@@ -61,6 +62,7 @@ class TaskCompletionRepository:
             photo_path=photo_path,
             video_path=video_path,
             audio_path=audio_path,
+            completion_attachments=completion_attachments,
             not_completed_reason=not_completed_reason,
             completed_by_id=mp.parse_uuid(completed_by_id),
             manager_review_status=manager_review_status,
@@ -83,6 +85,7 @@ class TaskCompletionRepository:
         not_completed_reason: str | None,
         completed_by_id: str,
         manager_review_status: str | None,
+        completion_attachments: list | None = None,
     ) -> TaskCompletion | None:
         row = (
             self._db.query(orm.TaskCompletion)
@@ -96,6 +99,7 @@ class TaskCompletionRepository:
         row.photo_path = photo_path
         row.video_path = video_path
         row.audio_path = audio_path
+        row.completion_attachments = completion_attachments
         row.audio_transcript = None
         row.audio_transcript_employee = None
         row.not_completed_reason = not_completed_reason

@@ -71,3 +71,26 @@ def test_transcribe_reads_file_and_calls_gemini(monkeypatch, tmp_path: Path):
         )
     )
     assert result == "המשימה בוצעה"
+
+
+def test_transcribe_returns_none_when_gemini_raises(monkeypatch, tmp_path: Path):
+    audio_dir = tmp_path / "task_audio"
+    audio_dir.mkdir()
+    (audio_dir / "msg.webm").write_bytes(b"fake-audio")
+    monkeypatch.setattr("app.services.blob_storage.UPLOADS_DIR", tmp_path)
+    monkeypatch.setattr(
+        "app.services.completion_audio_transcription_service.is_voice_ai_configured",
+        lambda: True,
+    )
+
+    async def boom(*_args, **_kwargs):
+        raise RuntimeError("model gone")
+
+    monkeypatch.setattr(
+        "app.services.completion_audio_transcription_service.generate_from_audio",
+        boom,
+    )
+    result = asyncio.run(
+        transcribe_completion_audio("/uploads/task_audio/msg.webm", manager_language="he")
+    )
+    assert result is None

@@ -48,6 +48,16 @@ describe("StoreStatusKpiRow", () => {
             approval_pct: 0,
             open_pct: 100,
           },
+          info_collection: {
+            category: "info_collection",
+            total: 2,
+            reported: 1,
+            approved: 1,
+            remaining: 1,
+            report_pct: 50,
+            approval_pct: 50,
+            open_pct: 50,
+          },
         }}
       />,
     );
@@ -56,6 +66,7 @@ describe("StoreStatusKpiRow", () => {
     expect(screen.getByText(he.dashboardKpiCleaning)).toBeTruthy();
     expect(screen.getByText(he.dashboardKpiFronts)).toBeTruthy();
     expect(screen.getByText(he.dashboardKpiOrders)).toBeTruthy();
+    expect(screen.getByText(he.dashboardKpiInfoCollection)).toBeTruthy();
     expect(screen.getByText(he.dashboardKpiRemainingLabel)).toBeTruthy();
     expect(screen.getByText("25%")).toBeTruthy();
     expect(screen.getByText(he.dashboardKpiGoals)).toBeTruthy();

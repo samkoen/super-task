@@ -16,7 +16,8 @@ export function revokeTaskMediaBlobs(media: TaskReferenceMediaValue): void {
     media.reference_photo_url,
     media.reference_video_url,
     media.reference_audio_url,
+    media.pending_audio_preview,
   ]) {
-    if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+    if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
   }
 }

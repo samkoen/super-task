@@ -89,6 +89,7 @@ export default function TaskCompletionReviewDialog({
             photo_path={completion.photo_path}
             video_path={completion.video_path}
             audio_path={completion.audio_path}
+            attachments={completion.completion_attachments}
             audio_transcript={completion.audio_transcript}
           />
         )}

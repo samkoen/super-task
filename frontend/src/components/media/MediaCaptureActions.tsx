@@ -35,7 +35,9 @@ interface MediaCaptureActionsProps {
   disabled?: boolean;
   /** Boutons texte (défaut) ou petites icônes discrètes (chat). */
   density?: "default" | "icon";
-  onCapture: (file: File, kind: MediaKind) => void | Promise<void>;
+  minVideoSeconds?: number | null;
+  allowedKinds?: MediaKind[];
+  onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
 }
 
 function errorMessage(error: string): string {
@@ -228,14 +230,16 @@ function VideoCaptureDialog({
   open,
   uploading,
   recorder,
+  minSeconds,
   onClose,
   onCapture,
 }: {
   open: boolean;
   uploading: boolean;
   recorder: ReturnType<typeof useVideoRecorder>;
+  minSeconds: number | null;
   onClose: () => void;
-  onCapture: (file: File) => void | Promise<void>;
+  onCapture: (file: File, durationSeconds: number) => void | Promise<void>;
 }) {
   const {
     supported,
@@ -243,6 +247,7 @@ function VideoCaptureDialog({
     starting,
     recording,
     blob,
+    elapsedSeconds,
     error,
     onVideoRef,
     startPreview,
@@ -254,12 +259,16 @@ function VideoCaptureDialog({
   const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
   const onRecordedVideoRef = useRecordedVideoRef(previewUrl);
   const [confirming, setConfirming] = useState(false);
+  const tooShort = Boolean(minSeconds && elapsedSeconds < minSeconds);
 
   const handleConfirm = async () => {
-    if (!blob || blob.size === 0 || uploading || confirming) return;
+    if (!blob || blob.size === 0 || uploading || confirming || tooShort) return;
     setConfirming(true);
     try {
-      await onCapture(blobToFile(blob, `task-video-${Date.now()}.webm`, blob.type || "video/webm"));
+      await onCapture(
+        blobToFile(blob, `task-video-${Date.now()}.webm`, blob.type || "video/webm"),
+        elapsedSeconds,
+      );
       onClose();
     } finally {
       setConfirming(false);
@@ -300,7 +309,11 @@ function VideoCaptureDialog({
         {recording && (
           <Typography variant="body2" color="error.main">
             {he.mediaCaptureRecording}
+            {` · ${elapsedSeconds}${minSeconds ? ` / ${minSeconds}` : ""} ${he.secondsShort}`}
           </Typography>
+        )}
+        {hasPreview && tooShort && minSeconds && (
+          <Alert severity="warning">{he.videoTooShort(minSeconds)}</Alert>
         )}
         {hasPreview && (
           <Typography variant="body2" color="text.secondary">
@@ -340,7 +353,7 @@ function VideoCaptureDialog({
             <Button
               variant="contained"
               onClick={() => void handleConfirm()}
-              disabled={uploading || confirming}
+              disabled={uploading || confirming || tooShort}
               startIcon={uploading || confirming ? <CircularProgress size={18} color="inherit" /> : undefined}
             >
               {uploading || confirming ? he.loading : he.mediaCaptureUseRecording}
@@ -473,6 +486,8 @@ export default function MediaCaptureActions({
   uploadingKind,
   disabled = false,
   density = "default",
+  minVideoSeconds = null,
+  allowedKinds,
   onCapture,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream();
@@ -484,6 +499,10 @@ export default function MediaCaptureActions({
 
   const busy = disabled || uploadingKind !== null;
   const captureDisabled = busy || !captureSupported;
+  const kinds = allowedKinds ?? (["photo", "video", "audio"] as MediaKind[]);
+  const showPhoto = kinds.includes("photo");
+  const showVideo = kinds.includes("video");
+  const showAudio = kinds.includes("audio");
 
   const openPhotoCapture = useCallback(() => {
     setPhotoOpen(true);
@@ -511,6 +530,7 @@ export default function MediaCaptureActions({
 
   const iconActions = (
     <Box display="flex" alignItems="center" gap={0.25} sx={{ opacity: 0.75 }}>
+      {showAudio && (
       <Tooltip title={audioAdded ? he.audioAdded : he.addAudio}>
         <span>
           <IconButton
@@ -529,6 +549,8 @@ export default function MediaCaptureActions({
           </IconButton>
         </span>
       </Tooltip>
+      )}
+      {showPhoto && (
       <Tooltip title={photoAdded ? he.photoAdded : he.addPhoto}>
         <span>
           <IconButton
@@ -547,6 +569,8 @@ export default function MediaCaptureActions({
           </IconButton>
         </span>
       </Tooltip>
+      )}
+      {showVideo && (
       <Tooltip title={videoAdded ? he.videoAdded : he.addVideo}>
         <span>
           <IconButton
@@ -565,11 +589,13 @@ export default function MediaCaptureActions({
           </IconButton>
         </span>
       </Tooltip>
+      )}
     </Box>
   );
 
   const defaultActions = (
     <Box display="flex" flexWrap="wrap" gap={1}>
+      {showPhoto && (
       <Button
         startIcon={<PhotoCameraIcon />}
         variant={photoAdded ? "contained" : "outlined"}
@@ -578,6 +604,8 @@ export default function MediaCaptureActions({
       >
         {uploadingKind === "photo" ? he.loading : photoAdded ? he.photoAdded : he.addPhoto}
       </Button>
+      )}
+      {showVideo && (
       <Button
         startIcon={<VideocamIcon />}
         variant={videoAdded ? "contained" : "outlined"}
@@ -586,6 +614,8 @@ export default function MediaCaptureActions({
       >
         {uploadingKind === "video" ? he.loading : videoAdded ? he.videoAdded : he.addVideo}
       </Button>
+      )}
+      {showAudio && (
       <Button
         startIcon={<MicIcon />}
         variant={audioAdded ? "contained" : "outlined"}
@@ -594,6 +624,7 @@ export default function MediaCaptureActions({
       >
         {uploadingKind === "audio" ? he.loading : audioAdded ? he.audioAdded : he.addAudio}
       </Button>
+      )}
     </Box>
   );
 
@@ -616,8 +647,9 @@ export default function MediaCaptureActions({
         open={videoOpen}
         uploading={uploadingKind === "video"}
         recorder={videoRecorder}
+        minSeconds={minVideoSeconds && minVideoSeconds > 0 ? minVideoSeconds : null}
         onClose={closeVideoCapture}
-        onCapture={(file) => onCapture(file, "video")}
+        onCapture={(file, durationSeconds) => onCapture(file, "video", { durationSeconds })}
       />
       <AudioCaptureDialog
         open={audioOpen}

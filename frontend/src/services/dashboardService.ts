@@ -1,4 +1,5 @@
 import api from "./api";
+import type { CompletionRequirement } from "../utils/completionMedia";
 import type { TaskCompletion, TaskKind, TaskStatus } from "./taskService";
 
 export type HealthLevel = "green" | "orange" | "red";
@@ -64,6 +65,8 @@ export interface TimelineTask {
   manager_next_at?: string | null;
   is_manager_next?: boolean;
   reference_photo_url?: string | null;
+  is_work_start?: boolean;
+  min_video_seconds?: number | null;
 }
 
 export interface TeamMember {
@@ -109,7 +112,7 @@ export interface BranchSummary {
   completion_rate: number;
 }
 
-export type OpsCategory = "cleaning" | "fronts_signage" | "orders";
+export type OpsCategory = "cleaning" | "fronts_signage" | "orders" | "info_collection";
 
 /** Catégorie KPI dashboard (inclut l'agrégat « general », hors ops_category tâche). */
 export type StoreKpiKey = OpsCategory | "general";
@@ -130,6 +133,7 @@ export interface StoreKpis {
   cleaning: StoreCategoryKpi;
   fronts_signage: StoreCategoryKpi;
   orders: StoreCategoryKpi;
+  info_collection: StoreCategoryKpi;
 }
 
 export interface ManagerDashboard {
@@ -157,6 +161,9 @@ export interface EmployeeTaskCard {
   status: TaskStatus;
   task_kind: TaskKind;
   photo_required: boolean;
+  min_video_seconds?: number | null;
+  completion_requirements?: CompletionRequirement[];
+  is_work_start?: boolean;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;

@@ -15,7 +15,9 @@ _TRANSIENT_STATUSES = frozenset({429, 503, 529})
 
 
 class GeminiError(Exception):
-    pass
+    def __init__(self, message: str, *, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 def _extract_text(payload: dict) -> str:
@@ -51,8 +53,12 @@ def _parse_models_csv(raw: str) -> list[str]:
     return [m.strip() for m in raw.split(",") if m.strip()]
 
 
+def _default_model() -> str:
+    return config.DEFAULT_GEMINI_MODEL or "gemini-3.6-flash"
+
+
 def _models_chain(primary: str, *, use_generation_fallbacks: bool) -> list[str]:
-    chain = [primary.strip() or "gemini-2.0-flash"]
+    chain = [primary.strip() or _default_model()]
     extra = (
         config.GEMINI_GENERATION_FALLBACK_MODELS
         if use_generation_fallbacks
@@ -76,7 +82,10 @@ def _parse_api_error(response: httpx.Response) -> str:
 def _user_message(status: int, model: str, detail: str) -> str:
     detail_lower = detail.lower()
     if status == 404:
-        return f"המודל '{model}' לא זמין. עדכן GEMINI_MODEL (למשל gemini-2.0-flash)."
+        return (
+            f"המודל '{model}' לא זמין. עדכן GEMINI_MODEL "
+            f"(למשל {_default_model()})."
+        )
     if status == 429:
         return "מכסת Gemini נגמרה — בדוק ב-AI Studio את החיוב והמכסה."
     if status in (401, 403):
@@ -84,6 +93,10 @@ def _user_message(status: int, model: str, detail: str) -> str:
     if status in _TRANSIENT_STATUSES or "high demand" in detail_lower:
         return "שירות Gemini עמוס כרגע — המערכת ניסתה שוב; נסו בעוד דקה."
     return "שגיאה בשירות הבינה המלאכותית"
+
+
+def _is_retryable_status(status: int) -> bool:
+    return status in _TRANSIENT_STATUSES or status >= 500
 
 
 async def _post_generate(
@@ -99,7 +112,10 @@ async def _request_once(model: str, api_key: str, body: dict, timeout: float) ->
     if response.status_code >= 400:
         detail = _parse_api_error(response)
         logger.warning("Gemini API %s model=%s: %s", response.status_code, model, detail)
-        raise GeminiError(_user_message(response.status_code, model, detail))
+        raise GeminiError(
+            _user_message(response.status_code, model, detail),
+            retryable=_is_retryable_status(response.status_code),
+        )
     return _extract_text(response.json())
 
 
@@ -114,7 +130,7 @@ async def _request_with_retries(
             return await _request_once(model, api_key, body, timeout)
         except GeminiError as exc:
             last = exc
-            if attempt >= retries:
+            if not exc.retryable or attempt >= retries:
                 break
             await asyncio.sleep(delay * (attempt + 1))
     assert last is not None
@@ -165,7 +181,7 @@ async def _generate_with_body(
             else "הוסף GEMINI_API_KEY לקובץ backend/.env."
         )
         raise GeminiError(f"שירות AI אינו מוגדר. {hint}")
-    primary = config.GEMINI_MODEL or "gemini-2.0-flash"
+    primary = config.GEMINI_MODEL or _default_model()
     timeout = timeout_seconds or config.GEMINI_TIMEOUT_SECONDS
     models = _models_chain(primary, use_generation_fallbacks=use_generation_fallbacks)
     return await _generate_across_models(models, api_key, body, timeout)

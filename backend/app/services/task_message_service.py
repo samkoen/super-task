@@ -1,12 +1,17 @@
 """Chat tâche oved ↔ menahel (+ i18n texte/audio)."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.core import config
 from app.db import mappers as mp
 from app.domain import roles, task_status
+from app.domain.audio_transcription_fallback import (
+    transcript_or_unavailable,
+    transcription_unavailable_message,
+)
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
 from app.domain.scope import ActorContext
@@ -33,6 +38,35 @@ from app.repositories.user_repository import UserRepository
 from app.services.completion_audio_transcription_service import transcribe_completion_audio
 
 TZ = ZoneInfo("Asia/Jerusalem")
+_TRANSCRIBE_TIMEOUT_SECONDS = 25.0
+
+
+async def _transcribe_or_none(audio_url: str, language: str) -> str | None:
+    try:
+        return await asyncio.wait_for(
+            transcribe_completion_audio(audio_url, manager_language=language),
+            timeout=_TRANSCRIBE_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return None
+
+
+async def _chat_audio_pair(
+    audio_url: str, *, sender_lang: str, recipient_lang: str
+) -> tuple[str, str]:
+    raw = await _transcribe_or_none(audio_url, recipient_lang)
+    recipient = transcript_or_unavailable(raw, recipient_lang)
+    if not (raw or "").strip():
+        return recipient, transcription_unavailable_message(sender_lang)
+    if not languages_differ(recipient_lang, sender_lang):
+        return recipient, recipient
+    localized = await localize_completion_transcript(
+        recipient,
+        source_language=recipient_lang,
+        target_language=sender_lang,
+    )
+    sender = (localized or "").strip() or transcription_unavailable_message(sender_lang)
+    return recipient, sender
 
 
 class TaskMessageService:
@@ -141,21 +175,11 @@ class TaskMessageService:
 
         audio_url = (message.audio_url or "").strip()
         if audio_url:
-            # Même תמלול que clôture tâche (Gemini → langue destinataire)
-            audio_transcript = await transcribe_completion_audio(
+            audio_transcript, audio_transcript_sender = await _chat_audio_pair(
                 audio_url,
-                manager_language=recipient_lang,
+                sender_lang=sender_lang,
+                recipient_lang=recipient_lang,
             )
-            if audio_transcript:
-                # Même localisation Google Translate que clôture / création
-                if languages_differ(recipient_lang, sender_lang):
-                    audio_transcript_sender = await localize_completion_transcript(
-                        audio_transcript,
-                        source_language=recipient_lang,
-                        target_language=sender_lang,
-                    )
-                else:
-                    audio_transcript_sender = audio_transcript
 
         if body_translated is None and audio_transcript is None and audio_transcript_sender is None:
             return message

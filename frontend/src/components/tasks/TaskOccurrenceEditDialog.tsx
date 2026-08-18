@@ -11,6 +11,7 @@ import {
   MenuItem,
   Switch,
   TextField,
+  Typography,
 } from "@mui/material";
 import { ApiError, type User } from "../../services/api";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
@@ -22,8 +23,10 @@ import { he } from "../../i18n/he";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
+import { defaultApplyAdHocEditToNetwork, isNetworkAdHocOccurrence } from "../../utils/adHocNetworkTasks";
 import TaskChatPanel from "./TaskChatPanel";
 import TaskReferenceMediaEditor from "./TaskReferenceMediaEditor";
+import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
 import {
   emptyOccurrenceEditForm,
   formFromOccurrence,
@@ -77,7 +80,13 @@ export default function TaskOccurrenceEditDialog({
         return;
       }
       setTarget(result.fresh);
-      setForm(formFromOccurrence(result.fresh));
+      setForm({
+        ...formFromOccurrence(result.fresh),
+        apply_to_network: defaultApplyAdHocEditToNetwork(
+          result.fresh,
+          user?.role === "network_manager" || user?.role === "admin",
+        ),
+      });
       setMediaDirty(false);
       if (result.employees) setEmployees(result.employees);
       setLoading(false);
@@ -134,16 +143,31 @@ export default function TaskOccurrenceEditDialog({
               editEmployees={editEmployees}
               isBranchManager={isBranchManager}
             />
-            {target.task_kind === "ad_hoc" && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.photo_required}
-                    onChange={(e) => setForm({ ...form, photo_required: e.target.checked })}
-                  />
-                }
-                label={he.photoRequired}
-              />
+            <CompletionRequirementsEditor
+              value={form.completion_requirements}
+              onChange={(completion_requirements) =>
+                setForm({ ...form, completion_requirements })
+              }
+              disabled={saving}
+            />
+            {(user?.role === "network_manager" || user?.role === "admin") &&
+              isNetworkAdHocOccurrence(target) && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.apply_to_network}
+                      onChange={(e) => setForm({ ...form, apply_to_network: e.target.checked })}
+                    />
+                  }
+                  label={he.fixedTaskUpdateAllBranches}
+                />
+                {form.apply_to_network && (
+                  <Typography variant="caption" color="text.secondary">
+                    {he.fixedTaskUpdateAllBranchesHint}
+                  </Typography>
+                )}
+              </>
             )}
             <TaskReferenceMediaEditor
               key={target.id}

@@ -13,6 +13,7 @@ describe("storeKpis", () => {
     expect(resolved.cleaning).toEqual(emptyCategoryKpi("cleaning"));
     expect(resolved.fronts_signage.approval_pct).toBe(0);
     expect(resolved.orders.total).toBe(0);
+    expect(resolved.info_collection.total).toBe(0);
   });
 
   it("keeps provided KPI values", () => {
@@ -39,6 +40,7 @@ describe("storeKpis", () => {
       },
       fronts_signage: emptyCategoryKpi("fronts_signage"),
       orders: emptyCategoryKpi("orders"),
+      info_collection: emptyCategoryKpi("info_collection"),
     });
     expect(resolved.cleaning.approval_pct).toBe(25);
     expect(resolved.cleaning.report_pct).toBe(50);

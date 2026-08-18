@@ -59,6 +59,10 @@ def test_normalize_ops_category_accepts_orders():
     assert normalize_ops_category("orders") == "orders"
 
 
+def test_normalize_ops_category_accepts_info_collection():
+    assert normalize_ops_category("info_collection") == "info_collection"
+
+
 def test_compute_category_kpi_nominal_full_day():
     tasks = [
         _task(id="1", status=task_status.COMPLETED),

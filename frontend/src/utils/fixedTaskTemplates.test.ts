@@ -6,6 +6,9 @@ import {
   formatTemplateSchedule,
   opsCategoryLabel,
   sortFixedTemplates,
+  defaultApplyEditToNetwork,
+  networkFixedChipLabel,
+  networkFixedTemplateIds,
 } from "./fixedTaskTemplates";
 
 function tpl(partial: Partial<TaskTemplate> & Pick<TaskTemplate, "id" | "title">): TaskTemplate {
@@ -61,5 +64,30 @@ describe("fixedTaskTemplates", () => {
   it("labels ops category", () => {
     expect(opsCategoryLabel(null)).toBe(he.opsCategoryNone);
     expect(opsCategoryLabel("cleaning")).toBe(he.opsCategoryLabels.cleaning);
+  });
+
+  it("defaults network edit to all branches when grouped", () => {
+    expect(defaultApplyEditToNetwork({ network_group_id: "g1" }, true)).toBe(true);
+    expect(defaultApplyEditToNetwork({ network_group_id: "g1" }, false)).toBe(false);
+    expect(defaultApplyEditToNetwork({ network_group_id: null }, true)).toBe(false);
+    expect(defaultApplyEditToNetwork({ id: "1", is_network_task: true }, true)).toBe(true);
+  });
+
+  it("detects network copies across branches even without group id", () => {
+    const ids = networkFixedTemplateIds([
+      tpl({ id: "1", title: "בדיקה", branch_id: "b1" }),
+      tpl({ id: "2", title: "בדיקה", branch_id: "b2" }),
+      tpl({ id: "3", title: "אחר", branch_id: "b1" }),
+    ]);
+    expect([...ids].sort()).toEqual(["1", "2"]);
+  });
+
+  it("labels subset groups with snif count", () => {
+    const items = [
+      tpl({ id: "1", title: "בדיקה", branch_id: "b1", network_group_id: "g1" }),
+      tpl({ id: "2", title: "בדיקה", branch_id: "b2", network_group_id: "g1" }),
+    ];
+    expect(networkFixedChipLabel(items[0], items, 4)).toBe(he.fixedTaskNetworkChipCount(2));
+    expect(networkFixedChipLabel(items[0], items, 2)).toBe(he.fixedTaskNetworkChip);
   });
 });

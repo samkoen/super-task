@@ -152,4 +152,15 @@ describe("TaskOccurrenceCard", () => {
     expect(screen.getAllByAltText(he.taskReferencePhoto).length).toBeGreaterThan(0);
     vi.unstubAllGlobals();
   });
+
+  it("shows network chip for grouped ad-hoc tasks", () => {
+    render(
+      <TaskOccurrenceCard
+        task={baseTask({ is_network_task: true, network_group_id: "g1" })}
+        index={0}
+        networkChipLabel={he.fixedTaskNetworkChip}
+      />,
+    );
+    expect(screen.getByText(he.fixedTaskNetworkChip)).toBeTruthy();
+  });
 });

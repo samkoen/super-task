@@ -64,7 +64,7 @@ def _describe_ai_call(
     audience = _audience(for_generation)
     resolved = resolve_provider(provider=provider)
     if resolved == "gemini":
-        model = config.GEMINI_MODEL or "gemini-2.0-flash"
+        model = config.GEMINI_MODEL or config.DEFAULT_GEMINI_MODEL or "gemini-3.6-flash"
         transport = "gemini-api"
     else:
         model = config.OPENCODE_MODEL_ID

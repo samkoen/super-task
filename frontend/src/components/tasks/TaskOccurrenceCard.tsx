@@ -62,6 +62,7 @@ export interface TaskOccurrenceCardProps {
   starting?: boolean;
   speaking?: boolean;
   titleNode?: ReactNode;
+  networkChipLabel?: string | null;
   /** @deprecated Déplacé vers l'édition (שיוך → גלריה). Conservé pour compat. */
   onAddToGallery?: (task: TaskOccurrence) => void;
 }
@@ -102,6 +103,7 @@ export default function TaskOccurrenceCard({
   starting = false,
   speaking = false,
   titleNode,
+  networkChipLabel,
 }: TaskOccurrenceCardProps) {
   const isNative = isNativeApp();
   const visual = taskStatusVisual(task.status);
@@ -326,6 +328,15 @@ export default function TaskOccurrenceCard({
                 </>
               )}
             </Box>
+            {(networkChipLabel || task.is_network_task || task.network_group_id) &&
+              task.task_kind === "ad_hoc" && (
+              <Chip
+                size="small"
+                color="info"
+                label={networkChipLabel || he.fixedTaskNetworkChip}
+                sx={{ fontWeight: 700, flexShrink: 0 }}
+              />
+            )}
             {showMenu && (
               <>
                 <IconButton

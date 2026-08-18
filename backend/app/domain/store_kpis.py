@@ -55,4 +55,5 @@ def build_store_kpis(tasks: list[TaskOccurrence]) -> dict:
         "cleaning": compute_category_kpi(tasks, ops_category.CLEANING),
         "fronts_signage": compute_category_kpi(tasks, ops_category.FRONTS_SIGNAGE),
         "orders": compute_category_kpi(tasks, ops_category.ORDERS),
+        "info_collection": compute_category_kpi(tasks, ops_category.INFO_COLLECTION),
     }

@@ -25,6 +25,7 @@ export interface TaskOccurrenceGridProps {
   onListen?: TaskOccurrenceCardProps["onListen"];
   onStopListen?: TaskOccurrenceCardProps["onStopListen"];
   onChatUpdated?: TaskOccurrenceCardProps["onChatUpdated"];
+  networkChipFor?: (task: TaskOccurrence) => string | null;
 }
 
 export default function TaskOccurrenceGrid({
@@ -46,6 +47,7 @@ export default function TaskOccurrenceGrid({
   onListen,
   onStopListen,
   onChatUpdated,
+  networkChipFor,
 }: TaskOccurrenceGridProps) {
   if (tasks.length === 0) {
     return (
@@ -73,6 +75,7 @@ export default function TaskOccurrenceGrid({
       onListen={onListen}
       onStopListen={onStopListen}
       onChatUpdated={onChatUpdated}
+      networkChipLabel={networkChipFor?.(task)}
       starting={startingId === task.id}
       speaking={speakingId === task.id}
     />

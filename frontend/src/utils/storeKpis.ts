@@ -19,6 +19,7 @@ export function resolveStoreKpis(kpis: StoreKpis | null | undefined): StoreKpis 
     cleaning: kpis?.cleaning ?? emptyCategoryKpi("cleaning"),
     fronts_signage: kpis?.fronts_signage ?? emptyCategoryKpi("fronts_signage"),
     orders: kpis?.orders ?? emptyCategoryKpi("orders"),
+    info_collection: kpis?.info_collection ?? emptyCategoryKpi("info_collection"),
   };
 }
 

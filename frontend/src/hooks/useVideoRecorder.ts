@@ -14,12 +14,15 @@ export function useVideoRecorder() {
   const [starting, setStarting] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const sessionRef = useRef(0);
+  const startedAtRef = useRef<number | null>(null);
+  const tickRef = useRef<number | null>(null);
 
   const supported = isMediaCaptureSupported();
 
@@ -42,6 +45,8 @@ export function useVideoRecorder() {
   const reset = useCallback(() => {
     setBlob(null);
     setError("");
+    setElapsedSeconds(0);
+    startedAtRef.current = null;
   }, []);
 
   const onVideoRef = useCallback((node: HTMLVideoElement | null) => {
@@ -105,6 +110,13 @@ export function useVideoRecorder() {
       if (event.data.size > 0) chunksRef.current.push(event.data);
     };
     recorder.onstop = () => {
+      if (tickRef.current) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      if (startedAtRef.current) {
+        setElapsedSeconds(Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)));
+      }
       const next = new Blob(chunksRef.current, { type: recorder.mimeType || "video/webm" });
       setBlob(next);
       setRecording(false);
@@ -112,6 +124,13 @@ export function useVideoRecorder() {
     };
     mediaRecorderRef.current = recorder;
     recorder.start();
+    startedAtRef.current = Date.now();
+    setElapsedSeconds(0);
+    tickRef.current = window.setInterval(() => {
+      if (startedAtRef.current) {
+        setElapsedSeconds(Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000)));
+      }
+    }, 250);
     setRecording(true);
   }, [detachLivePreview, recording]);
 
@@ -143,6 +162,7 @@ export function useVideoRecorder() {
     starting,
     recording,
     blob,
+    elapsedSeconds,
     error,
     stream,
     videoRef,
