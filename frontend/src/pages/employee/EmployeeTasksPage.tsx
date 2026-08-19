@@ -6,13 +6,11 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  LinearProgress,
   Paper,
   TextField,
   Typography,
@@ -36,11 +34,13 @@ import { employeeActivityService } from "../../services/employeeActivityService"
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { playTaskEndSound } from "../../utils/notificationSounds";
+import { useSearchParams } from "react-router-dom";
+import { sortInProgressFocusFirst } from "../../utils/employeeTaskFocus";
+import { taskIdFromSearch } from "../../utils/notificationNavigation";
 import {
-  sortEmployeeOpenFocus,
-  sortInProgressFocusFirst,
-} from "../../utils/employeeTaskFocus";
-import { employeeCardToOccurrence } from "../../utils/employeeTaskCard";
+  collectUniqueTasks,
+  splitEmployeeWorkLists,
+} from "../../utils/employeeDashboardSections";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import {
   defaultRangeFrom,
@@ -50,16 +50,15 @@ import {
   todayIso,
   type TaskDateViewMode,
 } from "../../utils/dateView";
-import { useTaskSpeech } from "../../hooks/useTaskSpeech";
-import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import CompletionRequirementSlots from "../../components/tasks/CompletionRequirementSlots";
 import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
-import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
 import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
-import EmployeeBranchSwitcher from "../../components/Layout/EmployeeBranchSwitcher";
+import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
+import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
+import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
@@ -189,6 +188,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
 
 export default function EmployeeTasksPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useFeedback();
   const [dashboard, setDashboard] = useState<EmployeeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,7 +216,6 @@ export default function EmployeeTasksPage() {
   const [rangeTasks, setRangeTasks] = useState<EmployeeTaskCard[]>([]);
   const [employeeLanguage, setEmployeeLanguage] = useState<EmployeeLanguage>("he");
   const [translatingTasks, setTranslatingTasks] = useState(false);
-  const { speakingId, speak, stop: stopSpeech, supported: speechSupported } = useTaskSpeech(employeeLanguage);
 
   const translatePendingTasks = useCallback(
     async (language: EmployeeLanguage, tasks: EmployeeTaskCard[]) => {
@@ -296,7 +295,6 @@ export default function EmployeeTasksPage() {
   }, []);
 
   const openComplete = (task: EmployeeTaskCard) => {
-    stopSpeech();
     clearCompletionMedia();
     setSlotMedia(effectiveRequirements(task).map(() => null));
     setSelected(task);
@@ -318,23 +316,6 @@ export default function EmployeeTasksPage() {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setStartingId(null);
-    }
-  };
-
-  const handleListen = async (task: EmployeeTaskCard) => {
-    if (!speechSupported) {
-      showError(he.taskListenUnsupported);
-      return;
-    }
-    const text = task.spoken_text || [task.title, task.description].filter(Boolean).join(". ");
-    const speechLanguage = resolveSpeechLanguage(
-      employeeLanguage,
-      task.display_language,
-      task.translation_pending
-    );
-    const ok = await speak(task.id, text, speechLanguage);
-    if (!ok && speechLanguage === "ar") {
-      showError(he.taskListenVoiceMissing);
     }
   };
 
@@ -442,28 +423,25 @@ export default function EmployeeTasksPage() {
     }
   };
 
-  const urgentTasks = useMemo(
-    () => sortEmployeeOpenFocus(dashboard?.urgent_tasks ?? [], (dashboard?.in_progress_tasks ?? []).length > 0),
-    [dashboard?.urgent_tasks, dashboard?.in_progress_tasks],
-  );
-  const inProgressTasks = useMemo(
-    () => sortInProgressFocusFirst(dashboard?.in_progress_tasks ?? []),
-    [dashboard?.in_progress_tasks],
-  );
+  const urgentTasks = dashboard?.urgent_tasks ?? [];
+  const inProgressTasks = dashboard?.in_progress_tasks ?? [];
   const awaitingResponseTasks = dashboard?.awaiting_response_tasks ?? [];
   const pendingReviewTasks = dashboard?.pending_review_tasks ?? [];
-  const todayTasks = useMemo(
-    () => sortEmployeeOpenFocus(dashboard?.today_tasks ?? [], (dashboard?.in_progress_tasks ?? []).length > 0),
-    [dashboard?.today_tasks, dashboard?.in_progress_tasks],
-  );
+  const todayTasks = dashboard?.today_tasks ?? [];
   const completedTasks = dashboard?.completed_tasks ?? [];
 
+  const workLists = useMemo(() => {
+    const pool = collectUniqueTasks([
+      inProgressTasks,
+      awaitingResponseTasks,
+      urgentTasks,
+      todayTasks,
+    ]);
+    return splitEmployeeWorkLists(pool, new Set(urgentTasks.map((t) => t.id)));
+  }, [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks]);
+
   const progress = dashboard?.progress_percent ?? 0;
-  const openCount =
-    urgentTasks.length +
-    todayTasks.length +
-    inProgressTasks.length +
-    awaitingResponseTasks.length;
+  const openCount = workLists.dynamic.length + workLists.routine.length;
   const dayTasksLabel = isToday(filterDay)
     ? he.employeeTodayTasks
     : `${he.tasksForSelectedDay} · ${formatHebrewDay(filterDay)}`;
@@ -498,26 +476,30 @@ export default function EmployeeTasksPage() {
     rangeTasks,
   ]);
 
-  const withCard = (occ: TaskOccurrence, fn: (card: EmployeeTaskCard) => void) => {
-    const card = cardById.get(occ.id);
-    if (card) fn(card);
-  };
-
-  const employeeGridProps = {
-    layout: "stack" as const,
-    startingId,
-    speakingId: speakingId ?? null,
-    onOpen: (occ: TaskOccurrence) => withCard(occ, setDetailTask),
-    onComplete: (occ: TaskOccurrence) => withCard(occ, (c) => void handleDoTask(c)),
-    onListen: speechSupported
-      ? (occ: TaskOccurrence) => withCard(occ, (c) => void handleListen(c))
-      : undefined,
-    onStopListen: speechSupported ? stopSpeech : undefined,
-    onChatUpdated: () => {
-      void load();
-      showSuccess(he.taskChatSent);
-    },
-  };
+  const alertTaskId = taskIdFromSearch(searchParams.toString());
+  useEffect(() => {
+    if (!alertTaskId || loading) return;
+    const existing = cardById.get(alertTaskId);
+    if (existing) {
+      setDetailTask(existing);
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    let cancelled = false;
+    void taskService
+      .getOccurrence(alertTaskId)
+      .then((occ) => {
+        if (cancelled) return;
+        setDetailTask(toEmployeeCard(occ));
+        setSearchParams({}, { replace: true });
+      })
+      .catch(() => {
+        if (!cancelled) setSearchParams({}, { replace: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [alertTaskId, loading, cardById, setSearchParams]);
 
   const headerName = dashboard?.employee?.full_name ?? user?.full_name;
   const headerBranch = dashboard?.employee?.branch_name;
@@ -526,46 +508,20 @@ export default function EmployeeTasksPage() {
 
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", pb: 14, px: { xs: 1, sm: 2 } }}>
-      <Box
-        mb={2.5}
-        sx={{
-          p: 2.5,
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: "background.paper",
-          boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.04)",
-        }}
-      >
-        <Typography variant="h5" fontWeight={800} letterSpacing="-0.02em">{headerName}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {headerBranch ? `${he.branch}: ${headerBranch}` : ""}
-          {headerJob ? ` · ${jobLabel(headerJob)}` : ""}
-        </Typography>
-        {(user?.branches?.length ?? 0) >= 2 && (
-          <Box mt={1.5} maxWidth={360}>
-            <EmployeeBranchSwitcher />
-          </Box>
-        )}
-        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" sx={{ mt: 1.25 }}>
-          <Chip
-            size="small"
-            color={onBreak ? "warning" : onShift ? "success" : "default"}
-            label={
-              onBreak ? he.employeeOnBreak : onShift ? he.employeeOnShift : he.employeeOffShift
-            }
-          />
-          <Button
-            size="small"
-            variant={onBreak ? "contained" : "outlined"}
-            color={onBreak ? "warning" : "primary"}
-            disabled={breakBusy}
-            onClick={() => void handleToggleBreak()}
-          >
-            {onBreak ? he.employeeBreakEnd : he.employeeBreakStart}
-          </Button>
-        </Box>
-      </Box>
+      <EmployeeShiftHeader
+        name={headerName}
+        meta={[
+          headerBranch ? `${he.branch}: ${headerBranch}` : "",
+          headerJob ? jobLabel(headerJob) : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        onShift={Boolean(onShift)}
+        onBreak={onBreak}
+        breakBusy={breakBusy}
+        progress={dateViewMode === "day" ? progress : null}
+        onToggleBreak={() => void handleToggleBreak()}
+      />
 
       <TaskDateViewBar
         mode={dateViewMode}
@@ -580,33 +536,14 @@ export default function EmployeeTasksPage() {
         }}
       />
 
-      {dateViewMode === "day" && (
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="body2" color="text.secondary" mb={1}>{he.employeeDailyProgress}</Typography>
-        <Box display="flex" alignItems="center" gap={2}>
-          <LinearProgress variant="determinate" value={progress} sx={{ flex: 1, height: 8, borderRadius: 4 }} />
-          <Typography fontWeight={800}>{progress}%</Typography>
-        </Box>
-      </Paper>
-      )}
-
       {translatingTasks && (
         <Alert severity="info" sx={{ mb: 2 }}>{he.taskTranslating}</Alert>
       )}
 
       {loading ? (
-        <ListSkeleton variant="cards" rows={3} />
+        <ListSkeleton variant="table" rows={5} />
       ) : dateViewMode === "range" ? (
         <>
-          {rangeInProgress.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.tasksInProgress}</Typography>
-              <TaskOccurrenceGrid
-                tasks={rangeInProgress.map(employeeCardToOccurrence)}
-                {...employeeGridProps}
-              />
-            </Box>
-          )}
           {rangeGroups.length === 0 ? (
             <EmptyState
               title={he.noTasks}
@@ -616,33 +553,39 @@ export default function EmployeeTasksPage() {
             />
           ) : (
             rangeGroups.map(([day, dayTasks]) => {
-              const open = sortEmployeeOpenFocus(
-                dayTasks.filter(
-                  (t) =>
-                    t.status !== "completed" &&
-                    t.status !== "cancelled" &&
-                    t.status !== "in_progress",
-                ),
-                rangeInProgress.length > 0,
+              const lists = splitEmployeeWorkLists(
+                dayTasks,
+                new Set(dayTasks.filter((t) => t.status === "overdue").map((t) => t.id)),
               );
+              const review = dayTasks.filter((t) => t.status === "pending_review");
               const done = dayTasks.filter((t) => t.status === "completed");
               return (
                 <Box key={day} mb={3}>
-                  <Typography variant="subtitle1" fontWeight={800} mb={1}>
+                  <Typography variant="subtitle2" fontWeight={800} mb={1}>
                     {isToday(day) ? he.tasksTodayLabel : formatHebrewDay(day)}
                   </Typography>
-                  {open.length === 0 && done.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" mb={1}>{he.noTasks}</Typography>
-                  ) : open.length > 0 ? (
-                    <TaskOccurrenceGrid
-                      tasks={open.map(employeeCardToOccurrence)}
-                      {...employeeGridProps}
-                    />
-                  ) : null}
+                  <EmployeeTaskSection
+                    title={he.employeeRoutineTasks}
+                    tasks={lists.routine}
+                    onOpen={setDetailTask}
+                  />
+                  <EmployeeTaskSection
+                    title={he.employeeDynamicTasks}
+                    tasks={lists.dynamic}
+                    onOpen={setDetailTask}
+                    color="error.main"
+                  />
+                  <EmployeeTaskSection
+                    title={he.taskPendingReview}
+                    tasks={review}
+                    onOpen={setDetailTask}
+                  />
                   {done.length > 0 && (
-                    <Box mt={open.length ? 2 : 0}>
-                      <TaskOccurrenceGrid tasks={done.map(employeeCardToOccurrence)} onOpen={employeeGridProps.onOpen} />
-                    </Box>
+                    <EmployeeTaskSection
+                      title={he.employeeCompletedTasks}
+                      tasks={done}
+                      onOpen={setDetailTask}
+                    />
                   )}
                 </Box>
               );
@@ -651,52 +594,9 @@ export default function EmployeeTasksPage() {
         </>
       ) : (
         <>
-          {inProgressTasks.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.tasksInProgress}</Typography>
-              <TaskOccurrenceGrid
-                tasks={inProgressTasks.map(employeeCardToOccurrence)}
-                {...employeeGridProps}
-              />
-            </Box>
-          )}
-
-          {awaitingResponseTasks.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" fontWeight={800} color="warning.main" mb={1}>
-                {he.employeeAwaitingResponseTasks}
-              </Typography>
-              <TaskOccurrenceGrid
-                tasks={awaitingResponseTasks.map(employeeCardToOccurrence)}
-                {...employeeGridProps}
-              />
-            </Box>
-          )}
-
-          {urgentTasks.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" fontWeight={800} color="error.main" mb={1}>
-                {he.employeeUrgentTasks}
-              </Typography>
-              <TaskOccurrenceGrid
-                tasks={urgentTasks.map(employeeCardToOccurrence)}
-                urgentIds={new Set(urgentTasks.map((t) => t.id))}
-                {...employeeGridProps}
-              />
-            </Box>
-          )}
-
-          {pendingReviewTasks.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle1" fontWeight={800} mb={1}>{he.taskPendingReview}</Typography>
-              <TaskOccurrenceGrid
-                tasks={pendingReviewTasks.map(employeeCardToOccurrence)}
-                onOpen={employeeGridProps.onOpen}
-              />
-            </Box>
-          )}
-
-          <Typography variant="subtitle1" fontWeight={800} mb={1}>{dayTasksLabel}</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+            {dayTasksLabel}
+          </Typography>
           {openCount === 0 ? (
             <EmptyState
               title={he.noTasksToday}
@@ -704,25 +604,41 @@ export default function EmployeeTasksPage() {
               icon={<TaskAltOutlinedIcon fontSize="inherit" />}
               compact
             />
-          ) : todayTasks.length > 0 ? (
-            <TaskOccurrenceGrid
-              tasks={todayTasks.map(employeeCardToOccurrence)}
-              {...employeeGridProps}
-            />
-          ) : null}
+          ) : (
+            <>
+              <EmployeeTaskSection
+                title={he.employeeRoutineTasks}
+                tasks={workLists.routine}
+                onOpen={setDetailTask}
+              />
+              <EmployeeTaskSection
+                title={he.employeeDynamicTasks}
+                tasks={workLists.dynamic}
+                onOpen={setDetailTask}
+                color="error.main"
+              />
+            </>
+          )}
+
+          <EmployeeTaskSection
+            title={he.taskPendingReview}
+            tasks={pendingReviewTasks}
+            onOpen={setDetailTask}
+          />
 
           {completedTasks.length > 0 && (
-            <Accordion expanded={showCompleted} onChange={() => setShowCompleted((v) => !v)} sx={{ mt: 2, boxShadow: 0, border: 1, borderColor: "divider" }}>
+            <Accordion expanded={showCompleted} onChange={() => setShowCompleted((v) => !v)} sx={{ mt: 1, boxShadow: 0, border: 1, borderColor: "divider" }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography fontWeight={700}>
                   {showCompleted ? he.employeeHideCompleted : he.employeeShowCompleted} ({completedTasks.length})
                 </Typography>
               </AccordionSummary>
-              <AccordionDetails sx={{ pt: 0 }}>
-                <TaskOccurrenceGrid
-                  tasks={completedTasks.map(employeeCardToOccurrence)}
-                  onOpen={employeeGridProps.onOpen}
-                />
+              <AccordionDetails sx={{ pt: 1, px: 1.5 }}>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
+                  {completedTasks.map((task) => (
+                    <EmployeeTaskRow key={task.id} task={task} onOpen={setDetailTask} />
+                  ))}
+                </Box>
               </AccordionDetails>
             </Accordion>
           )}

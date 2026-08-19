@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Badge,
   Box,
@@ -13,9 +14,12 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import { useAuth } from "../../context/AuthContext";
 import { notificationService, type AppNotification } from "../../services/notificationService";
 import { NOTIFICATION_EVENT } from "../../constants/events";
+import { employeeTaskAlertPath } from "../../utils/notificationNavigation";
 import IssueReportDetailDialog from "../issues/IssueReportDetailDialog";
 import { he } from "../../i18n/he";
 
@@ -33,6 +37,8 @@ function formatWhen(iso: string) {
 }
 
 export default function NotificationBell() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -64,6 +70,8 @@ export default function NotificationBell() {
     return () => window.removeEventListener(NOTIFICATION_EVENT, onNotify);
   }, [refresh]);
 
+  const closeAlerts = () => setOpen(false);
+
   const handleOpen = () => {
     setOpen(true);
     void refresh();
@@ -80,12 +88,16 @@ export default function NotificationBell() {
   };
 
   const handleItemClick = async (item: AppNotification) => {
+    closeAlerts();
     if (!item.read_at) {
       await handleMarkRead(item.id);
     }
     if (item.kind === "issue_reported" && item.issue_report_id) {
-      setOpen(false);
       setIssueReportId(item.issue_report_id);
+      return;
+    }
+    if (item.occurrence_id && user?.role === "employee") {
+      navigate(employeeTaskAlertPath(item.occurrence_id));
     }
   };
 
@@ -97,13 +109,32 @@ export default function NotificationBell() {
         </Badge>
       </IconButton>
 
-      <Drawer anchor="left" open={open} onClose={() => setOpen(false)} dir="rtl">
-        <Box sx={{ width: { xs: "100vw", sm: 360 }, p: 2 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+      <Drawer anchor="left" open={open} onClose={closeAlerts} dir="rtl">
+        <Box
+          sx={{
+            width: { xs: "100vw", sm: 360 },
+            p: 2,
+            pt: "max(12px, env(safe-area-inset-top, 0px))",
+            minHeight: "100%",
+          }}
+        >
+          <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} mb={1}>
             <Typography variant="h6" fontWeight={700}>{he.notificationsTitle}</Typography>
-            {unreadCount > 0 && (
-              <Button size="small" onClick={() => void handleMarkAll()}>{he.notificationsMarkAllRead}</Button>
-            )}
+            <Box display="flex" alignItems="center" gap={0.5}>
+              {unreadCount > 0 && (
+                <Button size="small" onClick={() => void handleMarkAll()}>
+                  {he.notificationsMarkAllRead}
+                </Button>
+              )}
+              <IconButton
+                aria-label={he.notificationsClose}
+                onClick={closeAlerts}
+                size="medium"
+                sx={{ minWidth: 44, minHeight: 44 }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
           <Divider sx={{ mb: 1 }} />
           {loading && items.length === 0 ? (
