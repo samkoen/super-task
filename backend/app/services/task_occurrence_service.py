@@ -32,6 +32,7 @@ from app.domain.task_scope import (
 from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
+from app.domain.gallery_employee_claim import gallery_item_claimable_by_employee
 from app.domain.network_fixed_task import (
     can_edit_network_fixed_group,
     grouped_occurrence_ids,
@@ -214,9 +215,11 @@ class TaskOccurrenceService:
         reference_audio_url: str | None = None,
         source_gallery_item_id: str | None = None,
         network_group_id: str | None = None,
+        self_claim: bool = False,
     ) -> dict:
-        if not can_manage_tasks(actor):
-            raise PermissionError("אין הרשאה ליצור משימות")
+        self._assert_can_create_ad_hoc(
+            actor, branch_id, assignee_user_id, self_claim=self_claim
+        )
         title = resolve_create_title(title, description)
         self._assert_branch_access(actor, branch_id)
 
@@ -259,6 +262,58 @@ class TaskOccurrenceService:
             **media_fields,
         )
         return self._to_api(occurrence, already_in_gallery=False)
+
+    def claim_gallery_item(self, actor: ActorContext, item_id: str) -> dict:
+        item = self._require_claimable_gallery(actor, item_id)
+        assert actor.branch_id is not None
+        return self.create_ad_hoc(
+            actor,
+            branch_id=actor.branch_id,
+            title=item.title,
+            description=item.description,
+            due_at=datetime.now(TZ).isoformat(),
+            assignee_user_id=actor.user_id,
+            photo_required=item.photo_required,
+            min_video_seconds=item.min_video_seconds,
+            completion_requirements=item.completion_requirements,
+            reference_photo_url=item.reference_photo_url,
+            reference_video_url=item.reference_video_url,
+            reference_audio_url=item.reference_audio_url,
+            source_gallery_item_id=item.id,
+            self_claim=True,
+        )
+
+    def _require_claimable_gallery(self, actor: ActorContext, item_id: str):
+        if not self._gallery:
+            raise ValueError("גלריה לא זמינה")
+        item = self._gallery.find_by_id(item_id)
+        if not item:
+            raise ValueError("פריט גלריה לא נמצא")
+        if not gallery_item_claimable_by_employee(
+            employee_can_claim=item.employee_can_claim,
+            item_network_id=item.network_id,
+            item_branch_id=item.branch_id,
+            actor=actor,
+        ):
+            raise PermissionError("אין הרשאה להוסיף משימה זו")
+        return item
+
+    def _assert_can_create_ad_hoc(
+        self,
+        actor: ActorContext,
+        branch_id: str,
+        assignee_user_id: str | None,
+        *,
+        self_claim: bool,
+    ) -> None:
+        if self_claim:
+            if actor.role != roles.EMPLOYEE:
+                raise PermissionError("רק עובד יכול להוסיף משימה לעצמו")
+            if assignee_user_id != actor.user_id:
+                raise PermissionError("ניתן לשייך רק לעצמך")
+            return
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה ליצור משימות")
 
     @staticmethod
     def _isolate_issue_media(

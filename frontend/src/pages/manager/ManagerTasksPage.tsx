@@ -357,6 +357,7 @@ export default function ManagerTasksPage() {
               ? payload.monthly_day
               : null,
           photo_required: true,
+          completion_requirements: payload.completion_requirements,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);

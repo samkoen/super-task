@@ -94,6 +94,27 @@ class TaskOccurrenceRepository:
         rows = self._db.execute(q).scalars().all()
         return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
 
+    def has_open_from_gallery(
+        self,
+        *,
+        assignee_user_id: str,
+        gallery_item_id: str,
+        statuses: frozenset[str],
+    ) -> bool:
+        try:
+            uid = mp.parse_uuid(assignee_user_id)
+            gid = mp.parse_uuid(gallery_item_id)
+        except ValueError:
+            return False
+        row = self._db.execute(
+            select(orm.TaskOccurrence.id)
+            .where(orm.TaskOccurrence.assignee_user_id == uid)
+            .where(orm.TaskOccurrence.source_gallery_item_id == gid)
+            .where(orm.TaskOccurrence.status.in_(list(statuses)))
+            .limit(1)
+        ).first()
+        return bool(row)
+
     def list_by_template_id(self, template_id: str) -> list[TaskOccurrence]:
         try:
             tid = mp.parse_uuid(template_id)

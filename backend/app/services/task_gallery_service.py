@@ -2,6 +2,11 @@
 from __future__ import annotations
 
 from app.domain import roles, task_recurrence
+from app.domain.completion_media import packed_media_fields, parse_requirements_input
+from app.domain.gallery_employee_claim import (
+    CLAIMABLE_OPEN_STATUSES,
+    gallery_item_claimable_by_employee,
+)
 from app.domain.scope import ActorContext
 from app.domain.task_gallery import (
     GALLERY_KINDS,
@@ -46,6 +51,28 @@ class TaskGalleryService:
             raise ValueError("סוג משימה לא תקין")
         items = self._query_visible(actor, task_kind=kind)
         return [i.to_dict() for i in items]
+
+    def list_claimable_for_employee(self, actor: ActorContext) -> list[dict]:
+        if actor.role != roles.EMPLOYEE:
+            raise PermissionError("אין הרשאה")
+        items = self._query_visible(actor, task_kind=None)
+        out: list[dict] = []
+        for item in items:
+            if not gallery_item_claimable_by_employee(
+                employee_can_claim=item.employee_can_claim,
+                item_network_id=item.network_id,
+                item_branch_id=item.branch_id,
+                actor=actor,
+            ):
+                continue
+            payload = item.to_dict()
+            payload["has_open"] = self._occurrences.has_open_from_gallery(
+                assignee_user_id=actor.user_id,
+                gallery_item_id=item.id,
+                statuses=CLAIMABLE_OPEN_STATUSES,
+            )
+            out.append(payload)
+        return out
 
     def create_item(self, actor: ActorContext, body: dict) -> dict:
         self._require_manager(actor)
@@ -95,6 +122,8 @@ class TaskGalleryService:
                 if occurrence.task_kind in GALLERY_KINDS
                 else "ad_hoc",
                 "photo_required": occurrence.photo_required,
+                "min_video_seconds": occurrence.min_video_seconds,
+                "completion_requirements": occurrence.completion_requirements,
                 "reference_photo_url": occurrence.reference_photo_url,
                 "reference_video_url": occurrence.reference_video_url,
                 "reference_audio_url": occurrence.reference_audio_url,
@@ -120,6 +149,8 @@ class TaskGalleryService:
                 "weekly_days": template.weekly_days,
                 "monthly_day": template.monthly_day,
                 "photo_required": template.photo_required,
+                "min_video_seconds": getattr(template, "min_video_seconds", None),
+                "completion_requirements": getattr(template, "completion_requirements", None),
                 "reference_photo_url": template.reference_photo_url,
                 "reference_video_url": template.reference_video_url,
                 "reference_audio_url": template.reference_audio_url,
@@ -149,6 +180,7 @@ class TaskGalleryService:
             body.get("reference_audio_url"),
         )
         recurrence, due_time, weekly_days, monthly_day = self._fixed_fields(task_kind, body)
+        recipe = self._recipe_fields(body)
         return {
             "network_id": network_id,
             "branch_id": branch_id,
@@ -159,12 +191,12 @@ class TaskGalleryService:
             "due_time": due_time,
             "weekly_days": weekly_days,
             "monthly_day": monthly_day,
-            "photo_required": bool(body.get("photo_required", True)),
             "reference_photo_url": photo,
             "reference_video_url": video,
             "reference_audio_url": audio,
             "source_occurrence_id": (body.get("source_occurrence_id") or "").strip()
             or None,
+            **recipe,
         }
 
     def _normalize_update_payload(self, actor: ActorContext, body: dict) -> dict:
@@ -181,6 +213,7 @@ class TaskGalleryService:
             body.get("reference_audio_url"),
         )
         recurrence, due_time, weekly_days, monthly_day = self._fixed_fields(task_kind, body)
+        recipe = self._recipe_fields(body)
         return {
             "branch_id": branch_id,
             "title": title,
@@ -190,10 +223,26 @@ class TaskGalleryService:
             "due_time": due_time,
             "weekly_days": weekly_days,
             "monthly_day": monthly_day,
-            "photo_required": bool(body.get("photo_required", True)),
             "reference_photo_url": photo,
             "reference_video_url": video,
             "reference_audio_url": audio,
+            **recipe,
+        }
+
+    @staticmethod
+    def _recipe_fields(body: dict) -> dict:
+        reqs = body.get("completion_requirements")
+        media = packed_media_fields(
+            parse_requirements_input(
+                reqs,
+                provided=reqs is not None,
+                photo_required=bool(body.get("photo_required", True)),
+                min_video_seconds=body.get("min_video_seconds"),
+            )
+        )
+        return {
+            "employee_can_claim": bool(body.get("employee_can_claim", False)),
+            **media,
         }
 
     @staticmethod

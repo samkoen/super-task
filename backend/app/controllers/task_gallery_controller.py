@@ -4,12 +4,18 @@ from sqlalchemy.orm import Session
 from app.auth.actor import load_actor
 from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
+from app.realtime.task_events import notify_task_change
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.notification_repository import NotificationRepository
+from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
+from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
 from app.services.task_gallery_service import TaskGalleryService
+from app.services.task_occurrence_service import TaskOccurrenceService
+from app.services.task_translation_service import TaskTranslationService
 
 router = APIRouter()
 
@@ -20,6 +26,19 @@ def get_gallery_service(db: Session = Depends(get_db)) -> TaskGalleryService:
         BranchRepository(db),
         TaskOccurrenceRepository(db),
         TaskTemplateRepository(db),
+    )
+
+
+def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceService:
+    return TaskOccurrenceService(
+        TaskOccurrenceRepository(db),
+        TaskCompletionRepository(db),
+        BranchRepository(db),
+        UserRepository(db),
+        TaskTranslationService(TaskTranslationRepository(db)),
+        TaskTemplateRepository(db),
+        notification_repo=NotificationRepository(db),
+        gallery_repo=TaskGalleryRepository(db),
     )
 
 
@@ -34,6 +53,39 @@ def list_gallery_items(
     actor = load_actor(request, UserRepository(db))
     items = service.list_items(actor, task_kind=task_kind)
     return {"items": items}
+
+
+@router.get("/claimable")
+@handle_controller_errors
+def list_claimable_gallery_items(
+    request: Request,
+    db: Session = Depends(get_db),
+    service: TaskGalleryService = Depends(get_gallery_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    items = service.list_claimable_for_employee(actor)
+    return {"items": items}
+
+
+@router.post("/{item_id}/claim", status_code=201)
+@handle_controller_errors
+def claim_gallery_item(
+    item_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    occ_service: TaskOccurrenceService = Depends(get_occurrence_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    item = occ_service.claim_gallery_item(actor, item_id)
+    db.commit()
+    notify_task_change(
+        event_type="task_created",
+        branch_id=str(item.get("branch_id") or ""),
+        assignee_user_id=item.get("assignee_user_id"),
+        occurrence_id=item.get("id"),
+        status=item.get("status"),
+    )
+    return {"occurrence": item, "message": "המשימה נוספה לרשימה"}
 
 
 @router.post("", status_code=201)

@@ -399,6 +399,11 @@ class TaskGalleryItem(Base):
     weekly_days: Mapped[str | None] = mapped_column(String(32), nullable=True)
     monthly_day: Mapped[int | None] = mapped_column(nullable=True)
     photo_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    employee_can_claim: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
+    completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     reference_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)

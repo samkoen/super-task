@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { ApiError } from "../../services/api";
 import { useFeedback } from "../../context/FeedbackContext";
@@ -53,6 +54,7 @@ import { useTaskSpeech } from "../../hooks/useTaskSpeech";
 import { resolveSpeechLanguage } from "../../utils/speechVoice";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import CompletionRequirementSlots from "../../components/tasks/CompletionRequirementSlots";
+import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
@@ -192,6 +194,7 @@ export default function EmployeeTasksPage() {
   const [saving, setSaving] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const [reportText, setReportText] = useState("");
   const [reportPhotoUrl, setReportPhotoUrl] = useState("");
   const [reportVideoUrl, setReportVideoUrl] = useState("");
@@ -753,6 +756,15 @@ export default function EmployeeTasksPage() {
       >
         <Button
           fullWidth
+          variant="contained"
+          startIcon={<PlaylistAddIcon />}
+          onClick={() => setClaimOpen(true)}
+          sx={{ borderRadius: 2.5, py: 1.1 }}
+        >
+          {he.employeeClaimTask}
+        </Button>
+        <Button
+          fullWidth
           variant="outlined"
           color="warning"
           startIcon={<ReportProblemIcon />}
@@ -762,6 +774,12 @@ export default function EmployeeTasksPage() {
           {he.employeeReportIssue}
         </Button>
       </Paper>
+
+      <EmployeeClaimTaskDialog
+        open={claimOpen}
+        onClose={() => setClaimOpen(false)}
+        onClaimed={() => void load(true)}
+      />
 
       <Dialog open={reportOpen} onClose={() => setReportOpen(false)} fullWidth maxWidth="xs" dir="rtl">
         <DialogTitle>{he.issueReportTitle}</DialogTitle>

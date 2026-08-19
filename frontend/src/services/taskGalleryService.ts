@@ -14,12 +14,16 @@ export interface TaskGalleryItem {
   weekly_days: string | null;
   monthly_day: number | null;
   photo_required: boolean;
+  employee_can_claim?: boolean;
+  min_video_seconds?: number | null;
+  completion_requirements?: Array<{ kind: string; min_seconds?: number }> | null;
   reference_photo_url: string | null;
   reference_video_url: string | null;
   reference_audio_url: string | null;
   created_by_id: string;
   created_at: string;
   updated_at: string;
+  has_open?: boolean;
 }
 
 export interface TaskGalleryPayload {
@@ -33,6 +37,9 @@ export interface TaskGalleryPayload {
   weekly_days?: string | null;
   monthly_day?: number | null;
   photo_required?: boolean;
+  employee_can_claim?: boolean;
+  min_video_seconds?: number | null;
+  completion_requirements?: Array<{ kind: string; min_seconds?: number }> | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
@@ -43,6 +50,18 @@ export const taskGalleryService = {
     const params = taskKind ? { task_kind: taskKind } : undefined;
     const response = await api.get<{ items: TaskGalleryItem[] }>("/task-gallery", { params });
     return response.data.items;
+  },
+
+  listClaimable: async () => {
+    const response = await api.get<{ items: TaskGalleryItem[] }>("/task-gallery/claimable");
+    return response.data.items;
+  },
+
+  claim: async (id: string) => {
+    const response = await api.post<{ occurrence: { id: string }; message: string }>(
+      `/task-gallery/${id}/claim`,
+    );
+    return response.data;
   },
 
   create: async (payload: TaskGalleryPayload) => {

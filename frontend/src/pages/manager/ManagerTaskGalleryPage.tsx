@@ -3,11 +3,14 @@ import { useSearchParams } from "react-router-dom";
 import {
   Box,
   Button,
+  Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -40,6 +43,8 @@ import {
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
 import TaskReferenceMediaEditor from "../../components/tasks/TaskReferenceMediaEditor";
+import CompletionRequirementsEditor from "../../components/tasks/CompletionRequirementsEditor";
+import type { CompletionRequirement } from "../../utils/completionMedia";
 import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
@@ -69,6 +74,7 @@ type FormState = {
   due_time: string;
   weekly_days: string;
   monthly_day: number;
+  employee_can_claim: boolean;
 };
 
 const EMPTY_FORM: FormState = {
@@ -80,6 +86,7 @@ const EMPTY_FORM: FormState = {
   due_time: "09:00",
   weekly_days: "0",
   monthly_day: 1,
+  employee_can_claim: false,
 };
 
 export default function ManagerTaskGalleryPage() {
@@ -93,6 +100,7 @@ export default function ManagerTaskGalleryPage() {
   const [editing, setEditing] = useState<TaskGalleryItem | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [media, setMedia] = useState<TaskReferenceMediaValue>(EMPTY_MEDIA);
+  const [completionRequirements, setCompletionRequirements] = useState<CompletionRequirement[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TaskGalleryItem | null>(null);
 
@@ -141,6 +149,7 @@ export default function ManagerTaskGalleryPage() {
       branch_id: scopeBranchId || user?.branch_id || "",
     });
     setMedia(EMPTY_MEDIA);
+    setCompletionRequirements([]);
     setOpenForm(true);
   };
 
@@ -155,12 +164,16 @@ export default function ManagerTaskGalleryPage() {
       due_time: item.due_time || "09:00",
       weekly_days: item.weekly_days || "0",
       monthly_day: item.monthly_day ?? 1,
+      employee_can_claim: Boolean(item.employee_can_claim),
     });
     setMedia({
       reference_photo_url: item.reference_photo_url ?? "",
       reference_video_url: item.reference_video_url ?? "",
       reference_audio_url: item.reference_audio_url ?? "",
     });
+    setCompletionRequirements(
+      (item.completion_requirements as CompletionRequirement[] | null) ?? [],
+    );
     setOpenForm(true);
   };
 
@@ -172,6 +185,8 @@ export default function ManagerTaskGalleryPage() {
       task_kind: form.task_kind,
       branch_id: canPickBranch ? form.branch_id || null : user?.branch_id || null,
       photo_required: true,
+      employee_can_claim: form.employee_can_claim,
+      completion_requirements: completionRequirements,
       ...resolved,
     };
     if (form.task_kind === "fixed") {
@@ -261,6 +276,7 @@ export default function ManagerTaskGalleryPage() {
                 <TableCell width={72}>{he.issueReportPhoto}</TableCell>
                 <TableCell>{he.taskTitle}</TableCell>
                 <TableCell>{he.taskKind}</TableCell>
+                <TableCell>{he.galleryEmployeeKit}</TableCell>
                 {canPickBranch && <TableCell>{he.branch}</TableCell>}
                 <TableCell width={100} />
               </TableRow>
@@ -321,6 +337,13 @@ export default function ManagerTaskGalleryPage() {
                     )}
                   </TableCell>
                   <TableCell>{he.taskKindLabels[item.task_kind]}</TableCell>
+                  <TableCell>
+                    {item.employee_can_claim ? (
+                      <Chip size="small" color="primary" label={he.galleryEmployeeKit} />
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   {canPickBranch && <TableCell>{branchName(item.branch_id)}</TableCell>}
                   <TableCell align="left">
                     <Tooltip title={he.edit}>
@@ -418,6 +441,28 @@ export default function ManagerTaskGalleryPage() {
               />
             </>
           )}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.employee_can_claim}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, employee_can_claim: e.target.checked }))
+                }
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">{he.galleryEmployeeCanClaim}</Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {he.galleryEmployeeCanClaimHint}
+                </Typography>
+              </Box>
+            }
+          />
+          <CompletionRequirementsEditor
+            value={completionRequirements}
+            onChange={setCompletionRequirements}
+          />
           <TaskReferenceMediaEditor
             value={media}
             onChange={setMedia}

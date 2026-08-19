@@ -106,3 +106,83 @@ def test_create_item_ok(monkeypatch):
     )
     assert result["id"] == "g1"
     repo.create.assert_called_once()
+
+
+def _gallery_item(**kwargs) -> TaskGalleryItem:
+    defaults = dict(
+        id="g1",
+        network_id="n1",
+        branch_id="b1",
+        title="תיעוד הבסטה אחרי העמסה",
+        description="",
+        task_kind="ad_hoc",
+        recurrence=None,
+        due_time=None,
+        weekly_days=None,
+        monthly_day=None,
+        photo_required=True,
+        reference_photo_url=None,
+        reference_video_url=None,
+        reference_audio_url=None,
+        created_by_id="u1",
+        created_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:00+00:00",
+        source_occurrence_id=None,
+        employee_can_claim=True,
+    )
+    defaults.update(kwargs)
+    return TaskGalleryItem(**defaults)
+
+
+def test_list_claimable_only_flagged_for_employee(monkeypatch):
+    repo = MagicMock()
+    repo.list_items.return_value = [
+        _gallery_item(id="g1", employee_can_claim=True),
+        _gallery_item(id="g2", employee_can_claim=False, title="אחר"),
+    ]
+    occ = MagicMock()
+    occ.has_open_from_gallery.return_value = True
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, branches: ["b1"],
+    )
+    service = TaskGalleryService(repo, MagicMock(), occ, MagicMock())
+    items = service.list_claimable_for_employee(
+        _actor(role="employee", user_id="e1")
+    )
+    assert [i["id"] for i in items] == ["g1"]
+    assert items[0]["has_open"] is True
+
+
+def test_manager_cannot_list_claimable():
+    service = TaskGalleryService(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+    with pytest.raises(PermissionError):
+        service.list_claimable_for_employee(_actor())
+
+
+def test_create_item_stores_employee_can_claim(monkeypatch):
+    repo = MagicMock()
+    repo.create.return_value = _gallery_item()
+    branches = MagicMock()
+    branches.find_by_id.return_value = MagicMock(id="b1")
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, r: ["b1"],
+    )
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.blob_storage.copy_media_url",
+        lambda url, folder: url,
+    )
+    service = TaskGalleryService(repo, branches, MagicMock(), MagicMock())
+    service.create_item(
+        _actor(),
+        {
+            "title": "תיעוד",
+            "task_kind": "ad_hoc",
+            "employee_can_claim": True,
+            "completion_requirements": [{"kind": "photo"}],
+        },
+    )
+    kwargs = repo.create.call_args.kwargs
+    assert kwargs["employee_can_claim"] is True
+    assert kwargs["completion_requirements"] == [{"kind": "photo"}]

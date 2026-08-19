@@ -21,6 +21,9 @@ class TaskGalleryItem:
     created_at: str
     updated_at: str
     source_occurrence_id: str | None = None
+    employee_can_claim: bool = False
+    min_video_seconds: int | None = None
+    completion_requirements: list | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -35,6 +38,9 @@ class TaskGalleryItem:
             "weekly_days": self.weekly_days,
             "monthly_day": self.monthly_day,
             "photo_required": self.photo_required,
+            "employee_can_claim": self.employee_can_claim,
+            "min_video_seconds": self.min_video_seconds,
+            "completion_requirements": self.completion_requirements,
             "reference_photo_url": self.reference_photo_url,
             "reference_video_url": self.reference_video_url,
             "reference_audio_url": self.reference_audio_url,
