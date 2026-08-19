@@ -163,4 +163,34 @@ describe("TaskOccurrenceCard", () => {
     );
     expect(screen.getByText(he.fixedTaskNetworkChip)).toBeTruthy();
   });
+
+  it("uses one do-task button instead of start then finish", () => {
+    const onComplete = vi.fn();
+    render(
+      <TaskOccurrenceCard
+        task={baseTask()}
+        index={0}
+        onOpen={vi.fn()}
+        onStart={vi.fn()}
+        onComplete={onComplete}
+      />,
+    );
+    expect(screen.queryByText(he.startTask)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: he.doTask }));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels the same action as finish when already in progress", () => {
+    const onComplete = vi.fn();
+    render(
+      <TaskOccurrenceCard
+        task={baseTask({ status: "in_progress" })}
+        index={0}
+        onComplete={onComplete}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.markDone }));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(he.doTask)).toBeNull();
+  });
 });

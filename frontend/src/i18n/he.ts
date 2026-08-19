@@ -261,6 +261,7 @@ export const he = {
   adHocNetworkManagerHint: "המשימה תועבר למנהל הסניף לשיוך לעובד",
   startTask: "התחלת משימה",
   startTaskSuccess: "המשימה התחילה — ניתן לסיים כשתסיים",
+  doTask: "ביצוע משימה",
   tasksInProgress: "משימות בטיפול",
   photoRequired: "חובה לצרף תמונה או וידאו לסיום (שמע אופציונלי)",
   videoRequiredMin: (seconds: number) =>

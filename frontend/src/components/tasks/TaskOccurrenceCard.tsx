@@ -5,7 +5,6 @@ import {
   Card,
   Checkbox,
   Chip,
-  CircularProgress,
   Collapse,
   Dialog,
   DialogActions,
@@ -22,12 +21,12 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditIcon from "@mui/icons-material/Edit";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import StopIcon from "@mui/icons-material/Stop";
 import ChatIcon from "@mui/icons-material/Chat";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
+import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import TaskStatusChip from "./TaskStatusChip";
 import TaskChatPanel from "./TaskChatPanel";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
@@ -154,8 +153,8 @@ export default function TaskOccurrenceCard({
     Boolean(task.assignee_user_id) &&
     !["completed", "cancelled", "pending_review"].includes(task.status);
   const canStart =
-    Boolean(onStart) && (task.status === "pending" || task.status === "overdue");
-  const canComplete = Boolean(onComplete) && task.status === "in_progress";
+    Boolean(onStart) && !onComplete && (task.status === "pending" || task.status === "overdue");
+  const canDo = Boolean(onComplete);
   const hasTextInstructions = Boolean(
     (task.description || "").trim() || audioSrc || task.spoken_text,
   );
@@ -564,29 +563,22 @@ export default function TaskOccurrenceCard({
               </Button>
             )}
             {canStart && onStart && (
-              <Button
+              <EmployeeDoTaskButton
+                status={task.status}
                 fullWidth
-                variant="contained"
                 size="small"
-                startIcon={
-                  starting ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />
-                }
+                starting={starting}
                 onClick={() => onStart(task)}
-                disabled={starting}
-              >
-                {he.startTask}
-              </Button>
+              />
             )}
-            {canComplete && onComplete && (
-              <Button
+            {canDo && onComplete && (
+              <EmployeeDoTaskButton
+                status={task.status}
                 fullWidth
-                variant="contained"
-                color="success"
                 size="small"
+                starting={starting}
                 onClick={() => onComplete(task)}
-              >
-                {he.markDone}
-              </Button>
+              />
             )}
           </Box>
         </Box>

@@ -71,6 +71,11 @@ import {
   effectiveRequirements,
   meetsCompletionRequirements,
 } from "../../utils/completionMedia";
+import {
+  applyStartedOnDashboard,
+  cardAfterStart,
+  needsTaskStart,
+} from "../../utils/employeeDoTask";
 
 function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
@@ -283,35 +288,6 @@ export default function EmployeeTasksPage() {
     load(true);
   }, [load]));
 
-  const handleStart = async (task: EmployeeTaskCard) => {
-    setStartingId(task.id);
-    try {
-      const result = await taskService.start(task.id);
-      const updated: EmployeeTaskCard = {
-        ...task,
-        status: result.occurrence?.status ?? "in_progress",
-        started_at: result.occurrence?.started_at ?? new Date().toISOString(),
-      };
-      setDashboard((prev) => {
-        if (!prev) return prev;
-        const without = (list: EmployeeTaskCard[]) => list.filter((t) => t.id !== task.id);
-        return {
-          ...prev,
-          on_shift: true,
-          urgent_tasks: without(prev.urgent_tasks),
-          today_tasks: without(prev.today_tasks),
-          in_progress_tasks: [...without(prev.in_progress_tasks), updated],
-        };
-      });
-      showSuccess(he.startTaskSuccess);
-      await load(true);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setStartingId(null);
-    }
-  };
-
   const clearCompletionMedia = useCallback(() => {
     setSlotMedia((prev) => {
       prev.forEach((item) => revokePendingMedia(item));
@@ -325,6 +301,24 @@ export default function EmployeeTasksPage() {
     setSlotMedia(effectiveRequirements(task).map(() => null));
     setSelected(task);
     setNote("");
+  };
+
+  const handleDoTask = async (task: EmployeeTaskCard) => {
+    setStartingId(task.id);
+    try {
+      let next = task;
+      if (needsTaskStart(task.status)) {
+        const result = await taskService.start(task.id);
+        next = cardAfterStart(task, result.occurrence);
+        setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
+        void load(true);
+      }
+      openComplete(next);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setStartingId(null);
+    }
   };
 
   const handleListen = async (task: EmployeeTaskCard) => {
@@ -514,8 +508,7 @@ export default function EmployeeTasksPage() {
     startingId,
     speakingId: speakingId ?? null,
     onOpen: (occ: TaskOccurrence) => withCard(occ, setDetailTask),
-    onStart: (occ: TaskOccurrence) => withCard(occ, (c) => void handleStart(c)),
-    onComplete: (occ: TaskOccurrence) => withCard(occ, openComplete),
+    onComplete: (occ: TaskOccurrence) => withCard(occ, (c) => void handleDoTask(c)),
     onListen: speechSupported
       ? (occ: TaskOccurrence) => withCard(occ, (c) => void handleListen(c))
       : undefined,
@@ -823,19 +816,12 @@ export default function EmployeeTasksPage() {
         titleNode={detailTask ? <EmployeeTaskTitle task={detailTask} variant="h6" /> : null}
         onClose={() => setDetailTask(null)}
         starting={detailTask ? startingId === detailTask.id : false}
-        onStart={
+        onDoTask={
           detailTask
             ? () => {
-                void handleStart(detailTask);
+                const task = detailTask;
                 setDetailTask(null);
-              }
-            : undefined
-        }
-        onComplete={
-          detailTask
-            ? () => {
-                openComplete(detailTask);
-                setDetailTask(null);
+                void handleDoTask(task);
               }
             : undefined
         }
@@ -847,11 +833,16 @@ export default function EmployeeTasksPage() {
       />
 
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
-        <DialogTitle>{he.markDone}</DialogTitle>
+        <DialogTitle>{he.doTask}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
           {selected && (
             <EmployeeTaskTitle task={selected} variant="subtitle1" />
           )}
+          {selected?.description ? (
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+              {selected.description}
+            </Typography>
+          ) : null}
           {selected && (
             <TaskReferenceMediaDisplay
               reference_photo_url={selected.reference_photo_url}

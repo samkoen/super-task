@@ -8,10 +8,9 @@ import {
   DialogTitle,
   Typography,
 } from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
+import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import TaskChatPanel from "./TaskChatPanel";
 import TaskStatusChip from "./TaskStatusChip";
 import { he } from "../../i18n/he";
@@ -35,8 +34,7 @@ export interface EmployeeTaskDetailDialogProps {
   task: EmployeeTaskDetailTask | null;
   titleNode?: ReactNode;
   onClose: () => void;
-  onStart?: () => void;
-  onComplete?: () => void;
+  onDoTask?: () => void;
   onChatUpdated?: () => void;
   starting?: boolean;
 }
@@ -46,15 +44,11 @@ export default function EmployeeTaskDetailDialog({
   task,
   titleNode,
   onClose,
-  onStart,
-  onComplete,
+  onDoTask,
   onChatUpdated,
   starting = false,
 }: EmployeeTaskDetailDialogProps) {
   if (!task) return null;
-
-  const canStart = task.status === "pending" || task.status === "overdue";
-  const canComplete = task.status === "in_progress";
 
   return (
     <Dialog open={Boolean(task)} onClose={onClose} fullWidth maxWidth="sm" dir="rtl">
@@ -114,20 +108,8 @@ export default function EmployeeTaskDetailDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
         <Button onClick={onClose}>{he.close}</Button>
-        {canStart && onStart && (
-          <Button
-            variant="contained"
-            startIcon={<PlayArrowIcon />}
-            onClick={onStart}
-            disabled={starting}
-          >
-            {he.startTask}
-          </Button>
-        )}
-        {canComplete && onComplete && (
-          <Button variant="contained" color="success" startIcon={<TaskAltIcon />} onClick={onComplete}>
-            {he.markDone}
-          </Button>
+        {onDoTask && (
+          <EmployeeDoTaskButton status={task.status} starting={starting} onClick={onDoTask} />
         )}
       </DialogActions>
     </Dialog>
