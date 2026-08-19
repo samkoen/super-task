@@ -214,7 +214,6 @@ export default function EmployeeTasksPage() {
   const [filterFrom, setFilterFrom] = useState(() => todayIso());
   const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
   const [rangeTasks, setRangeTasks] = useState<EmployeeTaskCard[]>([]);
-  const [employeeLanguage, setEmployeeLanguage] = useState<EmployeeLanguage>("he");
   const [translatingTasks, setTranslatingTasks] = useState(false);
 
   const translatePendingTasks = useCallback(
@@ -252,7 +251,6 @@ export default function EmployeeTasksPage() {
         setDashboard(data);
         setOnBreak(Boolean(breakState.on_break));
         const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
-        setEmployeeLanguage(lang);
         setRangeTasks([]);
         const allTasks = [
           ...data.urgent_tasks,
@@ -269,7 +267,6 @@ export default function EmployeeTasksPage() {
         setRangeTasks(cards);
         setDashboard(null);
         const lang = (user?.preferred_language as EmployeeLanguage) || "he";
-        setEmployeeLanguage(lang);
         void translatePendingTasks(lang, cards);
       }
     } catch (e) {
@@ -318,12 +315,6 @@ export default function EmployeeTasksPage() {
       setStartingId(null);
     }
   };
-
-  useEffect(() => {
-    if (user?.preferred_language) {
-      setEmployeeLanguage(user.preferred_language as EmployeeLanguage);
-    }
-  }, [user?.preferred_language]);
 
   const requirements = useMemo(
     () => (selected ? effectiveRequirements(selected) : []),
