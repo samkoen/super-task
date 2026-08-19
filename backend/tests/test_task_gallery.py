@@ -186,3 +186,27 @@ def test_create_item_stores_employee_can_claim(monkeypatch):
     kwargs = repo.create.call_args.kwargs
     assert kwargs["employee_can_claim"] is True
     assert kwargs["completion_requirements"] == [{"kind": "photo"}]
+
+
+def test_list_claimable_empty_when_none_flagged(monkeypatch):
+    repo = MagicMock()
+    repo.list_items.return_value = [_gallery_item(employee_can_claim=False)]
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, branches: ["b1"],
+    )
+    service = TaskGalleryService(repo, MagicMock(), MagicMock(), MagicMock())
+    assert service.list_claimable_for_employee(_actor(role="employee")) == []
+
+
+def test_list_claimable_skips_other_snif_recipe(monkeypatch):
+    repo = MagicMock()
+    repo.list_items.return_value = [
+        _gallery_item(id="g-other", branch_id="b2", employee_can_claim=True),
+    ]
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, branches: ["b1"],
+    )
+    service = TaskGalleryService(repo, MagicMock(), MagicMock(), MagicMock())
+    assert service.list_claimable_for_employee(_actor(role="employee")) == []

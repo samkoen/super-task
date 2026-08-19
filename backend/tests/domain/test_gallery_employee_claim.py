@@ -71,3 +71,34 @@ def test_not_claimable_other_snif_or_manager():
         )
         is False
     )
+
+
+def test_not_claimable_other_network_or_without_active_snif():
+    assert (
+        gallery_item_claimable_by_employee(
+            employee_can_claim=True,
+            item_network_id="n2",
+            item_branch_id=None,
+            actor=_employee(),
+        )
+        is False
+    )
+    assert (
+        gallery_item_claimable_by_employee(
+            employee_can_claim=True,
+            item_network_id="n1",
+            item_branch_id=None,
+            actor=_employee(branch_id=None),
+        )
+        is False
+    )
+
+
+def test_open_claim_statuses_exclude_done_and_review():
+    from app.domain import task_status
+    from app.domain.gallery_employee_claim import CLAIMABLE_OPEN_STATUSES
+
+    assert task_status.PENDING in CLAIMABLE_OPEN_STATUSES
+    assert task_status.COMPLETED not in CLAIMABLE_OPEN_STATUSES
+    assert task_status.PENDING_REVIEW not in CLAIMABLE_OPEN_STATUSES
+    assert task_status.CANCELLED not in CLAIMABLE_OPEN_STATUSES

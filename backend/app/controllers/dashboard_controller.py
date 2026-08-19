@@ -12,20 +12,24 @@ from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
 from app.services.dashboard_service import DashboardService
+from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
 
 router = APIRouter()
 
 
 def get_service(db: Session = Depends(get_db)) -> DashboardService:
+    occurrences = TaskOccurrenceRepository(db)
+    templates = TaskTemplateRepository(db)
     return DashboardService(
-        TaskOccurrenceRepository(db),
+        occurrences,
         BranchRepository(db),
         DepartmentRepository(db),
         UserRepository(db),
         TaskCompletionRepository(db),
         TaskTranslationService(TaskTranslationRepository(db)),
-        TaskTemplateRepository(db),
+        templates,
+        TaskSchedulerService(templates, occurrences, TaskCompletionRepository(db)),
     )
 
 

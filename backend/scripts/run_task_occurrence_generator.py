@@ -8,6 +8,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
 from app.db.session import SessionLocal
+from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.services.task_scheduler_service import TaskSchedulerService
@@ -16,7 +17,10 @@ from app.services.task_scheduler_service import TaskSchedulerService
 def main() -> None:
     db = SessionLocal()
     try:
-        scheduler = TaskSchedulerService(TaskTemplateRepository(db), TaskOccurrenceRepository(db))
+        occ = TaskOccurrenceRepository(db)
+        scheduler = TaskSchedulerService(
+            TaskTemplateRepository(db), occ, TaskCompletionRepository(db)
+        )
         result = scheduler.run_for_date()
         db.commit()
         print(result)

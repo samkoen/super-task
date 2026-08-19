@@ -105,7 +105,9 @@ def _emit_task_event(
 def get_template_service(db: Session = Depends(get_db)) -> TaskTemplateService:
     template_repo = TaskTemplateRepository(db)
     occurrence_repo = TaskOccurrenceRepository(db)
-    scheduler = TaskSchedulerService(template_repo, occurrence_repo)
+    scheduler = TaskSchedulerService(
+        template_repo, occurrence_repo, TaskCompletionRepository(db)
+    )
     return TaskTemplateService(
         template_repo,
         BranchRepository(db),
@@ -133,7 +135,10 @@ def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceServi
 
 def get_scheduler(db: Session = Depends(get_db)) -> TaskSchedulerService:
     template_repo = TaskTemplateRepository(db)
-    return TaskSchedulerService(template_repo, TaskOccurrenceRepository(db))
+    occurrence_repo = TaskOccurrenceRepository(db)
+    return TaskSchedulerService(
+        template_repo, occurrence_repo, TaskCompletionRepository(db)
+    )
 
 
 def get_message_service(db: Session = Depends(get_db)) -> TaskMessageService:

@@ -74,3 +74,44 @@ def test_claim_creates_ad_hoc_for_self():
     assert kwargs["source_gallery_item_id"] == "g1"
     assert kwargs["title"] == "תיעוד הבסטה"
     assert kwargs["completion_requirements"] == [{"kind": "photo"}]
+
+
+def test_claim_rejects_missing_item():
+    gallery = MagicMock()
+    gallery.find_by_id.return_value = None
+    with pytest.raises(ValueError, match="לא נמצא"):
+        _svc(gallery).claim_gallery_item(_oved(), "missing")
+
+
+def test_claim_rejects_other_snif_recipe():
+    gallery = MagicMock()
+    gallery.find_by_id.return_value = _item(branch_id="b2")
+    with pytest.raises(PermissionError, match="אין הרשאה"):
+        _svc(gallery).claim_gallery_item(_oved(), "g1")
+
+
+def test_claim_rejects_manager():
+    gallery = MagicMock()
+    gallery.find_by_id.return_value = _item()
+    manager = ActorContext(
+        user_id="m1", role="branch_manager", network_id="n1", branch_id="b1"
+    )
+    with pytest.raises(PermissionError, match="אין הרשאה"):
+        _svc(gallery).claim_gallery_item(manager, "g1")
+
+
+def test_self_claim_cannot_assign_someone_else():
+    svc = _svc(MagicMock())
+    with pytest.raises(PermissionError, match="לעצמך"):
+        svc._assert_can_create_ad_hoc(
+            _oved(), "b1", "other-oved", self_claim=True
+        )
+
+
+def test_self_claim_rejects_manager_role():
+    svc = _svc(MagicMock())
+    manager = ActorContext(
+        user_id="m1", role="branch_manager", network_id="n1", branch_id="b1"
+    )
+    with pytest.raises(PermissionError, match="רק עובד"):
+        svc._assert_can_create_ad_hoc(manager, "b1", "m1", self_claim=True)

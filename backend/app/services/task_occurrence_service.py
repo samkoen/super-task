@@ -51,6 +51,7 @@ from app.repositories.user_branch_membership_repository import UserBranchMembers
 from app.repositories.user_repository import UserRepository
 from app.services import blob_storage
 from app.services.completion_audio_transcription_service import transcribe_completion_audio
+from app.services.fixed_task_expiry import close_expired_fixed_occurrences
 from app.services.media_retention_service import MediaRetentionService
 from app.services.task_translation_service import TaskTranslationService
 
@@ -83,6 +84,15 @@ class TaskOccurrenceService:
         self._notifications = notification_repo
         self._gallery = gallery_repo
 
+    def _refresh_open_tasks(self, now: datetime, *, branch_ids: list[str] | None) -> None:
+        close_expired_fixed_occurrences(
+            self._occurrences, self._completions, now.date(), branch_ids=branch_ids
+        )
+        self._occurrences.rollover_open_tasks_to_day(
+            now.date(), now=now, branch_ids=branch_ids
+        )
+        self._occurrences.mark_overdue_before(now, branch_ids=branch_ids)
+
     def list_occurrences(
         self,
         actor: ActorContext,
@@ -99,10 +109,7 @@ class TaskOccurrenceService:
             raise PermissionError("אין הרשאה לצפות במשימות")
         now = datetime.now(TZ)
         branch_ids = visible_branch_ids_for_tasks(actor, self._branch)
-        self._occurrences.rollover_open_tasks_to_day(
-            now.date(), now=now, branch_ids=branch_ids
-        )
-        self._occurrences.mark_overdue_before(now, branch_ids=branch_ids)
+        self._refresh_open_tasks(now, branch_ids=branch_ids)
         day = date.fromisoformat(due_on) if due_on else None
         day_from = date.fromisoformat(due_from) if due_from else None
         day_to = date.fromisoformat(due_to) if due_to else None
@@ -136,10 +143,7 @@ class TaskOccurrenceService:
             raise PermissionError("רק עובדים יכולים לראות את המשימות שלהם")
         now = datetime.now(TZ)
         scope_branches = [actor.branch_id] if actor.branch_id else []
-        self._occurrences.rollover_open_tasks_to_day(
-            now.date(), now=now, branch_ids=scope_branches
-        )
-        self._occurrences.mark_overdue_before(now, branch_ids=scope_branches)
+        self._refresh_open_tasks(now, branch_ids=scope_branches)
         day = date.fromisoformat(due_on) if due_on else None
         if not day and not due_from and not due_to:
             day = now.date()

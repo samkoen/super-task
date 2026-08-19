@@ -125,6 +125,29 @@ describe("buildPendingTasks + filters", () => {
     expect(pending.map((t) => t.id).sort()).toEqual(["ip1", "ov1", "up1"]);
   });
 
+  it("keeps fixed and ad_hoc tasks together in the pending list", () => {
+    const mixed: TaskQueues = {
+      ...queues,
+      upcoming: [
+        task({
+          id: "fixed1",
+          status: "pending",
+          segment: "upcoming",
+          task_kind: "fixed",
+          due_at: "2026-07-14T09:00:00+03:00",
+        }),
+        task({
+          id: "adhoc1",
+          status: "pending",
+          segment: "upcoming",
+          task_kind: "ad_hoc",
+          due_at: "2026-07-14T10:00:00+03:00",
+        }),
+      ],
+    };
+    expect(buildPendingTasks(mixed).map((t) => t.id).sort()).toEqual(["adhoc1", "fixed1", "ip1"]);
+  });
+
   it("filters by department and assignee", () => {
     const pending = buildPendingTasks(queues);
     const filtered = filterPendingTasks(pending, {

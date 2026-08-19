@@ -67,6 +67,7 @@ class EmployeeReportService:
             due_to=due_to,
             tz=TZ,
             branch_names=branch_names,
+            completions=completions,
         )
         return {
             "period": period,

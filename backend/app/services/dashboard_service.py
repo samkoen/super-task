@@ -34,6 +34,8 @@ from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
+from app.services.fixed_task_expiry import close_expired_fixed_occurrences
+from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
 
 TZ = ZoneInfo("Asia/Jerusalem")
@@ -107,6 +109,7 @@ class DashboardService:
         completion_repo: TaskCompletionRepository,
         translation_service: TaskTranslationService | None = None,
         template_repo: TaskTemplateRepository | None = None,
+        scheduler: TaskSchedulerService | None = None,
     ):
         self._occurrences = occurrence_repo
         self._branches = branch_repo
@@ -115,6 +118,7 @@ class DashboardService:
         self._completions = completion_repo
         self._translations = translation_service
         self._templates = template_repo
+        self._scheduler = scheduler
 
     def manager_dashboard(
         self,
@@ -127,8 +131,7 @@ class DashboardService:
             raise PermissionError("אין הרשאה ללוח הבקרה")
 
         now = datetime.now(TZ)
-        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
-        self._occurrences.mark_overdue_before(now)
+        self._sync_live_occurrences(now)
         day = date.fromisoformat(due_on) if due_on else now.date()
 
         resolved_branch_id = self._resolve_manager_branch(actor, branch_id)
@@ -148,16 +151,14 @@ class DashboardService:
             raise ValueError("לעובד חסר שיוך לסניף")
 
         now = datetime.now(TZ)
-        # Tâches non faites hier → deviennent des tâches d'aujourd'hui (due_at avance).
-        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
-        self._occurrences.mark_overdue_before(now)
+        self._sync_live_occurrences(now)
         day = date.fromisoformat(due_on) if due_on else now.date()
 
-        # Même règle que le menahel : après rollover, le jour d'exécution (due_on).
-        tasks_today = self._occurrences.list_occurrences(
+        tasks_today = self._tasks_for_dashboard_day(
             branch_id=actor.branch_id,
+            day=day,
+            now=now,
             for_employee_user_id=actor.user_id,
-            due_on=day,
         )
 
         user = self._users.find_by_id(actor.user_id)
@@ -246,6 +247,31 @@ class DashboardService:
             return branch.id
         return None
 
+    def _sync_live_occurrences(self, now: datetime) -> None:
+        """Ferme les קבועות d'hier, génère celles du jour, reporte les מזדמנות."""
+        if self._scheduler:
+            self._scheduler.run_for_date(now.date())
+            return
+        close_expired_fixed_occurrences(
+            self._occurrences, self._completions, now.date()
+        )
+        self._occurrences.rollover_open_tasks_to_day(now.date(), now=now)
+        self._occurrences.mark_overdue_before(now)
+
+    def _tasks_for_dashboard_day(
+        self,
+        *,
+        branch_id: str,
+        day: date,
+        now: datetime,
+        for_employee_user_id: str | None = None,
+    ) -> list[TaskOccurrence]:
+        return self._occurrences.list_occurrences(
+            branch_id=branch_id,
+            for_employee_user_id=for_employee_user_id,
+            due_on=day,
+        )
+
     def _branch_manager_dashboard(
         self,
         actor: ActorContext,
@@ -258,7 +284,9 @@ class DashboardService:
             raise ValueError("סניף לא נמצא")
         assert_branch_visible(actor, branch.network_id, branch.id)
 
-        tasks_today = self._occurrences.list_occurrences(branch_id=branch_id, due_on=day)
+        tasks_today = self._tasks_for_dashboard_day(
+            branch_id=branch_id, day=day, now=now
+        )
         overdue_branch = self._occurrences.list_occurrences(
             branch_id=branch_id, status=task_status.OVERDUE
         )
@@ -339,7 +367,7 @@ class DashboardService:
             branch = self._branches.find_by_id(bid)
             if not branch:
                 continue
-            tasks_today = self._occurrences.list_occurrences(branch_id=bid, due_on=day)
+            tasks_today = self._tasks_for_dashboard_day(branch_id=bid, day=day, now=now)
             overdue = self._occurrences.list_occurrences(branch_id=bid, status=task_status.OVERDUE)
             counts = _count_by_status(tasks_today)
             urgent_pending = sum(

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 import app.db.models as orm
 from app.db import mappers as mp
 from app.domain import task_status
+from app.domain.dashboard_day_tasks import due_window
 from app.domain.employee_task_carry_over import (
     ROLLOVER_STATUSES,
     can_rollover_task_kind,
@@ -15,7 +16,8 @@ from app.domain.employee_task_carry_over import (
     start_of_day,
     status_after_rollover,
 )
-from app.domain.task_kind import AD_HOC
+from app.domain.fixed_task_expiry import EXPIRE_STATUSES
+from app.domain.task_kind import AD_HOC, FIXED
 from app.models.task_occurrence import TaskOccurrence
 
 _TZ = ZoneInfo("Asia/Jerusalem")
@@ -34,11 +36,13 @@ class TaskOccurrenceRepository:
             return None
 
     def exists_for_template_on_date(self, template_id: str, day: date) -> bool:
+        start, end = due_window(day, _TZ)
         q = (
             select(func.count())
             .select_from(orm.TaskOccurrence)
             .where(orm.TaskOccurrence.template_id == mp.parse_uuid(template_id))
-            .where(func.date(orm.TaskOccurrence.due_at) == day)
+            .where(orm.TaskOccurrence.due_at >= start)
+            .where(orm.TaskOccurrence.due_at < end)
         )
         return self._db.execute(q).scalar_one() > 0
 
@@ -58,6 +62,66 @@ class TaskOccurrenceRepository:
         due_to: date | None = None,
     ) -> list[TaskOccurrence]:
         q = select(orm.TaskOccurrence).order_by(orm.TaskOccurrence.due_at.asc())
+        q = self._apply_scope_filters(
+            q,
+            branch_ids=branch_ids,
+            branch_id=branch_id,
+            status=status,
+            assignee_user_id=assignee_user_id,
+            for_employee_user_id=for_employee_user_id,
+            manager_user_id=manager_user_id,
+            pending_delegation=pending_delegation,
+            task_kind=task_kind,
+        )
+        q = self._apply_due_filters(q, due_on=due_on, due_from=due_from, due_to=due_to)
+        rows = self._db.execute(q).scalars().all()
+        return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
+
+    def expire_open_fixed_before(
+        self,
+        day: date,
+        *,
+        branch_ids: list[str] | None = None,
+    ) -> list[TaskOccurrence]:
+        """Annule les קבועות ouvertes dont le jour d'origine est passé."""
+        start, _ = due_window(day, _TZ)
+        q = (
+            select(orm.TaskOccurrence)
+            .where(orm.TaskOccurrence.task_kind == FIXED)
+            .where(orm.TaskOccurrence.status.in_(tuple(EXPIRE_STATUSES)))
+            .where(orm.TaskOccurrence.due_at < start)
+        )
+        if branch_ids is not None:
+            if not branch_ids:
+                return []
+            q = q.where(
+                orm.TaskOccurrence.branch_id.in_([mp.parse_uuid(i) for i in branch_ids])
+            )
+        rows = self._db.execute(q).scalars().all()
+        expired: list[TaskOccurrence] = []
+        for row in rows:
+            row.status = task_status.CANCELLED
+            row.manager_next_at = None
+            domain = mp.task_occurrence_orm_to_domain(row)
+            if domain:
+                expired.append(domain)
+        if expired:
+            self._db.flush()
+        return expired
+
+    def _apply_scope_filters(
+        self,
+        q,
+        *,
+        branch_ids,
+        branch_id,
+        status,
+        assignee_user_id,
+        for_employee_user_id,
+        manager_user_id,
+        pending_delegation,
+        task_kind,
+    ):
         if branch_id:
             q = q.where(orm.TaskOccurrence.branch_id == mp.parse_uuid(branch_id))
         if branch_ids is not None:
@@ -75,15 +139,21 @@ class TaskOccurrenceRepository:
             q = q.where(orm.TaskOccurrence.assignee_user_id.is_(None))
         if task_kind:
             q = q.where(orm.TaskOccurrence.task_kind == task_kind)
+        return q
+
+    def _apply_due_filters(self, q, *, due_on, due_from, due_to):
         if due_on:
-            q = q.where(func.date(orm.TaskOccurrence.due_at) == due_on)
-        else:
-            if due_from:
-                q = q.where(func.date(orm.TaskOccurrence.due_at) >= due_from)
-            if due_to:
-                q = q.where(func.date(orm.TaskOccurrence.due_at) <= due_to)
-        rows = self._db.execute(q).scalars().all()
-        return [o for row in rows if (o := mp.task_occurrence_orm_to_domain(row))]
+            start, end = due_window(due_on, _TZ)
+            return q.where(orm.TaskOccurrence.due_at >= start).where(
+                orm.TaskOccurrence.due_at < end
+            )
+        if due_from:
+            start, _ = due_window(due_from, _TZ)
+            q = q.where(orm.TaskOccurrence.due_at >= start)
+        if due_to:
+            _, end = due_window(due_to, _TZ)
+            q = q.where(orm.TaskOccurrence.due_at < end)
+        return q
 
     def list_by_network_group(self, network_group_id: str) -> list[TaskOccurrence]:
         try:

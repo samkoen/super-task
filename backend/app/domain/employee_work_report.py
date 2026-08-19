@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 from app.domain import task_status
+from app.domain.fixed_task_expiry import counts_in_work_report
 from app.domain.manager_dashboard import duration_minutes, parse_dt
 from app.models.task_completion import TaskCompletion
 from app.models.task_occurrence import TaskOccurrence
@@ -35,8 +36,12 @@ def _task_due_day(task: TaskOccurrence, tz: ZoneInfo) -> date:
     return parse_dt(task.due_at, tz).date()
 
 
-def _day_completion_pct(tasks: list[TaskOccurrence]) -> float:
-    assigned = [t for t in tasks if t.status != task_status.CANCELLED]
+def _day_completion_pct(
+    tasks: list[TaskOccurrence],
+    completions: dict[str, TaskCompletion] | None = None,
+) -> float:
+    by_id = completions or {}
+    assigned = [t for t in tasks if counts_in_work_report(t, by_id.get(t.id))]
     if not assigned:
         return 1.0
     done = sum(1 for t in assigned if t.status == task_status.COMPLETED)
@@ -51,7 +56,8 @@ def build_employee_report_row(
     tz: ZoneInfo,
     branch_names: dict[str, str] | None = None,
 ) -> dict:
-    assigned = [t for t in tasks if t.status != task_status.CANCELLED]
+    by_id = completions
+    assigned = [t for t in tasks if counts_in_work_report(t, by_id.get(t.id))]
     completed = [t for t in assigned if t.status == task_status.COMPLETED]
     overdue = [t for t in assigned if t.status == task_status.OVERDUE]
     assigned_n = len(assigned)
@@ -161,10 +167,12 @@ def daily_completion_series(
     due_from: date,
     due_to: date,
     tz: ZoneInfo,
+    completions: dict[str, TaskCompletion] | None = None,
 ) -> list[dict]:
+    by_id = completions or {}
     by_day: dict[date, list[TaskOccurrence]] = {}
     for task in tasks:
-        if task.status == task_status.CANCELLED:
+        if not counts_in_work_report(task, by_id.get(task.id)):
             continue
         day = _task_due_day(task, tz)
         if due_from <= day <= due_to:
@@ -180,7 +188,7 @@ def daily_completion_series(
                 "day": cur.isoformat(),
                 "assigned_count": assigned_n,
                 "completed_count": completed_n,
-                "completion_pct": _day_completion_pct(day_tasks),
+                "completion_pct": _day_completion_pct(day_tasks, by_id),
             }
         )
         cur += timedelta(days=1)
@@ -191,10 +199,12 @@ def branch_completion_rows(
     tasks: list[TaskOccurrence],
     *,
     branch_names: dict[str, str],
+    completions: dict[str, TaskCompletion] | None = None,
 ) -> list[dict]:
+    by_id = completions or {}
     by_branch: dict[str, list[TaskOccurrence]] = {}
     for task in tasks:
-        if task.status == task_status.CANCELLED:
+        if not counts_in_work_report(task, by_id.get(task.id)):
             continue
         by_branch.setdefault(task.branch_id, []).append(task)
     rows: list[dict] = []
@@ -224,11 +234,14 @@ def build_report_charts(
     due_to: date,
     tz: ZoneInfo,
     branch_names: dict[str, str],
+    completions: dict[str, TaskCompletion] | None = None,
 ) -> dict:
     return {
         "alert_breakdown": alert_breakdown(rows),
         "daily_series": daily_completion_series(
-            tasks, due_from=due_from, due_to=due_to, tz=tz
+            tasks, due_from=due_from, due_to=due_to, tz=tz, completions=completions
         ),
-        "by_branch": branch_completion_rows(tasks, branch_names=branch_names),
+        "by_branch": branch_completion_rows(
+            tasks, branch_names=branch_names, completions=completions
+        ),
     }

@@ -9,6 +9,7 @@ from app.domain.employee_work_report import (
     report_summary,
     resolve_report_range,
 )
+from app.domain.fixed_task_expiry import SYSTEM_NOT_COMPLETED_REASON
 from app.models.task_completion import TaskCompletion
 from app.models.task_occurrence import TaskOccurrence
 from app.models.user import User
@@ -98,6 +99,33 @@ def test_build_row_counts_and_avg_duration():
     assert row["last_activity_at"] == "2026-08-17T10:30:00+03:00"
     assert row["branch_id"] == "b1"
     assert row["branch_name"] == "מרכז"
+
+
+def test_auto_closed_fixed_counts_as_assigned_not_completed():
+    emp = _emp()
+    tasks = [
+        _occ(id="a", status=task_status.COMPLETED),
+        _occ(id="b", status=task_status.CANCELLED, task_kind="fixed"),
+    ]
+    completions = {
+        "b": TaskCompletion(
+            id="c2",
+            occurrence_id="b",
+            status=task_status.COMPLETION_NOT_DONE,
+            note=None,
+            photo_path=None,
+            video_path=None,
+            audio_path=None,
+            not_completed_reason=SYSTEM_NOT_COMPLETED_REASON,
+            completed_by_id="e1",
+            completed_at="2026-08-18T00:01:00+03:00",
+        )
+    }
+    row = build_employee_report_row(emp, tasks, completions, tz=TZ)
+    assert row["assigned_count"] == 2
+    assert row["completed_count"] == 1
+    assert row["completion_pct"] == 0.5
+    assert row["overdue_count"] == 0
 
 
 def test_aggregate_sorts_weak_first():

@@ -7,7 +7,9 @@ from zoneinfo import ZoneInfo
 from app.domain import task_recurrence, task_status
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
+from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.services import blob_storage
+from app.services.fixed_task_expiry import close_expired_fixed_occurrences
 
 TZ = ZoneInfo("Asia/Jerusalem")
 
@@ -17,19 +19,24 @@ class TaskSchedulerService:
         self,
         template_repo: TaskTemplateRepository,
         occurrence_repo: TaskOccurrenceRepository,
+        completion_repo: TaskCompletionRepository | None = None,
     ):
         self._templates = template_repo
         self._occurrences = occurrence_repo
+        self._completions = completion_repo
 
     def run_for_date(self, on_date: date | None = None) -> dict:
         day = on_date or datetime.now(TZ).date()
         now = datetime.now(TZ)
-        # קבועות : nouvelles occurrences. מזדמנות ouvertes : report due_at (pas les קבועות).
+        expired = close_expired_fixed_occurrences(
+            self._occurrences, self._completions, day
+        )
         generated = self._generate_occurrences(day)
         rolled = self._occurrences.rollover_open_tasks_to_day(day, now=now)
         overdue = self._mark_overdue()
         return {
             "generated": generated,
+            "expired_fixed": expired,
             "rolled_forward": rolled,
             "overdue_marked": overdue,
             "date": day.isoformat(),

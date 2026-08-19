@@ -368,6 +368,7 @@ export const he = {
   markDone: "סיום משימה",
   taskCompleted: "בוצע",
   taskNotCompleted: "לא בוצע",
+  taskAutoClosedBySystem: "נסגר אוטומטית — לא בוצע ביום היעד",
   notCompletedReason: "סיבה",
   note: "הערה",
   addPhoto: "צילום תמונה",
