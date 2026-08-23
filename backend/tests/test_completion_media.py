@@ -2,9 +2,11 @@ from app.domain.completion_media import (
     assert_attachments_match,
     assert_completion_media,
     has_required_completion_visual_media,
+    merge_completion_requirements,
     normalize_min_video_seconds,
     normalize_requirements,
     parse_requirements_input,
+    requirement_example_urls,
 )
 import pytest
 
@@ -117,3 +119,76 @@ def test_parse_requirements_prefers_explicit_list():
         min_video_seconds=30,
     )
     assert reqs == [{"kind": "audio"}]
+
+
+def test_normalize_keeps_visual_slot_title_and_example():
+    reqs = normalize_requirements(
+        [
+            {
+                "kind": "photo",
+                "title": "  מדף חלב  ",
+                "hint": "  לצלם את כל השורה  ",
+                "example_url": "/uploads/task_photos/shelf.jpg",
+            },
+            {
+                "kind": "video",
+                "min_seconds": 12,
+                "title": "ניקוי קופה",
+                "example_url": "/uploads/task_photos/till.jpg",
+            },
+            {
+                "kind": "audio",
+                "title": "ignored",
+                "example_url": "/uploads/task_photos/no.jpg",
+            },
+        ]
+    )
+    assert reqs[0] == {
+        "kind": "photo",
+        "title": "מדף חלב",
+        "hint": "לצלם את כל השורה",
+        "example_url": "/uploads/task_photos/shelf.jpg",
+    }
+    assert reqs[1]["title"] == "ניקוי קופה"
+    assert reqs[1]["example_url"] == "/uploads/task_photos/till.jpg"
+    assert reqs[2] == {"kind": "audio"}
+
+
+def test_requirement_example_urls_skips_audio_and_empty():
+    assert requirement_example_urls(None) == []
+    assert requirement_example_urls(
+        [
+            {"kind": "photo", "example_url": "/a.jpg"},
+            {"kind": "video", "example_url": "  "},
+            {"kind": "audio", "example_url": "/no.jpg"},
+        ]
+    ) == ["/a.jpg"]
+
+
+def test_merge_uses_template_guides_when_occurrence_has_kinds_only():
+    merged = merge_completion_requirements(
+        [{"kind": "photo"}, {"kind": "video", "min_seconds": 10}],
+        [
+            {
+                "kind": "photo",
+                "title": "מדף",
+                "hint": "כל השורה",
+                "example_url": "/ex.jpg",
+            },
+            {"kind": "video", "min_seconds": 10, "title": "קופה", "example_url": "/v.jpg"},
+        ],
+    )
+    assert merged[0]["title"] == "מדף"
+    assert merged[0]["hint"] == "כל השורה"
+    assert merged[0]["example_url"] == "/ex.jpg"
+    assert merged[1]["title"] == "קופה"
+
+
+def test_merge_fills_missing_example_without_dropping_occurrence_title():
+    merged = merge_completion_requirements(
+        [{"kind": "photo", "title": "מדף"}],
+        [{"kind": "photo", "title": "תבנית", "hint": "הסבר", "example_url": "/ex.jpg"}],
+    )
+    assert merged == [
+        {"kind": "photo", "title": "מדף", "hint": "הסבר", "example_url": "/ex.jpg"}
+    ]

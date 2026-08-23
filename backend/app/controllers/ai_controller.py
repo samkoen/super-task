@@ -15,6 +15,7 @@ from app.repositories.user_repository import UserRepository
 from app.services.ai_service import AiChatMessage, AiService
 from app.services.reference_audio_transcription_service import transcribe_reference_audio
 from app.services.task_title_ai_service import generate_title_from_description
+from app.domain.text_localization import localize_text
 from app.services.task_tts_service import TaskTtsService
 from app.services.task_voice_ai_service import TaskVoiceAiService
 
@@ -49,6 +50,12 @@ class AiCompleteRequest(BaseModel):
 class AiTaskTtsRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1500)
     language: Literal["he", "ar", "th", "fr", "en"] = "he"
+
+
+class TranslateTextRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+    language: Literal["he", "ar", "th", "fr", "en"] = "he"
+    source_language: Literal["he", "ar", "th", "fr", "en"] = "he"
 
 
 class TranscribeReferenceAudioRequest(BaseModel):
@@ -153,6 +160,19 @@ async def ai_task_title_from_description(
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return {"title": title}
+
+
+@router.post("/translate-text")
+async def ai_translate_text(
+    body: TranslateTextRequest, request: Request, db: Session = Depends(get_db)
+):
+    _require_actor(request, db)
+    text = await localize_text(
+        body.text,
+        source_language=body.source_language,
+        target_language=body.language,
+    )
+    return {"text": text}
 
 
 @router.post("/task-tts")

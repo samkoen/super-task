@@ -89,3 +89,21 @@ def test_merge_occurrence_reference_media_keeps_occurrence_values():
     )
     assert merged.reference_photo_url == "/uploads/task_photos/occ.jpg"
     assert merged.reference_video_url == "/uploads/task_videos/tpl.mp4"
+
+
+def test_merge_fills_slot_guides_from_template():
+    merged = merge_occurrence_reference_media(
+        _occurrence(completion_requirements=[{"kind": "photo"}]),
+        _template(
+            completion_requirements=[
+                {
+                    "kind": "photo",
+                    "title": "מדף",
+                    "hint": "כל השורה",
+                    "example_url": "/uploads/task_photos/ex.jpg",
+                }
+            ]
+        ),
+    )
+    assert merged.completion_requirements[0]["title"] == "מדף"
+    assert merged.completion_requirements[0]["example_url"] == "/uploads/task_photos/ex.jpg"

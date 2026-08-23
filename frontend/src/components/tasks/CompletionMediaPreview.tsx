@@ -1,14 +1,21 @@
 import { Box, Button, Typography } from "@mui/material";
+import CompletionSlotGrid from "./CompletionSlotGrid";
 import { he } from "../../i18n/he";
 import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
 import { mediaUrl } from "../../utils/mediaUrl";
-import type { CompletionAttachment } from "../../utils/completionMedia";
+import {
+  attachmentsFromCompletion,
+  fillsFromAttachments,
+  visualSlotCount,
+} from "../../utils/completionSlotView";
+import { normalizeRequirements, type CompletionAttachment, type CompletionRequirement } from "../../utils/completionMedia";
 
 interface CompletionMediaPreviewProps {
   photo_path?: string | null;
   video_path?: string | null;
   audio_path?: string | null;
   attachments?: CompletionAttachment[] | null;
+  requirements?: CompletionRequirement[] | null;
   audio_transcript?: string | null;
   audio_transcript_employee?: string | null;
   viewer?: "employee" | "manager";
@@ -31,6 +38,7 @@ export default function CompletionMediaPreview({
   video_path,
   audio_path,
   attachments,
+  requirements,
   audio_transcript,
   audio_transcript_employee,
   viewer = "manager",
@@ -40,28 +48,69 @@ export default function CompletionMediaPreview({
   disabled = false,
   transcriptFallback = true,
 }: CompletionMediaPreviewProps) {
-  const items =
-    attachments && attachments.length > 0
-      ? attachments
-      : ([
-          photo_path ? { kind: "photo" as const, url: photo_path } : null,
-          video_path ? { kind: "video" as const, url: video_path } : null,
-          audio_path ? { kind: "audio" as const, url: audio_path } : null,
-        ].filter(Boolean) as CompletionAttachment[]);
-  const hasAudio = items.some((item) => item.kind === "audio");
+  const items = attachmentsFromCompletion({
+    completion_attachments: attachments,
+    photo_path,
+    video_path,
+    audio_path,
+  });
+  const reqs = normalizeRequirements(requirements);
+  const hasVisualGuides = visualSlotCount(reqs) > 0;
+  const hasAudio = items.some((item) => item.kind === "audio") || reqs.some((r) => r.kind === "audio");
   const resolvedTranscript = displayedAudioTranscript(
     viewer === "employee"
       ? audio_transcript_employee ?? audio_transcript
       : audio_transcript,
     { hasAudio, allowFallback: transcriptFallback },
   );
-  if (!items.length && !resolvedTranscript) return null;
+  if (!items.length && !resolvedTranscript && !hasVisualGuides) return null;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Typography variant="subtitle2" color="text.secondary">
         {he.completionMediaAdded}
       </Typography>
+      {hasVisualGuides ? (
+        <CompletionSlotGrid
+          requirements={reqs}
+          fills={fillsFromAttachments(reqs, items)}
+        />
+      ) : (
+        <LegacyAttachmentList
+          items={items}
+          disabled={disabled}
+          onRemovePhoto={onRemovePhoto}
+          onRemoveVideo={onRemoveVideo}
+          onRemoveAudio={onRemoveAudio}
+        />
+      )}
+      {resolvedTranscript && (
+        <Box sx={{ p: 1.25, bgcolor: "action.hover", borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+            {he.completionAudioTranscript}
+          </Typography>
+          <Typography variant="body2">{resolvedTranscript}</Typography>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function LegacyAttachmentList({
+  items,
+  disabled,
+  onRemovePhoto,
+  onRemoveVideo,
+  onRemoveAudio,
+}: {
+  items: CompletionAttachment[];
+  disabled: boolean;
+  onRemovePhoto?: () => void;
+  onRemoveVideo?: () => void;
+  onRemoveAudio?: () => void;
+}) {
+  return (
+    <>
       {items.map((item, index) => {
         const src = mediaUrl(item.url);
         if (!src) return null;
@@ -97,14 +146,6 @@ export default function CompletionMediaPreview({
           </Box>
         );
       })}
-      {resolvedTranscript && (
-        <Box sx={{ p: 1.25, bgcolor: "action.hover", borderRadius: 1 }}>
-          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-            {he.completionAudioTranscript}
-          </Typography>
-          <Typography variant="body2">{resolvedTranscript}</Typography>
-        </Box>
-      )}
-    </Box>
+    </>
   );
 }

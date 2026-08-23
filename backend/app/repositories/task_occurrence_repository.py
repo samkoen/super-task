@@ -343,6 +343,16 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
+    def update_completion_requirements(
+        self, id_: str, requirements: list | None
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.completion_requirements = requirements or []
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
     def update_details(
         self,
         id_: str,

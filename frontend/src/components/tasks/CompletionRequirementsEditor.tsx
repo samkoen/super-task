@@ -1,20 +1,17 @@
-import {
-  Box,
-  Button,
-  IconButton,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
+import VisualRequirementCard from "./VisualRequirementCard";
 import { he } from "../../i18n/he";
 import {
   addRequirement,
   MAX_COMPLETION_REQUIREMENTS,
   removeRequirement,
+  setRequirementExample,
+  setRequirementHint,
+  setRequirementTitle,
   setVideoSeconds,
   type CompletionKind,
   type CompletionRequirement,
@@ -26,11 +23,9 @@ interface CompletionRequirementsEditorProps {
   disabled?: boolean;
 }
 
-const KIND_LABEL: Record<CompletionKind, string> = {
-  photo: he.completionReqPhoto,
-  video: he.completionReqVideo,
-  audio: he.completionReqAudio,
-};
+function revokeIfBlob(url: string | undefined): void {
+  if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+}
 
 export default function CompletionRequirementsEditor({
   value,
@@ -38,10 +33,6 @@ export default function CompletionRequirementsEditor({
   disabled = false,
 }: CompletionRequirementsEditorProps) {
   const canAdd = value.length < MAX_COMPLETION_REQUIREMENTS && !disabled;
-
-  const add = (kind: CompletionKind) => {
-    onChange(addRequirement(value, kind));
-  };
 
   return (
     <Box
@@ -68,43 +59,25 @@ export default function CompletionRequirementsEditor({
       ) : (
         <Stack spacing={1}>
           {value.map((req, index) => (
-            <RequirementRow
+            <RequirementItem
               key={`${req.kind}-${index}`}
               req={req}
               index={index}
               disabled={disabled}
-              onRemove={() => onChange(removeRequirement(value, index))}
-              onSeconds={(seconds) => onChange(setVideoSeconds(value, index, seconds))}
+              onChange={onChange}
+              value={value}
             />
           ))}
         </Stack>
       )}
       <Box display="flex" flexWrap="wrap" gap={1}>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<PhotoCameraIcon />}
-          onClick={() => add("photo")}
-          disabled={!canAdd}
-        >
+        <Button size="small" variant="outlined" startIcon={<PhotoCameraIcon />} onClick={() => onChange(addRequirement(value, "photo"))} disabled={!canAdd}>
           {he.completionAddPhotoReq}
         </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<VideocamIcon />}
-          onClick={() => add("video")}
-          disabled={!canAdd}
-        >
+        <Button size="small" variant="outlined" startIcon={<VideocamIcon />} onClick={() => onChange(addRequirement(value, "video"))} disabled={!canAdd}>
           {he.completionAddVideoReq}
         </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<MicIcon />}
-          onClick={() => add("audio")}
-          disabled={!canAdd}
-        >
+        <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={() => onChange(addRequirement(value, "audio"))} disabled={!canAdd}>
           {he.completionAddAudioReq}
         </Button>
       </Box>
@@ -112,57 +85,53 @@ export default function CompletionRequirementsEditor({
   );
 }
 
-function RequirementRow({
+function RequirementItem({
   req,
   index,
   disabled,
-  onRemove,
-  onSeconds,
+  value,
+  onChange,
 }: {
   req: CompletionRequirement;
   index: number;
   disabled: boolean;
-  onRemove: () => void;
-  onSeconds: (value: string) => void;
+  value: CompletionRequirement[];
+  onChange: (next: CompletionRequirement[]) => void;
 }) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 1,
-        flexWrap: "wrap",
-        bgcolor: "action.hover",
-        borderRadius: 1,
-        px: 1,
-        py: 0.75,
-      }}
-    >
-      <Typography variant="body2" fontWeight={600} sx={{ minWidth: 72 }}>
-        {he.completionRequirementN(index + 1)}
-      </Typography>
-      <Typography variant="body2">{KIND_LABEL[req.kind]}</Typography>
-      {req.kind === "video" && (
-        <TextField
+  if (req.kind === "audio") {
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "action.hover", borderRadius: 1, px: 1, py: 0.75 }}>
+        <Typography variant="body2" fontWeight={600}>
+          {he.completionRequirementN(index + 1)} · {he.completionReqAudio}
+        </Typography>
+        <IconButton
           size="small"
-          type="number"
-          label={he.completionVideoMinSeconds}
-          value={req.min_seconds ?? ""}
-          onChange={(e) => onSeconds(e.target.value)}
+          aria-label={he.removeMedia}
+          onClick={() => onChange(removeRequirement(value, index))}
           disabled={disabled}
-          inputProps={{ min: 1, max: 600 }}
-          sx={{ width: 140 }}
-        />
-      )}
-      <IconButton
-        size="small"
-        aria-label={he.removeMedia}
-        onClick={onRemove}
-        disabled={disabled}
-        sx={{ mr: "auto" }}
-      >
-        <DeleteOutlineIcon fontSize="small" />
-      </IconButton>
-    </Box>
+          sx={{ mr: "auto" }}
+        >
+          <DeleteOutlineIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    );
+  }
+  return (
+    <VisualRequirementCard
+      req={req}
+      index={index}
+      disabled={disabled}
+      onTitle={(title) => onChange(setRequirementTitle(value, index, title))}
+      onHint={(hint) => onChange(setRequirementHint(value, index, hint))}
+      onSeconds={(seconds) => onChange(setVideoSeconds(value, index, seconds))}
+      onRemove={() => {
+        revokeIfBlob(req.example_url);
+        onChange(removeRequirement(value, index));
+      }}
+      onExample={(url, file) => {
+        revokeIfBlob(req.example_url);
+        onChange(setRequirementExample(value, index, url, file));
+      }}
+    />
   );
 }

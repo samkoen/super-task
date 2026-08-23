@@ -51,11 +51,9 @@ import {
   type TaskDateViewMode,
 } from "../../utils/dateView";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
-import CompletionRequirementSlots from "../../components/tasks/CompletionRequirementSlots";
 import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
-import TaskReferenceMediaDisplay from "../../components/tasks/TaskReferenceMediaDisplay";
 import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
 import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
@@ -72,6 +70,7 @@ import {
 } from "../../utils/completionMedia";
 import {
   applyStartedOnDashboard,
+  canDoTask,
   cardAfterStart,
   needsTaskStart,
 } from "../../utils/employeeDoTask";
@@ -188,11 +187,11 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
 
 export default function EmployeeTasksPage() {
   const { user } = useAuth();
+  const employeeLanguage = ((user?.preferred_language || "he") as EmployeeLanguage);
   const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useFeedback();
   const [dashboard, setDashboard] = useState<EmployeeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<EmployeeTaskCard | null>(null);
   const [detailTask, setDetailTask] = useState<EmployeeTaskCard | null>(null);
   const [note, setNote] = useState("");
   const [slotMedia, setSlotMedia] = useState<Array<PendingMedia | null>>([]);
@@ -208,7 +207,6 @@ export default function EmployeeTasksPage() {
   const [breakBusy, setBreakBusy] = useState(false);
   const [reportUploadingKind, setReportUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
   const [reportSaving, setReportSaving] = useState(false);
-  const [startingId, setStartingId] = useState<string | null>(null);
   const [filterDay, setFilterDay] = useState(() => todayIso());
   const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
   const [filterFrom, setFilterFrom] = useState(() => todayIso());
@@ -291,34 +289,21 @@ export default function EmployeeTasksPage() {
     });
   }, []);
 
-  const openComplete = (task: EmployeeTaskCard) => {
+  const openDetail = useCallback((task: EmployeeTaskCard) => {
     clearCompletionMedia();
-    setSlotMedia(effectiveRequirements(task).map(() => null));
-    setSelected(task);
     setNote("");
-  };
+    setSlotMedia(canDoTask(task.status) ? effectiveRequirements(task).map(() => null) : []);
+    setDetailTask(task);
+  }, [clearCompletionMedia]);
 
-  const handleDoTask = async (task: EmployeeTaskCard) => {
-    setStartingId(task.id);
-    try {
-      let next = task;
-      if (needsTaskStart(task.status)) {
-        const result = await taskService.start(task.id);
-        next = cardAfterStart(task, result.occurrence);
-        setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
-        void load(true);
-      }
-      openComplete(next);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setStartingId(null);
-    }
-  };
+  const closeDetail = useCallback(() => {
+    clearCompletionMedia();
+    setDetailTask(null);
+  }, [clearCompletionMedia]);
 
   const requirements = useMemo(
-    () => (selected ? effectiveRequirements(selected) : []),
-    [selected],
+    () => (detailTask && canDoTask(detailTask.status) ? effectiveRequirements(detailTask) : []),
+    [detailTask],
   );
   const canSubmitDone = meetsCompletionRequirements(
     requirements,
@@ -378,17 +363,23 @@ export default function EmployeeTasksPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selected) return;
+    if (!detailTask) return;
     setSaving(true);
     try {
-      const attachments = await uploadRequirementSlots(requirements, slotMedia);
-      await taskService.complete(selected.id, {
+      let task = detailTask;
+      if (needsTaskStart(task.status)) {
+        const result = await taskService.start(task.id);
+        task = cardAfterStart(task, result.occurrence);
+        setDashboard((prev) => applyStartedOnDashboard(prev, detailTask.id, task));
+      }
+      const attachments = await uploadRequirementSlots(effectiveRequirements(task), slotMedia);
+      await taskService.complete(task.id, {
         status: "completed",
         note: note || undefined,
         completion_attachments: attachments,
       });
       clearCompletionMedia();
-      setSelected(null);
+      setDetailTask(null);
       playTaskEndSound();
       showSuccess(he.taskSubmitSuccess);
       await load();
@@ -472,7 +463,7 @@ export default function EmployeeTasksPage() {
     if (!alertTaskId || loading) return;
     const existing = cardById.get(alertTaskId);
     if (existing) {
-      setDetailTask(existing);
+      openDetail(existing);
       setSearchParams({}, { replace: true });
       return;
     }
@@ -481,7 +472,7 @@ export default function EmployeeTasksPage() {
       .getOccurrence(alertTaskId)
       .then((occ) => {
         if (cancelled) return;
-        setDetailTask(toEmployeeCard(occ));
+        openDetail(toEmployeeCard(occ));
         setSearchParams({}, { replace: true });
       })
       .catch(() => {
@@ -490,7 +481,7 @@ export default function EmployeeTasksPage() {
     return () => {
       cancelled = true;
     };
-  }, [alertTaskId, loading, cardById, setSearchParams]);
+  }, [alertTaskId, loading, cardById, setSearchParams, openDetail]);
 
   const headerName = dashboard?.employee?.full_name ?? user?.full_name;
   const headerBranch = dashboard?.employee?.branch_name;
@@ -558,24 +549,24 @@ export default function EmployeeTasksPage() {
                   <EmployeeTaskSection
                     title={he.employeeRoutineTasks}
                     tasks={lists.routine}
-                    onOpen={setDetailTask}
+                    onOpen={openDetail}
                   />
                   <EmployeeTaskSection
                     title={he.employeeDynamicTasks}
                     tasks={lists.dynamic}
-                    onOpen={setDetailTask}
+                    onOpen={openDetail}
                     color="error.main"
                   />
                   <EmployeeTaskSection
                     title={he.taskPendingReview}
                     tasks={review}
-                    onOpen={setDetailTask}
+                    onOpen={openDetail}
                   />
                   {done.length > 0 && (
                     <EmployeeTaskSection
                       title={he.employeeCompletedTasks}
                       tasks={done}
-                      onOpen={setDetailTask}
+                      onOpen={openDetail}
                     />
                   )}
                 </Box>
@@ -600,12 +591,12 @@ export default function EmployeeTasksPage() {
               <EmployeeTaskSection
                 title={he.employeeRoutineTasks}
                 tasks={workLists.routine}
-                onOpen={setDetailTask}
+                onOpen={openDetail}
               />
               <EmployeeTaskSection
                 title={he.employeeDynamicTasks}
                 tasks={workLists.dynamic}
-                onOpen={setDetailTask}
+                onOpen={openDetail}
                 color="error.main"
               />
             </>
@@ -614,7 +605,7 @@ export default function EmployeeTasksPage() {
           <EmployeeTaskSection
             title={he.taskPendingReview}
             tasks={pendingReviewTasks}
-            onOpen={setDetailTask}
+            onOpen={openDetail}
           />
 
           {completedTasks.length > 0 && (
@@ -627,7 +618,7 @@ export default function EmployeeTasksPage() {
               <AccordionDetails sx={{ pt: 1, px: 1.5 }}>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
                   {completedTasks.map((task) => (
-                    <EmployeeTaskRow key={task.id} task={task} onOpen={setDetailTask} />
+                    <EmployeeTaskRow key={task.id} task={task} onOpen={openDetail} />
                   ))}
                 </Box>
               </AccordionDetails>
@@ -720,81 +711,28 @@ export default function EmployeeTasksPage() {
 
       <EmployeeTaskDetailDialog
         task={detailTask}
+        language={employeeLanguage}
         titleNode={detailTask ? <EmployeeTaskTitle task={detailTask} variant="h6" /> : null}
-        onClose={() => setDetailTask(null)}
-        starting={detailTask ? startingId === detailTask.id : false}
-        onDoTask={
-          detailTask
-            ? () => {
-                const task = detailTask;
-                setDetailTask(null);
-                void handleDoTask(task);
+        onClose={closeDetail}
+        capture={
+          detailTask && canDoTask(detailTask.status)
+            ? {
+                slots: slotMedia,
+                onSlotsChange: setSlotMedia,
+                note,
+                onNoteChange: setNote,
+                onSubmit: () => void handleSubmit(),
+                canSubmit: canSubmitDone,
+                saving,
               }
             : undefined
         }
         onChatUpdated={() => {
           void load();
-          setDetailTask(null);
+          closeDetail();
           showSuccess(he.taskChatSent);
         }}
       />
-
-      <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="xs" dir="rtl">
-        <DialogTitle>{he.doTask}</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-          {selected && (
-            <EmployeeTaskTitle task={selected} variant="subtitle1" />
-          )}
-          {selected?.description ? (
-            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
-              {selected.description}
-            </Typography>
-          ) : null}
-          {selected && (
-            <TaskReferenceMediaDisplay
-              reference_photo_url={selected.reference_photo_url}
-              reference_video_url={selected.reference_video_url}
-              reference_audio_url={selected.reference_audio_url}
-            />
-          )}
-          <Typography variant="body2" color="text.secondary">
-            {he.taskChatHint}
-          </Typography>
-          <TextField label={he.note} value={note} onChange={(e) => setNote(e.target.value)} fullWidth multiline rows={3} placeholder={he.completionMediaHint} />
-          <Typography variant="caption" color="text.secondary">{he.completionMediaHint}</Typography>
-          {requirements.length > 0 ? (
-            <CompletionRequirementSlots
-              requirements={requirements}
-              slots={slotMedia}
-              onChange={setSlotMedia}
-              disabled={saving}
-            />
-          ) : null}
-          {!canSubmitDone && (
-            <Typography variant="caption" color="warning.main">
-              {he.completionFillSlotsHint}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => {
-              clearCompletionMedia();
-              setSelected(null);
-            }}
-            disabled={saving}
-          >
-            {he.cancel}
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => void handleSubmit()}
-            disabled={saving || !canSubmitDone}
-          >
-            {saving ? <CircularProgress size={22} color="inherit" /> : he.submit}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
     </Box>
   );

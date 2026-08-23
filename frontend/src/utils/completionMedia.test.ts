@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   addRequirement,
   effectiveRequirements,
   meetsCompletionMedia,
   meetsCompletionRequirements,
   normalizeMinVideoSeconds,
+  normalizeRequirements,
+  resolveRequirementExamples,
+  setRequirementHint,
+  setRequirementTitle,
 } from "./completionMedia";
 
 describe("completionMedia", () => {
@@ -45,5 +49,36 @@ describe("completionMedia", () => {
 
   it("keeps an explicit empty list from the API", () => {
     expect(effectiveRequirements({ completion_requirements: [] })).toEqual([]);
+  });
+
+  it("keeps title and example on visual slots only", () => {
+    expect(
+      normalizeRequirements([
+        { kind: "photo", title: "  מדף  ", hint: "  כל השורה  ", example_url: "/a.jpg" },
+        { kind: "audio", title: "no", hint: "no", example_url: "/x.jpg" },
+      ]),
+    ).toEqual([
+      { kind: "photo", title: "מדף", hint: "כל השורה", example_url: "/a.jpg" },
+      { kind: "audio" },
+    ]);
+  });
+
+  it("keeps spaces while typing a slot title or hint", () => {
+    const withSpace = setRequirementTitle([{ kind: "photo" }], 0, "מדף ");
+    expect(withSpace[0].title).toBe("מדף ");
+    expect(setRequirementHint(withSpace, 0, "לצלם את ")[0].hint).toBe("לצלם את ");
+  });
+
+  it("uploads pending example photos at resolve time", async () => {
+    const file = new File(["x"], "ex.jpg", { type: "image/jpeg" });
+    const upload = vi.fn(async () => ({ url: "/uploads/task_photos/ex.jpg" }));
+    const resolved = await resolveRequirementExamples(
+      [{ kind: "photo", title: "מדף", example_url: "blob:http://localhost/1", pending_example: file }],
+      upload,
+    );
+    expect(upload).toHaveBeenCalledWith(file);
+    expect(resolved).toEqual([
+      { kind: "photo", title: "מדף", example_url: "/uploads/task_photos/ex.jpg" },
+    ]);
   });
 });

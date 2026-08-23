@@ -16,7 +16,12 @@ export interface TaskGalleryItem {
   photo_required: boolean;
   employee_can_claim?: boolean;
   min_video_seconds?: number | null;
-  completion_requirements?: Array<{ kind: string; min_seconds?: number }> | null;
+  completion_requirements?: Array<{
+    kind: string;
+    min_seconds?: number;
+    title?: string;
+    example_url?: string;
+  }> | null;
   reference_photo_url: string | null;
   reference_video_url: string | null;
   reference_audio_url: string | null;
@@ -39,7 +44,12 @@ export interface TaskGalleryPayload {
   photo_required?: boolean;
   employee_can_claim?: boolean;
   min_video_seconds?: number | null;
-  completion_requirements?: Array<{ kind: string; min_seconds?: number }> | null;
+  completion_requirements?: Array<{
+    kind: string;
+    min_seconds?: number;
+    title?: string;
+    example_url?: string;
+  }> | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;

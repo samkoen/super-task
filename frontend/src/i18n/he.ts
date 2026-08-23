@@ -272,7 +272,7 @@ export const he = {
   minVideoSecondsHint: "ריק = תמונה או וידאו. מספר = וידאו חובה באורך זה",
   completionHowToFinish: "איך מסיימים את המשימה?",
   completionHowToFinishHint:
-    "הוסיפו את הקבצים שהעובד חייב לצרף בסיום. אפשר כמה וידאו — לכל אחד משך מינימלי משלו.",
+    "אפשר להוסיף כותרת, תמונת דוגמה והסבר לכל תמונה או וידאו. שמע בנפרד.",
   completionNoRequirements: "בלי דרישת מדיה — אפשר לסיים בלי קובץ",
   completionAddPhotoReq: "+ תמונה",
   completionAddVideoReq: "+ וידאו",
@@ -286,6 +286,26 @@ export const he = {
   completionSlotVideoMin: (seconds: number) => `וידאו · לפחות ${seconds} שניות`,
   completionSlotPhoto: "תמונה",
   completionSlotAudio: "שמע",
+  completionSlotTitle: "כותרת למשבצת",
+  completionSlotTitleHint: "מה מצפים לראות כאן",
+  completionSlotHint: "הסבר לעובד",
+  completionSlotHintHint: "אופציונלי — מה בדיוק מצפים לראות או לצלם",
+  completionShowHint: "הצג הסבר",
+  completionListenHint: "השמע הסבר",
+  completionHintTitle: "מה מצפים כאן",
+  completionSlotExample: "תמונת דוגמה",
+  completionTakePhoto: "צלם תמונה",
+  completionTakeVideo: "צלם סרטון",
+  completionRetake: "צלם שוב",
+  completionEnlargeExample: "הגדלת דוגמה",
+  completionSlotDone: "הושלם",
+  completionVisualSummary: (photos: number, videos: number) => {
+    const parts: string[] = [];
+    if (photos > 0) parts.push(`${photos} תמונות`);
+    if (videos > 0) parts.push(`${videos} סרטונים`);
+    return parts.join(" · ");
+  },
+  completionSlotsProgress: (done: number, total: number) => `${done}/${total}`,
   workStartTask: "שעון נוכחות — תחילת עבודה",
   workStartTaskHint: "שעת פתיחת המשימה נחשבת כהגעה, רק אם המשימה גם נסגרה",
   taskReferenceMediaHint:

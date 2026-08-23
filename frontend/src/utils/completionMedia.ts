@@ -3,6 +3,11 @@ export type CompletionKind = "photo" | "video" | "audio";
 export type CompletionRequirement = {
   kind: CompletionKind;
   min_seconds?: number;
+  title?: string;
+  hint?: string;
+  example_url?: string;
+  /** Fichier local — upload seulement à la soumission. */
+  pending_example?: File | null;
 };
 
 export type CompletionAttachment = {
@@ -13,12 +18,46 @@ export type CompletionAttachment = {
 
 export const MAX_COMPLETION_REQUIREMENTS = 10;
 export const DEFAULT_VIDEO_SECONDS = 10;
+export const MAX_SLOT_TITLE = 80;
+export const MAX_SLOT_HINT = 300;
 
 export function normalizeMinVideoSeconds(value: number | string | null | undefined): number | null {
   if (value == null || value === "") return null;
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.min(600, Math.round(n));
+}
+
+function readSlotTitle(item: { title?: unknown }): string | undefined {
+  if (typeof item.title !== "string") return undefined;
+  const title = item.title.trim().slice(0, MAX_SLOT_TITLE);
+  return title || undefined;
+}
+
+function readExampleUrl(item: { example_url?: unknown }): string | undefined {
+  if (typeof item.example_url !== "string") return undefined;
+  const url = item.example_url.trim();
+  return url || undefined;
+}
+
+function readSlotHint(item: { hint?: unknown }): string | undefined {
+  if (typeof item.hint !== "string") return undefined;
+  const hint = item.hint.trim().slice(0, MAX_SLOT_HINT);
+  return hint || undefined;
+}
+
+function withVisualGuide(
+  kind: "photo" | "video",
+  item: { title?: unknown; hint?: unknown; example_url?: unknown },
+): Pick<CompletionRequirement, "title" | "hint" | "example_url"> {
+  const title = readSlotTitle(item);
+  const hint = readSlotHint(item);
+  const example_url = readExampleUrl(item);
+  return {
+    ...(title ? { title } : {}),
+    ...(hint ? { hint } : {}),
+    ...(example_url ? { example_url } : {}),
+  };
 }
 
 export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
@@ -28,12 +67,20 @@ export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
     if (!item || typeof item !== "object") continue;
     const kind = (item as { kind?: string }).kind;
     if (kind !== "photo" && kind !== "video" && kind !== "audio") continue;
-    if (kind !== "video") {
+    if (kind === "audio") {
       out.push({ kind });
       continue;
     }
+    const guide = withVisualGuide(
+      kind,
+      item as { title?: unknown; hint?: unknown; example_url?: unknown },
+    );
+    if (kind !== "video") {
+      out.push({ kind, ...guide });
+      continue;
+    }
     const min = normalizeMinVideoSeconds((item as { min_seconds?: number }).min_seconds);
-    out.push({ kind: "video", min_seconds: min ?? DEFAULT_VIDEO_SECONDS });
+    out.push({ kind: "video", min_seconds: min ?? DEFAULT_VIDEO_SECONDS, ...guide });
   }
   return out.slice(0, MAX_COMPLETION_REQUIREMENTS);
 }
@@ -83,6 +130,76 @@ export function setVideoSeconds(
 ): CompletionRequirement[] {
   const min = normalizeMinVideoSeconds(seconds) ?? DEFAULT_VIDEO_SECONDS;
   return list.map((item, i) => (i === index && item.kind === "video" ? { ...item, min_seconds: min } : item));
+}
+
+export function setRequirementTitle(
+  list: CompletionRequirement[],
+  index: number,
+  title: string,
+): CompletionRequirement[] {
+  const next = title.slice(0, MAX_SLOT_TITLE);
+  return list.map((item, i) =>
+    i === index && item.kind !== "audio" ? { ...item, title: next } : item,
+  );
+}
+
+export function setRequirementHint(
+  list: CompletionRequirement[],
+  index: number,
+  hint: string,
+): CompletionRequirement[] {
+  const next = hint.slice(0, MAX_SLOT_HINT);
+  return list.map((item, i) =>
+    i === index && item.kind !== "audio" ? { ...item, hint: next } : item,
+  );
+}
+
+export function setRequirementExample(
+  list: CompletionRequirement[],
+  index: number,
+  example_url: string,
+  pending_example: File | null,
+): CompletionRequirement[] {
+  return list.map((item, i) =>
+    i === index && item.kind !== "audio" ? { ...item, example_url, pending_example } : item,
+  );
+}
+
+export function countVisualKinds(list: CompletionRequirement[]): { photos: number; videos: number } {
+  return {
+    photos: list.filter((item) => item.kind === "photo").length,
+    videos: list.filter((item) => item.kind === "video").length,
+  };
+}
+
+export function toApiRequirement(item: CompletionRequirement): CompletionRequirement {
+  const next: CompletionRequirement = { kind: item.kind };
+  if (item.kind === "video") {
+    next.min_seconds = item.min_seconds ?? DEFAULT_VIDEO_SECONDS;
+  }
+  if (item.kind === "audio") return next;
+  const title = (item.title || "").trim().slice(0, MAX_SLOT_TITLE);
+  if (title) next.title = title;
+  const hint = (item.hint || "").trim().slice(0, MAX_SLOT_HINT);
+  if (hint) next.hint = hint;
+  const url = (item.example_url || "").trim();
+  if (url && !url.startsWith("blob:")) next.example_url = url;
+  return next;
+}
+
+export async function resolveRequirementExamples(
+  list: CompletionRequirement[],
+  uploadPhoto: (file: File) => Promise<{ url: string }>,
+): Promise<CompletionRequirement[]> {
+  const out: CompletionRequirement[] = [];
+  for (const item of list) {
+    const next = toApiRequirement(item);
+    if (item.kind !== "audio" && item.pending_example) {
+      next.example_url = (await uploadPhoto(item.pending_example)).url;
+    }
+    out.push(next);
+  }
+  return out;
 }
 
 export function meetsCompletionRequirements(

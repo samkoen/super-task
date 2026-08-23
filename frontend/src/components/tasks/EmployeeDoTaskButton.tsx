@@ -8,15 +8,17 @@ interface EmployeeDoTaskButtonProps {
   status: TaskStatus;
   onClick: () => void;
   starting?: boolean;
+  disabled?: boolean;
   fullWidth?: boolean;
   size?: "small" | "medium" | "large";
 }
 
-/** Bouton unique oved : démarre + ouvre la feuille de capture. */
+/** Bouton unique oved : démarre si besoin puis envoie la clôture. */
 export default function EmployeeDoTaskButton({
   status,
   onClick,
   starting = false,
+  disabled = false,
   fullWidth = false,
   size = "medium",
 }: EmployeeDoTaskButtonProps) {
@@ -37,7 +39,7 @@ export default function EmployeeDoTaskButton({
       size={size}
       startIcon={icon}
       onClick={onClick}
-      disabled={starting}
+      disabled={starting || disabled}
     >
       {doTaskButtonLabel(status)}
     </Button>

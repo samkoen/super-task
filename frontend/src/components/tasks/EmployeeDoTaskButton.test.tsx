@@ -9,6 +9,11 @@ describe("EmployeeDoTaskButton", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
+  it("can stay visible but disabled until the slots are filled", () => {
+    render(<EmployeeDoTaskButton status="pending" onClick={vi.fn()} disabled />);
+    expect((screen.getByRole("button", { name: he.doTask }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("uses do-task then finish labels", () => {
     const onClick = vi.fn();
     const { rerender } = render(

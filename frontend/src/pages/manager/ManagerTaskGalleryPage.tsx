@@ -45,6 +45,7 @@ import {
 import TaskReferenceMediaEditor from "../../components/tasks/TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "../../components/tasks/CompletionRequirementsEditor";
 import type { CompletionRequirement } from "../../utils/completionMedia";
+import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
@@ -179,6 +180,7 @@ export default function ManagerTaskGalleryPage() {
 
   const buildPayload = async (): Promise<TaskGalleryPayload> => {
     const resolved = await resolveTaskReferenceMedia(media);
+    const completion_requirements = await resolveTaskCompletionGuides(completionRequirements);
     const payload: TaskGalleryPayload = {
       title: form.title.trim(),
       description: form.description,
@@ -186,7 +188,7 @@ export default function ManagerTaskGalleryPage() {
       branch_id: canPickBranch ? form.branch_id || null : user?.branch_id || null,
       photo_required: true,
       employee_can_claim: form.employee_can_claim,
-      completion_requirements: completionRequirements,
+      completion_requirements,
       ...resolved,
     };
     if (form.task_kind === "fixed") {

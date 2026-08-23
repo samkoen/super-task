@@ -317,7 +317,7 @@ class TaskTemplateService:
         return {"deleted_count": len(targets), "cancelled_occurrences": cancelled}
 
     def _sync_open_occurrence_text(self, template) -> None:
-        """Propage titre/description (ex. תמלול audio) vers les occurrences ouvertes."""
+        """Propage titre, description et cases de clôture vers les occurrences ouvertes."""
         if not self._occurrences or not template:
             return
         open_statuses = {
@@ -325,12 +325,14 @@ class TaskTemplateService:
             task_status.OVERDUE,
             task_status.IN_PROGRESS,
         }
+        guides = getattr(template, "completion_requirements", None) or []
         for occ in self._occurrences.list_by_template_id(template.id):
             if occ.status not in open_statuses:
                 continue
             self._occurrences.update_title_description(
                 occ.id, title=template.title, description=template.description
             )
+            self._occurrences.update_completion_requirements(occ.id, guides)
 
     def _purge_open_occurrences(self, template_id: str) -> list[dict]:
         if not self._occurrences:

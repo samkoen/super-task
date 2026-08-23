@@ -95,6 +95,17 @@ describe("aiService", () => {
     expect(result.title).toBe("ניקוי מדף");
   });
 
+  it("translateText posts to /ai/translate-text", async () => {
+    mockPost.mockResolvedValue({ data: { text: "Take a photo of the shelf" } });
+    const text = await aiService.translateText("לצלם את המדף", "en");
+    expect(mockPost).toHaveBeenCalledWith(
+      "/ai/translate-text",
+      { text: "לצלם את המדף", language: "en", source_language: "he" },
+      { timeout: 60_000 },
+    );
+    expect(text).toBe("Take a photo of the shelf");
+  });
+
   it("speakTask posts text to /ai/task-tts as blob", async () => {
     mockPost.mockResolvedValue({ data: new Blob(["audio"], { type: "audio/mpeg" }) });
 

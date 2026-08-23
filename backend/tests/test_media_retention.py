@@ -133,6 +133,33 @@ def test_delete_stored_media_skips_urls_still_on_template(monkeypatch):
 
 
 
+def test_collect_includes_slot_example_unless_on_template():
+    occurrence = _occurrence(
+        template_id="tpl-1",
+        completion_requirements=[
+            {"kind": "photo", "example_url": "https://blob.example/shared-slot.jpg"},
+            {"kind": "video", "example_url": "https://blob.example/owned-slot.jpg"},
+        ],
+    )
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    template_repo = MagicMock()
+    template_repo.find_by_id.return_value = MagicMock(
+        reference_photo_url=None,
+        reference_video_url=None,
+        reference_audio_url=None,
+        completion_requirements=[
+            {"kind": "photo", "example_url": "https://blob.example/shared-slot.jpg"},
+        ],
+    )
+    service = MediaRetentionService(occurrence_repo, completion_repo, template_repo)
+    urls = service.collect_deletable_media_urls("occ-1")
+    assert "https://blob.example/shared-slot.jpg" not in urls
+    assert "https://blob.example/owned-slot.jpg" in urls
+
+
 def test_purge_due_empty_list():
     occurrence_repo = MagicMock()
     occurrence_repo.list_due_for_media_purge.return_value = []

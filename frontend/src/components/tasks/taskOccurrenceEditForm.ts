@@ -5,6 +5,7 @@ import { he } from "../../i18n/he";
 import { toDatetimeLocal } from "../../utils/dateView";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { effectiveRequirements } from "../../utils/completionMedia";
+import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
@@ -60,6 +61,7 @@ export async function saveOccurrenceEdit(
   mediaDirty: boolean,
 ): Promise<string> {
   const moveToGallery = isAssignToGallery(form.assignee_user_id);
+  const completion_requirements = await resolveTaskCompletionGuides(form.completion_requirements);
   const payload: Parameters<typeof taskService.updateOccurrence>[1] = {
     title: form.title.trim(),
     description: form.description,
@@ -68,7 +70,7 @@ export async function saveOccurrenceEdit(
       ? target.assignee_user_id || undefined
       : form.assignee_user_id || undefined,
     photo_required: target.task_kind === "ad_hoc" ? form.photo_required : undefined,
-    completion_requirements: form.completion_requirements,
+    completion_requirements,
     apply_to_network: moveToGallery ? false : form.apply_to_network,
   };
   if (mediaDirty) {

@@ -37,6 +37,10 @@ interface MediaCaptureActionsProps {
   density?: "default" | "icon";
   minVideoSeconds?: number | null;
   allowedKinds?: MediaKind[];
+  photoLabel?: string;
+  videoLabel?: string;
+  photoDoneLabel?: string;
+  videoDoneLabel?: string;
   onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
 }
 
@@ -488,6 +492,10 @@ export default function MediaCaptureActions({
   density = "default",
   minVideoSeconds = null,
   allowedKinds,
+  photoLabel,
+  videoLabel,
+  photoDoneLabel,
+  videoDoneLabel,
   onCapture,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream();
@@ -602,7 +610,11 @@ export default function MediaCaptureActions({
         onClick={openPhotoCapture}
         disabled={captureDisabled}
       >
-        {uploadingKind === "photo" ? he.loading : photoAdded ? he.photoAdded : he.addPhoto}
+        {uploadingKind === "photo"
+          ? he.loading
+          : photoAdded
+            ? photoDoneLabel ?? he.photoAdded
+            : photoLabel ?? he.addPhoto}
       </Button>
       )}
       {showVideo && (
@@ -612,7 +624,11 @@ export default function MediaCaptureActions({
         onClick={openVideoCapture}
         disabled={captureDisabled}
       >
-        {uploadingKind === "video" ? he.loading : videoAdded ? he.videoAdded : he.addVideo}
+        {uploadingKind === "video"
+          ? he.loading
+          : videoAdded
+            ? videoDoneLabel ?? he.videoAdded
+            : videoLabel ?? he.addVideo}
       </Button>
       )}
       {showAudio && (

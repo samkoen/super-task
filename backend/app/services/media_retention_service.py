@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.core import config
-from app.domain.completion_media import attachment_urls
+from app.domain.completion_media import attachment_urls, requirement_example_urls
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -54,6 +54,7 @@ class MediaRetentionService:
             occurrence.reference_video_url,
             occurrence.reference_audio_url,
         ]
+        urls.extend(requirement_example_urls(getattr(occurrence, "completion_requirements", None)))
         if completion:
             urls.extend(
                 [completion.photo_path, completion.video_path, completion.audio_path]
@@ -79,7 +80,7 @@ class MediaRetentionService:
         template = self._templates.find_by_id(template_id)
         if not template:
             return set()
-        return {
+        urls = {
             u
             for u in (
                 template.reference_photo_url,
@@ -88,6 +89,8 @@ class MediaRetentionService:
             )
             if u
         }
+        urls.update(requirement_example_urls(getattr(template, "completion_requirements", None)))
+        return urls
 
     def _purge_one(self, occurrence_id: str) -> bool:
         deleted = self.delete_stored_media(occurrence_id)

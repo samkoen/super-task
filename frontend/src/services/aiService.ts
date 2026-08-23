@@ -89,6 +89,15 @@ export const aiService = {
     return response.data;
   },
 
+  translateText: async (text: string, language: string, sourceLanguage = "he") => {
+    const response = await api.post<{ text: string }>(
+      "/ai/translate-text",
+      { text, language, source_language: sourceLanguage },
+      { timeout: 60_000 },
+    );
+    return response.data.text;
+  },
+
   speakTask: async (text: string, language: string) => {
     const response = await api.post<Blob>(
       "/ai/task-tts",

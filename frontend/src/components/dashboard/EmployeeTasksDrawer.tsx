@@ -32,6 +32,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import type { TeamMember } from "../../services/dashboardService";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
+import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import { datetimeLocalForNewTask, formatHebrewDayShort } from "../../utils/dateView";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { filterTasksForEmployee } from "../../utils/employeeDrawerTasks";
@@ -142,6 +143,9 @@ export default function EmployeeTasksDrawer({
     try {
       const title = await ensureTaskTitle(payload.title, payload.description);
       const media = await resolveTaskReferenceMedia(payload.media);
+      const completion_requirements = await resolveTaskCompletionGuides(
+        payload.completion_requirements,
+      );
       if (payload.task_kind === "fixed") {
         const res = await taskService.createTemplate({
           branch_id: branchId,
@@ -157,7 +161,7 @@ export default function EmployeeTasksDrawer({
           assignee_user_id: member.user_id,
           ops_category: payload.ops_category,
           min_video_seconds: payload.min_video_seconds,
-          completion_requirements: payload.completion_requirements,
+          completion_requirements,
           is_work_start: payload.is_work_start,
           ...media,
         });
@@ -171,7 +175,7 @@ export default function EmployeeTasksDrawer({
           assignee_user_id: member.user_id,
           photo_required: true,
           min_video_seconds: payload.min_video_seconds,
-          completion_requirements: payload.completion_requirements,
+          completion_requirements,
           ...media,
         });
         showSuccess(res.message);

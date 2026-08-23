@@ -127,3 +127,34 @@ def test_employee_card_without_template_keeps_occurrence_blob_urls():
     )
     assert card["reference_video_url"] == video
     assert card["reference_audio_url"] is None
+
+
+def test_employee_card_merges_slot_guides_from_template():
+    occ_repo = MagicMock()
+    occ_repo.get_department_name.return_value = None
+    tpl_repo = MagicMock()
+    tpl_repo.find_by_id.return_value = _tpl(
+        completion_requirements=[
+            {
+                "kind": "photo",
+                "title": "מדף",
+                "hint": "כל השורה",
+                "example_url": "/uploads/task_photos/ex.jpg",
+            }
+        ]
+    )
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+
+    svc = DashboardService(
+        occ_repo,
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        completion_repo,
+        template_repo=tpl_repo,
+    )
+    card = svc._employee_task_card(_occ(completion_requirements=[{"kind": "photo"}]))
+    assert card["completion_requirements"][0]["title"] == "מדף"
+    assert card["completion_requirements"][0]["hint"] == "כל השורה"
+    assert card["completion_requirements"][0]["example_url"] == "/uploads/task_photos/ex.jpg"

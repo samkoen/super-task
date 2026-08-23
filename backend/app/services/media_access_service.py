@@ -1,7 +1,7 @@
 """Contrôle d'accès aux URLs média (Blob /uploads) selon le périmètre acteur."""
 from __future__ import annotations
 
-from sqlalchemy import or_, select
+from sqlalchemy import String, cast, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -128,11 +128,16 @@ def _gallery_url_in_scope(
     return bool(db.execute(q.limit(1)).first())
 
 
+def _json_column_has_url(column, url: str):
+    return cast(column, String).contains(url)
+
+
 def _occurrence_media_match(url: str):
     return or_(
         orm.TaskOccurrence.reference_photo_url == url,
         orm.TaskOccurrence.reference_video_url == url,
         orm.TaskOccurrence.reference_audio_url == url,
+        _json_column_has_url(orm.TaskOccurrence.completion_requirements, url),
     )
 
 
@@ -149,6 +154,7 @@ def _template_media_match(url: str):
         orm.TaskTemplate.reference_photo_url == url,
         orm.TaskTemplate.reference_video_url == url,
         orm.TaskTemplate.reference_audio_url == url,
+        _json_column_has_url(orm.TaskTemplate.completion_requirements, url),
     )
 
 
@@ -165,6 +171,7 @@ def _gallery_media_match(url: str):
         orm.TaskGalleryItem.reference_photo_url == url,
         orm.TaskGalleryItem.reference_video_url == url,
         orm.TaskGalleryItem.reference_audio_url == url,
+        _json_column_has_url(orm.TaskGalleryItem.completion_requirements, url),
     )
 
 

@@ -15,7 +15,7 @@ def test_localize_same_language_returns_original():
 
 def test_localize_without_google_returns_original(monkeypatch):
     monkeypatch.setattr(
-        "app.domain.completion_transcript_localization.google_translate_configured",
+        "app.domain.text_localization.google_translate_configured",
         lambda: False,
     )
     result = asyncio.run(

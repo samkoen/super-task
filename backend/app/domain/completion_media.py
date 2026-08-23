@@ -5,6 +5,9 @@ from __future__ import annotations
 VALID_KINDS = ("photo", "video", "audio")
 MAX_MIN_VIDEO_SECONDS = 600
 MAX_REQUIREMENTS = 10
+MAX_SLOT_TITLE = 80
+MAX_SLOT_HINT = 300
+MAX_EXAMPLE_URL = 1024
 
 
 def packed_media_fields(requirements: list[dict]) -> dict:
@@ -185,6 +188,64 @@ def attachment_urls(attachments: list[dict] | None) -> list[str]:
     return [item["url"].strip() for item in attachments if (item.get("url") or "").strip()]
 
 
+def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
+    if not isinstance(requirements, list):
+        return []
+    urls: list[str] = []
+    for item in requirements:
+        if not isinstance(item, dict) or item.get("kind") == "audio":
+            continue
+        url = str(item.get("example_url") or "").strip()
+        if url:
+            urls.append(url)
+    return urls
+
+
+_GUIDE_KEYS = ("title", "hint", "example_url")
+
+
+def _has_slot_guides(requirements: list | None) -> bool:
+    if not isinstance(requirements, list):
+        return False
+    for item in requirements:
+        if not isinstance(item, dict) or item.get("kind") == "audio":
+            continue
+        if any(str(item.get(key) or "").strip() for key in _GUIDE_KEYS):
+            return True
+    return False
+
+
+def _fill_missing_guides(item: dict, extra: dict) -> dict:
+    if item.get("kind") == "audio" or extra.get("kind") == "audio":
+        return item
+    next_item = dict(item)
+    for key in _GUIDE_KEYS:
+        if str(next_item.get(key) or "").strip():
+            continue
+        value = extra.get(key)
+        if value:
+            next_item[key] = value
+    return next_item
+
+
+def merge_completion_requirements(
+    occurrence_reqs: list | None,
+    template_reqs: list | None,
+) -> list | None:
+    """Complète les guides de cases depuis le template si l'occurrence est en retard."""
+    occ = occurrence_reqs if isinstance(occurrence_reqs, list) else []
+    tpl = template_reqs if isinstance(template_reqs, list) else []
+    if not tpl:
+        return occurrence_reqs
+    if not occ or (_has_slot_guides(tpl) and not _has_slot_guides(occ)):
+        return template_reqs
+    merged: list = []
+    for index, item in enumerate(occ):
+        extra = tpl[index] if index < len(tpl) and isinstance(tpl[index], dict) else {}
+        merged.append(_fill_missing_guides(item, extra) if isinstance(item, dict) else item)
+    return merged
+
+
 def assert_attachments_match(requirements: list[dict], attachments: list[dict]) -> None:
     if not requirements:
         return
@@ -209,18 +270,43 @@ def _as_item_list(raw: object | None) -> list:
     return raw
 
 
+def _optional_text(value: object | None, *, max_len: int) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return text[:max_len]
+
+
+def _slot_guide_fields(item: dict) -> dict:
+    title = _optional_text(item.get("title"), max_len=MAX_SLOT_TITLE)
+    hint = _optional_text(item.get("hint"), max_len=MAX_SLOT_HINT)
+    example_url = _optional_text(item.get("example_url"), max_len=MAX_EXAMPLE_URL)
+    extra: dict = {}
+    if title:
+        extra["title"] = title
+    if hint:
+        extra["hint"] = hint
+    if example_url:
+        extra["example_url"] = example_url
+    return extra
+
+
 def _normalize_requirement(item: object) -> dict:
     if not isinstance(item, dict):
         raise ValueError("דרישות סיום לא תקינות")
     kind = str(item.get("kind") or "").strip()
     if kind not in VALID_KINDS:
         raise ValueError("סוג מדיה לא תקין")
+    if kind == "audio":
+        return {"kind": "audio"}
+    entry = {"kind": kind, **_slot_guide_fields(item)}
     if kind != "video":
-        return {"kind": kind}
+        return entry
     seconds = normalize_min_video_seconds(item.get("min_seconds"))
     if not seconds:
         raise ValueError("נדרש משך וידאו מינימלי")
-    return {"kind": "video", "min_seconds": seconds}
+    entry["min_seconds"] = seconds
+    return entry
 
 
 def _normalize_attachment(item: object) -> dict:

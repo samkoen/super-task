@@ -71,6 +71,7 @@ import {
   networkAdHocIds,
 } from "../../utils/adHocNetworkTasks";
 import { he } from "../../i18n/he";
+import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 
 const SAVED_FILTERS_EXPANDED_KEY = "super:saved-filters:manager_tasks:expanded";
 
@@ -339,6 +340,9 @@ export default function ManagerTasksPage() {
     try {
       const title = await ensureTaskTitle(payload.title, payload.description);
       const media = await resolveTaskReferenceMedia(payload.media);
+      const completion_requirements = await resolveTaskCompletionGuides(
+        payload.completion_requirements,
+      );
       if (isAssignToGallery(payload.assignee_user_id)) {
         const res = await taskGalleryService.create({
           branch_id: payload.branch_id,
@@ -357,7 +361,7 @@ export default function ManagerTasksPage() {
               ? payload.monthly_day
               : null,
           photo_required: true,
-          completion_requirements: payload.completion_requirements,
+          completion_requirements,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);
@@ -382,7 +386,7 @@ export default function ManagerTasksPage() {
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
           ops_category: payload.ops_category,
           min_video_seconds: payload.min_video_seconds,
-          completion_requirements: payload.completion_requirements,
+          completion_requirements,
           is_work_start: payload.is_work_start,
           ...media,
         });
@@ -404,7 +408,7 @@ export default function ManagerTasksPage() {
           due_at: new Date(payload.due_at).toISOString(),
           photo_required: true,
           min_video_seconds: payload.min_video_seconds,
-          completion_requirements: payload.completion_requirements,
+          completion_requirements,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);

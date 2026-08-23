@@ -77,3 +77,22 @@ def test_sync_updates_open_occurrences_only():
     occ_repo.update_title_description.assert_called_once_with(
         "open", title="כותרת", description="תמלול"
     )
+    occ_repo.update_completion_requirements.assert_called_once_with("open", [])
+
+
+def test_sync_copies_slot_guides_to_open_occurrence():
+    occ_repo = MagicMock()
+    occ_repo.list_by_template_id.return_value = [_occ(status=task_status.PENDING, id_="open")]
+    svc = TaskTemplateService(
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        occurrence_repo=occ_repo,
+    )
+    guides = [{"kind": "photo", "title": "מדף", "hint": "הסבר", "example_url": "/ex.jpg"}]
+    tpl = _tpl()
+    tpl.completion_requirements = guides
+    svc._sync_open_occurrence_text(tpl)
+    occ_repo.update_completion_requirements.assert_called_once_with("open", guides)

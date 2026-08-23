@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
+
+vi.mock("../media/MediaCaptureActions", () => ({
+  default: () => <div>capture</div>,
+}));
 import { he } from "../../i18n/he";
 import {
   addRequirement,
   effectiveRequirements,
   meetsCompletionRequirements,
   removeRequirement,
+  setRequirementHint,
+  setRequirementTitle,
 } from "../../utils/completionMedia";
 
 describe("completion requirements editor helpers", () => {
@@ -40,6 +46,38 @@ describe("completion requirements editor helpers", () => {
 });
 
 describe("CompletionRequirementsEditor", () => {
+  it("lets the menahel name a visual slot", () => {
+    const onChange = vi.fn();
+    render(
+      <CompletionRequirementsEditor
+        value={[{ kind: "photo" }]}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(he.completionSlotTitleHint), {
+      target: { value: "מדף חלב" },
+    });
+    expect(onChange).toHaveBeenCalledWith(
+      setRequirementTitle([{ kind: "photo" }], 0, "מדף חלב"),
+    );
+  });
+
+  it("lets the menahel add an optional hint", () => {
+    const onChange = vi.fn();
+    render(
+      <CompletionRequirementsEditor
+        value={[{ kind: "photo", title: "מדף" }]}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(he.completionSlotHintHint), {
+      target: { value: "לצלם את כל השורה" },
+    });
+    expect(onChange).toHaveBeenCalledWith(
+      setRequirementHint([{ kind: "photo", title: "מדף" }], 0, "לצלם את כל השורה"),
+    );
+  });
+
   it("lets the menahel add a second video", () => {
     const onChange = vi.fn();
     const { rerender } = render(

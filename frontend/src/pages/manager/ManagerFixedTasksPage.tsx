@@ -66,6 +66,7 @@ import {
 import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { he } from "../../i18n/he";
 import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
+import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
 
@@ -172,6 +173,9 @@ export default function ManagerFixedTasksPage() {
     setCreateSaving(true);
     try {
       const media = await resolveTaskReferenceMedia(payload.media);
+      const completion_requirements = await resolveTaskCompletionGuides(
+        payload.completion_requirements,
+      );
       const res = await taskService.createTemplate({
         ...groupedCreateApiFields(payload),
         title: payload.title,
@@ -181,7 +185,7 @@ export default function ManagerFixedTasksPage() {
         weekly_days: payload.weekly_days,
         monthly_day: payload.monthly_day,
         ops_category: payload.ops_category,
-        completion_requirements: payload.completion_requirements,
+        completion_requirements,
         is_work_start: payload.is_work_start,
         ...media,
       });
@@ -231,6 +235,9 @@ export default function ManagerFixedTasksPage() {
     setSaving(true);
     try {
       const media = await resolveTaskReferenceMedia(editMedia);
+      const completion_requirements = await resolveTaskCompletionGuides(
+        editForm.completion_requirements,
+      );
       const res = await taskService.updateTemplate(editing.id, {
         title: editForm.title,
         description: editForm.description,
@@ -243,7 +250,7 @@ export default function ManagerFixedTasksPage() {
         department_id: editing.department_id,
         is_active: editForm.is_active,
         ops_category: editForm.ops_category || null,
-        completion_requirements: editForm.completion_requirements,
+        completion_requirements,
         is_work_start: editForm.is_work_start,
         apply_to_network: editForm.apply_to_network,
         ...media,
@@ -594,7 +601,11 @@ export default function ManagerFixedTasksPage() {
             {he.managerFixedTasksDelete}
           </Button>
           <Button onClick={() => setEditing(null)} disabled={saving}>{he.cancel}</Button>
-          <Button variant="contained" onClick={() => void handleSaveEdit()} disabled={saving}>
+          <Button
+            variant="contained"
+            onClick={() => void handleSaveEdit()}
+            disabled={saving || !editForm}
+          >
             {he.submit}
           </Button>
         </DialogActions>
