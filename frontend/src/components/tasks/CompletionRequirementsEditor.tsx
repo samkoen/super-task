@@ -13,7 +13,6 @@ import {
   setRequirementHint,
   setRequirementTitle,
   setVideoSeconds,
-  type CompletionKind,
   type CompletionRequirement,
 } from "../../utils/completionMedia";
 

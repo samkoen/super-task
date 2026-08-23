@@ -47,7 +47,6 @@ function readSlotHint(item: { hint?: unknown }): string | undefined {
 }
 
 function withVisualGuide(
-  kind: "photo" | "video",
   item: { title?: unknown; hint?: unknown; example_url?: unknown },
 ): Pick<CompletionRequirement, "title" | "hint" | "example_url"> {
   const title = readSlotTitle(item);
@@ -72,7 +71,6 @@ export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
       continue;
     }
     const guide = withVisualGuide(
-      kind,
       item as { title?: unknown; hint?: unknown; example_url?: unknown },
     );
     if (kind !== "video") {
