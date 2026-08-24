@@ -21,17 +21,19 @@ const MediaPermissions = registerPlugin<MediaPermissionsPlugin>("MediaPermission
 export async function ensureNativeAvPermissions(options?: {
   camera?: boolean;
   microphone?: boolean;
+  requireMicrophone?: boolean;
 }): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return true;
   const needCamera = options?.camera !== false;
   const needMic = options?.microphone === true;
+  const requireMic = options?.requireMicrophone !== false;
   try {
     const status = await MediaPermissions.request({
       camera: needCamera,
       microphone: needMic,
     });
     if (needCamera && status.camera !== "granted") return false;
-    if (needMic && status.microphone !== "granted") return false;
+    if (needMic && requireMic && status.microphone !== "granted") return false;
     return true;
   } catch {
     return false;

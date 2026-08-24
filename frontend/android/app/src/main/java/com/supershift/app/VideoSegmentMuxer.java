@@ -118,7 +118,7 @@ final class VideoSegmentMuxer {
         }
         extractor.selectTrack(srcTrack);
         extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-        ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+        ByteBuffer buffer = ByteBuffer.allocate(sampleBufferBytes(extractor.getTrackFormat(srcTrack)));
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         long maxPts = 0;
         while (true) {
@@ -136,6 +136,14 @@ final class VideoSegmentMuxer {
         }
         extractor.unselectTrack(srcTrack);
         return maxPts;
+    }
+
+    static int sampleBufferBytes(MediaFormat format) {
+        int minBytes = 4 * 1024 * 1024;
+        if (format == null || !format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
+            return minBytes;
+        }
+        return Math.max(minBytes, format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE));
     }
 
     private static final class TrackMap {

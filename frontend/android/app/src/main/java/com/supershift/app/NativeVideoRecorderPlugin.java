@@ -23,6 +23,10 @@ public class NativeVideoRecorderPlugin extends Plugin {
     @PluginMethod
     public void record(PluginCall call) {
         Intent intent = new Intent(getContext(), VideoRecordActivity.class);
+        Integer minSeconds = call.getInt("minSeconds");
+        if (minSeconds != null && minSeconds > 0) {
+            intent.putExtra(VideoRecordActivity.EXTRA_MIN_SECONDS, minSeconds);
+        }
         startActivityForResult(call, intent, "onRecorded");
     }
 

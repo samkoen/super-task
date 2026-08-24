@@ -20,6 +20,9 @@ export async function launchVideoCapture(options: {
       options.onPermissionDenied();
       return;
     }
+    if (error instanceof Error && error.message === "too-short") {
+      return;
+    }
     options.openWeb();
   }
 }

@@ -56,6 +56,21 @@ describe("launchVideoCapture", () => {
     expect(openWeb).not.toHaveBeenCalled();
   });
 
+  it("does not open the web recorder when the native clip is too short", async () => {
+    canUseNativeVideoRecorder.mockReturnValue(true);
+    recordNativeVideo.mockRejectedValue(new Error("too-short"));
+    const openWeb = vi.fn();
+    const onNative = vi.fn();
+    await launchVideoCapture({
+      minSeconds: 10,
+      openWeb,
+      onNative,
+      onPermissionDenied: vi.fn(),
+    });
+    expect(onNative).not.toHaveBeenCalled();
+    expect(openWeb).not.toHaveBeenCalled();
+  });
+
   it("falls back to the web recorder if CameraX fails", async () => {
     canUseNativeVideoRecorder.mockReturnValue(true);
     recordNativeVideo.mockRejectedValue(new Error("device"));

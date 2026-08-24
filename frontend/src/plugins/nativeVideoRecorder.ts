@@ -40,18 +40,25 @@ export async function recordNativeVideo(options?: {
   if (!canUseNativeVideoRecorder()) {
     return null;
   }
-  const granted = await ensureNativeAvPermissions({ camera: true, microphone: true });
+  const granted = await ensureNativeAvPermissions({
+    camera: true,
+    microphone: true,
+    requireMicrophone: false,
+  });
   if (!granted) {
     throw new Error("permission");
   }
-  const raw = await NativeVideoRecorder.record({
-    minSeconds: options?.minSeconds ?? undefined,
-  });
+  const minSeconds = options?.minSeconds ?? undefined;
+  const raw = await NativeVideoRecorder.record({ minSeconds });
   if (raw.cancelled || !raw.path) {
     return null;
   }
+  const durationSeconds = Math.max(0, raw.durationSeconds ?? 0);
+  if (minSeconds && durationSeconds < minSeconds) {
+    throw new Error("too-short");
+  }
   return {
     file: await fileFromNativePath(raw.path, raw.mimeType || "video/mp4"),
-    durationSeconds: Math.max(1, raw.durationSeconds ?? 1),
+    durationSeconds: Math.max(1, durationSeconds),
   };
 }

@@ -70,10 +70,28 @@ describe("nativeVideoRecorder", () => {
       })),
     );
     const result = await recordNativeVideo({ minSeconds: 5 });
+    expect(ensureNativeAvPermissions).toHaveBeenCalledWith({
+      camera: true,
+      microphone: true,
+      requireMicrophone: false,
+    });
     expect(result?.durationSeconds).toBe(8);
     expect(result?.file.type).toBe("video/mp4");
     expect(result?.file.name.endsWith(".mp4")).toBe(true);
     expect(convertFileSrc).toHaveBeenCalled();
+  });
+
+  it("rejects a native clip shorter than minSeconds", async () => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue("android");
+    ensureNativeAvPermissions.mockResolvedValue(true);
+    record.mockResolvedValue({
+      cancelled: false,
+      path: "/data/cache/task-video.mp4",
+      mimeType: "video/mp4",
+      durationSeconds: 2,
+    });
+    await expect(recordNativeVideo({ minSeconds: 5 })).rejects.toThrow("too-short");
   });
 
   it("throws when camera permission is denied", async () => {

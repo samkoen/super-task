@@ -38,4 +38,20 @@ describe("ensureNativeAvPermissions", () => {
     request.mockResolvedValue({ camera: "denied", microphone: "prompt" });
     await expect(ensureNativeAvPermissions({ camera: true })).resolves.toBe(false);
   });
+
+  it("allows video when the microphone is denied but not required", async () => {
+    isNativePlatform.mockReturnValue(true);
+    request.mockResolvedValue({ camera: "granted", microphone: "denied" });
+    await expect(
+      ensureNativeAvPermissions({ camera: true, microphone: true, requireMicrophone: false })
+    ).resolves.toBe(true);
+  });
+
+  it("returns false when a required microphone is denied", async () => {
+    isNativePlatform.mockReturnValue(true);
+    request.mockResolvedValue({ camera: "granted", microphone: "denied" });
+    await expect(
+      ensureNativeAvPermissions({ camera: true, microphone: true })
+    ).resolves.toBe(false);
+  });
 });

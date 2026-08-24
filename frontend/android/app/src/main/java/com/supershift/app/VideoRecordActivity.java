@@ -39,6 +39,7 @@ import java.util.concurrent.Executor;
 public class VideoRecordActivity extends AppCompatActivity {
     static final String EXTRA_PATH = "path";
     static final String EXTRA_DURATION = "durationSeconds";
+    static final String EXTRA_MIN_SECONDS = "minSeconds";
 
     private PreviewView previewView;
     private TextView timerView;
@@ -50,7 +51,9 @@ public class VideoRecordActivity extends AppCompatActivity {
     private boolean useBackCamera = true;
     private boolean switching;
     private boolean finishing;
+    private boolean canceling;
     private boolean continueAfterStop;
+    private int minSeconds;
     private final List<File> segments = new ArrayList<>();
     private long completedMs;
     private long segmentStartedAt;
@@ -71,6 +74,7 @@ public class VideoRecordActivity extends AppCompatActivity {
         flipButton.setOnClickListener(v -> flipCamera());
         toggleButton.setOnClickListener(v -> toggleRecording());
         applySystemBarInsets();
+        minSeconds = Math.max(0, getIntent().getIntExtra(EXTRA_MIN_SECONDS, 0));
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             setResult(RESULT_CANCELED);
@@ -145,7 +149,7 @@ public class VideoRecordActivity extends AppCompatActivity {
     }
 
     private void flipCamera() {
-        if (switching || !hasBothCameras()) {
+        if (switching || finishing || canceling || !hasBothCameras()) {
             return;
         }
         useBackCamera = !useBackCamera;
@@ -160,7 +164,16 @@ public class VideoRecordActivity extends AppCompatActivity {
 
     private void toggleRecording() {
         if (recording != null) {
+            if (minSeconds > 0 && elapsedSeconds() < minSeconds) {
+                android.widget.Toast.makeText(
+                    this,
+                    getString(R.string.video_record_too_short, minSeconds),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show();
+                return;
+            }
             finishing = true;
+            continueAfterStop = false;
             stopCurrentSegment();
             return;
         }
@@ -198,16 +211,25 @@ public class VideoRecordActivity extends AppCompatActivity {
         if (!done.hasError() && file.exists() && file.length() > 0) {
             segments.add(file);
         }
+        if (canceling) {
+            canceling = false;
+            continueAfterStop = false;
+            switching = false;
+            finishCanceled();
+            return;
+        }
+        if (finishing) {
+            finishing = false;
+            continueAfterStop = false;
+            switching = false;
+            deliverResult();
+            return;
+        }
         if (continueAfterStop) {
             continueAfterStop = false;
             bindCamera();
             previewView.post(this::startSegment);
             switching = false;
-            return;
-        }
-        if (finishing) {
-            finishing = false;
-            deliverResult();
         }
     }
 
@@ -242,15 +264,18 @@ public class VideoRecordActivity extends AppCompatActivity {
     }
 
     private void onCloseClicked() {
+        continueAfterStop = false;
         if (recording != null) {
-            finishing = true;
+            canceling = true;
             stopCurrentSegment();
             return;
         }
-        if (!segments.isEmpty()) {
-            deliverResult();
-            return;
-        }
+        finishCanceled();
+    }
+
+    private void finishCanceled() {
+        timerHandler.removeCallbacks(timerTick);
+        deleteSegments();
         setResult(RESULT_CANCELED);
         finish();
     }

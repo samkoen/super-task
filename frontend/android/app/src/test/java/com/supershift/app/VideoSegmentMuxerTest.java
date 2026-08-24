@@ -19,4 +19,9 @@ public class VideoSegmentMuxerTest {
         assertEquals(payload.length, to.length());
         assertArrayEquals(payload, Files.readAllBytes(to.toPath()));
     }
+
+    @Test
+    public void sampleBufferUsesAtLeastFourMegabytesWhenFormatMissing() {
+        assertEquals(4 * 1024 * 1024, VideoSegmentMuxer.sampleBufferBytes(null));
+    }
 }
