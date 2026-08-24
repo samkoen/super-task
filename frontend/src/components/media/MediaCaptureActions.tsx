@@ -26,6 +26,7 @@ import { he } from "../../i18n/he";
 import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
 import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 
 export type MediaKind = "photo" | "video" | "audio";
 
@@ -175,7 +176,7 @@ export function PhotoCaptureDialog({
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
         <Button onClick={onClose} disabled={capturing || uploading || confirming}>
           {he.cancel}
         </Button>
@@ -342,7 +343,7 @@ function VideoCaptureDialog({
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
         <Button onClick={onClose} disabled={uploading || recording || confirming}>
           {he.cancel}
         </Button>
@@ -443,7 +444,7 @@ function AudioCaptureDialog({
           </>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
         <Button onClick={onClose} disabled={uploading || recording || confirming}>
           {he.cancel}
         </Button>

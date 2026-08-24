@@ -5,11 +5,16 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
@@ -55,6 +60,7 @@ public class VideoRecordActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_video_record);
         previewView = findViewById(R.id.video_preview);
@@ -64,6 +70,7 @@ public class VideoRecordActivity extends AppCompatActivity {
         findViewById(R.id.video_close).setOnClickListener(v -> onCloseClicked());
         flipButton.setOnClickListener(v -> flipCamera());
         toggleButton.setOnClickListener(v -> toggleRecording());
+        applySystemBarInsets();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             setResult(RESULT_CANCELED);
@@ -71,6 +78,22 @@ public class VideoRecordActivity extends AppCompatActivity {
             return;
         }
         startCameraProvider();
+    }
+
+    private void applySystemBarInsets() {
+        View controls = findViewById(R.id.video_controls);
+        int base = Math.round(16 * getResources().getDisplayMetrics().density);
+        ViewCompat.setOnApplyWindowInsetsListener(controls, (v, windowInsets) -> {
+            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(base + bars.left, base, base + bars.right, base + bars.bottom);
+            return windowInsets;
+        });
+        ViewCompat.setOnApplyWindowInsetsListener(timerView, (v, windowInsets) -> {
+            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setTranslationY(bars.top);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(controls);
     }
 
     private void startCameraProvider() {
