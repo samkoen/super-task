@@ -8,6 +8,9 @@ import { AuthProvider } from "./context/AuthContext";
 import { FeedbackProvider } from "./context/FeedbackContext";
 import { emotionCache } from "./emotion/caches";
 import { theme } from "./theme/theme";
+import { applyAndroidNavBottomFallback } from "./utils/systemInsets";
+
+applyAndroidNavBottomFallback();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

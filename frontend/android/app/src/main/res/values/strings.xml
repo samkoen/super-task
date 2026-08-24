@@ -4,4 +4,10 @@
     <string name="title_activity_main">SuperShift</string>
     <string name="package_name">com.supershift.app</string>
     <string name="custom_url_scheme">com.supershift.app</string>
+    <string name="video_record_flip">החלף מצלמה</string>
+    <string name="video_record_start">הקלט</string>
+    <string name="video_record_stop">עצור</string>
+    <string name="video_record_close">סגור</string>
+    <string name="video_record_recording">מקליט…</string>
+    <string name="video_record_too_short">יש להקליט לפחות %d שניות</string>
 </resources>

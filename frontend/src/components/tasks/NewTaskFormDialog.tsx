@@ -28,6 +28,7 @@ import { OPS_CATEGORIES, type OpsCategory, type TaskRecurrence } from "../../ser
 import { he } from "../../i18n/he";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import type { CompletionRequirement } from "../../utils/completionMedia";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 import {
   createFieldsFromBranchSelection,
 } from "../../utils/fixedTaskCreateScope";
@@ -475,7 +476,7 @@ export default function NewTaskFormDialog({
           </Typography>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss() }}>
         <Button onClick={onClose} disabled={saving}>{he.cancel}</Button>
         <Button
           variant="contained"

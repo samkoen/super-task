@@ -1,4 +1,5 @@
 import { alpha, createTheme } from "@mui/material/styles";
+import { dialogActionsPbCss } from "../utils/systemInsets";
 
 /** Deep teal — retail ops brand */
 const primaryMain = "#0A6B5C";
@@ -170,6 +171,16 @@ export const theme = createTheme({
           borderRadius: 18,
           border: `1px solid ${alpha(ink, 0.06)}`,
           boxShadow: `0 24px 64px ${alpha(ink, 0.18)}`,
+        },
+        paperFullScreen: {
+          borderRadius: 0,
+        },
+      },
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: {
+          paddingBottom: dialogActionsPbCss(),
         },
       },
     },

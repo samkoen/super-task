@@ -3,6 +3,7 @@ import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import MicIcon from "@mui/icons-material/Mic";
 import { he } from "../../i18n/he";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 
 export type TaskCreationMode = "manual" | "voice" | "gallery";
 
@@ -54,7 +55,7 @@ export default function TaskCreationModeDialog({
           {he.taskCreationModeGallery}
         </Button>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss() }}>
         <Button onClick={onClose}>{he.cancel}</Button>
       </DialogActions>
     </Dialog>
