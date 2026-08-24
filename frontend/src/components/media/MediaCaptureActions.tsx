@@ -24,6 +24,8 @@ import { useVideoRecorder } from "../../hooks/useVideoRecorder";
 import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./PhotoAnnotationCanvas";
 import { he } from "../../i18n/he";
 import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
+import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
+import { launchVideoCapture } from "../../utils/launchVideoCapture";
 
 export type MediaKind = "photo" | "video" | "audio";
 
@@ -503,10 +505,13 @@ export default function MediaCaptureActions({
   const [photoOpen, setPhotoOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
+  const [nativeVideoError, setNativeVideoError] = useState("");
   const captureSupported = isMediaCaptureSupported();
+  const nativeVideo = canUseNativeVideoRecorder();
 
   const busy = disabled || uploadingKind !== null;
   const captureDisabled = busy || !captureSupported;
+  const videoDisabled = busy || (!captureSupported && !nativeVideo);
   const kinds = allowedKinds ?? (["photo", "video", "audio"] as MediaKind[]);
   const showPhoto = kinds.includes("photo");
   const showVideo = kinds.includes("video");
@@ -524,12 +529,22 @@ export default function MediaCaptureActions({
     photoCamera.stop();
   }, [photoCamera.stop]);
 
-  const openVideoCapture = useCallback(() => {
+  const openWebVideoCapture = useCallback(() => {
     setVideoOpen(true);
     scheduleAfterDialogPaint(() => {
       void videoRecorder.startPreview();
     });
   }, [videoRecorder.startPreview]);
+
+  const openVideoCapture = useCallback(() => {
+    setNativeVideoError("");
+    void launchVideoCapture({
+      minSeconds: minVideoSeconds,
+      openWeb: openWebVideoCapture,
+      onNative: (file, durationSeconds) => onCapture(file, "video", { durationSeconds }),
+      onPermissionDenied: () => setNativeVideoError("permission"),
+    });
+  }, [minVideoSeconds, onCapture, openWebVideoCapture]);
 
   const closeVideoCapture = useCallback(() => {
     setVideoOpen(false);
@@ -586,7 +601,7 @@ export default function MediaCaptureActions({
             aria-label={he.addVideo}
             color={videoAdded ? "primary" : "default"}
             onClick={openVideoCapture}
-            disabled={captureDisabled}
+            disabled={videoDisabled}
             sx={{ p: 0.5 }}
           >
             {uploadingKind === "video" ? (
@@ -622,7 +637,7 @@ export default function MediaCaptureActions({
         startIcon={<VideocamIcon />}
         variant={videoAdded ? "contained" : "outlined"}
         onClick={openVideoCapture}
-        disabled={captureDisabled}
+        disabled={videoDisabled}
       >
         {uploadingKind === "video"
           ? he.loading
@@ -647,11 +662,16 @@ export default function MediaCaptureActions({
   return (
     <>
       {density === "icon" ? iconActions : defaultActions}
-      {!captureSupported && (
+      {!captureSupported && !nativeVideo && (
         <Typography variant="caption" color="warning.main">
           {he.mediaCaptureUnsupported}
         </Typography>
       )}
+      {nativeVideoError ? (
+        <Typography variant="caption" color="warning.main">
+          {errorMessage(nativeVideoError)}
+        </Typography>
+      ) : null}
       <PhotoCaptureDialog
         open={photoOpen}
         uploading={uploadingKind === "photo"}

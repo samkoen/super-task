@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(MediaPermissionsPlugin.class);
+        registerPlugin(NativeVideoRecorderPlugin.class);
         super.onCreate(savedInstanceState);
         CookieManager.getInstance().setAcceptCookie(true);
         // Ne pas demander caméra/micro au démarrage : ça peut figer le WebView.
