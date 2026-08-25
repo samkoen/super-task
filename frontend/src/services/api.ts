@@ -50,6 +50,13 @@ export interface User {
   branches?: UserBranchMembership[];
   /** Snif actif à l'écran (oved). */
   active_branch_id?: string | null;
+  /** Mode test menahel : session réelle inchangée, UI oved. */
+  is_preview?: boolean;
+  preview_real_user?: {
+    id: string;
+    full_name: string;
+    role: UserRole;
+  };
 }
 
 export class ApiError extends Error {

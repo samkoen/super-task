@@ -64,6 +64,37 @@ def test_require_admin_uses_db_role_not_stale_session():
     assert exc.value.status_code == 403
 
 
+def test_load_actor_preview_does_not_overwrite_session_role(monkeypatch):
+    manager = MagicMock()
+    manager.id = "m1"
+    manager.is_active = True
+    manager.role = roles.BRANCH_MANAGER
+    manager.network_id = "n1"
+    manager.branch_id = "b1"
+    employee = MagicMock()
+    employee.id = "e1"
+    employee.is_active = True
+    employee.role = roles.EMPLOYEE
+    employee.network_id = "n1"
+    employee.branch_id = "b1"
+    repo = MagicMock()
+    repo.find_by_id.side_effect = lambda uid: manager if uid == "m1" else employee
+    request = MagicMock()
+    request.session = {
+        "user_id": "m1",
+        "user_role": roles.BRANCH_MANAGER,
+        "preview_as_user_id": "e1",
+    }
+    monkeypatch.setattr("app.auth.actor._preview_still_allowed", lambda *_a, **_k: True)
+    monkeypatch.setattr("app.auth.actor._employee_membership_ids", lambda *_a, **_k: ("b1",))
+
+    actor = load_actor(request, repo)
+    assert actor.user_id == "e1"
+    assert actor.role == roles.EMPLOYEE
+    assert request.session["user_role"] == roles.BRANCH_MANAGER
+    assert request.session["user_id"] == "m1"
+
+
 def test_require_manager_actor_ok():
     user = MagicMock()
     user.is_active = True
