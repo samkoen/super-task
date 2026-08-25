@@ -21,4 +21,17 @@ describe("MobileMenuTopBar", () => {
     expect(screen.queryByRole("button", { name: he.goBack })).toBeNull();
     expect(screen.getByRole("button", { name: he.mainMenu })).toBeTruthy();
   });
+
+  it("renders trailing action next to the menu", () => {
+    render(
+      <MobileMenuTopBar
+        showBack={false}
+        forceVisible
+        onOpenMenu={() => {}}
+        trailing={<button type="button">צפייה כעובד</button>}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "צפייה כעובד" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.mainMenu })).toBeTruthy();
+  });
 });

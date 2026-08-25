@@ -7,14 +7,16 @@ interface EmployeeTaskSectionProps {
   tasks: EmployeeTaskCard[];
   onOpen: (task: EmployeeTaskCard) => void;
   color?: string;
+  layout?: "tile" | "list";
 }
 
-/** Grille de petites tuiles photo. */
+/** קבועות : liste. מזדמנות : tuiles photo. */
 export default function EmployeeTaskSection({
   title,
   tasks,
   onOpen,
   color,
+  layout = "tile",
 }: EmployeeTaskSectionProps) {
   if (tasks.length === 0) return null;
   return (
@@ -27,9 +29,15 @@ export default function EmployeeTaskSection({
       >
         {title} ({tasks.length})
       </Typography>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
+      <Box
+        sx={
+          layout === "list"
+            ? { display: "flex", flexDirection: "column", gap: 0.75 }
+            : { display: "flex", flexWrap: "wrap", gap: 1.25 }
+        }
+      >
         {tasks.map((task) => (
-          <EmployeeTaskRow key={task.id} task={task} onOpen={onOpen} />
+          <EmployeeTaskRow key={task.id} task={task} onOpen={onOpen} layout={layout} />
         ))}
       </Box>
     </Box>

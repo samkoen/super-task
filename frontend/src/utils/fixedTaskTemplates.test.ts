@@ -52,13 +52,13 @@ describe("fixedTaskTemplates", () => {
     expect(sorted.map((t) => t.id)).toEqual(["2", "3", "1"]);
   });
 
-  it("formats schedule with weekday when weekly", () => {
+  it("formats daily weekdays when not every day", () => {
     const text = formatTemplateSchedule(
-      tpl({ id: "1", title: "x", recurrence: "weekly", weekly_days: "0", due_time: "10:30" }),
+      tpl({ id: "1", title: "x", recurrence: "daily", weekly_days: "0,1", due_time: "09:00" }),
     );
-    expect(text).toContain(he.recurrenceLabels.weekly);
+    expect(text).toContain(he.recurrenceLabels.daily);
     expect(text).toContain(he.weekdayMon);
-    expect(text).toContain("10:30");
+    expect(text).toContain(he.weekdayTue);
   });
 
   it("labels ops category", () => {

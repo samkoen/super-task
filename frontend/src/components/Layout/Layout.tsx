@@ -48,10 +48,13 @@ import ManagerBottomNav from "./ManagerBottomNav";
 import ManagerNewTaskFab from "./ManagerNewTaskFab";
 import MobileMenuTopBar from "./MobileMenuTopBar";
 import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
+import ViewAsBanner from "./ViewAsBanner";
+import ViewAsPicker from "./ViewAsPicker";
 import {
   managerBottomContentPadCss,
   shouldShowManagerChrome,
 } from "../../utils/managerBottomNav";
+import { isViewAsPreview } from "../../utils/viewAsPreview";
 
 const SIDEBAR_BG = "#0B1220";
 const SIDEBAR_ACCENT = "#1A9B86";
@@ -286,6 +289,7 @@ function Layout() {
       </List>
 
       <Box sx={{ p: 2, borderTop: `1px solid ${alpha("#fff", 0.08)}` }}>
+        <ViewAsPicker fullWidth dark />
         <Button
           fullWidth
           type="button"
@@ -313,11 +317,10 @@ function Layout() {
   if (isEmployee) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+        <Box sx={{ position: "sticky", top: 0, zIndex: (t) => t.zIndex.appBar }}>
+        {isViewAsPreview(user) && <ViewAsBanner />}
         <Box
           sx={{
-            position: "sticky",
-            top: 0,
-            zIndex: (t) => t.zIndex.appBar,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -375,6 +378,7 @@ function Layout() {
               {he.logout}
             </Button>
           </Box>
+        </Box>
         </Box>
         {(user?.branches?.length ?? 0) >= 2 && (
           <Box
@@ -461,6 +465,7 @@ function Layout() {
             showBack={showBack}
             forceVisible={overlayNav}
             onOpenMenu={() => setMobileOpen(true)}
+            trailing={<ViewAsPicker compact />}
           />
           {showBack && (
             <Box sx={{ display: overlayNav ? "none" : { xs: "none", sm: "block" } }}>

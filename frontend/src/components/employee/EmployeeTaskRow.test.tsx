@@ -42,7 +42,7 @@ describe("EmployeeTaskRow", () => {
     expect(screen.getByText(he.alertOverdue)).toBeTruthy();
   });
 
-  it("shows the reference photo on the tile", async () => {
+  it("shows the reference photo on the ad-hoc tile", async () => {
     vi.mocked(taskCardBackgroundUrl).mockReturnValue("https://cdn.example/p.jpg");
     class FakeImage {
       onload: (() => void) | null = null;
@@ -52,8 +52,15 @@ describe("EmployeeTaskRow", () => {
       }
     }
     vi.stubGlobal("Image", FakeImage);
-    render(<EmployeeTaskRow task={card()} onOpen={vi.fn()} />);
+    render(<EmployeeTaskRow task={card({ task_kind: "ad_hoc" })} onOpen={vi.fn()} />);
     expect(await screen.findByLabelText(he.taskPhotoEnlarge)).toBeTruthy();
     vi.unstubAllGlobals();
+  });
+
+  it("hides the photo on the fixed-task list row", () => {
+    vi.mocked(taskCardBackgroundUrl).mockReturnValue("https://cdn.example/p.jpg");
+    render(<EmployeeTaskRow task={card()} onOpen={vi.fn()} layout="list" />);
+    expect(screen.queryByLabelText(he.taskPhotoEnlarge)).toBeNull();
+    expect(screen.getByText("ניקיון מדף")).toBeTruthy();
   });
 });

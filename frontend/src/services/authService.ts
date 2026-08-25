@@ -37,6 +37,18 @@ export const authService = {
     return response.data;
   },
 
+  viewAs: async (userId: string) => {
+    const response = await api.post<{ user: User }>("/auth/view-as", {
+      user_id: userId,
+    });
+    return response.data;
+  },
+
+  exitViewAs: async () => {
+    const response = await api.post<{ user: User }>("/auth/exit-view-as");
+    return response.data;
+  },
+
   updateProfile: async (payload: {
     first_name: string;
     last_name: string;

@@ -97,10 +97,10 @@ class TaskTemplateService:
         self._validate_assignment(branch_id, assignee_user_id, department_id)
         title = resolve_create_title(title, description)
         if recurrence not in task_recurrence.RECURRING:
-            raise ValueError("משימה קבועה דורשת חזרה יומית/שבועית/דו-שבועית/חודשית")
+            raise ValueError("משימה קבועה דורשת חזרה יומית/שבועית/חודשית")
         if not assignee_user_id:
             raise ValueError("נדרש שיוך לעובד למשימה קבועה")
-        if recurrence in {task_recurrence.WEEKLY, task_recurrence.BIWEEKLY} and not (weekly_days or "").strip():
+        if recurrence == task_recurrence.WEEKLY and not (weekly_days or "").strip():
             raise ValueError("נדרש יום בשבוע למשימה שבועית")
         parsed_monthly_day: int | None = None
         if recurrence == task_recurrence.MONTHLY:
@@ -118,7 +118,6 @@ class TaskTemplateService:
             )
         )
         work_start = bool(is_work_start)
-        anchor = datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None
         photo, video, audio = self._isolate_external_media(
             reference_photo_url, reference_video_url, reference_audio_url
         )
@@ -136,7 +135,7 @@ class TaskTemplateService:
             department_id=department_id,
             created_by_id=actor.user_id,
             task_kind=FIXED,
-            biweekly_anchor=anchor,
+            biweekly_anchor=None,
             reference_photo_url=photo,
             reference_video_url=video,
             reference_audio_url=audio,

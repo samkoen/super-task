@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import MenuIcon from "@mui/icons-material/Menu";
 import { Box, Fab } from "@mui/material";
 import { he } from "../../i18n/he";
@@ -7,6 +8,7 @@ interface MobileMenuTopBarProps {
   showBack: boolean;
   forceVisible?: boolean;
   onOpenMenu: () => void;
+  trailing?: ReactNode;
 }
 
 /** Barre sticky : חזרה + menu — évite que le rond vert recouvre le contenu. */
@@ -14,6 +16,7 @@ export default function MobileMenuTopBar({
   showBack,
   forceVisible = false,
   onOpenMenu,
+  trailing,
 }: MobileMenuTopBarProps) {
   return (
     <Box
@@ -36,19 +39,22 @@ export default function MobileMenuTopBar({
       <Box sx={{ minWidth: 0, flex: 1, display: "flex", justifyContent: "flex-start" }}>
         {showBack ? <BackButton sx={{ mb: 0 }} /> : null}
       </Box>
-      <Fab
-        size="small"
-        color="primary"
-        aria-label={he.mainMenu}
-        onClick={onOpenMenu}
-        sx={{
-          flexShrink: 0,
-          transform: "translateZ(0)",
-          WebkitBackfaceVisibility: "hidden",
-        }}
-      >
-        <MenuIcon />
-      </Fab>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+        {trailing}
+        <Fab
+          size="small"
+          color="primary"
+          aria-label={he.mainMenu}
+          onClick={onOpenMenu}
+          sx={{
+            flexShrink: 0,
+            transform: "translateZ(0)",
+            WebkitBackfaceVisibility: "hidden",
+          }}
+        >
+          <MenuIcon />
+        </Fab>
+      </Box>
     </Box>
   );
 }

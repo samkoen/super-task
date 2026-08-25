@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { User } from "../services/api";
 import { authService } from "../services/authService";
+import { getHomePath } from "../config/routes";
 
 interface AuthContextValue {
   user: User | null;
@@ -17,6 +18,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   setActiveBranch: (branchId: string) => Promise<void>;
+  viewAs: (employeeId: string) => Promise<void>;
+  exitViewAs: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,9 +78,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistUser(res.user);
   }, []);
 
+  const viewAs = useCallback(async (employeeId: string) => {
+    const res = await authService.viewAs(employeeId);
+    setUser(res.user);
+    persistUser(res.user);
+    window.location.replace(getHomePath(res.user.role));
+  }, []);
+
+  const exitViewAs = useCallback(async () => {
+    const res = await authService.exitViewAs();
+    setUser(res.user);
+    persistUser(res.user);
+    window.location.replace(getHomePath(res.user.role));
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, login, logout, refresh, setActiveBranch }),
-    [user, loading, login, logout, refresh, setActiveBranch]
+    () => ({
+      user,
+      loading,
+      login,
+      logout,
+      refresh,
+      setActiveBranch,
+      viewAs,
+      exitViewAs,
+    }),
+    [user, loading, login, logout, refresh, setActiveBranch, viewAs, exitViewAs]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

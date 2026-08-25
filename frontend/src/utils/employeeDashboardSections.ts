@@ -2,13 +2,8 @@ import { sortMostOverdueFirst } from "./employeeTaskFocus";
 
 const CLOSED = new Set(["completed", "cancelled"]);
 
-export function isDynamicEmployeeTask(
-  task: { id: string; task_kind?: string | null; status: string },
-  urgentIds: Set<string>,
-): boolean {
-  if (task.task_kind === "ad_hoc") return true;
-  if (task.status === "overdue" || task.status === "awaiting_response") return true;
-  return urgentIds.has(task.id);
+export function isDynamicEmployeeTask(task: { task_kind?: string | null }): boolean {
+  return task.task_kind === "ad_hoc";
 }
 
 export function shouldHighlightEmployeeTask(status: string): boolean {
@@ -30,12 +25,12 @@ export function collectUniqueTasks<T extends { id: string }>(groups: T[][]): T[]
 
 export function splitEmployeeWorkLists<
   T extends { id: string; task_kind?: string | null; status: string; due_at: string },
->(tasks: T[], urgentIds: Set<string>): { dynamic: T[]; routine: T[] } {
+>(tasks: T[]): { dynamic: T[]; routine: T[] } {
   const open = tasks.filter((t) => !CLOSED.has(t.status) && t.status !== "pending_review");
   const dynamic: T[] = [];
   const routine: T[] = [];
   for (const task of open) {
-    if (isDynamicEmployeeTask(task, urgentIds)) dynamic.push(task);
+    if (isDynamicEmployeeTask(task)) dynamic.push(task);
     else routine.push(task);
   }
   return {

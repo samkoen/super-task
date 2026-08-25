@@ -36,6 +36,18 @@ describe("authService profile", () => {
     });
   });
 
+  it("viewAs posts employee id", async () => {
+    mockPost.mockResolvedValue({ data: { user: { id: "e1", is_preview: true } } });
+    await authService.viewAs("e1");
+    expect(mockPost).toHaveBeenCalledWith("/auth/view-as", { user_id: "e1" });
+  });
+
+  it("exitViewAs posts exit endpoint", async () => {
+    mockPost.mockResolvedValue({ data: { user: { id: "m1", is_preview: false } } });
+    await authService.exitViewAs();
+    expect(mockPost).toHaveBeenCalledWith("/auth/exit-view-as");
+  });
+
   it("changePassword posts current and new", async () => {
     mockPost.mockResolvedValue({ data: { message: "ok" } });
     await authService.changePassword("old", "newpass");

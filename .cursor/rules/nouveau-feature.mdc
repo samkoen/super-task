@@ -1,0 +1,26 @@
+---
+description: Au message « nouveau feature », partir de main à jour puis créer une branche feat/
+alwaysApply: true
+---
+
+# Nouveau feature → branche depuis main
+
+Quand l’utilisateur écrit **« nouveau feature »** (ou « nouvelle feature »), **avant tout code** :
+
+1. Si le working tree n’est pas propre : `git stash push -u -m "wip avant nouveau feature"` (ne pas jeter le travail).
+2. `git checkout main`
+3. `git pull` (remote GitHub `origin`)
+4. `git checkout -b feat/<slug>` — slug court en anglais ou hébreu translittéré, d’après le nom de la feature.
+5. Si stash à l’étape 1 : `git stash pop`
+
+Ensuite seulement : implémenter sur cette branche (pas sur `main`).
+
+```bash
+# ✅
+# user: nouveau feature enregistrement vocal
+git checkout main && git pull && git checkout -b feat/voice-recording
+
+# ❌ coder ou committer sur main
+```
+
+Ne pas merger, ne pas pousser sur `main`. Le flux PR est dans `docs/FLUX-PR-GITHUB-ORIGIN.md`.

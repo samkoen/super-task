@@ -27,6 +27,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { ApiError, type JobFunction, type User } from "../../services/api";
 import { EMPLOYEE_LANGUAGES, EMPLOYEE_LANGUAGE_LABELS, employeeLanguageLabel, type EmployeeLanguage } from "../../domain/employeeLanguages";
 import { branchService, type Branch } from "../../services/branchService";
@@ -49,7 +50,7 @@ const emptyForm = {
 };
 
 export default function ManagerEmployeesPage() {
-  const { user } = useAuth();
+  const { user, viewAs } = useAuth();
   const isNetworkManager = user?.role === "network_manager";
   const isBranchManager = user?.role === "branch_manager";
 
@@ -242,6 +243,15 @@ export default function ManagerEmployeesPage() {
     }
   };
 
+  const handleViewAs = async (employee: User) => {
+    setError("");
+    try {
+      await viewAs(employee.id);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
   const jobLabel = (value: JobFunction | null) =>
     value ? he.jobFunctionLabels[value] : "—";
 
@@ -331,6 +341,17 @@ export default function ManagerEmployeesPage() {
                       />
                     </TableCell>
                     <TableCell>
+                      <Tooltip title={he.viewAsEmployee}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => void handleViewAs(u)}
+                            disabled={!u.is_active}
+                          >
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                       <Tooltip title={he.edit}>
                         <IconButton size="small" onClick={() => openEdit(u)}>
                           <EditIcon fontSize="small" />

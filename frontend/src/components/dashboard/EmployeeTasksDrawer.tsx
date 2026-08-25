@@ -35,6 +35,7 @@ import { he } from "../../i18n/he";
 import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import { datetimeLocalForNewTask, formatHebrewDayShort } from "../../utils/dateView";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
+import { weeklyDaysPayload, normalizeFixedRecurrence } from "../../utils/taskRecurrence";
 import { filterTasksForEmployee } from "../../utils/employeeDrawerTasks";
 import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
 import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
@@ -153,10 +154,7 @@ export default function EmployeeTasksDrawer({
           description: payload.description,
           recurrence: payload.recurrence,
           due_time: payload.due_time,
-          weekly_days:
-            payload.recurrence === "weekly" || payload.recurrence === "biweekly"
-              ? payload.weekly_days
-              : undefined,
+          weekly_days: weeklyDaysPayload(payload.recurrence, payload.weekly_days),
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
           assignee_user_id: member.user_id,
           ops_category: payload.ops_category,
@@ -213,7 +211,7 @@ export default function EmployeeTasksDrawer({
           branch_id: branchId,
           title: item.title,
           description: item.description,
-          recurrence: (item.recurrence as "daily" | "weekly" | "biweekly" | "monthly") || "daily",
+          recurrence: normalizeFixedRecurrence(item.recurrence),
           due_time: item.due_time || "09:00",
           weekly_days: item.weekly_days || undefined,
           monthly_day: item.monthly_day ?? undefined,
