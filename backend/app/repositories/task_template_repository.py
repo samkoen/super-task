@@ -100,6 +100,7 @@ class TaskTemplateRepository:
         min_video_seconds: int | None = None,
         completion_requirements: list | None = None,
         is_work_start: bool = False,
+        start_url: str | None = None,
         network_group_id: str | None = None,
     ) -> TaskTemplate:
         import uuid
@@ -120,6 +121,7 @@ class TaskTemplateRepository:
             min_video_seconds=min_video_seconds,
             completion_requirements=completion_requirements,
             is_work_start=bool(is_work_start),
+            start_url=(start_url or "").strip() or None,
             network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             photo_required=photo_required,
             reference_photo_url=(reference_photo_url or "").strip() or None,
@@ -160,6 +162,8 @@ class TaskTemplateRepository:
         update_completion_requirements: bool = False,
         photo_required: bool | None = None,
         is_work_start: bool | None = None,
+        start_url: str | None = None,
+        update_start_url: bool = False,
     ) -> TaskTemplate | None:
         row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
         if not row:
@@ -181,6 +185,8 @@ class TaskTemplateRepository:
             row.photo_required = bool(photo_required)
         if is_work_start is not None:
             row.is_work_start = bool(is_work_start)
+        if update_start_url:
+            row.start_url = (start_url or "").strip() or None
         if reference_photo_url is not None:
             row.reference_photo_url = reference_photo_url.strip() or None
         if reference_video_url is not None:

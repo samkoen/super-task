@@ -161,6 +161,7 @@ export default function EmployeeTasksDrawer({
           min_video_seconds: payload.min_video_seconds,
           completion_requirements,
           is_work_start: payload.is_work_start,
+          start_url: payload.start_url,
           ...media,
         });
         showSuccess(res.message);
@@ -174,6 +175,7 @@ export default function EmployeeTasksDrawer({
           photo_required: true,
           min_video_seconds: payload.min_video_seconds,
           completion_requirements,
+          start_url: payload.start_url,
           ...media,
         });
         showSuccess(res.message);

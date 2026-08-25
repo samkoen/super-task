@@ -27,7 +27,16 @@ describe("employeeCardToOccurrence", () => {
     expect(occ.title).toBe("Clean");
     expect(occ.title_he).toBe("ניקיון");
     expect(occ.spoken_text).toBe("hello");
+    expect(occ.start_url).toBeUndefined();
     expect(occ.reference_photo_url).toBeUndefined();
+  });
+
+  it("keeps the start url on the shared occurrence shape", () => {
+    const occ = employeeCardToOccurrence({
+      ...baseCard,
+      start_url: "https://my.agroline.co.il/x",
+    });
+    expect(occ.start_url).toBe("https://my.agroline.co.il/x");
   });
 });
 

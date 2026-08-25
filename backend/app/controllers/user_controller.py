@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from app.repositories.network_repository import NetworkRepository
 from app.repositories.user_repository import UserRepository
 from app.services.user_scope_service import UserScopeService
 from app.services.user_service import UserService
+from app.services.media_upload_service import upload_attachment
 
 router = APIRouter()
 
@@ -97,6 +98,21 @@ def update_team_employee(
         preferred_language=(str(payload.get("preferred_language")).strip() if payload.get("preferred_language") else None),
     )
     return {"message": "פרטי העובד עודכנו", "user": user}
+
+
+@router.post("/team/{user_id}/avatar")
+@handle_controller_errors
+async def upload_team_employee_avatar(
+    user_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    uploaded = await upload_attachment(kind="photo", folder="avatars", file=file)
+    user = service.set_team_employee_avatar(actor, user_id, uploaded["url"])
+    return {"message": "התמונה עודכנה", "user": user, "url": uploaded["url"]}
 
 
 @router.delete("/team/{user_id}")

@@ -56,4 +56,16 @@ describe("authService profile", () => {
       new_password: "newpass",
     });
   });
+
+  it("uploadAvatar posts the photo to /auth/me/avatar", async () => {
+    const file = new File(["x"], "face.jpg", { type: "image/jpeg" });
+    mockPost.mockResolvedValue({
+      data: { message: "ok", user: { id: "1" }, url: "/uploads/avatars/a.jpg" },
+    });
+    await authService.uploadAvatar(file);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [path, body] = mockPost.mock.calls[0];
+    expect(path).toBe("/auth/me/avatar");
+    expect(body).toBeInstanceOf(FormData);
+  });
 });

@@ -94,6 +94,23 @@ class AuthService:
         assert updated is not None
         return self._user_api(updated, active_branch_id=active_branch_id)
 
+    def set_my_avatar(
+        self,
+        user_id: str,
+        avatar_url: str | None,
+        *,
+        active_branch_id: str | None = None,
+    ) -> dict:
+        from app.domain.avatar_url import normalize_avatar_url
+
+        user = self.user_repository.find_by_id(user_id)
+        if not user or not user.is_active:
+            raise ValueError("משתמש לא נמצא")
+        cleaned = normalize_avatar_url(avatar_url)
+        updated = self.user_repository.update_avatar(user_id, cleaned)
+        assert updated is not None
+        return self._user_api(updated, active_branch_id=active_branch_id)
+
     def change_password(
         self, user_id: str, *, current_password: str, new_password: str
     ) -> None:

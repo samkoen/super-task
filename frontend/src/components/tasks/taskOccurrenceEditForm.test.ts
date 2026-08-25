@@ -63,6 +63,17 @@ describe("taskOccurrenceEditForm", () => {
     expect(form.title).toBe("Task");
     expect(form.assignee_user_id).toBe("u1");
     expect(form.due_at).toContain("2026-07-25");
+    expect(form.start_url).toBe("");
+  });
+
+  it("maps start_url into the edit form", () => {
+    const form = formFromOccurrence({
+      ...baseTarget,
+      start_url: "https://my.agroline.co.il/x",
+      status: "pending",
+      created_at: "2026-07-25T05:00:00+03:00",
+    } as never);
+    expect(form.start_url).toBe("https://my.agroline.co.il/x");
   });
 
   it("saves nominal update", async () => {
@@ -81,9 +92,26 @@ describe("taskOccurrenceEditForm", () => {
         title: "Updated",
         assignee_user_id: "u2",
         apply_to_network: false,
+        start_url: null,
       }),
     );
     expect(taskGalleryService.createFromOccurrence).not.toHaveBeenCalled();
+  });
+
+  it("saves the start url", async () => {
+    const url = "https://my.agroline.co.il/main/azmanot/client-orders/create";
+    const form = {
+      ...emptyOccurrenceEditForm(),
+      title: "Updated",
+      due_at: "2026-07-25T10:00",
+      assignee_user_id: "u2",
+      start_url: url,
+    };
+    await saveOccurrenceEdit(baseTarget as never, form, false);
+    expect(taskService.updateOccurrence).toHaveBeenCalledWith(
+      "occ-1",
+      expect.objectContaining({ start_url: url }),
+    );
   });
 
   it("moves to gallery when assignee is gallery sentinel", async () => {

@@ -70,6 +70,7 @@ import { effectiveRequirements, type CompletionRequirement } from "../../utils/c
 import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
+import { startUrlFieldError } from "../../utils/startUrl";
 
 import {
   initialWeeklyDays,
@@ -86,6 +87,7 @@ type EditForm = {
   ops_category: OpsCategory | "";
   completion_requirements: CompletionRequirement[];
   is_work_start: boolean;
+  start_url: string;
   apply_to_network: boolean;
 };
 
@@ -156,6 +158,7 @@ export default function ManagerFixedTasksPage() {
       ops_category: tpl.ops_category ?? "",
       completion_requirements: effectiveRequirements(tpl),
       is_work_start: Boolean(tpl.is_work_start),
+      start_url: tpl.start_url ?? "",
       apply_to_network: defaultApplyEditToNetwork(tpl, canPickBranch, networkIds),
     });
     setEditMedia({
@@ -183,6 +186,7 @@ export default function ManagerFixedTasksPage() {
         ops_category: payload.ops_category,
         completion_requirements,
         is_work_start: payload.is_work_start,
+        start_url: payload.start_url,
         ...media,
       });
       setCreateOpen(false);
@@ -228,6 +232,11 @@ export default function ManagerFixedTasksPage() {
       showError(he.newTaskAssigneeRequired);
       return;
     }
+    const urlErr = startUrlFieldError(editForm.start_url);
+    if (urlErr) {
+      showError(urlErr);
+      return;
+    }
     setSaving(true);
     try {
       const media = await resolveTaskReferenceMedia(editMedia);
@@ -245,6 +254,7 @@ export default function ManagerFixedTasksPage() {
         ops_category: editForm.ops_category || null,
         completion_requirements,
         is_work_start: editForm.is_work_start,
+        start_url: editForm.start_url,
         apply_to_network: editForm.apply_to_network,
         ...media,
       });
@@ -294,6 +304,7 @@ export default function ManagerFixedTasksPage() {
         ops_category: tpl.ops_category ?? null,
         completion_requirements: effectiveRequirements(tpl),
         is_work_start: Boolean(tpl.is_work_start),
+        start_url: tpl.start_url ?? null,
         reference_photo_url: tpl.reference_photo_url,
         reference_video_url: tpl.reference_video_url,
         reference_audio_url: tpl.reference_audio_url,
@@ -540,6 +551,14 @@ export default function ManagerFixedTasksPage() {
                 />
               }
               label={he.workStartTask}
+            />
+            <TextField
+              label={he.startUrl}
+              value={editForm.start_url}
+              onChange={(e) => setEditForm({ ...editForm, start_url: e.target.value })}
+              helperText={he.startUrlHint}
+              fullWidth
+              dir="ltr"
             />
             {canPickBranch && isNetworkFixedTemplate(editing, networkIds) && (
               <FormControlLabel

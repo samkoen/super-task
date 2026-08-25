@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import {
+  Alert,
   Box,
   Button,
   Dialog,
@@ -16,10 +17,13 @@ import CompletionSlotGrid from "./CompletionSlotGrid";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import TaskChatPanel from "./TaskChatPanel";
 import TaskStatusChip from "./TaskStatusChip";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
+import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { canDoTask } from "../../utils/employeeDoTask";
+import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import {
   attachmentsFromCompletion,
@@ -44,6 +48,7 @@ export interface EmployeeTaskDetailTask {
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
   completion?: TaskCompletion | null;
+  start_url?: string | null;
 }
 
 export type EmployeeTaskCaptureProps = {
@@ -80,6 +85,7 @@ export default function EmployeeTaskDetailDialog({
 }: EmployeeTaskDetailDialogProps) {
   if (!task) return null;
   const liveCapture = capture && canDoTask(task.status) ? capture : undefined;
+  const remark = rejectionRemark(task.completion);
 
   return (
     <Dialog open={Boolean(task)} onClose={onClose} fullWidth maxWidth="sm" dir="rtl">
@@ -90,6 +96,17 @@ export default function EmployeeTaskDetailDialog({
           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
             {task.description}
           </Typography>
+        ) : null}
+        <StartUrlButton url={task.start_url} fullWidth />
+        {remark ? (
+          <Alert severity="warning">
+            {he.taskRejectedReopen}
+            {remark !== he.taskRejectedReopen ? (
+              <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
+                {remark}
+              </Typography>
+            ) : null}
+          </Alert>
         ) : null}
         <TaskDetailMedia task={task} language={language} capture={liveCapture} />
         <TaskChatPanel
@@ -264,5 +281,27 @@ function TaskDetailActions({
         <EmployeeDoTaskButton status={task.status} starting={starting} onClick={onDoTask} />
       ) : null}
     </DialogActions>
+  );
+}
+
+function StartUrlButton({
+  url,
+  fullWidth = false,
+}: {
+  url?: string | null;
+  fullWidth?: boolean;
+}) {
+  const clean = normalizeStartUrl(url);
+  if (!clean) return null;
+  return (
+    <Button
+      variant={fullWidth ? "contained" : "outlined"}
+      color="info"
+      fullWidth={fullWidth}
+      startIcon={<OpenInNewIcon />}
+      onClick={() => openExternalUrl(clean)}
+    >
+      {he.openStartUrl}
+    </Button>
   );
 }

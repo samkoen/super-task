@@ -60,6 +60,56 @@ function capture(overrides: Partial<EmployeeTaskCaptureProps> = {}): EmployeeTas
 }
 
 describe("EmployeeTaskDetailDialog", () => {
+  it("offers to reopen the start url", () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    render(
+      <EmployeeTaskDetailDialog
+        task={{ ...task("in_progress"), start_url: "https://example.com/order" }}
+        onClose={vi.fn()}
+      />,
+    );
+    const buttons = screen.getAllByRole("button", { name: he.openStartUrl });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(click).toHaveBeenCalled();
+    const a = click.mock.instances[0] as HTMLAnchorElement;
+    expect(a.target).toBe("_blank");
+    expect(a.href).toContain("https://example.com/order");
+    click.mockRestore();
+  });
+
+  it("hides the reopen button when there is no start url", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: he.openStartUrl })).toBeNull();
+  });
+
+  it("shows the manager remark after a rejected review", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("in_progress"),
+          completion: {
+            id: "c1",
+            occurrence_id: "t1",
+            status: "completed",
+            note: null,
+            photo_path: "/p.jpg",
+            video_path: null,
+            audio_path: null,
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "rejected",
+            rejection_note: "תקן את התמונה",
+          },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.taskRejectedReopen)).toBeTruthy();
+    expect(screen.getByText("תקן את התמונה")).toBeTruthy();
+  });
+
   it("submits from the same dialog once the slots are filled", () => {
     const onSubmit = vi.fn();
     render(

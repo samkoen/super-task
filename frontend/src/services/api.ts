@@ -46,6 +46,7 @@ export interface User {
   is_active: boolean;
   email_verified: boolean;
   preferred_language?: EmployeeLanguage;
+  avatar_url?: string | null;
   /** Memberships multi-snif (oved). */
   branches?: UserBranchMembership[];
   /** Snif actif à l'écran (oved). */

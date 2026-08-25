@@ -63,6 +63,7 @@ def user_orm_to_domain(row: orm.User | None) -> User | None:
         is_active=row.is_active,
         email_verified=row.email_verified,
         preferred_language=getattr(row, "preferred_language", None) or "he",
+        avatar_url=getattr(row, "avatar_url", None),
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
     )
@@ -83,6 +84,7 @@ def user_domain_to_api(user: User) -> dict:
         "is_active": user.is_active,
         "email_verified": user.email_verified,
         "preferred_language": user.preferred_language,
+        "avatar_url": user.avatar_url,
     }
 
 
@@ -268,6 +270,7 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),
+        start_url=getattr(row, "start_url", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
         ),
@@ -324,6 +327,7 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),
+        start_url=getattr(row, "start_url", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
         ),

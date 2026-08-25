@@ -3,9 +3,12 @@ import { he } from "../i18n/he";
 import {
   applyStartedOnDashboard,
   canDoTask,
+  canSubmitEmployeeTask,
   cardAfterStart,
   doTaskButtonLabel,
+  hasExternalStartUrl,
   needsTaskStart,
+  shouldOpenStartUrlOnBegin,
 } from "./employeeDoTask";
 
 describe("employeeDoTask", () => {
@@ -16,6 +19,20 @@ describe("employeeDoTask", () => {
     expect(canDoTask("pending")).toBe(true);
     expect(canDoTask("in_progress")).toBe(true);
     expect(canDoTask("pending_review")).toBe(false);
+  });
+
+  it("lets the first tap start a linked task before slots are filled", () => {
+    const url = "https://my.agroline.co.il/main/azmanot/client-orders/create";
+    expect(hasExternalStartUrl(url)).toBe(true);
+    expect(hasExternalStartUrl("not-a-url")).toBe(false);
+    expect(shouldOpenStartUrlOnBegin("pending", url)).toBe(true);
+    expect(shouldOpenStartUrlOnBegin("overdue", url)).toBe(true);
+    expect(shouldOpenStartUrlOnBegin("in_progress", url)).toBe(false);
+    expect(canSubmitEmployeeTask("pending", url, false)).toBe(true);
+    expect(canSubmitEmployeeTask("overdue", url, false)).toBe(true);
+    expect(canSubmitEmployeeTask("in_progress", url, false)).toBe(false);
+    expect(canSubmitEmployeeTask("pending", null, false)).toBe(false);
+    expect(canSubmitEmployeeTask("in_progress", url, true)).toBe(true);
   });
 
   it("labels first click as do-task and resume as finish", () => {

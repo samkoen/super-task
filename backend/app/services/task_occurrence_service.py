@@ -22,7 +22,8 @@ from app.domain.completion_transcript_localization import localize_completion_tr
 from app.domain.employee_language import normalize_employee_language
 from app.domain.task_translation_source import task_source_language
 from app.domain.scope import ActorContext
-from app.domain.task_kind import AD_HOC, FIXED
+from app.domain.start_url import normalize_start_url
+from app.domain.task_kind import AD_HOC
 from app.domain.task_scope import (
     branch_manager_owns_delegation,
     can_manage_tasks,
@@ -218,6 +219,7 @@ class TaskOccurrenceService:
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
         source_gallery_item_id: str | None = None,
+        start_url: str | None = None,
         network_group_id: str | None = None,
         self_claim: bool = False,
     ) -> dict:
@@ -262,6 +264,7 @@ class TaskOccurrenceService:
             reference_audio_url=audio,
             created_by_id=actor.user_id,
             source_gallery_item_id=gallery_id,
+            start_url=normalize_start_url(start_url),
             network_group_id=network_group_id,
             **media_fields,
         )
@@ -352,6 +355,7 @@ class TaskOccurrenceService:
         reference_video_url: str | None = None,
         reference_audio_url: str | None = None,
         source_gallery_item_id: str | None = None,
+        start_url: str | None = None,
         branch_ids: list[str] | None = None,
     ) -> dict:
         """Duplique une מזדמנת (tous les snifim, ou une liste). 1er oved par snif."""
@@ -379,6 +383,7 @@ class TaskOccurrenceService:
             reference_video_url=video,
             reference_audio_url=audio,
             source_gallery_item_id=source_gallery_item_id,
+            start_url=start_url,
             network_group_id=group_id,
         )
         if not created:
@@ -774,6 +779,8 @@ class TaskOccurrenceService:
         reference_photo_url: str | None | object = _UNSET,
         reference_video_url: str | None | object = _UNSET,
         reference_audio_url: str | None | object = _UNSET,
+        start_url: str | None = None,
+        update_start_url: bool = False,
         apply_to_network: bool = False,
     ) -> dict:
         occurrence = self._require_editable_occurrence(actor, occurrence_id, title)
@@ -793,6 +800,8 @@ class TaskOccurrenceService:
             reference_photo_url,
             reference_video_url,
             reference_audio_url,
+            start_url,
+            update_start_url,
         )
         if apply_to_network and occurrence.task_kind == AD_HOC:
             return self._update_network_ad_hoc(actor, occurrence, details, assignee_user_id)
@@ -823,6 +832,7 @@ class TaskOccurrenceService:
         occurrence, title, description, due_at, photo_required, min_video_seconds,
         update_min_video_seconds, completion_requirements, update_completion_requirements,
         reference_photo_url, reference_video_url, reference_audio_url,
+        start_url=None, update_start_url=False,
     ) -> dict:
         media = TaskOccurrenceService._edit_media_fields(
             occurrence,
@@ -849,6 +859,8 @@ class TaskOccurrenceService:
             "update_reference_photo": reference_photo_url is not _UNSET,
             "update_reference_video": reference_video_url is not _UNSET,
             "update_reference_audio": reference_audio_url is not _UNSET,
+            "start_url": normalize_start_url(start_url) if update_start_url else None,
+            "update_start_url": update_start_url,
         }
 
     @staticmethod

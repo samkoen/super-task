@@ -221,6 +221,17 @@ class UserRepository:
         self._db.flush()
         return mp.user_orm_to_domain(row)
 
+    def update_avatar(self, user_id: str, avatar_url: str | None) -> User | None:
+        try:
+            row = self._db.get(orm.User, mp.parse_uuid(user_id))
+        except ValueError:
+            return None
+        if not row:
+            return None
+        row.avatar_url = avatar_url
+        self._db.flush()
+        return mp.user_orm_to_domain(row)
+
     def set_active(self, user_id: str, is_active: bool) -> User | None:
         try:
             row = self._db.get(orm.User, mp.parse_uuid(user_id))

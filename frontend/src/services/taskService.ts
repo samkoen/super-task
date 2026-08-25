@@ -57,6 +57,7 @@ export interface TaskTemplate {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  start_url?: string | null;
   network_group_id?: string | null;
   is_network_task?: boolean;
   reference_photo_url?: string | null;
@@ -86,6 +87,7 @@ export interface UpdateTaskTemplatePayload {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  start_url?: string | null;
   apply_to_network?: boolean;
 }
 
@@ -128,6 +130,7 @@ export interface TaskOccurrence {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  start_url?: string | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
@@ -173,6 +176,7 @@ export interface CreateTaskTemplatePayload {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  start_url?: string | null;
 }
 
 export interface CreateAdHocPayload {
@@ -190,6 +194,7 @@ export interface CreateAdHocPayload {
   completion_requirements?: CompletionRequirement[];
   apply_to_network?: boolean;
   branch_ids?: string[];
+  start_url?: string | null;
 }
 
 export interface CompleteTaskPayload {
@@ -389,6 +394,7 @@ export const taskService = {
       photo_required?: boolean;
       min_video_seconds?: number | null;
       completion_requirements?: CompletionRequirement[];
+      start_url?: string | null;
       reference_photo_url?: string | null;
       reference_video_url?: string | null;
       reference_audio_url?: string | null;

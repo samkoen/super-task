@@ -36,6 +36,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     preferred_language: Mapped[str] = mapped_column(String(8), nullable=False, default="he")
+    avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     on_break_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idle_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     inactivity_notified_at: Mapped[datetime | None] = mapped_column(
@@ -211,6 +212,7 @@ class TaskTemplate(Base):
     min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
     completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
     )
@@ -266,6 +268,7 @@ class TaskOccurrence(Base):
     min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
     completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
     )

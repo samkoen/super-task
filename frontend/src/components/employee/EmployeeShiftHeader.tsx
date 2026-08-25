@@ -1,9 +1,15 @@
-import { Box, Button, Chip, Paper, Typography } from "@mui/material";
+import { Box, Chip, IconButton, Paper, Tooltip, Typography } from "@mui/material";
+import FreeBreakfastIcon from "@mui/icons-material/FreeBreakfast";
 import { he } from "../../i18n/he";
 import { EmployeeShiftProgress, shiftStatusLabel } from "./employeeShiftStatus";
+import EmployeeAvatar from "./EmployeeAvatar";
 
 interface EmployeeShiftHeaderProps {
+  dateLabel?: string;
   name?: string;
+  photoUrl?: string | null;
+  photoEditable?: boolean;
+  onEditPhoto?: () => void;
   meta?: string;
   onShift: boolean;
   onBreak: boolean;
@@ -12,9 +18,88 @@ interface EmployeeShiftHeaderProps {
   onToggleBreak: () => void;
 }
 
-/** Barre présence compacte — pas un bloc 25% d’écran. */
-export default function EmployeeShiftHeader({
+function ShiftIdentity({
   name,
+  photoUrl,
+  photoEditable,
+  onEditPhoto,
+  meta,
+}: Pick<
+  EmployeeShiftHeaderProps,
+  "name" | "photoUrl" | "photoEditable" | "onEditPhoto" | "meta"
+>) {
+  return (
+    <Box display="flex" alignItems="center" gap={1.25} flex={1} minWidth={0}>
+      <EmployeeAvatar
+        name={name}
+        photoUrl={photoUrl}
+        editable={photoEditable}
+        onEdit={onEditPhoto}
+      />
+      <Box flex={1} minWidth={0}>
+        <Typography
+          variant="h5"
+          component="h1"
+          fontWeight={800}
+          sx={{ fontSize: { xs: "1.4rem", sm: "1.7rem" }, lineHeight: 1.2 }}
+        >
+          {name}
+        </Typography>
+        {meta ? (
+          <Typography variant="caption" color="text.secondary" display="block">
+            {meta}
+          </Typography>
+        ) : null}
+      </Box>
+    </Box>
+  );
+}
+
+function ShiftPresence({
+  onShift,
+  onBreak,
+  breakBusy,
+  onToggleBreak,
+}: Pick<EmployeeShiftHeaderProps, "onShift" | "onBreak" | "breakBusy" | "onToggleBreak">) {
+  const breakLabel = onBreak ? he.employeeBreakEnd : he.employeeBreakStart;
+  return (
+    <Box display="flex" alignItems="center" gap={1} flexShrink={0}>
+      <Chip
+        size="small"
+        color={onBreak ? "warning" : onShift ? "success" : "default"}
+        label={shiftStatusLabel(onBreak, onShift)}
+      />
+      <Tooltip title={breakLabel}>
+        <span>
+          <IconButton
+            color={onBreak ? "warning" : "primary"}
+            disabled={breakBusy}
+            onClick={onToggleBreak}
+            aria-label={breakLabel}
+            sx={{
+              border: 1,
+              borderColor: onBreak ? "warning.main" : "primary.main",
+              bgcolor: onBreak ? "warning.main" : "transparent",
+              color: onBreak ? "warning.contrastText" : "primary.main",
+              "&:hover": {
+                bgcolor: onBreak ? "warning.dark" : "action.hover",
+              },
+            }}
+          >
+            <FreeBreakfastIcon />
+          </IconButton>
+        </span>
+      </Tooltip>
+    </Box>
+  );
+}
+
+export default function EmployeeShiftHeader({
+  dateLabel,
+  name,
+  photoUrl,
+  photoEditable = false,
+  onEditPhoto,
   meta,
   onShift,
   onBreak,
@@ -24,42 +109,37 @@ export default function EmployeeShiftHeader({
 }: EmployeeShiftHeaderProps) {
   return (
     <Box mb={1.5}>
+      {dateLabel ? (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+          {dateLabel}
+        </Typography>
+      ) : null}
       <Paper
         variant="outlined"
         sx={{
           px: 1.5,
-          py: 1,
+          py: 1.25,
           display: "flex",
           alignItems: "center",
-          gap: 1,
+          gap: 1.25,
+          flexWrap: "wrap",
+          overflow: "visible",
           borderRadius: 2,
         }}
       >
-        <Box flex={1} minWidth={0}>
-          <Typography variant="subtitle2" fontWeight={800} noWrap>
-            {name}
-          </Typography>
-          {meta ? (
-            <Typography variant="caption" color="text.secondary" noWrap display="block">
-              {meta}
-            </Typography>
-          ) : null}
-        </Box>
-        <Chip
-          size="small"
-          color={onBreak ? "warning" : onShift ? "success" : "default"}
-          label={shiftStatusLabel(onBreak, onShift)}
+        <ShiftIdentity
+          name={name}
+          photoUrl={photoUrl}
+          photoEditable={photoEditable}
+          onEditPhoto={onEditPhoto}
+          meta={meta}
         />
-        <Button
-          size="small"
-          variant={onBreak ? "contained" : "outlined"}
-          color={onBreak ? "warning" : "primary"}
-          disabled={breakBusy}
-          onClick={onToggleBreak}
-          sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
-        >
-          {onBreak ? he.employeeBreakEnd : he.employeeBreakStart}
-        </Button>
+        <ShiftPresence
+          onShift={onShift}
+          onBreak={onBreak}
+          breakBusy={breakBusy}
+          onToggleBreak={onToggleBreak}
+        />
       </Paper>
       {progress != null ? <EmployeeShiftProgress progress={progress} /> : null}
     </Box>

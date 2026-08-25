@@ -192,6 +192,7 @@ def test_create_ad_hoc_one_branch_has_no_network_group(monkeypatch):
     occ.create.assert_called_once()
     assert occ.create.call_args.kwargs["network_group_id"] is None
     assert occ.create.call_args.kwargs["branch_id"] == "b1"
+    assert occ.create.call_args.kwargs["task_kind"] == "ad_hoc"
 
 
 def test_create_ad_hoc_for_network_skips_empty_snif(monkeypatch):

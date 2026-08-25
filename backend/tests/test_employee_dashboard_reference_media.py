@@ -158,3 +158,45 @@ def test_employee_card_merges_slot_guides_from_template():
     assert card["completion_requirements"][0]["title"] == "מדף"
     assert card["completion_requirements"][0]["hint"] == "כל השורה"
     assert card["completion_requirements"][0]["example_url"] == "/uploads/task_photos/ex.jpg"
+
+
+def test_employee_card_includes_start_url():
+    occ_repo = MagicMock()
+    occ_repo.get_department_name.return_value = None
+    tpl_repo = MagicMock()
+    tpl_repo.find_by_id.return_value = None
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+
+    svc = DashboardService(
+        occ_repo,
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        completion_repo,
+        template_repo=tpl_repo,
+    )
+    url = "https://my.agroline.co.il/main/azmanot/client-orders/create"
+    card = svc._employee_task_card(_occ(start_url=url))
+    assert card["start_url"] == url
+
+
+def test_employee_card_fills_start_url_from_template():
+    occ_repo = MagicMock()
+    occ_repo.get_department_name.return_value = None
+    tpl_repo = MagicMock()
+    url = "https://my.agroline.co.il/main/azmanot/client-orders/create"
+    tpl_repo.find_by_id.return_value = _tpl(start_url=url)
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+
+    svc = DashboardService(
+        occ_repo,
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        completion_repo,
+        template_repo=tpl_repo,
+    )
+    card = svc._employee_task_card(_occ(start_url=None))
+    assert card["start_url"] == url

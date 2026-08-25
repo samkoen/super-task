@@ -78,6 +78,7 @@ def test_sync_updates_open_occurrences_only():
         "open", title="כותרת", description="תמלול"
     )
     occ_repo.update_completion_requirements.assert_called_once_with("open", [])
+    occ_repo.update_start_url.assert_called_once_with("open", None)
 
 
 def test_sync_copies_slot_guides_to_open_occurrence():
@@ -96,3 +97,20 @@ def test_sync_copies_slot_guides_to_open_occurrence():
     tpl.completion_requirements = guides
     svc._sync_open_occurrence_text(tpl)
     occ_repo.update_completion_requirements.assert_called_once_with("open", guides)
+
+
+def test_sync_copies_start_url_to_open_occurrence():
+    occ_repo = MagicMock()
+    occ_repo.list_by_template_id.return_value = [_occ(status=task_status.PENDING, id_="open")]
+    svc = TaskTemplateService(
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        occurrence_repo=occ_repo,
+    )
+    tpl = _tpl()
+    tpl.start_url = "https://my.agroline.co.il/main/azmanot/client-orders/create"
+    svc._sync_open_occurrence_text(tpl)
+    occ_repo.update_start_url.assert_called_once_with("open", tpl.start_url)

@@ -78,4 +78,14 @@ export const userService = {
     );
     return response.data;
   },
+
+  uploadTeamAvatar: async (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await api.post<{ user: User; message: string; url: string }>(
+      `/users/team/${id}/avatar`,
+      form,
+    );
+    return response.data;
+  },
 };

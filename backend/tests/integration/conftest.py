@@ -175,7 +175,7 @@ def chat_seed(world_seed) -> dict[str, str]:
             branch_id=world_seed["branch_id"],
             title="משימת צ'אט",
             description="",
-            due_at=datetime.now(TZ) + timedelta(hours=2),
+            due_at=datetime.fromisoformat(due_at_iso()),
             assignee_user_id=world_seed["employee_id"],
             department_id=None,
             status=task_status.IN_PROGRESS,

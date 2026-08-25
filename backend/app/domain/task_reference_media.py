@@ -23,4 +23,5 @@ def merge_occurrence_reference_media(
             occurrence.completion_requirements,
             template.completion_requirements,
         ),
+        start_url=(occurrence.start_url or "").strip() or template.start_url,
     )

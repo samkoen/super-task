@@ -107,3 +107,17 @@ def test_merge_fills_slot_guides_from_template():
     )
     assert merged.completion_requirements[0]["title"] == "מדף"
     assert merged.completion_requirements[0]["example_url"] == "/uploads/task_photos/ex.jpg"
+
+
+def test_merge_fills_start_url_from_template():
+    url = "https://my.agroline.co.il/main/azmanot/client-orders/create"
+    merged = merge_occurrence_reference_media(_occurrence(), _template(start_url=url))
+    assert merged.start_url == url
+
+
+def test_merge_keeps_occurrence_start_url():
+    merged = merge_occurrence_reference_media(
+        _occurrence(start_url="https://occ.example/x"),
+        _template(start_url="https://tpl.example/y"),
+    )
+    assert merged.start_url == "https://occ.example/x"

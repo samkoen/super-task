@@ -2,7 +2,7 @@ import traceback
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from app.repositories.invitation_repository import InvitationRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
 from app.services.invitation_service import InvitationService
+from app.services.media_upload_service import upload_attachment
 from app.services.view_as_service import ViewAsService
 
 router = APIRouter()
@@ -200,6 +201,29 @@ def update_current_user(
         return JSONResponse({"error": str(e)}, status_code=400)
     request.session["user_email"] = user["email"]
     return {"message": "הפרופיל עודכן", "user": user}
+
+
+@router.post("/me/avatar")
+async def upload_my_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    service: AuthService = Depends(get_auth_service),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse({"error": "לא מחובר"}, status_code=401)
+    if request.session.get(SESSION_PREVIEW_AS_KEY):
+        return JSONResponse({"error": "לא ניתן לערוך פרופיל במצב צפייה כעובד"}, status_code=403)
+    uploaded = await upload_attachment(kind="photo", folder="avatars", file=file)
+    try:
+        user = service.set_my_avatar(
+            str(user_id),
+            uploaded["url"],
+            active_branch_id=request.session.get(SESSION_ACTIVE_BRANCH_KEY),
+        )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"message": "התמונה עודכנה", "user": user, "url": uploaded["url"]}
 
 
 @router.post("/change-password")

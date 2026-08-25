@@ -45,6 +45,26 @@ def test_update_me_ok():
     repo.update_profile.assert_called_once()
 
 
+def test_set_my_avatar_ok():
+    repo = MagicMock()
+    repo.find_by_id.return_value = _user()
+    repo.update_avatar.return_value = _user(avatar_url="/uploads/avatars/a.jpg")
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    out = service.set_my_avatar("u1", "/uploads/avatars/a.jpg")
+    assert out["avatar_url"] == "/uploads/avatars/a.jpg"
+    repo.update_avatar.assert_called_once_with("u1", "/uploads/avatars/a.jpg")
+
+
+def test_set_my_avatar_rejects_javascript():
+    repo = MagicMock()
+    repo.find_by_id.return_value = _user()
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    with pytest.raises(ValueError, match="לא חוקי"):
+        service.set_my_avatar("u1", "javascript:alert(1)")
+
+
 def test_update_me_rejects_taken_email():
     repo = MagicMock()
     repo.find_by_id.return_value = _user()

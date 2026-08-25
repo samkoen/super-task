@@ -1,11 +1,33 @@
 import { he } from "../i18n/he";
 import type { TaskStatus } from "../services/taskService";
+import { normalizeStartUrl } from "./startUrl";
 
 const STARTABLE: ReadonlySet<string> = new Set(["pending", "overdue"]);
 const DOABLE: ReadonlySet<string> = new Set(["pending", "overdue", "in_progress"]);
 
 export function needsTaskStart(status: TaskStatus | string): boolean {
   return STARTABLE.has(status);
+}
+
+export function hasExternalStartUrl(startUrl: string | null | undefined): boolean {
+  return Boolean(normalizeStartUrl(startUrl));
+}
+
+export function shouldOpenStartUrlOnBegin(
+  status: TaskStatus | string,
+  startUrl: string | null | undefined,
+): boolean {
+  return needsTaskStart(status) && hasExternalStartUrl(startUrl);
+}
+
+/** Premier tap avec URL : start + navigateur, même sans cases de clôture. */
+export function canSubmitEmployeeTask(
+  status: TaskStatus | string,
+  startUrl: string | null | undefined,
+  slotsFilled: boolean,
+): boolean {
+  if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return true;
+  return slotsFilled;
 }
 
 export function canDoTask(status: TaskStatus | string): boolean {
