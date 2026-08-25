@@ -72,8 +72,7 @@ import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
 
 import {
-  ALL_WEEKDAYS,
-  WEEKDAY_OPTIONS,
+  initialWeeklyDays,
   weeklyDaysPayload,
 } from "../../utils/taskRecurrence";
 
@@ -151,7 +150,7 @@ export default function ManagerFixedTasksPage() {
       title: tpl.title,
       description: tpl.description ?? "",
       due_time: tpl.due_time || "09:00",
-      weekly_days: tpl.weekly_days ?? ALL_WEEKDAYS,
+      weekly_days: initialWeeklyDays(tpl.recurrence, tpl.weekly_days),
       assignee_user_id: tpl.assignee_user_id ?? "",
       is_active: tpl.is_active,
       ops_category: tpl.ops_category ?? "",
@@ -489,24 +488,12 @@ export default function ManagerFixedTasksPage() {
               fullWidth
               dir="ltr"
             />
-            {editing.recurrence === "daily" && (
+            {(editing.recurrence === "daily" || editing.recurrence === "weekly") && (
               <WeekdayMultiSelect
                 value={editForm.weekly_days}
                 onChange={(weekly_days) => setEditForm({ ...editForm, weekly_days })}
+                exclusive={editing.recurrence === "weekly"}
               />
-            )}
-            {editing.recurrence === "weekly" && (
-              <TextField
-                select
-                label={he.weekday}
-                value={editForm.weekly_days.split(",")[0] || "0"}
-                onChange={(e) => setEditForm({ ...editForm, weekly_days: e.target.value })}
-                fullWidth
-              >
-                {WEEKDAY_OPTIONS.map((d) => (
-                  <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>
-                ))}
-              </TextField>
             )}
             <TextField
               select

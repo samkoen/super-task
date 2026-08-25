@@ -61,10 +61,11 @@ import {
 } from "../../utils/managerScopeBranch";
 import { he } from "../../i18n/he";
 import {
-  ALL_WEEKDAYS,
+  DAILY_DEFAULT_WEEKDAYS,
   FIXED_RECURRENCE_OPTIONS,
-  WEEKDAY_OPTIONS,
+  initialWeeklyDays,
   normalizeFixedRecurrence,
+  weekdaysOnRecurrenceChange,
   weeklyDaysPayload,
 } from "../../utils/taskRecurrence";
 
@@ -93,7 +94,7 @@ const EMPTY_FORM: FormState = {
   branch_id: "",
   recurrence: "daily",
   due_time: "09:00",
-  weekly_days: ALL_WEEKDAYS,
+  weekly_days: DAILY_DEFAULT_WEEKDAYS,
   monthly_day: 1,
   employee_can_claim: false,
 };
@@ -171,7 +172,10 @@ export default function ManagerTaskGalleryPage() {
       branch_id: item.branch_id ?? "",
       recurrence: normalizeFixedRecurrence(item.recurrence),
       due_time: item.due_time || "09:00",
-      weekly_days: item.weekly_days || ALL_WEEKDAYS,
+      weekly_days: initialWeeklyDays(
+        normalizeFixedRecurrence(item.recurrence),
+        item.weekly_days,
+      ),
       monthly_day: item.monthly_day ?? 1,
       employee_can_claim: Boolean(item.employee_can_claim),
     });
@@ -427,7 +431,13 @@ export default function ManagerTaskGalleryPage() {
                 <Select
                   label={he.recurrence}
                   value={form.recurrence}
-                  onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      recurrence: e.target.value,
+                      weekly_days: weekdaysOnRecurrenceChange(e.target.value, f.weekly_days),
+                    }))
+                  }
                 >
                   {FIXED_RECURRENCE_OPTIONS.map((value) => (
                     <MenuItem key={value} value={value}>
@@ -444,24 +454,12 @@ export default function ManagerTaskGalleryPage() {
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
-              {form.recurrence === "daily" && (
+              {(form.recurrence === "daily" || form.recurrence === "weekly") && (
                 <WeekdayMultiSelect
                   value={form.weekly_days}
                   onChange={(weekly_days) => setForm((f) => ({ ...f, weekly_days }))}
+                  exclusive={form.recurrence === "weekly"}
                 />
-              )}
-              {form.recurrence === "weekly" && (
-                <TextField
-                  select
-                  label={he.weekday}
-                  value={form.weekly_days.split(",")[0] || "0"}
-                  onChange={(e) => setForm((f) => ({ ...f, weekly_days: e.target.value }))}
-                  fullWidth
-                >
-                  {WEEKDAY_OPTIONS.map((d) => (
-                    <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>
-                  ))}
-                </TextField>
               )}
             </>
           )}

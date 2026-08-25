@@ -419,7 +419,7 @@ export default function EmployeeTasksPage() {
       urgentTasks,
       todayTasks,
     ]);
-    return splitEmployeeWorkLists(pool, new Set(urgentTasks.map((t) => t.id)));
+    return splitEmployeeWorkLists(pool);
   }, [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks]);
 
   const progress = dashboard?.progress_percent ?? 0;
@@ -535,10 +535,7 @@ export default function EmployeeTasksPage() {
             />
           ) : (
             rangeGroups.map(([day, dayTasks]) => {
-              const lists = splitEmployeeWorkLists(
-                dayTasks,
-                new Set(dayTasks.filter((t) => t.status === "overdue").map((t) => t.id)),
-              );
+              const lists = splitEmployeeWorkLists(dayTasks);
               const review = dayTasks.filter((t) => t.status === "pending_review");
               const done = dayTasks.filter((t) => t.status === "completed");
               return (
@@ -550,11 +547,13 @@ export default function EmployeeTasksPage() {
                     title={he.employeeRoutineTasks}
                     tasks={lists.routine}
                     onOpen={openDetail}
+                    layout="list"
                   />
                   <EmployeeTaskSection
                     title={he.employeeDynamicTasks}
                     tasks={lists.dynamic}
                     onOpen={openDetail}
+                    layout="tile"
                     color="error.main"
                   />
                   <EmployeeTaskSection
@@ -592,11 +591,13 @@ export default function EmployeeTasksPage() {
                 title={he.employeeRoutineTasks}
                 tasks={workLists.routine}
                 onOpen={openDetail}
+                layout="list"
               />
               <EmployeeTaskSection
                 title={he.employeeDynamicTasks}
                 tasks={workLists.dynamic}
                 onOpen={openDetail}
+                layout="tile"
                 color="error.main"
               />
             </>

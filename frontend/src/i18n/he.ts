@@ -630,7 +630,7 @@ export const he = {
   employeeDailyProgress: "התקדמות יומית",
   employeeUrgentTasks: "משימות דחופות",
   employeeRoutineTasks: "משימות קבועות",
-  employeeDynamicTasks: "משימות משתנות ודחופות",
+  employeeDynamicTasks: "משימות מזדמנות",
   employeeCarryOverTask: "לא הושלמה מיום קודם",
   employeeTaskCreatedOn: (dayLabel: string) => `נפתחה ב-${dayLabel}`,
   employeeTaskOpenedOn: (dayLabel: string) => `תאריך פתיחה: ${dayLabel}`,

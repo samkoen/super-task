@@ -34,9 +34,9 @@ import {
   createFieldsFromBranchSelection,
 } from "../../utils/fixedTaskCreateScope";
 import {
-  ALL_WEEKDAYS,
+  DAILY_DEFAULT_WEEKDAYS,
   FIXED_RECURRENCE_OPTIONS,
-  WEEKDAY_OPTIONS,
+  weekdaysOnRecurrenceChange,
 } from "../../utils/taskRecurrence";
 
 const EMPTY_MEDIA: TaskReferenceMediaValue = {
@@ -114,7 +114,7 @@ export default function NewTaskFormDialog({
   const [dueAt, setDueAt] = useState("");
   const [recurrence, setRecurrence] = useState<TaskRecurrence>("daily");
   const [dueTime, setDueTime] = useState("09:00");
-  const [weeklyDays, setWeeklyDays] = useState("0");
+  const [weeklyDays, setWeeklyDays] = useState(DAILY_DEFAULT_WEEKDAYS);
   const [monthlyDay, setMonthlyDay] = useState(1);
   const [opsCategory, setOpsCategory] = useState<OpsCategory | "">("");
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
@@ -139,7 +139,7 @@ export default function NewTaskFormDialog({
     setDueAt(defaultDueAt);
     setRecurrence("daily");
     setDueTime("09:00");
-    setWeeklyDays(ALL_WEEKDAYS);
+    setWeeklyDays(DAILY_DEFAULT_WEEKDAYS);
     setMonthlyDay(1);
     setOpsCategory("");
     setSelectedBranchIds(defaultBranchId ? [defaultBranchId] : []);
@@ -373,7 +373,11 @@ export default function NewTaskFormDialog({
               select
               label={he.recurrence}
               value={recurrence}
-              onChange={(e) => setRecurrence(e.target.value as TaskRecurrence)}
+              onChange={(e) => {
+                const next = e.target.value as TaskRecurrence;
+                setWeeklyDays((current) => weekdaysOnRecurrenceChange(next, current));
+                setRecurrence(next);
+              }}
               fullWidth
             >
               {FIXED_RECURRENCE_OPTIONS.map((r) => (
@@ -389,22 +393,13 @@ export default function NewTaskFormDialog({
               fullWidth
               dir="ltr"
             />
-            {recurrence === "daily" && (
-              <WeekdayMultiSelect value={weeklyDays} onChange={setWeeklyDays} />
-            )}
-            {recurrence === "weekly" && (
-              <TextField
-                select
-                label={he.weekday}
-                value={weeklyDays.split(",")[0] || "0"}
-                onChange={(e) => setWeeklyDays(e.target.value)}
-                fullWidth
-              >
-                {WEEKDAY_OPTIONS.map((d) => (
-                  <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>
-                ))}
-              </TextField>
-            )}
+            {recurrence === "daily" || recurrence === "weekly" ? (
+              <WeekdayMultiSelect
+                value={weeklyDays}
+                onChange={setWeeklyDays}
+                exclusive={recurrence === "weekly"}
+              />
+            ) : null}
             {recurrence === "monthly" && (
               <TextField
                 select

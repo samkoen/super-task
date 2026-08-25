@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import NewTaskFormDialog from "./NewTaskFormDialog";
 import { he } from "../../i18n/he";
 
@@ -46,7 +46,36 @@ describe("NewTaskFormDialog", () => {
     fireEvent.click(screen.getByText(he.taskKindLabels.fixed));
     expect(screen.getAllByText(he.recurrence).length).toBeGreaterThan(0);
     expect(screen.queryByText(he.recurrenceLabels.biweekly)).toBeNull();
-    expect(screen.getByLabelText(he.weekdays)).toBeTruthy();
+    const days = within(screen.getByLabelText(he.weekdays)).getAllByRole("button");
+    expect(days[0].textContent).toContain(he.weekdaySun);
+    expect(days[days.length - 1].textContent).toContain(he.weekdaySat);
+    expect(days[days.length - 1].getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByLabelText(he.weekday)).toBeNull();
+  });
+
+  it("keeps weekday toggles for weekly with a single selected day", () => {
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        branches={[]}
+        employees={[]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        forcedTaskKind="fixed"
+      />,
+    );
+    fireEvent.mouseDown(screen.getByLabelText(he.recurrence));
+    fireEvent.click(screen.getByRole("option", { name: he.recurrenceLabels.weekly }));
+    const group = screen.getByLabelText(he.weekdays);
+    const pressed = within(group)
+      .getAllByRole("button")
+      .filter((btn) => btn.getAttribute("aria-pressed") === "true");
+    expect(pressed).toHaveLength(1);
+    expect(screen.queryByLabelText(he.weekday)).toBeNull();
   });
 
   it("offers gallery as assignee and enables submit without due date", () => {

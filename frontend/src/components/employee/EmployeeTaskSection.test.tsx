@@ -26,9 +26,23 @@ describe("EmployeeTaskSection", () => {
 
   it("renders the compact list title with count", () => {
     render(
-      <EmployeeTaskSection title={he.employeeRoutineTasks} tasks={[task]} onOpen={vi.fn()} />,
+      <EmployeeTaskSection title={he.employeeRoutineTasks} tasks={[task]} onOpen={vi.fn()} layout="list" />,
     );
     expect(screen.getByText(`${he.employeeRoutineTasks} (1)`)).toBeTruthy();
     expect(screen.getByText("פתיחת סניף")).toBeTruthy();
+    expect(screen.queryByLabelText(he.taskPhotoEnlarge)).toBeNull();
+  });
+
+  it("renders ad-hoc tasks as photo tiles", () => {
+    render(
+      <EmployeeTaskSection
+        title={he.employeeDynamicTasks}
+        tasks={[{ ...task, id: "t2", task_kind: "ad_hoc", title: "מלאי חריג" }]}
+        onOpen={vi.fn()}
+        layout="tile"
+      />,
+    );
+    expect(screen.getByText(`${he.employeeDynamicTasks} (1)`)).toBeTruthy();
+    expect(screen.getByText("מלאי חריג")).toBeTruthy();
   });
 });
