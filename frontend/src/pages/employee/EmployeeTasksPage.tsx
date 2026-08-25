@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -67,7 +67,9 @@ import {
   canSubmitEmployeeTask,
   cardAfterStart,
   needsTaskStart,
+  revertStartedOnDashboard,
   shouldOpenStartUrlOnBegin,
+  waitForInFlightLinkedStart,
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 
@@ -207,6 +209,9 @@ export default function EmployeeTasksPage() {
   const [translatingTasks, setTranslatingTasks] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [linkedStartReady, setLinkedStartReady] = useState(true);
+  const linkedStartRef = useRef<Promise<boolean> | null>(null);
+  const linkedStartIdRef = useRef<string | null>(null);
 
   const translatePendingTasks = useCallback(
     async (language: EmployeeLanguage, tasks: EmployeeTaskCard[]) => {
@@ -270,18 +275,33 @@ export default function EmployeeTasksPage() {
   }, []);
 
   const persistLinkedStart = useCallback(async (task: EmployeeTaskCard) => {
-    try {
-      const result = await taskService.start(task.id);
-      const next = {
-        ...cardAfterStart(task, result.occurrence),
-        start_url: task.start_url,
-      };
-      setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
-      setDetailTask((prev) => (prev?.id === task.id ? next : prev));
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-      setDetailTask((prev) => (prev?.id === task.id ? task : prev));
+    if (linkedStartIdRef.current === task.id && linkedStartRef.current) {
+      return linkedStartRef.current;
     }
+    const run = (async () => {
+      try {
+        const result = await taskService.start(task.id);
+        const next = {
+          ...cardAfterStart(task, result.occurrence),
+          start_url: task.start_url,
+        };
+        setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
+        setDetailTask((prev) => (prev?.id === task.id ? next : prev));
+        setLinkedStartReady(true);
+        return true;
+      } catch (e) {
+        showError(e instanceof ApiError ? e.message : he.errorGeneric);
+        setDashboard((prev) => revertStartedOnDashboard(prev, task));
+        setDetailTask((prev) => (prev?.id === task.id ? task : prev));
+        setLinkedStartReady(false);
+        linkedStartRef.current = null;
+        linkedStartIdRef.current = null;
+        return false;
+      }
+    })();
+    linkedStartIdRef.current = task.id;
+    linkedStartRef.current = run;
+    return run;
   }, [showError]);
 
   const openDetail = useCallback((task: EmployeeTaskCard) => {
@@ -294,6 +314,7 @@ export default function EmployeeTasksPage() {
     const next = openLink ? { ...cardAfterStart(task), start_url: task.start_url } : task;
     setSlotMedia(canDoTask(next.status) ? effectiveRequirements(next).map(() => null) : []);
     setDetailTask(next);
+    setLinkedStartReady(!openLink);
     if (openLink) {
       setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
       showSuccess(he.startTaskOpenedLink);
@@ -384,10 +405,19 @@ export default function EmployeeTasksPage() {
         };
         setDashboard((prev) => applyStartedOnDashboard(prev, detailTask.id, task));
         setDetailTask(task);
+        setLinkedStartReady(true);
         if (openLink) {
           showSuccess(he.startTaskOpenedLink);
           return;
         }
+      } else {
+        const started = await waitForInFlightLinkedStart(
+          task,
+          linkedStartRef.current,
+          linkedStartIdRef.current,
+        );
+        if (!started) return;
+        task = started;
       }
       const attachments = await uploadRequirementSlots(effectiveRequirements(task), slotMedia);
       await taskService.complete(task.id, {
@@ -696,6 +726,7 @@ export default function EmployeeTasksPage() {
                   detailTask.status,
                   detailTask.start_url,
                   canSubmitDone,
+                  linkedStartReady,
                 ),
                 saving,
               }
