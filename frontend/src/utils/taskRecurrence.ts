@@ -25,7 +25,7 @@ const LABELS: Record<string, string> = Object.fromEntries(
   WEEKDAY_OPTIONS.map((d) => [d.value, d.label]),
 );
 
-const WEEKDAY_ORDER = WEEKDAY_OPTIONS.map((d) => d.value);
+const WEEKDAY_ORDER: string[] = WEEKDAY_OPTIONS.map((d) => d.value);
 
 export function parseWeeklyDays(value: string | null | undefined): string[] {
   if (!value) return [];

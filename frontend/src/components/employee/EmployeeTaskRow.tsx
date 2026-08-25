@@ -6,6 +6,7 @@ import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { shouldHighlightEmployeeTask } from "../../utils/employeeDashboardSections";
 import type { EmployeeTaskCard } from "../../services/dashboardService";
+import type { TaskStatus } from "../../services/taskService";
 
 export type EmployeeTaskRowLayout = "tile" | "list";
 
@@ -30,7 +31,7 @@ export default function EmployeeTaskRow({
   return <EmployeeTaskTile task={task} onOpen={onOpen} />;
 }
 
-function StatusChip({ status }: { status: string }) {
+function StatusChip({ status }: { status: TaskStatus }) {
   if (shouldHighlightEmployeeTask(status) && status === "overdue") {
     return <Chip size="small" color="error" label={he.alertOverdue} sx={chipLabelSx} />;
   }
