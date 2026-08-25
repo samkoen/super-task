@@ -14,7 +14,11 @@ BIWEEKLY = "biweekly"
 MONTHLY = "monthly"
 
 ALL = {ONCE, DAILY, WEEKLY, BIWEEKLY, MONTHLY}
-RECURRING = {DAILY, WEEKLY, BIWEEKLY, MONTHLY}
+RECURRING = {DAILY, WEEKLY, MONTHLY}
+
+
+def uses_weekly_days(recurrence: str) -> bool:
+    return recurrence in {DAILY, WEEKLY, BIWEEKLY}
 
 
 def parse_due_time(value: str | None, *, default: time = time(23, 59)) -> time:
@@ -60,16 +64,14 @@ def should_generate_on_date(
     anchor_date: date | None = None,
     monthly_day: int | None = None,
 ) -> bool:
+    _ = anchor_date
     if recurrence == DAILY:
-        return True
-    if recurrence in {WEEKLY, BIWEEKLY}:
-        if day.weekday() not in parse_weekly_days(weekly_days):
-            return False
-        if recurrence == WEEKLY:
+        selected = parse_weekly_days(weekly_days)
+        if not selected:
             return True
-        anchor = anchor_date or day
-        weeks = (day - anchor).days // 7
-        return weeks >= 0 and weeks % 2 == 0
+        return day.weekday() in selected
+    if recurrence in {WEEKLY, BIWEEKLY}:
+        return day.weekday() in parse_weekly_days(weekly_days)
     if recurrence == MONTHLY:
         target = monthly_day or 1
         if target < 1:

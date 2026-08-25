@@ -200,7 +200,7 @@ def seed_tasks(
     fixed_samples = [
         ("מונאדל", "סידור מדפים — מחלקה ראשית", task_recurrence.DAILY, "09:00", None),
         ("חאמד", "בדיקת מחירים", task_recurrence.WEEKLY, "10:00", "0"),
-        ("יזיד", "ניקוי אזור כניסה", task_recurrence.BIWEEKLY, "08:00", "0"),
+        ("יזיד", "ניקוי אזור כניסה", task_recurrence.WEEKLY, "08:00", "0"),
         ("אוראל", "ספירת מלאי מחסן", task_recurrence.DAILY, "07:30", None),
         ("שירה", "פתיחת קופה ראשית", task_recurrence.DAILY, "08:00", None),
     ]
@@ -218,7 +218,7 @@ def seed_tasks(
             department_id=None,
             created_by_id=branch_manager_id,
             task_kind="fixed",
-            biweekly_anchor=datetime.now(TZ) if recurrence == task_recurrence.BIWEEKLY else None,
+            biweekly_anchor=None,
         )
         scheduler.generate_from_template(template, on_date=datetime.now(TZ).date())
         print(f"  fixed: {title} -> {employee_name}")

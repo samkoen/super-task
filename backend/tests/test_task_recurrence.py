@@ -7,6 +7,29 @@ def test_should_generate_daily():
     assert task_recurrence.should_generate_on_date("daily", None, date(2026, 7, 6))
 
 
+def test_daily_respects_selected_weekdays():
+    monday = date(2026, 7, 6)
+    saturday = date(2026, 7, 11)
+    assert monday.weekday() == 0
+    assert saturday.weekday() == 5
+    assert task_recurrence.should_generate_on_date("daily", "0,1,2,3,4", monday)
+    assert not task_recurrence.should_generate_on_date("daily", "0,1,2,3,4", saturday)
+
+
+def test_legacy_biweekly_follows_weekday_every_week():
+    friday = date(2026, 7, 10)
+    next_friday = date(2026, 7, 17)
+    assert task_recurrence.should_generate_on_date("biweekly", "4", friday)
+    assert task_recurrence.should_generate_on_date("biweekly", "4", next_friday)
+    assert not task_recurrence.should_generate_on_date("biweekly", "4", date(2026, 7, 6))
+
+
+def test_recurring_excludes_biweekly():
+    assert "biweekly" not in task_recurrence.RECURRING
+    assert task_recurrence.uses_weekly_days("daily")
+    assert not task_recurrence.uses_weekly_days("monthly")
+
+
 def test_should_generate_weekly_friday():
     friday = date(2026, 7, 10)
     assert friday.weekday() == 4
