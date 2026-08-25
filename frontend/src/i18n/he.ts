@@ -325,6 +325,7 @@ export const he = {
   openedOn: "תאריך פתיחה",
   dueTime: "שעת יעד",
   weekday: "יום בשבוע",
+  weekdays: "ימים בשבוע",
   weekdayMon: "שני",
   weekdayTue: "שלישי",
   weekdayWed: "רביעי",

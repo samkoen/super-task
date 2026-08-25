@@ -64,6 +64,7 @@ import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
 import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
 import { isAssignToGallery } from "../../constants/taskAssignment";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
+import { weeklyDaysPayload, normalizeFixedRecurrence } from "../../utils/taskRecurrence";
 import {
   defaultApplyAdHocEditToNetwork,
   isNetworkAdHocOccurrence,
@@ -352,9 +353,8 @@ export default function ManagerTasksPage() {
           recurrence: payload.task_kind === "fixed" ? payload.recurrence : null,
           due_time: payload.task_kind === "fixed" ? payload.due_time : null,
           weekly_days:
-            payload.task_kind === "fixed" &&
-            (payload.recurrence === "weekly" || payload.recurrence === "biweekly")
-              ? payload.weekly_days
+            payload.task_kind === "fixed"
+              ? weeklyDaysPayload(payload.recurrence, payload.weekly_days) ?? null
               : null,
           monthly_day:
             payload.task_kind === "fixed" && payload.recurrence === "monthly"
@@ -379,10 +379,7 @@ export default function ManagerTasksPage() {
           description: payload.description,
           recurrence: payload.recurrence,
           due_time: payload.due_time,
-          weekly_days:
-            payload.recurrence === "weekly" || payload.recurrence === "biweekly"
-              ? payload.weekly_days
-              : undefined,
+          weekly_days: weeklyDaysPayload(payload.recurrence, payload.weekly_days),
           monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
           ops_category: payload.ops_category,
           min_video_seconds: payload.min_video_seconds,
@@ -452,7 +449,7 @@ export default function ManagerTasksPage() {
           branch_id,
           title: item.title,
           description: item.description,
-          recurrence: (item.recurrence as "daily" | "weekly" | "biweekly" | "monthly") || "daily",
+          recurrence: normalizeFixedRecurrence(item.recurrence),
           due_time: item.due_time || "09:00",
           weekly_days: item.weekly_days || undefined,
           monthly_day: item.monthly_day ?? undefined,

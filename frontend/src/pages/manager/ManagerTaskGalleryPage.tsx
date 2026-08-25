@@ -44,6 +44,7 @@ import {
 } from "../../components/tasks/TaskReferenceMediaEditor";
 import TaskReferenceMediaEditor from "../../components/tasks/TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "../../components/tasks/CompletionRequirementsEditor";
+import WeekdayMultiSelect from "../../components/tasks/WeekdayMultiSelect";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
 import PageHeader from "../../components/ui/PageHeader";
@@ -59,6 +60,13 @@ import {
   writeManagerScopeBranchId,
 } from "../../utils/managerScopeBranch";
 import { he } from "../../i18n/he";
+import {
+  ALL_WEEKDAYS,
+  FIXED_RECURRENCE_OPTIONS,
+  WEEKDAY_OPTIONS,
+  normalizeFixedRecurrence,
+  weeklyDaysPayload,
+} from "../../utils/taskRecurrence";
 
 const EMPTY_MEDIA: TaskReferenceMediaValue = {
   reference_photo_url: "",
@@ -85,7 +93,7 @@ const EMPTY_FORM: FormState = {
   branch_id: "",
   recurrence: "daily",
   due_time: "09:00",
-  weekly_days: "0",
+  weekly_days: ALL_WEEKDAYS,
   monthly_day: 1,
   employee_can_claim: false,
 };
@@ -161,9 +169,9 @@ export default function ManagerTaskGalleryPage() {
       description: item.description,
       task_kind: item.task_kind,
       branch_id: item.branch_id ?? "",
-      recurrence: item.recurrence || "daily",
+      recurrence: normalizeFixedRecurrence(item.recurrence),
       due_time: item.due_time || "09:00",
-      weekly_days: item.weekly_days || "0",
+      weekly_days: item.weekly_days || ALL_WEEKDAYS,
       monthly_day: item.monthly_day ?? 1,
       employee_can_claim: Boolean(item.employee_can_claim),
     });
@@ -194,10 +202,7 @@ export default function ManagerTaskGalleryPage() {
     if (form.task_kind === "fixed") {
       payload.recurrence = form.recurrence;
       payload.due_time = form.due_time;
-      payload.weekly_days =
-        form.recurrence === "weekly" || form.recurrence === "biweekly"
-          ? form.weekly_days
-          : null;
+      payload.weekly_days = weeklyDaysPayload(form.recurrence, form.weekly_days) ?? null;
       payload.monthly_day = form.recurrence === "monthly" ? form.monthly_day : null;
     }
     if (user?.role === "admin" && user.network_id) {
@@ -424,13 +429,11 @@ export default function ManagerTaskGalleryPage() {
                   value={form.recurrence}
                   onChange={(e) => setForm((f) => ({ ...f, recurrence: e.target.value }))}
                 >
-                  {Object.entries(he.recurrenceLabels)
-                    .filter(([k]) => k !== "once")
-                    .map(([value, label]) => (
-                      <MenuItem key={value} value={value}>
-                        {label}
-                      </MenuItem>
-                    ))}
+                  {FIXED_RECURRENCE_OPTIONS.map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {he.recurrenceLabels[value]}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
               <TextField
@@ -441,6 +444,25 @@ export default function ManagerTaskGalleryPage() {
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
+              {form.recurrence === "daily" && (
+                <WeekdayMultiSelect
+                  value={form.weekly_days}
+                  onChange={(weekly_days) => setForm((f) => ({ ...f, weekly_days }))}
+                />
+              )}
+              {form.recurrence === "weekly" && (
+                <TextField
+                  select
+                  label={he.weekday}
+                  value={form.weekly_days.split(",")[0] || "0"}
+                  onChange={(e) => setForm((f) => ({ ...f, weekly_days: e.target.value }))}
+                  fullWidth
+                >
+                  {WEEKDAY_OPTIONS.map((d) => (
+                    <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>
+                  ))}
+                </TextField>
+              )}
             </>
           )}
           <FormControlLabel

@@ -42,6 +42,7 @@ import CompletionRequirementsEditor from "../../components/tasks/CompletionRequi
 import NewTaskFormDialog, {
   type NewTaskFormSubmitPayload,
 } from "../../components/tasks/NewTaskFormDialog";
+import WeekdayMultiSelect from "../../components/tasks/WeekdayMultiSelect";
 import TaskReferenceMediaEditor, {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
@@ -70,15 +71,11 @@ import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGu
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
 
-const WEEKDAYS = [
-  { value: "0", label: he.weekdayMon },
-  { value: "1", label: he.weekdayTue },
-  { value: "2", label: he.weekdayWed },
-  { value: "3", label: he.weekdayThu },
-  { value: "4", label: he.weekdayFri },
-  { value: "5", label: he.weekdaySat },
-  { value: "6", label: he.weekdaySun },
-];
+import {
+  ALL_WEEKDAYS,
+  WEEKDAY_OPTIONS,
+  weeklyDaysPayload,
+} from "../../utils/taskRecurrence";
 
 type EditForm = {
   title: string;
@@ -154,7 +151,7 @@ export default function ManagerFixedTasksPage() {
       title: tpl.title,
       description: tpl.description ?? "",
       due_time: tpl.due_time || "09:00",
-      weekly_days: tpl.weekly_days ?? "0",
+      weekly_days: tpl.weekly_days ?? ALL_WEEKDAYS,
       assignee_user_id: tpl.assignee_user_id ?? "",
       is_active: tpl.is_active,
       ops_category: tpl.ops_category ?? "",
@@ -242,10 +239,7 @@ export default function ManagerFixedTasksPage() {
         title: editForm.title,
         description: editForm.description,
         due_time: editForm.due_time,
-        weekly_days:
-          editing.recurrence === "weekly" || editing.recurrence === "biweekly"
-            ? editForm.weekly_days
-            : editing.weekly_days,
+        weekly_days: weeklyDaysPayload(editing.recurrence, editForm.weekly_days) ?? editing.weekly_days,
         assignee_user_id: editForm.assignee_user_id,
         department_id: editing.department_id,
         is_active: editForm.is_active,
@@ -495,15 +489,21 @@ export default function ManagerFixedTasksPage() {
               fullWidth
               dir="ltr"
             />
-            {(editing.recurrence === "weekly" || editing.recurrence === "biweekly") && (
+            {editing.recurrence === "daily" && (
+              <WeekdayMultiSelect
+                value={editForm.weekly_days}
+                onChange={(weekly_days) => setEditForm({ ...editForm, weekly_days })}
+              />
+            )}
+            {editing.recurrence === "weekly" && (
               <TextField
                 select
                 label={he.weekday}
-                value={editForm.weekly_days}
+                value={editForm.weekly_days.split(",")[0] || "0"}
                 onChange={(e) => setEditForm({ ...editForm, weekly_days: e.target.value })}
                 fullWidth
               >
-                {WEEKDAYS.map((d) => (
+                {WEEKDAY_OPTIONS.map((d) => (
                   <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>
                 ))}
               </TextField>

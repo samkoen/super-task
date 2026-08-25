@@ -45,6 +45,8 @@ describe("NewTaskFormDialog", () => {
     );
     fireEvent.click(screen.getByText(he.taskKindLabels.fixed));
     expect(screen.getAllByText(he.recurrence).length).toBeGreaterThan(0);
+    expect(screen.queryByText(he.recurrenceLabels.biweekly)).toBeNull();
+    expect(screen.getByLabelText(he.weekdays)).toBeTruthy();
   });
 
   it("offers gallery as assignee and enables submit without due date", () => {

@@ -1,15 +1,6 @@
 import type { OpsCategory, TaskRecurrence, TaskTemplate } from "../services/taskService";
 import { he } from "../i18n/he";
-
-const WEEKDAY_LABELS: Record<string, string> = {
-  "0": he.weekdayMon,
-  "1": he.weekdayTue,
-  "2": he.weekdayWed,
-  "3": he.weekdayThu,
-  "4": he.weekdayFri,
-  "5": he.weekdaySat,
-  "6": he.weekdaySun,
-};
+import { formatWeekdaysPart } from "./taskRecurrence";
 
 export type FixedTemplateFilter = "all" | "active" | "inactive";
 
@@ -33,9 +24,9 @@ export function sortFixedTemplates(templates: TaskTemplate[]): TaskTemplate[] {
 export function formatTemplateSchedule(template: TaskTemplate): string {
   const recurrence = he.recurrenceLabels[template.recurrence as TaskRecurrence] ?? template.recurrence;
   const time = template.due_time || "—";
-  if (template.recurrence === "weekly" || template.recurrence === "biweekly") {
-    const day = WEEKDAY_LABELS[String(template.weekly_days ?? "")] ?? "";
-    return day ? `${recurrence} · ${day} · ${time}` : `${recurrence} · ${time}`;
+  const days = formatWeekdaysPart(template.weekly_days);
+  if (template.recurrence === "weekly" || template.recurrence === "daily") {
+    return days ? `${recurrence} · ${days} · ${time}` : `${recurrence} · ${time}`;
   }
   if (template.recurrence === "monthly" && template.monthly_day) {
     return `${recurrence} · ${he.monthlyDay} ${template.monthly_day} · ${time}`;
