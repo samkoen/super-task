@@ -164,6 +164,7 @@ export interface EmployeeTaskCard {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  start_url?: string | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
@@ -187,6 +188,7 @@ export interface EmployeeDashboard {
     branch_id: string;
     branch_name: string | null;
     preferred_language?: string;
+    avatar_url?: string | null;
   };
   progress_percent: number;
   on_shift: boolean;

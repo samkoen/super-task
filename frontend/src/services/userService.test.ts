@@ -95,4 +95,16 @@ describe("userService team employee methods", () => {
       password: "newpass123",
     });
   });
+
+  it("uploadTeamAvatar posts the photo", async () => {
+    const file = new File(["x"], "face.jpg", { type: "image/jpeg" });
+    mockPost.mockResolvedValue({
+      data: { message: "ok", user: { id: "6" }, url: "/uploads/avatars/a.jpg" },
+    });
+    await userService.uploadTeamAvatar("6", file);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [path, body] = mockPost.mock.calls[0];
+    expect(path).toBe("/users/team/6/avatar");
+    expect(body).toBeInstanceOf(FormData);
+  });
 });

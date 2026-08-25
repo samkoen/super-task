@@ -1,11 +1,35 @@
 import { he } from "../i18n/he";
 import type { TaskStatus } from "../services/taskService";
+import { normalizeStartUrl } from "./startUrl";
 
 const STARTABLE: ReadonlySet<string> = new Set(["pending", "overdue"]);
 const DOABLE: ReadonlySet<string> = new Set(["pending", "overdue", "in_progress"]);
 
 export function needsTaskStart(status: TaskStatus | string): boolean {
   return STARTABLE.has(status);
+}
+
+export function hasExternalStartUrl(startUrl: string | null | undefined): boolean {
+  return Boolean(normalizeStartUrl(startUrl));
+}
+
+export function shouldOpenStartUrlOnBegin(
+  status: TaskStatus | string,
+  startUrl: string | null | undefined,
+): boolean {
+  return needsTaskStart(status) && hasExternalStartUrl(startUrl);
+}
+
+/** Premier tap avec URL : start + navigateur, même sans cases de clôture. */
+export function canSubmitEmployeeTask(
+  status: TaskStatus | string,
+  startUrl: string | null | undefined,
+  slotsFilled: boolean,
+  startConfirmed = true,
+): boolean {
+  if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return true;
+  if (hasExternalStartUrl(startUrl) && !startConfirmed) return false;
+  return slotsFilled;
 }
 
 export function canDoTask(status: TaskStatus | string): boolean {
@@ -27,6 +51,21 @@ export function cardAfterStart<T extends { status: string; started_at?: string |
   };
 }
 
+/** Attend le start serveur d'une tâche liée avant complete(); null si le start a échoué. */
+export async function waitForInFlightLinkedStart<
+  T extends { id: string; status: string; start_url?: string | null },
+>(task: T, inFlight: Promise<boolean> | null, inFlightTaskId: string | null): Promise<T | null> {
+  if (needsTaskStart(task.status) || !hasExternalStartUrl(task.start_url)) {
+    return task;
+  }
+  if (!inFlight || inFlightTaskId !== task.id) {
+    return task;
+  }
+  const started = await inFlight;
+  if (!started) return null;
+  return { ...cardAfterStart(task), start_url: task.start_url };
+}
+
 export function applyStartedOnDashboard<
   T extends { id: string },
   D extends {
@@ -44,5 +83,36 @@ export function applyStartedOnDashboard<
     urgent_tasks: without(prev.urgent_tasks),
     today_tasks: without(prev.today_tasks),
     in_progress_tasks: [...without(prev.in_progress_tasks), updated],
+  };
+}
+
+function withoutTask<T extends { id: string }>(list: T[], taskId: string): T[] {
+  return list.filter((t) => t.id !== taskId);
+}
+
+function putTask<T extends { id: string }>(list: T[], task: T): T[] {
+  return [...withoutTask(list, task.id), task];
+}
+
+function restoreToUrgent(task: { status?: string; task_kind?: string }): boolean {
+  return task.status === "overdue" || task.task_kind === "ad_hoc";
+}
+
+export function revertStartedOnDashboard<
+  T extends { id: string; status?: string; task_kind?: string },
+  D extends {
+    urgent_tasks: T[];
+    today_tasks: T[];
+    in_progress_tasks: T[];
+  },
+>(prev: D | null, original: T): D | null {
+  if (!prev) return prev;
+  return {
+    ...prev,
+    in_progress_tasks: withoutTask(prev.in_progress_tasks, original.id),
+    today_tasks: putTask(prev.today_tasks, original),
+    urgent_tasks: restoreToUrgent(original)
+      ? putTask(prev.urgent_tasks, original)
+      : withoutTask(prev.urgent_tasks, original.id),
   };
 }

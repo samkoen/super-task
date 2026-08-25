@@ -64,3 +64,62 @@ def test_update_occurrence_skips_reference_media_when_unset():
     assert kwargs["update_reference_photo"] is False
     assert kwargs["update_reference_video"] is False
     assert kwargs["update_reference_audio"] is False
+
+
+def test_update_occurrence_saves_start_url():
+    occurrence = MagicMock()
+    occurrence.id = "occ-1"
+    occurrence.branch_id = "b1"
+    occurrence.status = "pending"
+    occurrence.pending_delegation = False
+    occurrence.task_kind = "ad_hoc"
+    occurrence.assignee_user_id = "u1"
+    occurrence.template_id = None
+    occurrence.department_id = None
+    occurrence.manager_user_id = None
+
+    employee = MagicMock()
+    employee.role = roles.EMPLOYEE
+    employee.branch_id = "b1"
+
+    repo = MagicMock()
+    repo.find_by_id.return_value = occurrence
+    repo.update_details.return_value = occurrence
+    repo.get_branch_name.return_value = "Branch"
+    repo.get_department_name.return_value = None
+    repo.get_assignee_name.return_value = "Worker"
+    repo.get_manager_name.return_value = None
+
+    users = MagicMock()
+    users.find_by_id.return_value = employee
+
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    stub_occurrence_batch_lookups(repo, completion_repo)
+
+    svc = TaskOccurrenceService(
+        repo,
+        completion_repo,
+        MagicMock(),
+        users,
+    )
+    actor = MagicMock()
+    actor.user_id = "m1"
+    actor.role = roles.BRANCH_MANAGER
+    actor.branch_id = "b1"
+
+    url = "https://my.agroline.co.il/main/azmanot/client-orders/create"
+    svc.update_occurrence(
+        actor,
+        "occ-1",
+        title="Updated",
+        description="",
+        due_at="2026-07-14T12:00:00+03:00",
+        assignee_user_id="u1",
+        start_url=url,
+        update_start_url=True,
+    )
+
+    kwargs = repo.update_details.call_args.kwargs
+    assert kwargs["start_url"] == url
+    assert kwargs["update_start_url"] is True

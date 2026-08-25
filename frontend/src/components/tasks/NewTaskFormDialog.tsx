@@ -38,6 +38,7 @@ import {
   FIXED_RECURRENCE_OPTIONS,
   weekdaysOnRecurrenceChange,
 } from "../../utils/taskRecurrence";
+import { startUrlFieldError } from "../../utils/startUrl";
 
 const EMPTY_MEDIA: TaskReferenceMediaValue = {
   reference_photo_url: "",
@@ -65,6 +66,7 @@ export interface NewTaskFormSubmitPayload {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  start_url?: string | null;
 }
 
 export interface NewTaskFormDialogProps {
@@ -120,6 +122,7 @@ export default function NewTaskFormDialog({
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [completionRequirements, setCompletionRequirements] = useState<CompletionRequirement[]>([]);
   const [isWorkStart, setIsWorkStart] = useState(false);
+  const [startUrl, setStartUrl] = useState("");
   const [media, setMedia] = useState<TaskReferenceMediaValue>(EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
   const wasOpenRef = useRef(false);
@@ -145,6 +148,7 @@ export default function NewTaskFormDialog({
     setSelectedBranchIds(defaultBranchId ? [defaultBranchId] : []);
     setCompletionRequirements([]);
     setIsWorkStart(false);
+    setStartUrl("");
     setMedia(initialMedia ?? EMPTY_MEDIA);
     setLocalError("");
     // Snapshot à l'ouverture seulement
@@ -204,6 +208,11 @@ export default function NewTaskFormDialog({
   const toGallery = isAssignToGallery(assigneeUserId);
 
   const handleSubmit = async () => {
+    const urlErr = startUrlFieldError(startUrl);
+    if (urlErr) {
+      setLocalError(urlErr);
+      return;
+    }
     if (canPickBranch && selectedBranchIds.length < 1) {
       setLocalError(he.fixedTaskSelectBranchesRequired);
       return;
@@ -229,6 +238,7 @@ export default function NewTaskFormDialog({
         branch_ids: branchScope.branch_ids,
         completion_requirements: completionRequirements,
         is_work_start: isWorkStart,
+        start_url: startUrl.trim() || null,
         media,
       });
       return;
@@ -260,6 +270,7 @@ export default function NewTaskFormDialog({
       apply_to_network: false,
       completion_requirements: completionRequirements,
       is_work_start: taskKind === "fixed" ? isWorkStart : false,
+      start_url: startUrl.trim() || null,
       media,
     });
   };
@@ -330,6 +341,14 @@ export default function NewTaskFormDialog({
           multiline
           rows={2}
           fullWidth
+        />
+        <TextField
+          label={he.startUrl}
+          value={startUrl}
+          onChange={(e) => setStartUrl(e.target.value)}
+          helperText={he.startUrlHint}
+          fullWidth
+          dir="ltr"
         />
 
         {!groupedCreate && (

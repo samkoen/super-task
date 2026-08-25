@@ -262,6 +262,28 @@ def test_branch_manager_can_reset_employee_password():
     repo.update_password.assert_called_once_with("e1", "newpass123")
 
 
+def test_branch_manager_can_set_employee_avatar():
+    repo = MagicMock()
+    employee = _employee(id="e1")
+    repo.find_by_id.return_value = employee
+    repo.update_avatar.return_value = _employee(
+        id="e1", avatar_url="/uploads/avatars/a.jpg"
+    )
+    branch = Branch(id="s1", network_id="r1", name="Branch")
+    service, _ = _service(branch=branch)
+    service._repo = repo
+    service._memberships = MagicMock()
+    service._memberships.list_branch_ids_for_user.return_value = ["s1"]
+    actor = ActorContext(
+        user_id="bm1", role=roles.BRANCH_MANAGER, network_id="r1", branch_id="s1"
+    )
+
+    result = service.set_team_employee_avatar(actor, "e1", "/uploads/avatars/a.jpg")
+
+    assert result["avatar_url"] == "/uploads/avatars/a.jpg"
+    repo.update_avatar.assert_called_once_with("e1", "/uploads/avatars/a.jpg")
+
+
 def test_reset_password_rejects_short_password():
     repo = MagicMock()
     employee = _employee(id="e1")

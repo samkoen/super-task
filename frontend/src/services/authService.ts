@@ -59,6 +59,16 @@ export const authService = {
     return response.data;
   },
 
+  uploadAvatar: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await api.post<{ user: User; message: string; url: string }>(
+      "/auth/me/avatar",
+      form,
+    );
+    return response.data;
+  },
+
   changePassword: async (current_password: string, new_password: string) => {
     const response = await api.post<{ message: string }>("/auth/change-password", {
       current_password,

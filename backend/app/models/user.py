@@ -17,6 +17,7 @@ class User:
     is_active: bool = True
     email_verified: bool = False
     preferred_language: str = "he"
+    avatar_url: Optional[str] = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -50,6 +51,7 @@ class User:
             "is_active",
             "email_verified",
             "preferred_language",
+            "avatar_url",
             "created_at",
             "updated_at",
         }

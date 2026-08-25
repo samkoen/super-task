@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -31,30 +31,23 @@ import {
 import { taskService, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
 import { employeeActivityService } from "../../services/employeeActivityService";
+import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { playTaskEndSound } from "../../utils/notificationSounds";
 import { useSearchParams } from "react-router-dom";
-import { sortInProgressFocusFirst } from "../../utils/employeeTaskFocus";
 import { taskIdFromSearch } from "../../utils/notificationNavigation";
 import {
   collectUniqueTasks,
   splitEmployeeWorkLists,
 } from "../../utils/employeeDashboardSections";
-import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
-import {
-  defaultRangeFrom,
-  formatHebrewDay,
-  groupTasksByDay,
-  isToday,
-  todayIso,
-  type TaskDateViewMode,
-} from "../../utils/dateView";
+import { formatHebrewDay, todayIso } from "../../utils/dateView";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
+import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
@@ -71,9 +64,14 @@ import {
 import {
   applyStartedOnDashboard,
   canDoTask,
+  canSubmitEmployeeTask,
   cardAfterStart,
   needsTaskStart,
+  revertStartedOnDashboard,
+  shouldOpenStartUrlOnBegin,
+  waitForInFlightLinkedStart,
 } from "../../utils/employeeDoTask";
+import { openExternalUrl } from "../../utils/startUrl";
 
 function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
@@ -170,6 +168,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     min_video_seconds: task.min_video_seconds ?? null,
     completion_requirements: task.completion_requirements ?? [],
     is_work_start: task.is_work_start,
+    start_url: task.start_url ?? null,
     reference_photo_url: task.reference_photo_url ?? null,
     reference_video_url: task.reference_video_url ?? null,
     reference_audio_url: task.reference_audio_url ?? null,
@@ -186,7 +185,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
 }
 
 export default function EmployeeTasksPage() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const employeeLanguage = ((user?.preferred_language || "he") as EmployeeLanguage);
   const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useFeedback();
@@ -207,12 +206,12 @@ export default function EmployeeTasksPage() {
   const [breakBusy, setBreakBusy] = useState(false);
   const [reportUploadingKind, setReportUploadingKind] = useState<"photo" | "video" | "audio" | null>(null);
   const [reportSaving, setReportSaving] = useState(false);
-  const [filterDay, setFilterDay] = useState(() => todayIso());
-  const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
-  const [filterFrom, setFilterFrom] = useState(() => todayIso());
-  const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
-  const [rangeTasks, setRangeTasks] = useState<EmployeeTaskCard[]>([]);
   const [translatingTasks, setTranslatingTasks] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [linkedStartReady, setLinkedStartReady] = useState(true);
+  const linkedStartRef = useRef<Promise<boolean> | null>(null);
+  const linkedStartIdRef = useRef<string | null>(null);
 
   const translatePendingTasks = useCallback(
     async (language: EmployeeLanguage, tasks: EmployeeTaskCard[]) => {
@@ -222,18 +221,14 @@ export default function EmployeeTasksPage() {
       setTranslatingTasks(true);
       try {
         const translations = await taskService.translateMine(pendingIds);
-        if (dateViewMode === "day") {
-          setDashboard((prev) => (prev ? mergeDashboardTranslations(prev, translations) : prev));
-        } else {
-          setRangeTasks((prev) => mergeTaskTranslations(prev, translations));
-        }
+        setDashboard((prev) => (prev ? mergeDashboardTranslations(prev, translations) : prev));
       } catch {
         // Les tâches restent en hébreu si la traduction échoue.
       } finally {
         setTranslatingTasks(false);
       }
     },
-    [dateViewMode]
+    []
   );
 
   const load = useCallback(async (silent = false) => {
@@ -241,38 +236,28 @@ export default function EmployeeTasksPage() {
       setLoading(true);
     }
     try {
-      if (dateViewMode === "day") {
-        const [data, breakState] = await Promise.all([
-          dashboardService.getEmployee(filterDay),
-          employeeActivityService.getBreak().catch(() => ({ on_break: false, on_break_since: null })),
-        ]);
-        setDashboard(data);
-        setOnBreak(Boolean(breakState.on_break));
-        const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
-        setRangeTasks([]);
-        const allTasks = [
-          ...data.urgent_tasks,
-          ...data.in_progress_tasks,
-          ...(data.awaiting_response_tasks ?? []),
-          ...data.pending_review_tasks,
-          ...data.today_tasks,
-          ...data.completed_tasks,
-        ];
-        void translatePendingTasks(lang, allTasks);
-      } else {
-        const items = await taskService.listMine({ due_from: filterFrom, due_to: filterTo });
-        const cards = items.map(toEmployeeCard);
-        setRangeTasks(cards);
-        setDashboard(null);
-        const lang = (user?.preferred_language as EmployeeLanguage) || "he";
-        void translatePendingTasks(lang, cards);
-      }
+      const [data, breakState] = await Promise.all([
+        dashboardService.getEmployee(todayIso()),
+        employeeActivityService.getBreak().catch(() => ({ on_break: false, on_break_since: null })),
+      ]);
+      setDashboard(data);
+      setOnBreak(Boolean(breakState.on_break));
+      const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
+      const allTasks = [
+        ...data.urgent_tasks,
+        ...data.in_progress_tasks,
+        ...(data.awaiting_response_tasks ?? []),
+        ...data.pending_review_tasks,
+        ...data.today_tasks,
+        ...data.completed_tasks,
+      ];
+      void translatePendingTasks(lang, allTasks);
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filterDay, filterFrom, filterTo, dateViewMode, translatePendingTasks, user?.preferred_language, user?.active_branch_id, user?.branch_id]);
+  }, [translatePendingTasks, user?.preferred_language, user?.active_branch_id, user?.branch_id]);
 
   useEffect(() => {
     load();
@@ -289,12 +274,53 @@ export default function EmployeeTasksPage() {
     });
   }, []);
 
+  const persistLinkedStart = useCallback(async (task: EmployeeTaskCard) => {
+    if (linkedStartIdRef.current === task.id && linkedStartRef.current) {
+      return linkedStartRef.current;
+    }
+    const run = (async () => {
+      try {
+        const result = await taskService.start(task.id);
+        const next = {
+          ...cardAfterStart(task, result.occurrence),
+          start_url: task.start_url,
+        };
+        setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
+        setDetailTask((prev) => (prev?.id === task.id ? next : prev));
+        setLinkedStartReady(true);
+        return true;
+      } catch (e) {
+        showError(e instanceof ApiError ? e.message : he.errorGeneric);
+        setDashboard((prev) => revertStartedOnDashboard(prev, task));
+        setDetailTask((prev) => (prev?.id === task.id ? task : prev));
+        setLinkedStartReady(false);
+        linkedStartRef.current = null;
+        linkedStartIdRef.current = null;
+        return false;
+      }
+    })();
+    linkedStartIdRef.current = task.id;
+    linkedStartRef.current = run;
+    return run;
+  }, [showError]);
+
   const openDetail = useCallback((task: EmployeeTaskCard) => {
+    const openLink = shouldOpenStartUrlOnBegin(task.status, task.start_url);
+    if (openLink) {
+      openExternalUrl(task.start_url);
+    }
     clearCompletionMedia();
     setNote("");
-    setSlotMedia(canDoTask(task.status) ? effectiveRequirements(task).map(() => null) : []);
-    setDetailTask(task);
-  }, [clearCompletionMedia]);
+    const next = openLink ? { ...cardAfterStart(task), start_url: task.start_url } : task;
+    setSlotMedia(canDoTask(next.status) ? effectiveRequirements(next).map(() => null) : []);
+    setDetailTask(next);
+    setLinkedStartReady(!openLink);
+    if (openLink) {
+      setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
+      showSuccess(he.startTaskOpenedLink);
+      void persistLinkedStart(task);
+    }
+  }, [clearCompletionMedia, persistLinkedStart, showSuccess]);
 
   const closeDetail = useCallback(() => {
     clearCompletionMedia();
@@ -364,13 +390,34 @@ export default function EmployeeTasksPage() {
 
   const handleSubmit = async () => {
     if (!detailTask) return;
+    const openLink = shouldOpenStartUrlOnBegin(detailTask.status, detailTask.start_url);
+    if (openLink) {
+      openExternalUrl(detailTask.start_url);
+    }
     setSaving(true);
     try {
       let task = detailTask;
       if (needsTaskStart(task.status)) {
         const result = await taskService.start(task.id);
-        task = cardAfterStart(task, result.occurrence);
+        task = {
+          ...cardAfterStart(task, result.occurrence),
+          start_url: detailTask.start_url,
+        };
         setDashboard((prev) => applyStartedOnDashboard(prev, detailTask.id, task));
+        setDetailTask(task);
+        setLinkedStartReady(true);
+        if (openLink) {
+          showSuccess(he.startTaskOpenedLink);
+          return;
+        }
+      } else {
+        const started = await waitForInFlightLinkedStart(
+          task,
+          linkedStartRef.current,
+          linkedStartIdRef.current,
+        );
+        if (!started) return;
+        task = started;
       }
       const attachments = await uploadRequirementSlots(effectiveRequirements(task), slotMedia);
       await taskService.complete(task.id, {
@@ -405,6 +452,21 @@ export default function EmployeeTasksPage() {
     }
   };
 
+  const handleAvatarCapture = async (file: File) => {
+    setAvatarUploading(true);
+    try {
+      await authService.uploadAvatar(file);
+      await refresh();
+      await load(true);
+      showSuccess(he.employeePhotoUpdated);
+      setAvatarOpen(false);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const urgentTasks = dashboard?.urgent_tasks ?? [];
   const inProgressTasks = dashboard?.in_progress_tasks ?? [];
   const awaitingResponseTasks = dashboard?.awaiting_response_tasks ?? [];
@@ -424,15 +486,7 @@ export default function EmployeeTasksPage() {
 
   const progress = dashboard?.progress_percent ?? 0;
   const openCount = workLists.dynamic.length + workLists.routine.length;
-  const dayTasksLabel = isToday(filterDay)
-    ? he.employeeTodayTasks
-    : `${he.tasksForSelectedDay} · ${formatHebrewDay(filterDay)}`;
-
-  const rangeGroups = useMemo(() => groupTasksByDay(rangeTasks), [rangeTasks]);
-  const rangeInProgress = useMemo(
-    () => sortInProgressFocusFirst(rangeTasks.filter((t) => t.status === "in_progress")),
-    [rangeTasks],
-  );
+  const todayLabel = formatHebrewDay(dashboard?.due_on ?? todayIso());
 
   const cardById = useMemo(() => {
     const map = new Map<string, EmployeeTaskCard>();
@@ -443,7 +497,6 @@ export default function EmployeeTasksPage() {
       ...pendingReviewTasks,
       ...todayTasks,
       ...completedTasks,
-      ...rangeTasks,
     ]) {
       map.set(task.id, task);
     }
@@ -455,7 +508,6 @@ export default function EmployeeTasksPage() {
     pendingReviewTasks,
     todayTasks,
     completedTasks,
-    rangeTasks,
   ]);
 
   const alertTaskId = taskIdFromSearch(searchParams.toString());
@@ -486,12 +538,17 @@ export default function EmployeeTasksPage() {
   const headerName = dashboard?.employee?.full_name ?? user?.full_name;
   const headerBranch = dashboard?.employee?.branch_name;
   const headerJob = dashboard?.employee?.job_function;
-  const onShift = dateViewMode === "day" ? dashboard?.on_shift : rangeInProgress.length > 0;
+  const onShift = dashboard?.on_shift;
+  const photoUrl = dashboard?.employee?.avatar_url ?? user?.avatar_url;
 
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", pb: 14, px: { xs: 1, sm: 2 } }}>
       <EmployeeShiftHeader
+        dateLabel={todayLabel}
         name={headerName}
+        photoUrl={photoUrl}
+        photoEditable
+        onEditPhoto={() => setAvatarOpen(true)}
         meta={[
           headerBranch ? `${he.branch}: ${headerBranch}` : "",
           headerJob ? jobLabel(headerJob) : "",
@@ -501,21 +558,15 @@ export default function EmployeeTasksPage() {
         onShift={Boolean(onShift)}
         onBreak={onBreak}
         breakBusy={breakBusy}
-        progress={dateViewMode === "day" ? progress : null}
+        progress={progress}
         onToggleBreak={() => void handleToggleBreak()}
       />
 
-      <TaskDateViewBar
-        mode={dateViewMode}
-        onModeChange={setDateViewMode}
-        day={filterDay}
-        onDayChange={setFilterDay}
-        rangeFrom={filterFrom}
-        rangeTo={filterTo}
-        onRangeChange={(from, to) => {
-          setFilterFrom(from);
-          setFilterTo(to);
-        }}
+      <EmployeeAvatarCapture
+        open={avatarOpen}
+        uploading={avatarUploading}
+        onClose={() => setAvatarOpen(false)}
+        onCapture={handleAvatarCapture}
       />
 
       {translatingTasks && (
@@ -524,60 +575,8 @@ export default function EmployeeTasksPage() {
 
       {loading ? (
         <ListSkeleton variant="table" rows={5} />
-      ) : dateViewMode === "range" ? (
-        <>
-          {rangeGroups.length === 0 ? (
-            <EmptyState
-              title={he.noTasks}
-              description={he.noTasksHint}
-              icon={<TaskAltOutlinedIcon fontSize="inherit" />}
-              compact
-            />
-          ) : (
-            rangeGroups.map(([day, dayTasks]) => {
-              const lists = splitEmployeeWorkLists(dayTasks);
-              const review = dayTasks.filter((t) => t.status === "pending_review");
-              const done = dayTasks.filter((t) => t.status === "completed");
-              return (
-                <Box key={day} mb={3}>
-                  <Typography variant="subtitle2" fontWeight={800} mb={1}>
-                    {isToday(day) ? he.tasksTodayLabel : formatHebrewDay(day)}
-                  </Typography>
-                  <EmployeeTaskSection
-                    title={he.employeeRoutineTasks}
-                    tasks={lists.routine}
-                    onOpen={openDetail}
-                    layout="list"
-                  />
-                  <EmployeeTaskSection
-                    title={he.employeeDynamicTasks}
-                    tasks={lists.dynamic}
-                    onOpen={openDetail}
-                    layout="tile"
-                    color="error.main"
-                  />
-                  <EmployeeTaskSection
-                    title={he.taskPendingReview}
-                    tasks={review}
-                    onOpen={openDetail}
-                  />
-                  {done.length > 0 && (
-                    <EmployeeTaskSection
-                      title={he.employeeCompletedTasks}
-                      tasks={done}
-                      onOpen={openDetail}
-                    />
-                  )}
-                </Box>
-              );
-            })
-          )}
-        </>
       ) : (
         <>
-          <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-            {dayTasksLabel}
-          </Typography>
           {openCount === 0 ? (
             <EmptyState
               title={he.noTasksToday}
@@ -723,7 +722,12 @@ export default function EmployeeTasksPage() {
                 note,
                 onNoteChange: setNote,
                 onSubmit: () => void handleSubmit(),
-                canSubmit: canSubmitDone,
+                canSubmit: canSubmitEmployeeTask(
+                  detailTask.status,
+                  detailTask.start_url,
+                  canSubmitDone,
+                  linkedStartReady,
+                ),
                 saving,
               }
             : undefined

@@ -187,6 +187,20 @@ class UserService:
         assert updated is not None
         return self._to_api(updated)
 
+    def set_team_employee_avatar(
+        self, actor: ActorContext, user_id: str, avatar_url: str | None
+    ) -> dict:
+        from app.domain.avatar_url import normalize_avatar_url
+
+        target = self._repo.find_by_id(user_id)
+        if not target:
+            raise ValueError("משתמש לא נמצא")
+        self._assert_can_manage_team_member(actor, target)
+        cleaned = normalize_avatar_url(avatar_url)
+        updated = self._repo.update_avatar(user_id, cleaned)
+        assert updated is not None
+        return self._to_api(updated)
+
     def deactivate_team_employee(self, actor: ActorContext, user_id: str) -> dict:
         return self.set_team_employee_access(actor, user_id, is_active=False)
 

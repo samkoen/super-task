@@ -35,6 +35,7 @@ import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
 import { he } from "../../i18n/he";
 import { userBelongsToBranch, userBranchLabels } from "../../utils/userBranchMembership";
+import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
 
 const JOB_FUNCTIONS: JobFunction[] = ["head_cashier", "stockers", "warehouse_worker"];
 
@@ -71,6 +72,8 @@ export default function ManagerEmployeesPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [addBranchId, setAddBranchId] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,6 +121,8 @@ export default function ManagerEmployeesPage() {
     setEdit(null);
     setAddBranchId("");
     setForm({ ...emptyForm, branch_id: isBranchManager ? user?.branch_id ?? "" : "" });
+    setAvatarFile(null);
+    setAvatarPreview("");
     setOpen(true);
   };
 
@@ -134,6 +139,8 @@ export default function ManagerEmployeesPage() {
       branch_id: employee.branch_id ?? "",
       preferred_language: (employee.preferred_language ?? "he") as EmployeeLanguage,
     });
+    setAvatarFile(null);
+    setAvatarPreview(employee.avatar_url ?? "");
     setOpen(true);
   };
 
@@ -163,6 +170,7 @@ export default function ManagerEmployeesPage() {
           job_function: form.job_function,
           preferred_language: form.preferred_language,
         });
+        if (avatarFile) await userService.uploadTeamAvatar(res.user.id, avatarFile);
         setSuccess(res.message || he.employeeUpdated);
       } else {
         const res = await userService.createTeamEmployee({
@@ -175,6 +183,7 @@ export default function ManagerEmployeesPage() {
           branch_id: isNetworkManager ? form.branch_id : undefined,
           preferred_language: form.preferred_language,
         });
+        if (avatarFile) await userService.uploadTeamAvatar(res.user.id, avatarFile);
         setSuccess(res.message || he.employeeCreated);
       }
       setOpen(false);
@@ -384,6 +393,32 @@ export default function ManagerEmployeesPage() {
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm" dir="rtl">
         <DialogTitle>{edit ? he.editEmployee : he.newEmployee}</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <EmployeeAvatar
+              name={`${form.first_name} ${form.last_name}`.trim() || he.employeeAvatar}
+              photoUrl={avatarPreview || null}
+              size={72}
+            />
+            <Box>
+              <Button component="label" variant="outlined" size="small">
+                {he.employeeAvatar}
+                <input
+                  hidden
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setAvatarFile(file);
+                    setAvatarPreview(URL.createObjectURL(file));
+                  }}
+                />
+              </Button>
+              <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                {he.employeeAvatarHint}
+              </Typography>
+            </Box>
+          </Box>
           <TextField label={he.firstName} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required fullWidth />
           <TextField label={he.lastName} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required fullWidth />
           <TextField

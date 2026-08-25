@@ -22,6 +22,7 @@ import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssign
 import { he } from "../../i18n/he";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
+import { startUrlFieldError } from "../../utils/startUrl";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { defaultApplyAdHocEditToNetwork, isNetworkAdHocOccurrence } from "../../utils/adHocNetworkTasks";
 import TaskChatPanel from "./TaskChatPanel";
@@ -103,6 +104,11 @@ export default function TaskOccurrenceEditDialog({
 
   const handleSave = async () => {
     if (!target) return;
+    const urlErr = startUrlFieldError(form.start_url);
+    if (urlErr) {
+      showError(urlErr);
+      return;
+    }
     setSaving(true);
     try {
       const message = await saveOccurrenceEdit(target, form, mediaDirty);
@@ -276,6 +282,14 @@ function CoreEditFields({
         multiline
         rows={2}
         fullWidth
+      />
+      <TextField
+        label={he.startUrl}
+        value={form.start_url ?? ""}
+        onChange={(e) => setForm({ ...form, start_url: e.target.value })}
+        helperText={he.startUrlHint}
+        fullWidth
+        dir="ltr"
       />
       <TextField
         label={he.dueAt}

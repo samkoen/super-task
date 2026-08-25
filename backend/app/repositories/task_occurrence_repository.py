@@ -230,6 +230,7 @@ class TaskOccurrenceRepository:
         min_video_seconds: int | None = None,
         completion_requirements: list | None = None,
         is_work_start: bool = False,
+        start_url: str | None = None,
         network_group_id: str | None = None,
     ) -> TaskOccurrence:
         import uuid
@@ -250,6 +251,7 @@ class TaskOccurrenceRepository:
             min_video_seconds=min_video_seconds,
             completion_requirements=completion_requirements,
             is_work_start=bool(is_work_start),
+            start_url=(start_url or "").strip() or None,
             network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             manager_user_id=mp.parse_uuid(manager_user_id) if manager_user_id else None,
             photo_required=photo_required,
@@ -353,6 +355,14 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
+    def update_start_url(self, id_: str, start_url: str | None) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.start_url = (start_url or "").strip() or None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
     def update_details(
         self,
         id_: str,
@@ -372,6 +382,8 @@ class TaskOccurrenceRepository:
         update_min_video_seconds: bool = False,
         completion_requirements: list | None = None,
         update_completion_requirements: bool = False,
+        start_url: str | None = None,
+        update_start_url: bool = False,
     ) -> TaskOccurrence | None:
         row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
         if not row:
@@ -392,6 +404,8 @@ class TaskOccurrenceRepository:
             row.reference_video_url = (reference_video_url or "").strip() or None
         if update_reference_audio:
             row.reference_audio_url = (reference_audio_url or "").strip() or None
+        if update_start_url:
+            row.start_url = (start_url or "").strip() or None
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

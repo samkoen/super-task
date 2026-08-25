@@ -13,6 +13,7 @@ from app.domain.network_fixed_task import (
 )
 from app.domain.completion_media import packed_media_fields, parse_requirements_input
 from app.domain.ops_category import normalize_ops_category
+from app.domain.start_url import normalize_start_url
 from app.domain.task_kind import FIXED
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
@@ -89,6 +90,7 @@ class TaskTemplateService:
         min_video_seconds: int | None = None,
         completion_requirements: object | None = None,
         is_work_start: bool = False,
+        start_url: str | None = None,
         network_group_id: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
@@ -118,6 +120,7 @@ class TaskTemplateService:
             )
         )
         work_start = bool(is_work_start)
+        link = normalize_start_url(start_url)
         photo, video, audio = self._isolate_external_media(
             reference_photo_url, reference_video_url, reference_audio_url
         )
@@ -142,6 +145,7 @@ class TaskTemplateService:
             source_gallery_item_id=gallery_id,
             ops_category=category,
             is_work_start=work_start,
+            start_url=link,
             network_group_id=network_group_id,
             **media_fields,
         )
@@ -173,6 +177,7 @@ class TaskTemplateService:
         min_video_seconds: int | None = None,
         completion_requirements: object | None = None,
         is_work_start: bool = False,
+        start_url: str | None = None,
         branch_ids: list[str] | None = None,
     ) -> dict:
         """Duplique une tâche קבועה (tous les snifim, ou une liste). 1er oved par snif."""
@@ -204,6 +209,7 @@ class TaskTemplateService:
                 min_video_seconds=min_video_seconds,
                 completion_requirements=completion_requirements,
                 is_work_start=is_work_start,
+                start_url=start_url,
                 network_group_id=group_id,
             )
             if item is None:
@@ -262,6 +268,7 @@ class TaskTemplateService:
         completion_requirements: object | None = None,
         update_completion_requirements: bool = False,
         is_work_start: bool | None = None,
+        start_url: str | None = None,
         apply_to_network: bool = False,
     ) -> dict:
         existing = self._require_editable_template(actor, template_id)
@@ -282,6 +289,7 @@ class TaskTemplateService:
             completion_requirements=completion_requirements,
             update_completion_requirements=update_completion_requirements,
             is_work_start=is_work_start,
+            start_url=start_url,
         )
         if apply_to_network:
             return self._update_network_group(
@@ -332,6 +340,7 @@ class TaskTemplateService:
                 occ.id, title=template.title, description=template.description
             )
             self._occurrences.update_completion_requirements(occ.id, guides)
+            self._occurrences.update_start_url(occ.id, getattr(template, "start_url", None))
 
     def _purge_open_occurrences(self, template_id: str) -> list[dict]:
         if not self._occurrences:
@@ -408,7 +417,7 @@ class TaskTemplateService:
                       reference_photo_url, reference_video_url, reference_audio_url,
                       ops_category, update_ops_category, min_video_seconds,
                       update_min_video_seconds, completion_requirements,
-                      update_completion_requirements, is_work_start) -> dict:
+                      update_completion_requirements, is_work_start, start_url) -> dict:
         payload = {
             "title": title,
             "description": description,
@@ -423,6 +432,10 @@ class TaskTemplateService:
             ),
             "update_ops_category": update_ops_category,
             "is_work_start": existing.is_work_start if is_work_start is None else bool(is_work_start),
+            "start_url": (
+                existing.start_url if start_url is None else normalize_start_url(start_url)
+            ),
+            "update_start_url": start_url is not None,
         }
         payload.update(
             TaskTemplateService._edit_media_fields(

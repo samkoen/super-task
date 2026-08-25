@@ -16,6 +16,9 @@ def actor_can_access_media_url(db: Session, actor: ActorContext, media_url: str)
     if not url:
         return False
 
+    if _is_own_avatar(db, actor.user_id, url):
+        return True
+
     branch_ids = visible_branch_ids_for_tasks(actor, BranchRepository(db))
     # Admin / network sans filtre branche : URL doit exister en DB
     if branch_ids is None:
@@ -49,6 +52,9 @@ def _url_exists(db: Session, url: str) -> bool:
         ).first()
         or db.execute(
             select(orm.TaskMessage.id).where(_message_media_match(url)).limit(1)
+        ).first()
+        or db.execute(
+            select(orm.User.id).where(orm.User.avatar_url == url).limit(1)
         ).first()
     )
 
@@ -101,9 +107,41 @@ def _url_exists_in_branches(
             .where(_message_media_match(url))
             .limit(1)
         ).first()
+        or _avatar_url_in_branches(db, url, uuids)
     ):
         return True
     return False
+
+
+def _is_own_avatar(db: Session, user_id: str | None, url: str) -> bool:
+    if not user_id:
+        return False
+    try:
+        uid = mp.parse_uuid(user_id)
+    except ValueError:
+        return False
+    return bool(
+        db.execute(
+            select(orm.User.id)
+            .where(orm.User.id == uid)
+            .where(orm.User.avatar_url == url)
+            .limit(1)
+        ).first()
+    )
+
+
+def _avatar_url_in_branches(db: Session, url: str, branch_uuids: list) -> bool:
+    member_ids = select(orm.UserBranchMembership.user_id).where(
+        orm.UserBranchMembership.branch_id.in_(branch_uuids)
+    )
+    return bool(
+        db.execute(
+            select(orm.User.id)
+            .where(orm.User.avatar_url == url)
+            .where(or_(orm.User.branch_id.in_(branch_uuids), orm.User.id.in_(member_ids)))
+            .limit(1)
+        ).first()
+    )
 
 
 def _gallery_url_in_scope(

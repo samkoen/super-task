@@ -240,4 +240,32 @@ describe("NewTaskFormDialog", () => {
     );
     expect(onAll.mock.calls[0][0].branch_ids).toBeUndefined();
   });
+
+  it("includes start_url on submit and blocks an invalid link", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        branches={[{ id: "b1", name: "סניף", network_id: "n1" } as never]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        defaultAssigneeId="u1"
+      />,
+    );
+    const url = "https://my.agroline.co.il/main/azmanot/client-orders/create";
+    fireEvent.change(screen.getByLabelText(he.startUrl), { target: { value: "not-a-url" } });
+    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText(he.startUrlInvalid)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(he.startUrl), { target: { value: url } });
+    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].start_url).toBe(url);
+  });
 });

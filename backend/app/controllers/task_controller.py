@@ -190,6 +190,7 @@ def create_template(
             min_video_seconds=payload.get("min_video_seconds"),
             completion_requirements=payload.get("completion_requirements"),
             is_work_start=bool(payload.get("is_work_start")),
+            start_url=payload.get("start_url"),
             branch_ids=_parse_optional_ids(payload.get("branch_ids")),
         )
         for item in result["templates"]:
@@ -220,6 +221,7 @@ def create_template(
         min_video_seconds=payload.get("min_video_seconds"),
         completion_requirements=payload.get("completion_requirements"),
         is_work_start=bool(payload.get("is_work_start")),
+        start_url=payload.get("start_url"),
     )
     emit_item = _sse_payload_from_create_template(item)
     _emit_task_event(db, "task_created", emit_item)
@@ -257,6 +259,7 @@ def update_template(
         completion_requirements=payload.get("completion_requirements"),
         update_completion_requirements="completion_requirements" in payload,
         is_work_start=payload.get("is_work_start") if "is_work_start" in payload else None,
+        start_url=payload.get("start_url") if "start_url" in payload else None,
         apply_to_network=bool(payload.get("apply_to_network")),
     )
     count = item.pop("updated_count", 1)
@@ -317,6 +320,7 @@ def create_ad_hoc_task(
             reference_video_url=payload.get("reference_video_url"),
             reference_audio_url=payload.get("reference_audio_url"),
             source_gallery_item_id=payload.get("source_gallery_item_id"),
+            start_url=payload.get("start_url"),
             branch_ids=_parse_optional_ids(payload.get("branch_ids")),
         )
         for item in result["occurrences"]:
@@ -341,6 +345,7 @@ def create_ad_hoc_task(
         reference_video_url=payload.get("reference_video_url"),
         reference_audio_url=payload.get("reference_audio_url"),
         source_gallery_item_id=payload.get("source_gallery_item_id"),
+        start_url=payload.get("start_url"),
     )
     _emit_task_event(db, "task_created", item)
     return {"message": "משימה מזדמנת נוצרה", "occurrence": item}
@@ -602,6 +607,8 @@ def update_occurrence(
         completion_requirements=payload.get("completion_requirements"),
         update_completion_requirements="completion_requirements" in payload,
         apply_to_network=bool(payload.get("apply_to_network")),
+        start_url=payload.get("start_url") if "start_url" in payload else None,
+        update_start_url="start_url" in payload,
         **ref_kwargs,
     )
     count = item.pop("updated_count", 1)

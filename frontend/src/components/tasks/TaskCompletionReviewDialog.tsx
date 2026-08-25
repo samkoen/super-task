@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -8,6 +8,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  TextField,
   Typography,
 } from "@mui/material";
 import { ApiError } from "../../services/api";
@@ -17,6 +18,7 @@ import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
+import { reopenNoteError } from "../../utils/taskReview";
 
 interface TaskCompletionReviewDialogProps {
   task: TaskOccurrence | null;
@@ -31,31 +33,57 @@ export default function TaskCompletionReviewDialog({
 }: TaskCompletionReviewDialogProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
 
   const completion = task?.completion;
   const open = Boolean(task);
   const isAwaiting = task?.status === "awaiting_response";
   const isReview = task?.status === "pending_review";
 
+  useEffect(() => {
+    setNote("");
+    setError("");
+  }, [task?.id]);
+
   const handleClose = () => {
     if (saving) return;
     setError("");
+    setNote("");
     onClose();
   };
 
-  const handleApprove = async () => {
+  const runAction = async (action: () => Promise<string>) => {
     if (!task) return;
     setSaving(true);
     setError("");
     try {
-      await taskService.approve(task.id);
-      onDone(he.taskApprovedSuccess);
-      handleClose();
+      const message = await action();
+      setNote("");
+      onDone(message);
+      onClose();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleApprove = () =>
+    void runAction(async () => {
+      await taskService.approve(task!.id);
+      return he.taskApprovedSuccess;
+    });
+
+  const handleReopen = () => {
+    const noteErr = reopenNoteError(note);
+    if (noteErr) {
+      setError(noteErr);
+      return;
+    }
+    void runAction(async () => {
+      await taskService.reopen(task!.id, { rejection_note: note.trim() });
+      return he.taskReopenedSuccess;
+    });
   };
 
   return (
@@ -95,12 +123,25 @@ export default function TaskCompletionReviewDialog({
           />
         )}
 
+        {isReview && (
+          <TextField
+            label={he.taskReopenNote}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            helperText={he.taskReopenNoteHint}
+            fullWidth
+            multiline
+            minRows={2}
+            disabled={saving}
+          />
+        )}
+
         {task && (
           <TaskChatPanel
             key={task.id}
             occurrenceId={task.id}
             compact
-            composeEnabled={canComposeTaskChat(task.status, false)}
+            composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
             onOccurrenceUpdated={() => {
               onDone(he.taskChatSent);
             }}
@@ -114,12 +155,12 @@ export default function TaskCompletionReviewDialog({
           {he.cancel}
         </Button>
         {isReview && (
-          <Button
-            variant="contained"
-            color="success"
-            onClick={() => void handleApprove()}
-            disabled={saving}
-          >
+          <Button variant="outlined" color="warning" onClick={handleReopen} disabled={saving}>
+            {he.taskReopen}
+          </Button>
+        )}
+        {isReview && (
+          <Button variant="contained" color="success" onClick={handleApprove} disabled={saving}>
             {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
           </Button>
         )}

@@ -19,6 +19,7 @@ export type OccurrenceEditForm = {
   photo_required: boolean;
   completion_requirements: CompletionRequirement[];
   apply_to_network: boolean;
+  start_url: string;
 } & TaskReferenceMediaValue;
 
 export function emptyOccurrenceEditForm(): OccurrenceEditForm {
@@ -30,6 +31,7 @@ export function emptyOccurrenceEditForm(): OccurrenceEditForm {
     photo_required: true,
     completion_requirements: [],
     apply_to_network: false,
+    start_url: "",
     reference_photo_url: "",
     reference_video_url: "",
     reference_audio_url: "",
@@ -47,6 +49,7 @@ export function formFromOccurrence(fresh: TaskOccurrence): OccurrenceEditForm {
     photo_required: fresh.photo_required,
     completion_requirements: effectiveRequirements(fresh),
     apply_to_network: false,
+    start_url: fresh.start_url ?? "",
     reference_photo_url: fresh.reference_photo_url ?? "",
     reference_video_url: fresh.reference_video_url ?? "",
     reference_audio_url: fresh.reference_audio_url ?? "",
@@ -72,6 +75,7 @@ export async function saveOccurrenceEdit(
     photo_required: target.task_kind === "ad_hoc" ? form.photo_required : undefined,
     completion_requirements,
     apply_to_network: moveToGallery ? false : form.apply_to_network,
+    start_url: (form.start_url ?? "").trim() || null,
   };
   if (mediaDirty) {
     const media = await resolveTaskReferenceMedia(form);
