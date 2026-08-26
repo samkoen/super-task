@@ -63,7 +63,7 @@ export async function waitForInFlightLinkedStart<
   }
   const started = await inFlight;
   if (!started) return null;
-  return { ...cardAfterStart(task), start_url: task.start_url };
+  return cardAfterStart(task);
 }
 
 export function applyStartedOnDashboard<

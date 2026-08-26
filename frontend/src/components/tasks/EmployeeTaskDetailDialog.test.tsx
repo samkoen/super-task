@@ -72,7 +72,7 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0]);
     expect(click).toHaveBeenCalled();
-    const a = click.mock.instances[0] as HTMLAnchorElement;
+    const a = click.mock.instances[0] as unknown as HTMLAnchorElement;
     expect(a.target).toBe("_blank");
     expect(a.href).toContain("https://example.com/order");
     click.mockRestore();

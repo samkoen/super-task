@@ -19,7 +19,7 @@ describe("startUrl", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     expect(openExternalUrl("https://example.com/x")).toBe(true);
     expect(click).toHaveBeenCalled();
-    const a = click.mock.instances[0] as HTMLAnchorElement;
+    const a = click.mock.instances[0] as unknown as HTMLAnchorElement;
     expect(a.target).toBe("_blank");
     expect(a.rel).toContain("noopener");
     expect(a.href).toContain("https://example.com/x");
