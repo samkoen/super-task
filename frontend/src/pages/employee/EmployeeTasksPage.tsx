@@ -281,10 +281,7 @@ export default function EmployeeTasksPage() {
     const run = (async () => {
       try {
         const result = await taskService.start(task.id);
-        const next = {
-          ...cardAfterStart(task, result.occurrence),
-          start_url: task.start_url,
-        };
+        const next: EmployeeTaskCard = cardAfterStart(task, result.occurrence);
         setDashboard((prev) => applyStartedOnDashboard(prev, task.id, next));
         setDetailTask((prev) => (prev?.id === task.id ? next : prev));
         setLinkedStartReady(true);
@@ -311,7 +308,7 @@ export default function EmployeeTasksPage() {
     }
     clearCompletionMedia();
     setNote("");
-    const next = openLink ? { ...cardAfterStart(task), start_url: task.start_url } : task;
+    const next: EmployeeTaskCard = openLink ? cardAfterStart(task) : task;
     setSlotMedia(canDoTask(next.status) ? effectiveRequirements(next).map(() => null) : []);
     setDetailTask(next);
     setLinkedStartReady(!openLink);
@@ -399,10 +396,7 @@ export default function EmployeeTasksPage() {
       let task = detailTask;
       if (needsTaskStart(task.status)) {
         const result = await taskService.start(task.id);
-        task = {
-          ...cardAfterStart(task, result.occurrence),
-          start_url: detailTask.start_url,
-        };
+        task = cardAfterStart(task, result.occurrence);
         setDashboard((prev) => applyStartedOnDashboard(prev, detailTask.id, task));
         setDetailTask(task);
         setLinkedStartReady(true);

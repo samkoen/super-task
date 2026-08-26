@@ -92,7 +92,7 @@ describe("employeeDoTask", () => {
   });
 
   it("puts a fixed pending card back on today only", () => {
-    const original = { id: "t1", status: "pending" as const, task_kind: "fixed" };
+    const original = { id: "t1", status: "pending", task_kind: "fixed" };
     const next = revertStartedOnDashboard(
       {
         urgent_tasks: [],
@@ -107,7 +107,7 @@ describe("employeeDoTask", () => {
   });
 
   it("puts an overdue card back on today and urgent when start fails", () => {
-    const original = { id: "t1", status: "overdue" as const, task_kind: "fixed" };
+    const original = { id: "t1", status: "overdue", task_kind: "fixed" };
     const next = revertStartedOnDashboard(
       {
         urgent_tasks: [],
@@ -122,7 +122,7 @@ describe("employeeDoTask", () => {
   });
 
   it("puts an ad-hoc card back on today and urgent when start fails", () => {
-    const original = { id: "t1", status: "pending" as const, task_kind: "ad_hoc" };
+    const original = { id: "t1", status: "pending", task_kind: "ad_hoc" };
     const next = revertStartedOnDashboard(
       {
         urgent_tasks: [],
