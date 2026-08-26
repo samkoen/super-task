@@ -154,10 +154,10 @@ def test_list_claimable_only_flagged_for_employee(monkeypatch):
     assert items[0]["has_open"] is True
 
 
-def test_manager_cannot_list_claimable():
+def test_network_manager_cannot_list_claimable():
     service = TaskGalleryService(MagicMock(), MagicMock(), MagicMock(), MagicMock())
     with pytest.raises(PermissionError):
-        service.list_claimable_for_employee(_actor())
+        service.list_claimable_for_employee(_actor(role="network_manager", branch_id=None))
 
 
 def test_create_item_stores_employee_can_claim(monkeypatch):

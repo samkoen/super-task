@@ -42,6 +42,14 @@ def test_pick_first_employee_empty():
     assert pick_first_employee([_emp("x", created_at="2026-01-01", active=False)]) is None
 
 
+def test_pick_first_employee_prefers_oved_over_branch_manager():
+    bm = _emp("m1", created_at="2025-01-01T00:00:00")
+    bm.role = roles.BRANCH_MANAGER
+    oved = _emp("e1", created_at="2026-06-01T00:00:00")
+    assert pick_first_employee([bm, oved]) is oved
+    assert pick_first_employee([bm]) is bm
+
+
 def _template_service(branches, employees_by_branch):
     templates = MagicMock()
     branch_repo = MagicMock()
