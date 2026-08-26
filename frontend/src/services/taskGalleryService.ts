@@ -25,6 +25,7 @@ export interface TaskGalleryItem {
   reference_photo_url: string | null;
   reference_video_url: string | null;
   reference_audio_url: string | null;
+  start_url?: string | null;
   created_by_id: string;
   created_at: string;
   updated_at: string;
@@ -53,6 +54,7 @@ export interface TaskGalleryPayload {
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
+  start_url?: string | null;
 }
 
 export const taskGalleryService = {

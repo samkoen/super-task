@@ -53,6 +53,8 @@ import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
+import { galleryStartUrlForForm, galleryStartUrlPayload } from "../../utils/galleryModelForm";
+import { startUrlFieldError } from "../../utils/startUrl";
 import { mediaUrl } from "../../utils/mediaUrl";
 import {
   parseBranchFromSearch,
@@ -85,6 +87,7 @@ type FormState = {
   weekly_days: string;
   monthly_day: number;
   employee_can_claim: boolean;
+  start_url: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -97,6 +100,7 @@ const EMPTY_FORM: FormState = {
   weekly_days: DAILY_DEFAULT_WEEKDAYS,
   monthly_day: 1,
   employee_can_claim: false,
+  start_url: "",
 };
 
 export default function ManagerTaskGalleryPage() {
@@ -178,6 +182,7 @@ export default function ManagerTaskGalleryPage() {
       ),
       monthly_day: item.monthly_day ?? 1,
       employee_can_claim: Boolean(item.employee_can_claim),
+      start_url: galleryStartUrlForForm(item.start_url),
     });
     setMedia({
       reference_photo_url: item.reference_photo_url ?? "",
@@ -200,6 +205,7 @@ export default function ManagerTaskGalleryPage() {
       branch_id: canPickBranch ? form.branch_id || null : user?.branch_id || null,
       photo_required: true,
       employee_can_claim: form.employee_can_claim,
+      start_url: galleryStartUrlPayload(form.start_url),
       completion_requirements,
       ...resolved,
     };
@@ -216,6 +222,11 @@ export default function ManagerTaskGalleryPage() {
   };
 
   const handleSave = async () => {
+    const urlErr = startUrlFieldError(form.start_url);
+    if (urlErr) {
+      showError(urlErr);
+      return;
+    }
     setSaving(true);
     try {
       const title = await ensureTaskTitle(form.title, form.description);
@@ -495,6 +506,14 @@ export default function ManagerTaskGalleryPage() {
               }))
             }
             onError={showError}
+          />
+          <TextField
+            label={he.startUrl}
+            value={form.start_url}
+            onChange={(e) => setForm((f) => ({ ...f, start_url: e.target.value }))}
+            helperText={he.startUrlHint}
+            fullWidth
+            dir="ltr"
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

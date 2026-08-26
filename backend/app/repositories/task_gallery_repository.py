@@ -33,6 +33,7 @@ class TaskGalleryRepository:
             reference_photo_url=kwargs.get("reference_photo_url"),
             reference_video_url=kwargs.get("reference_video_url"),
             reference_audio_url=kwargs.get("reference_audio_url"),
+            start_url=kwargs.get("start_url"),
             source_occurrence_id=(
                 mp.parse_uuid(kwargs["source_occurrence_id"])
                 if kwargs.get("source_occurrence_id")
@@ -158,6 +159,7 @@ class TaskGalleryRepository:
             reference_photo_url=row.reference_photo_url,
             reference_video_url=row.reference_video_url,
             reference_audio_url=row.reference_audio_url,
+            start_url=getattr(row, "start_url", None),
             created_by_id=str(row.created_by_id),
             created_at=mp.parse_datetime_iso(row.created_at),
             updated_at=mp.parse_datetime_iso(row.updated_at),

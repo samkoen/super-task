@@ -424,6 +424,7 @@ class TaskGalleryItem(Base):
     reference_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     reference_audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source_occurrence_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("task_occurrences.id", ondelete="SET NULL"),

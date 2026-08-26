@@ -24,6 +24,7 @@ class TaskGalleryItem:
     employee_can_claim: bool = False
     min_video_seconds: int | None = None
     completion_requirements: list | None = None
+    start_url: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -44,6 +45,7 @@ class TaskGalleryItem:
             "reference_photo_url": self.reference_photo_url,
             "reference_video_url": self.reference_video_url,
             "reference_audio_url": self.reference_audio_url,
+            "start_url": self.start_url,
             "source_occurrence_id": self.source_occurrence_id,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at,

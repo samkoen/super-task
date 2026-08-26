@@ -219,6 +219,7 @@ export default function EmployeeTasksDrawer({
           monthly_day: item.monthly_day ?? undefined,
           assignee_user_id: member.user_id,
           source_gallery_item_id: item.id,
+          start_url: item.start_url,
           ...media,
         });
         showSuccess(res.message);
@@ -231,6 +232,7 @@ export default function EmployeeTasksDrawer({
           assignee_user_id: member.user_id,
           photo_required: true,
           source_gallery_item_id: item.id,
+          start_url: item.start_url,
           ...media,
         });
         showSuccess(res.message);
