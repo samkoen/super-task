@@ -63,6 +63,7 @@ import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import {
   employeeManagerLabel,
   employeeOpenMineScope,
+  employeeSurfaceChatState,
   needsEmployeeManagerPicker,
 } from "../../utils/employeeDirectChat";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
@@ -291,12 +292,13 @@ export default function EmployeeTasksPage() {
   const loadChatUnread = useCallback(async () => {
     try {
       const data = await directChatService.inbox();
-      setChatUnread(data.unread_count);
-      setChatManagers(data.managers ?? []);
+      const surface = employeeSurfaceChatState(data, user?.role);
+      setChatUnread(surface.unread);
+      setChatManagers(surface.managers);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [user?.role]);
 
   useEffect(() => {
     void loadChatUnread();
@@ -315,9 +317,10 @@ export default function EmployeeTasksPage() {
   const openChat = async () => {
     try {
       const data = await directChatService.inbox();
-      const managers = data.managers ?? [];
+      const surface = employeeSurfaceChatState(data, user?.role);
+      const managers = surface.managers;
       setChatManagers(managers);
-      setChatUnread(data.unread_count);
+      setChatUnread(surface.unread);
       if (needsEmployeeManagerPicker(managers)) {
         setChatPickerOpen(true);
         return;

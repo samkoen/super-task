@@ -5,6 +5,7 @@ import {
   employeeManagerCards,
   employeeManagerLabel,
   employeeOpenMineScope,
+  employeeSurfaceChatState,
   needsEmployeeManagerPicker,
 } from "./employeeDirectChat";
 
@@ -40,5 +41,25 @@ describe("employeeDirectChat", () => {
     expect(needsEmployeeManagerPicker(both)).toBe(true);
     expect(employeeOpenMineScope(both)).toBeUndefined();
     expect(employeeManagerLabel(both[0])).toBe(he.directChatManagerTitle);
+  });
+
+  it("uses only the upward thread on the oved screen for a dual-hat menahel", () => {
+    const inbox = {
+      items: [card({ kind: "down", counterpart_user_id: "e1", unread_count: 4 })],
+      up: card({
+        id: "up1",
+        scope: "network",
+        counterpart_user_id: "nm",
+        counterpart_role: "network_manager",
+        unread_count: 1,
+      }),
+      unread_count: 5,
+      managers: [],
+    };
+    const surface = employeeSurfaceChatState(inbox, "branch_manager");
+    expect(surface.unread).toBe(1);
+    expect(surface.managers).toHaveLength(1);
+    expect(surface.managers[0].scope).toBe("network");
+    expect(employeeSurfaceChatState(inbox, "employee").unread).toBe(5);
   });
 });

@@ -1,5 +1,9 @@
 from app.domain.scope import ActorContext
-from app.domain.task_scope import can_use_employee_work_surface, employee_can_see_occurrence
+from app.domain.task_scope import (
+    can_review_assigned_work,
+    can_use_employee_work_surface,
+    employee_can_see_occurrence,
+)
 
 
 def _oved(**kwargs) -> ActorContext:
@@ -43,6 +47,12 @@ def test_employee_sees_own_assigned_task():
     assert (
         employee_can_see_occurrence(_oved(), assignee_user_id="e2", branch_id="b1") is False
     )
+
+
+def test_cannot_review_own_assigned_work():
+    assert can_review_assigned_work(_bm(), assignee_user_id="e1") is True
+    assert can_review_assigned_work(_bm(), assignee_user_id="m1") is False
+    assert can_review_assigned_work(_oved(), assignee_user_id="e1") is False
 
 
 def test_branch_manager_sees_own_assigned_task_not_oved_tasks():

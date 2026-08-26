@@ -19,3 +19,14 @@ export function employeeOpenMineScope(managers: DirectChatCard[]): DirectChatSco
 export function employeeManagerLabel(card: Pick<DirectChatCard, "scope">): string {
   return card.scope === "network" ? he.roleNetworkManager : he.directChatManagerTitle;
 }
+
+export function employeeSurfaceChatState(
+  inbox: DirectChatInbox,
+  role: string | undefined | null,
+): { unread: number; managers: DirectChatCard[] } {
+  if (role === "branch_manager") {
+    const up = inbox.up;
+    return { unread: up?.unread_count ?? 0, managers: up ? [up] : [] };
+  }
+  return { unread: inbox.unread_count, managers: inbox.managers ?? [] };
+}

@@ -27,6 +27,7 @@ from app.domain.task_kind import AD_HOC
 from app.domain.task_scope import (
     branch_manager_owns_delegation,
     can_manage_tasks,
+    can_review_assigned_work,
     can_use_employee_work_surface,
     employee_can_see_occurrence,
     visible_branch_ids_for_tasks,
@@ -673,14 +674,7 @@ class TaskOccurrenceService:
         return data
 
     def approve_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
-        if not can_manage_tasks(actor):
-            raise PermissionError("אין הרשאה לאשר משימות")
-        occurrence = self._occurrences.find_by_id(occurrence_id)
-        if not occurrence:
-            raise ValueError("משימה לא נמצאה")
-        self._assert_branch_access(actor, occurrence.branch_id)
-        if occurrence.status != task_status.PENDING_REVIEW:
-            raise ValueError("המשימה לא ממתינה לאישור")
+        occurrence = self._require_reviewable(actor, occurrence_id)
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
@@ -701,14 +695,7 @@ class TaskOccurrenceService:
     def reopen_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, rejection_note: str | None = None
     ) -> dict:
-        if not can_manage_tasks(actor):
-            raise PermissionError("אין הרשאה לפתוח מחדש משימות")
-        occurrence = self._occurrences.find_by_id(occurrence_id)
-        if not occurrence:
-            raise ValueError("משימה לא נמצאה")
-        self._assert_branch_access(actor, occurrence.branch_id)
-        if occurrence.status != task_status.PENDING_REVIEW:
-            raise ValueError("המשימה לא ממתינה לאישור")
+        occurrence = self._require_reviewable(actor, occurrence_id)
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
@@ -726,6 +713,19 @@ class TaskOccurrenceService:
         data = self._to_api(updated)
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
+
+    def _require_reviewable(self, actor: ActorContext, occurrence_id: str):
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לאשר משימות")
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_branch_access(actor, occurrence.branch_id)
+        if not can_review_assigned_work(actor, assignee_user_id=occurrence.assignee_user_id):
+            raise PermissionError("לא ניתן לאשר או לדחות את המשימה של עצמך")
+        if occurrence.status != task_status.PENDING_REVIEW:
+            raise ValueError("המשימה לא ממתינה לאישור")
+        return occurrence
 
     def cancel_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, apply_to_network: bool = False

@@ -229,6 +229,20 @@ def test_approve_occurrence_closes_task():
     assert result["completion"]["manager_review_status"] == task_status.REVIEW_APPROVED
 
 
+def test_branch_manager_cannot_approve_own_submission():
+    occurrence = _occurrence(status=task_status.PENDING_REVIEW, assignee_user_id="mgr-1")
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    svc = _service(occurrence_repo, MagicMock())
+    actor = MagicMock()
+    actor.role = roles.BRANCH_MANAGER
+    actor.user_id = "mgr-1"
+    actor.branch_id = "b1"
+    with pytest.raises(PermissionError, match="עצמך"):
+        svc.approve_occurrence(actor, "occ-1")
+    occurrence_repo.update_status.assert_not_called()
+
+
 def test_reopen_occurrence_returns_to_employee():
     occurrence = _occurrence(status=task_status.PENDING_REVIEW)
     reopened = _occurrence(status=task_status.IN_PROGRESS)

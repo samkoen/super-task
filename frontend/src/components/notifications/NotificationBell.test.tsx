@@ -11,8 +11,10 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return { ...mod, useNavigate: () => navigate };
 });
 
+const authState = { user: { id: "emp-1", role: "employee" } };
+
 vi.mock("../../context/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "emp-1", role: "employee" } }),
+  useAuth: () => authState,
 }));
 
 vi.mock("../../services/notificationService", () => ({
@@ -42,6 +44,7 @@ const TASK_ALERT = {
 
 beforeEach(() => {
   navigate.mockReset();
+  authState.user = { id: "emp-1", role: "employee" };
   vi.mocked(notificationService.list).mockResolvedValue({
     items: [TASK_ALERT],
     unread_count: 1,
@@ -69,6 +72,15 @@ describe("NotificationBell", () => {
   });
 
   it("opens the task when clicking an alert", async () => {
+    await openAlerts();
+    fireEvent.click(screen.getByText("משימה חדשה"));
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith("/employee?task=occ-1");
+    });
+  });
+
+  it("opens the oved task surface for a dual-hat menahel", async () => {
+    authState.user = { id: "m1", role: "branch_manager" };
     await openAlerts();
     fireEvent.click(screen.getByText("משימה חדשה"));
     await waitFor(() => {

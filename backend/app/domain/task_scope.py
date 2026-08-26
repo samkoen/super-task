@@ -44,3 +44,12 @@ def employee_can_see_occurrence(actor: ActorContext, *, assignee_user_id: str | 
 
 def branch_manager_owns_delegation(actor: ActorContext, *, manager_user_id: str | None) -> bool:
     return actor.role == roles.BRANCH_MANAGER and manager_user_id == actor.user_id
+
+
+def can_review_assigned_work(actor: ActorContext, *, assignee_user_id: str | None) -> bool:
+    """Un menahel ne peut pas valider sa propre soumission oved."""
+    if not can_manage_tasks(actor):
+        return False
+    if assignee_user_id and assignee_user_id == actor.user_id:
+        return False
+    return True
