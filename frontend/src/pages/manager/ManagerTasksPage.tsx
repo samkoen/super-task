@@ -363,6 +363,7 @@ export default function ManagerTasksPage() {
           photo_required: true,
           completion_requirements,
           ...media,
+          start_url: payload.start_url,
         });
         revokeTaskMediaBlobs(formMedia);
         setFormOpen(false);
@@ -457,6 +458,7 @@ export default function ManagerTasksPage() {
           monthly_day: item.monthly_day ?? undefined,
           assignee_user_id,
           source_gallery_item_id: item.id,
+          start_url: item.start_url,
           ...media,
         });
         showSuccess(res.message);
@@ -469,6 +471,7 @@ export default function ManagerTasksPage() {
           assignee_user_id,
           photo_required: true,
           source_gallery_item_id: item.id,
+          start_url: item.start_url,
           ...media,
         });
         showSuccess(res.message);

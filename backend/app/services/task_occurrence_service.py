@@ -290,6 +290,7 @@ class TaskOccurrenceService:
             reference_video_url=item.reference_video_url,
             reference_audio_url=item.reference_audio_url,
             source_gallery_item_id=item.id,
+            start_url=getattr(item, "start_url", None),
             self_claim=True,
         )
 

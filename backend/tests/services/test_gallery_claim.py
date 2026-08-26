@@ -76,6 +76,16 @@ def test_claim_creates_ad_hoc_for_self():
     assert kwargs["completion_requirements"] == [{"kind": "photo"}]
 
 
+def test_claim_copies_start_url():
+    url = "https://my.agroline.co.il/x"
+    gallery = MagicMock()
+    gallery.find_by_id.return_value = _item(start_url=url)
+    svc = _svc(gallery)
+    svc.create_ad_hoc = MagicMock(return_value={"id": "o1"})
+    svc.claim_gallery_item(_oved(), "g1")
+    assert svc.create_ad_hoc.call_args.kwargs["start_url"] == url
+
+
 def test_claim_rejects_missing_item():
     gallery = MagicMock()
     gallery.find_by_id.return_value = None

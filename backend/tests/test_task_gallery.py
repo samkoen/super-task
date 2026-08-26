@@ -188,6 +188,80 @@ def test_create_item_stores_employee_can_claim(monkeypatch):
     assert kwargs["completion_requirements"] == [{"kind": "photo"}]
 
 
+def test_create_item_stores_start_url(monkeypatch):
+    url = "https://my.agroline.co.il/x"
+    repo = MagicMock()
+    repo.create.return_value = _gallery_item(start_url=url)
+    branches = MagicMock()
+    branches.find_by_id.return_value = MagicMock(id="b1")
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, r: ["b1"],
+    )
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.blob_storage.copy_media_url",
+        lambda url, folder: url,
+    )
+    service = TaskGalleryService(repo, branches, MagicMock(), MagicMock())
+    service.create_item(
+        _actor(),
+        {"title": "הזמנה", "task_kind": "ad_hoc", "start_url": url},
+    )
+    assert repo.create.call_args.kwargs["start_url"] == url
+
+
+def test_create_item_rejects_invalid_start_url(monkeypatch):
+    branches = MagicMock()
+    branches.find_by_id.return_value = MagicMock(id="b1")
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, r: ["b1"],
+    )
+    service = TaskGalleryService(MagicMock(), branches, MagicMock(), MagicMock())
+    with pytest.raises(ValueError, match="https"):
+        service.create_item(
+            _actor(),
+            {"title": "הזמנה", "task_kind": "ad_hoc", "start_url": "not-a-url"},
+        )
+
+
+def test_create_from_occurrence_copies_start_url(monkeypatch):
+    url = "https://my.agroline.co.il/x"
+    occ = MagicMock(
+        id="o1",
+        branch_id="b1",
+        title="הזמנה",
+        description="",
+        task_kind="ad_hoc",
+        photo_required=True,
+        min_video_seconds=None,
+        completion_requirements=None,
+        reference_photo_url=None,
+        reference_video_url=None,
+        reference_audio_url=None,
+        source_gallery_item_id=None,
+        start_url=url,
+    )
+    occ_repo = MagicMock()
+    occ_repo.find_by_id.return_value = occ
+    repo = MagicMock()
+    repo.find_by_source_occurrence_id.return_value = None
+    repo.create.return_value = _gallery_item(start_url=url)
+    branches = MagicMock()
+    branches.find_by_id.return_value = MagicMock(id="b1")
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.visible_branch_ids_for_tasks",
+        lambda actor, r: ["b1"],
+    )
+    monkeypatch.setattr(
+        "app.services.task_gallery_service.blob_storage.copy_media_url",
+        lambda url, folder: url,
+    )
+    service = TaskGalleryService(repo, branches, occ_repo, MagicMock())
+    service.create_from_occurrence(_actor(), "o1")
+    assert repo.create.call_args.kwargs["start_url"] == url
+
+
 def test_list_claimable_empty_when_none_flagged(monkeypatch):
     repo = MagicMock()
     repo.list_items.return_value = [_gallery_item(employee_can_claim=False)]

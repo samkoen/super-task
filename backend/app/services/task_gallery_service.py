@@ -19,6 +19,7 @@ from app.domain.task_scope import (
     can_use_employee_work_surface,
     visible_branch_ids_for_tasks,
 )
+from app.domain.start_url import normalize_start_url
 from app.domain.task_title_from_description import resolve_create_title
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
@@ -131,6 +132,7 @@ class TaskGalleryService:
                 "reference_photo_url": occurrence.reference_photo_url,
                 "reference_video_url": occurrence.reference_video_url,
                 "reference_audio_url": occurrence.reference_audio_url,
+                "start_url": getattr(occurrence, "start_url", None),
                 "source_occurrence_id": occurrence_id,
             },
         )
@@ -158,6 +160,7 @@ class TaskGalleryService:
                 "reference_photo_url": template.reference_photo_url,
                 "reference_video_url": template.reference_video_url,
                 "reference_audio_url": template.reference_audio_url,
+                "start_url": getattr(template, "start_url", None),
             },
         )
 
@@ -246,6 +249,7 @@ class TaskGalleryService:
         )
         return {
             "employee_can_claim": bool(body.get("employee_can_claim", False)),
+            "start_url": normalize_start_url(body.get("start_url")),
             **media,
         }
 
