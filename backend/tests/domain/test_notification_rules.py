@@ -49,3 +49,5 @@ def test_sounds_employee_vs_manager():
     assert notification_sound_for("task_cancelled", recipient_is_employee=True) == SOUND_TASK_END
     assert notification_sound_for("employee_idle_no_tasks", recipient_is_employee=True) == SOUND_ALERT
     assert notification_sound_for("task_created", recipient_is_employee=False) == SOUND_NONE
+    assert notification_sound_for("direct_message", recipient_is_employee=True) == SOUND_TASK_END
+    assert notification_sound_for("direct_message", recipient_is_employee=False) == SOUND_NONE

@@ -35,7 +35,11 @@ export function resolveManagerBottomTab(pathname: string): ManagerBottomTab | nu
   return null;
 }
 
-export function shouldShowManagerChrome(role: string | undefined | null): boolean {
+export function shouldShowManagerChrome(
+  role: string | undefined | null,
+  pathname = "",
+): boolean {
+  if (pathname.startsWith("/employee")) return false;
   return role === "branch_manager" || role === "network_manager";
 }
 

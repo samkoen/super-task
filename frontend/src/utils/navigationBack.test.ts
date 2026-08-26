@@ -5,6 +5,7 @@ describe("shouldShowAppBack", () => {
   it("hides on role home", () => {
     expect(shouldShowAppBack("/manager", "branch_manager")).toBe(false);
     expect(shouldShowAppBack("/employee", "employee")).toBe(false);
+    expect(shouldShowAppBack("/employee", "branch_manager")).toBe(true);
     expect(shouldShowAppBack("/admin", "admin")).toBe(false);
   });
 

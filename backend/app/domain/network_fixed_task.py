@@ -8,11 +8,13 @@ from app.models.user import User
 
 
 def pick_first_employee(employees: list[User]) -> User | None:
-    """Premier oved actif du snif : plus ancien created_at, puis id."""
+    """Premier oved actif du snif ; le מנהל סניף seulement s'il n'y a pas d'oved."""
     active = [u for u in employees if u.is_active]
     if not active:
         return None
-    return min(active, key=lambda u: (u.created_at or "", u.id))
+    ovdim = [u for u in active if u.role == roles.EMPLOYEE]
+    pool = ovdim or active
+    return min(pool, key=lambda u: (u.created_at or "", u.id))
 
 
 def can_edit_network_fixed_group(role: str) -> bool:

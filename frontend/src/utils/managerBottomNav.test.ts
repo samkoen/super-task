@@ -43,6 +43,8 @@ describe("managerBottomNav", () => {
     expect(shouldShowManagerChrome("network_manager")).toBe(true);
     expect(shouldShowManagerChrome("admin")).toBe(false);
     expect(shouldShowManagerChrome("employee")).toBe(false);
+    expect(shouldShowManagerChrome("branch_manager", "/employee")).toBe(false);
+    expect(shouldShowManagerChrome("branch_manager", "/manager")).toBe(true);
   });
 
   it("opens new task via tasks page state", () => {

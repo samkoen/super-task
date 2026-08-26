@@ -21,6 +21,7 @@ _TASK_LABELS = {
     "employee_idle_no_tasks": ("בלי משימה בטיפול", "אין משימות בקנה"),
     "employee_idle_has_tasks": ("בלי משימה בטיפול", "יש משימות אבל לא התחיל אף אחת"),
     "employee_idle_on_break": ("בלי משימה בטיפול", "העובד בהפסקה"),
+    "direct_message": ("הודעה חדשה", "קיבלת הודעה"),
 }
 
 
@@ -96,6 +97,30 @@ class NotificationService:
                 branch_id=branch_id,
             )
             pending.append((user_id, row.id, event_type, sound))
+        return pending
+
+    def publish_direct_chat(
+        self,
+        *,
+        recipient_ids: set[str],
+        branch_id: str | None,
+        preview: str,
+    ) -> list[tuple[str, str, str, str]]:
+        title, base_message = _TASK_LABELS["direct_message"]
+        message = f"{base_message}: {preview}" if preview else base_message
+        pending: list[tuple[str, str, str, str]] = []
+        for user_id in recipient_ids:
+            user = self._users.find_by_id(user_id)
+            is_employee = bool(user and user.role == roles.EMPLOYEE)
+            sound = notification_sound_for("direct_message", recipient_is_employee=is_employee)
+            row = self._repo.create(
+                user_id=user_id,
+                kind="direct_message",
+                title=title,
+                message=message,
+                branch_id=branch_id,
+            )
+            pending.append((user_id, row.id, "direct_message", sound))
         return pending
 
     @staticmethod

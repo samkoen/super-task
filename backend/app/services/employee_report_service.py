@@ -13,6 +13,7 @@ from app.domain.employee_work_report import (
 )
 from app.domain.scope import ActorContext, assert_branch_visible
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.team_roster import worker_roles_for_roster
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
@@ -45,7 +46,10 @@ class EmployeeReportService:
             raise PermissionError("אין הרשאה לדוחות")
         branch_ids, scope_branch_id, scope_label = self._resolve_scope(actor, branch_id)
         due_from, due_to = resolve_report_range(period, today=datetime.now(TZ).date())
-        employees = self._users.list_users(role=roles.EMPLOYEE, branch_ids=branch_ids)
+        employees = self._users.list_users(
+            roles_in=worker_roles_for_roster(actor.role),
+            branch_ids=branch_ids,
+        )
         tasks = self._occurrences.list_occurrences(
             branch_ids=branch_ids,
             due_from=due_from,

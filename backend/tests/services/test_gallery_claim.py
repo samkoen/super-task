@@ -90,14 +90,12 @@ def test_claim_rejects_other_snif_recipe():
         _svc(gallery).claim_gallery_item(_oved(), "g1")
 
 
-def test_claim_rejects_manager():
+def test_claim_rejects_network_manager():
     gallery = MagicMock()
     gallery.find_by_id.return_value = _item()
-    manager = ActorContext(
-        user_id="m1", role="branch_manager", network_id="n1", branch_id="b1"
-    )
+    nm = ActorContext(user_id="nm", role="network_manager", network_id="n1")
     with pytest.raises(PermissionError, match="אין הרשאה"):
-        _svc(gallery).claim_gallery_item(manager, "g1")
+        _svc(gallery).claim_gallery_item(nm, "g1")
 
 
 def test_self_claim_cannot_assign_someone_else():
@@ -108,10 +106,17 @@ def test_self_claim_cannot_assign_someone_else():
         )
 
 
-def test_self_claim_rejects_manager_role():
+def test_self_claim_allows_dual_hat_menahel():
     svc = _svc(MagicMock())
     manager = ActorContext(
         user_id="m1", role="branch_manager", network_id="n1", branch_id="b1"
     )
+    svc._assert_can_create_ad_hoc(manager, "b1", "m1", self_claim=True)
+
+
+def test_self_claim_rejects_network_manager():
+    svc = _svc(MagicMock())
+    nm = ActorContext(user_id="nm", role="network_manager", network_id="n1")
     with pytest.raises(PermissionError, match="רק עובד"):
-        svc._assert_can_create_ad_hoc(manager, "b1", "m1", self_claim=True)
+        svc._assert_can_create_ad_hoc(nm, "b1", "nm", self_claim=True)
+

@@ -19,6 +19,7 @@ from app.controllers import (
     cron_controller,
     dashboard_controller,
     department_controller,
+    direct_chat_controller,
     employee_activity_controller,
     employee_report_controller,
     events_controller,
@@ -107,9 +108,9 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "issue_photos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "issue_videos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "issue_audio").mkdir(exist_ok=True)
-    (UPLOADS_DIR / "gallery_photos").mkdir(exist_ok=True)
-    (UPLOADS_DIR / "gallery_videos").mkdir(exist_ok=True)
-    (UPLOADS_DIR / "gallery_audio").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "direct_chat_photos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "direct_chat_videos").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "direct_chat_audio").mkdir(exist_ok=True)
     # Prod/Vercel : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
     if not IS_PRODUCTION:
         app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
         task_gallery_controller.router, prefix="/api/task-gallery", tags=["task-gallery"]
     )
     app.include_router(issue_report_controller.router, prefix="/api/issue-reports", tags=["issue-reports"])
+    app.include_router(direct_chat_controller.router, prefix="/api/direct-chats", tags=["direct-chats"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(
         employee_report_controller.router, prefix="/api/reports", tags=["reports"]

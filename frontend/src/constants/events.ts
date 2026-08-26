@@ -9,6 +9,7 @@ export interface TaskChangeDetail {
   branch_id?: string;
   assignee_user_id?: string;
   occurrence_id?: string;
+  conversation_id?: string;
   status?: string;
   kind?: string;
   sound?: string;

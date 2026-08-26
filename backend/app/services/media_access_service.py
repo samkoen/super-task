@@ -1,7 +1,7 @@
 """Contrôle d'accès aux URLs média (Blob /uploads) selon le périmètre acteur."""
 from __future__ import annotations
 
-from sqlalchemy import String, cast, or_, select
+from sqlalchemy import String, and_ as sa_and, cast, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -52,6 +52,9 @@ def _url_exists(db: Session, url: str) -> bool:
         ).first()
         or db.execute(
             select(orm.TaskMessage.id).where(_message_media_match(url)).limit(1)
+        ).first()
+        or db.execute(
+            select(orm.DirectMessage.id).where(_direct_message_media_match(url)).limit(1)
         ).first()
         or db.execute(
             select(orm.User.id).where(orm.User.avatar_url == url).limit(1)
@@ -107,6 +110,7 @@ def _url_exists_in_branches(
             .where(_message_media_match(url))
             .limit(1)
         ).first()
+        or _direct_url_in_scope(db, url, uuids, network_id)
         or _avatar_url_in_branches(db, url, uuids)
     ):
         return True
@@ -218,4 +222,44 @@ def _message_media_match(url: str):
         orm.TaskMessage.photo_url == url,
         orm.TaskMessage.video_url == url,
         orm.TaskMessage.audio_url == url,
+    )
+
+
+def _direct_message_media_match(url: str):
+    return or_(
+        orm.DirectMessage.photo_url == url,
+        orm.DirectMessage.video_url == url,
+        orm.DirectMessage.audio_url == url,
+    )
+
+
+def _direct_url_in_scope(
+    db: Session,
+    url: str,
+    branch_uuids: list,
+    network_id: str | None,
+) -> bool:
+    branch_ok = (
+        orm.DirectConversation.scope == "branch",
+        orm.DirectConversation.scope_id.in_(branch_uuids),
+    )
+    network_ok = (
+        orm.DirectConversation.scope == "network",
+        orm.DirectConversation.scope_id == mp.parse_uuid(network_id),
+    ) if network_id else None
+    scope_filter = or_(
+        sa_and(*branch_ok),
+        sa_and(*network_ok),
+    ) if network_ok else sa_and(*branch_ok)
+    return bool(
+        db.execute(
+            select(orm.DirectMessage.id)
+            .join(
+                orm.DirectConversation,
+                orm.DirectConversation.id == orm.DirectMessage.conversation_id,
+            )
+            .where(_direct_message_media_match(url))
+            .where(scope_filter)
+            .limit(1)
+        ).first()
     )

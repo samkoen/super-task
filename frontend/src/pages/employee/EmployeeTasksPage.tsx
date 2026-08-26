@@ -4,6 +4,8 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
+  AppBar,
+  Badge,
   Box,
   Button,
   CircularProgress,
@@ -11,13 +13,18 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
   Paper,
   TextField,
+  Toolbar,
   Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ReportProblemIcon from "@mui/icons-material/ReportProblem";
-import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { ApiError } from "../../services/api";
 import { useFeedback } from "../../context/FeedbackContext";
@@ -50,6 +57,15 @@ import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
+import DirectChatThread from "../../components/chat/DirectChatThread";
+import { directChatService, type DirectChatCard } from "../../services/directChatService";
+import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
+import {
+  employeeManagerLabel,
+  employeeOpenMineScope,
+  employeeSurfaceChatState,
+  needsEmployeeManagerPicker,
+} from "../../utils/employeeDirectChat";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
@@ -198,6 +214,12 @@ export default function EmployeeTasksPage() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chatUnread, setChatUnread] = useState(0);
+  const [chatManagers, setChatManagers] = useState<DirectChatCard[]>([]);
+  const [chatPickerOpen, setChatPickerOpen] = useState(false);
+  const [chatTitle, setChatTitle] = useState(he.directChatManagerTitle);
   const [reportText, setReportText] = useState("");
   const [reportPhotoUrl, setReportPhotoUrl] = useState("");
   const [reportVideoUrl, setReportVideoUrl] = useState("");
@@ -267,6 +289,54 @@ export default function EmployeeTasksPage() {
     load(true);
   }, [load]));
 
+  const loadChatUnread = useCallback(async () => {
+    try {
+      const data = await directChatService.inbox();
+      const surface = employeeSurfaceChatState(data, user?.role);
+      setChatUnread(surface.unread);
+      setChatManagers(surface.managers);
+    } catch {
+      /* ignore */
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    void loadChatUnread();
+  }, [loadChatUnread]);
+  useDirectChatLiveSync(null, () => void loadChatUnread());
+
+  const openThread = async (scope?: "branch" | "network", title = he.directChatManagerTitle) => {
+    const opened = await directChatService.openMine(scope);
+    setChatId(opened.conversation.id);
+    setChatTitle(title);
+    setChatOpen(true);
+    setChatPickerOpen(false);
+    setChatUnread(0);
+  };
+
+  const openChat = async () => {
+    try {
+      const data = await directChatService.inbox();
+      const surface = employeeSurfaceChatState(data, user?.role);
+      const managers = surface.managers;
+      setChatManagers(managers);
+      setChatUnread(surface.unread);
+      if (needsEmployeeManagerPicker(managers)) {
+        setChatPickerOpen(true);
+        return;
+      }
+      const only = managers[0];
+      await openThread(employeeOpenMineScope(managers), only ? employeeManagerLabel(only) : he.directChatManagerTitle);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
+  const closeChat = () => {
+    setChatOpen(false);
+    void loadChatUnread();
+  };
+
   const clearCompletionMedia = useCallback(() => {
     setSlotMedia((prev) => {
       prev.forEach((item) => revokePendingMedia(item));
@@ -334,14 +404,6 @@ export default function EmployeeTasksPage() {
       item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
     ),
   );
-
-  const openReport = () => {
-    setReportText("");
-    setReportPhotoUrl("");
-    setReportVideoUrl("");
-    setReportAudioUrl("");
-    setReportOpen(true);
-  };
 
   const handleReportUpload = useCallback(async (file: File, kind: MediaKind) => {
     setReportUploadingKind(kind);
@@ -633,32 +695,57 @@ export default function EmployeeTasksPage() {
           zIndex: (t) => t.zIndex.fab,
           borderRadius: 3,
           p: 1.25,
-          display: "flex",
-          gap: 1,
           border: "1px solid",
           borderColor: "divider",
         }}
       >
-        <Button
-          fullWidth
-          variant="contained"
-          startIcon={<PlaylistAddIcon />}
-          onClick={() => setClaimOpen(true)}
-          sx={{ borderRadius: 2.5, py: 1.1 }}
-        >
-          {he.employeeClaimTask}
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          color="warning"
-          startIcon={<ReportProblemIcon />}
-          onClick={openReport}
-          sx={{ borderRadius: 2.5, py: 1.1 }}
-        >
-          {he.employeeReportIssue}
-        </Button>
+        <Badge badgeContent={chatUnread} color="error" sx={{ width: "100%", display: "block" }}>
+          <Button
+            fullWidth
+            variant="contained"
+            startIcon={<ChatOutlinedIcon />}
+            onClick={() => void openChat()}
+            sx={{ borderRadius: 2.5, py: 1.1 }}
+          >
+            {he.directChatOpen}
+          </Button>
+        </Badge>
       </Paper>
+
+      <Dialog fullScreen open={chatOpen} onClose={closeChat} dir="rtl">
+        <AppBar sx={{ position: "relative" }} color="inherit" elevation={1}>
+          <Toolbar>
+            <IconButton edge="start" onClick={closeChat} aria-label={he.close}>
+              <ArrowForwardIcon />
+            </IconButton>
+            <Typography sx={{ mr: 2 }} variant="h6">{chatTitle}</Typography>
+          </Toolbar>
+        </AppBar>
+        <Box p={2} display="flex" flexDirection="column" sx={{ height: "100%" }}>
+          {chatId && <DirectChatThread conversationId={chatId} onSent={() => void loadChatUnread()} />}
+        </Box>
+      </Dialog>
+
+      <Dialog open={chatPickerOpen} onClose={() => setChatPickerOpen(false)} fullWidth maxWidth="xs" dir="rtl">
+        <DialogTitle>{he.directChatPickManager}</DialogTitle>
+        <List>
+          {chatManagers.map((card) => (
+            <ListItemButton
+              key={`${card.scope}-${card.counterpart_user_id}`}
+              onClick={() =>
+                void openThread(card.scope === "network" ? "network" : "branch", employeeManagerLabel(card)).catch((e) =>
+                  showError(e instanceof ApiError ? e.message : he.errorGeneric),
+                )
+              }
+            >
+              <ListItemText
+                primary={employeeManagerLabel(card)}
+                secondary={card.unread_count ? String(card.unread_count) : undefined}
+              />
+            </ListItemButton>
+          ))}
+        </List>
+      </Dialog>
 
       <EmployeeClaimTaskDialog
         open={claimOpen}

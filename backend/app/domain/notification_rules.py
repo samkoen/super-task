@@ -14,7 +14,7 @@ def notification_sound_for(kind: str, *, recipient_is_employee: bool) -> str:
         return SOUND_NONE
     if kind in {"task_created", "task_delegated"}:
         return SOUND_NEW_TASK
-    if kind in {"task_cancelled", "task_reopened", "task_message_manager"}:
+    if kind in {"task_cancelled", "task_reopened", "task_message_manager", "direct_message"}:
         return SOUND_TASK_END
     if kind in {"employee_idle", "employee_idle_no_tasks", "employee_idle_has_tasks", "employee_idle_on_break"}:
         return SOUND_ALERT

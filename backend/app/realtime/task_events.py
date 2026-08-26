@@ -48,3 +48,10 @@ def notify_task_change(
     if assignee_user_id:
         channels.append(f"user:{str(assignee_user_id)}")
     sse_hub.publish_many_sync(channels, event)
+
+
+def notify_direct_message(*, conversation_id: str, recipient_ids: set[str]) -> None:
+    event = {"type": "direct_message", "conversation_id": str(conversation_id)}
+    channels = [f"user:{uid}" for uid in recipient_ids if uid]
+    if channels:
+        sse_hub.publish_many_sync(channels, event)

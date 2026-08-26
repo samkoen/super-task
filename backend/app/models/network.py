@@ -7,6 +7,7 @@ class Network:
     id: str
     name: str
     is_active: bool = True
+    manages_all_workers: bool = False
     created_at: str | None = None
     updated_at: str | None = None
 

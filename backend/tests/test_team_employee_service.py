@@ -297,3 +297,51 @@ def test_reset_password_rejects_short_password():
 
     with pytest.raises(ValueError, match="הסיסמה קצרה מדי"):
         service.reset_team_employee_password(actor, "e1", password="123")
+
+
+def test_network_manager_list_team_includes_snif_menahelim():
+    repo = MagicMock()
+    emp = _employee()
+    bm = User(
+        id="m1",
+        email="bm@test.com",
+        first_name="Man",
+        last_name="Snif",
+        role=roles.BRANCH_MANAGER,
+        network_id="r1",
+        branch_id="s1",
+        is_active=True,
+    )
+    repo.list_users.return_value = [emp, bm]
+    branch = Branch(id="s1", network_id="r1", name="Branch")
+    service, _ = _service(
+        branch=branch, network=Network(id="r1", name="Net"), branches=[branch]
+    )
+    service._repo = repo
+    actor = ActorContext(user_id="nm", role=roles.NETWORK_MANAGER, network_id="r1")
+
+    rows = service.list_team(actor, role=roles.EMPLOYEE)
+
+    assert set(repo.list_users.call_args.kwargs["roles_in"]) == {
+        roles.EMPLOYEE,
+        roles.BRANCH_MANAGER,
+    }
+    by_id = {r["id"]: r for r in rows}
+    assert by_id["m1"]["job_function"] == job_functions.BRANCH_MANAGER
+    assert by_id["e1"]["job_function"] == job_functions.HEAD_CASHIER
+
+
+def test_branch_manager_list_team_is_ovdim_only():
+    repo = MagicMock()
+    repo.list_users.return_value = []
+    branch = Branch(id="s1", network_id="r1", name="Branch")
+    service, _ = _service(branch=branch, branches=[branch])
+    service._repo = repo
+    actor = ActorContext(
+        user_id="bm1", role=roles.BRANCH_MANAGER, network_id="r1", branch_id="s1"
+    )
+
+    service.list_team(actor, role=roles.EMPLOYEE)
+
+    assert repo.list_users.call_args.kwargs["roles_in"] == (roles.EMPLOYEE,)
+

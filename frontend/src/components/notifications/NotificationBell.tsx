@@ -19,7 +19,7 @@ import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import { useAuth } from "../../context/AuthContext";
 import { notificationService, type AppNotification } from "../../services/notificationService";
 import { NOTIFICATION_EVENT } from "../../constants/events";
-import { employeeTaskAlertPath } from "../../utils/notificationNavigation";
+import { employeeTaskAlertPath, shouldOpenEmployeeTaskAlert } from "../../utils/notificationNavigation";
 import IssueReportDetailDialog from "../issues/IssueReportDetailDialog";
 import { he } from "../../i18n/he";
 
@@ -96,7 +96,11 @@ export default function NotificationBell() {
       setIssueReportId(item.issue_report_id);
       return;
     }
-    if (item.occurrence_id && user?.role === "employee") {
+    if (item.kind === "direct_message") {
+      navigate(user?.role === "employee" ? "/employee" : "/manager/chats");
+      return;
+    }
+    if (item.occurrence_id && shouldOpenEmployeeTaskAlert(user?.role)) {
       navigate(employeeTaskAlertPath(item.occurrence_id));
     }
   };

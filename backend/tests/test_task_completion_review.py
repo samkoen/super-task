@@ -160,6 +160,43 @@ def test_manager_complete_skips_review():
     assert result["status"] == task_status.COMPLETED
 
 
+def test_branch_manager_complete_own_task_sets_pending_review():
+    occurrence = _occurrence(assignee_user_id="mgr-1")
+    pending = _occurrence(status=task_status.PENDING_REVIEW, assignee_user_id="mgr-1")
+    completion = _completion()
+
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    occurrence_repo.update_status.return_value = pending
+    occurrence_repo.get_branch_name.return_value = "Branch"
+    occurrence_repo.get_department_name.return_value = None
+    occurrence_repo.get_assignee_name.return_value = "Manager"
+    occurrence_repo.get_manager_name.return_value = "Network"
+
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    completion_repo.create.return_value = completion
+
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.BRANCH_MANAGER
+    actor.user_id = "mgr-1"
+    actor.branch_id = "b1"
+
+    result = asyncio.run(
+        svc.complete_occurrence(
+            actor,
+            "occ-1",
+            completion_status=task_status.COMPLETION_DONE,
+            photo_path="/uploads/p.jpg",
+        )
+    )
+
+    occurrence_repo.update_status.assert_called_once_with("occ-1", task_status.PENDING_REVIEW)
+    assert result["status"] == task_status.PENDING_REVIEW
+
+
+
 def test_approve_occurrence_closes_task():
     occurrence = _occurrence(status=task_status.PENDING_REVIEW)
     completed = _occurrence(status=task_status.COMPLETED)
@@ -190,6 +227,20 @@ def test_approve_occurrence_closes_task():
     occurrence_repo.set_media_purge_after.assert_called_once()
     assert result["status"] == task_status.COMPLETED
     assert result["completion"]["manager_review_status"] == task_status.REVIEW_APPROVED
+
+
+def test_branch_manager_cannot_approve_own_submission():
+    occurrence = _occurrence(status=task_status.PENDING_REVIEW, assignee_user_id="mgr-1")
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    svc = _service(occurrence_repo, MagicMock())
+    actor = MagicMock()
+    actor.role = roles.BRANCH_MANAGER
+    actor.user_id = "mgr-1"
+    actor.branch_id = "b1"
+    with pytest.raises(PermissionError, match="עצמך"):
+        svc.approve_occurrence(actor, "occ-1")
+    occurrence_repo.update_status.assert_not_called()
 
 
 def test_reopen_occurrence_returns_to_employee():

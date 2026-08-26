@@ -35,6 +35,7 @@ import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
 import { he } from "../../i18n/he";
 import { userBelongsToBranch, userBranchLabels } from "../../utils/userBranchMembership";
+import { canManageAsTeamEmployee } from "../../utils/teamEmployeeActions";
 import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
 
 const JOB_FUNCTIONS: JobFunction[] = ["head_cashier", "stockers", "warehouse_worker"];
@@ -350,6 +351,8 @@ export default function ManagerEmployeesPage() {
                       />
                     </TableCell>
                     <TableCell>
+                      {canManageAsTeamEmployee(u.role) ? (
+                        <>
                       <Tooltip title={he.viewAsEmployee}>
                         <span>
                           <IconButton
@@ -381,6 +384,8 @@ export default function ManagerEmployeesPage() {
                           {u.is_active ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
                         </IconButton>
                       </Tooltip>
+                        </>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))

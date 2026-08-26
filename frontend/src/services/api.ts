@@ -20,7 +20,7 @@ const LOGOUT_PATHS = ["/auth/logout"];
 
 export type UserRole = "admin" | "network_manager" | "branch_manager" | "employee";
 
-export type JobFunction = "head_cashier" | "stockers" | "warehouse_worker";
+export type JobFunction = "head_cashier" | "stockers" | "warehouse_worker" | "branch_manager";
 
 export type EmployeeLanguage = "he" | "ar" | "th" | "fr" | "en";
 

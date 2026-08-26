@@ -27,9 +27,12 @@ from app.domain.task_kind import AD_HOC
 from app.domain.task_scope import (
     branch_manager_owns_delegation,
     can_manage_tasks,
+    can_review_assigned_work,
+    can_use_employee_work_surface,
     employee_can_see_occurrence,
     visible_branch_ids_for_tasks,
 )
+from app.domain.team_roster import worker_roles_for_roster
 from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
@@ -140,7 +143,7 @@ class TaskOccurrenceService:
         due_from: str | None = None,
         due_to: str | None = None,
     ) -> list[dict]:
-        if actor.role != roles.EMPLOYEE:
+        if not can_use_employee_work_surface(actor):
             raise PermissionError("רק עובדים יכולים לראות את המשימות שלהם")
         now = datetime.now(TZ)
         scope_branches = [actor.branch_id] if actor.branch_id else []
@@ -174,7 +177,7 @@ class TaskOccurrenceService:
         actor: ActorContext,
         occurrence_ids: list[str],
     ) -> list[dict]:
-        if actor.role != roles.EMPLOYEE:
+        if not can_use_employee_work_surface(actor):
             raise PermissionError("רק עובדים יכולים לתרגם משימות")
         if not self._translations or not self._users:
             return []
@@ -314,7 +317,7 @@ class TaskOccurrenceService:
         self_claim: bool,
     ) -> None:
         if self_claim:
-            if actor.role != roles.EMPLOYEE:
+            if not can_use_employee_work_surface(actor):
                 raise PermissionError("רק עובד יכול להוסיף משימה לעצמו")
             if assignee_user_id != actor.user_id:
                 raise PermissionError("ניתן לשייך רק לעצמך")
@@ -410,7 +413,10 @@ class TaskOccurrenceService:
     def _create_network_ad_hoc_copy(self, actor, branch, **fields) -> dict | None:
         if not self._users:
             raise RuntimeError("user repository required")
-        employees = self._users.list_users(role=roles.EMPLOYEE, branch_ids=[branch.id])
+        employees = self._users.list_users(
+            roles_in=worker_roles_for_roster(actor.role),
+            branch_ids=[branch.id],
+        )
         first = pick_first_employee(employees)
         if not first:
             return None
@@ -447,7 +453,7 @@ class TaskOccurrenceService:
         occurrence = self._occurrences.find_by_id(occurrence_id)
         if not occurrence:
             raise ValueError("משימה לא נמצאה")
-        if actor.role != roles.EMPLOYEE:
+        if not can_use_employee_work_surface(actor):
             raise PermissionError("רק עובדים יכולים להתחיל משימות")
         if not employee_can_see_occurrence(
             actor, assignee_user_id=occurrence.assignee_user_id, branch_id=occurrence.branch_id
@@ -520,7 +526,14 @@ class TaskOccurrenceService:
         if raw_reqs is not None:
             assert_attachments_match(effective_requirements(raw_reqs), attachments)
             return TaskOccurrenceService._pack_attachments(attachments)
-        requires_visual = actor.role == roles.EMPLOYEE or occurrence.photo_required
+        requires_visual = (
+            employee_can_see_occurrence(
+                actor,
+                assignee_user_id=occurrence.assignee_user_id,
+                branch_id=occurrence.branch_id,
+            )
+            or occurrence.photo_required
+        )
         assert_completion_media(
             photo_path=photo_path,
             video_path=video_path,
@@ -555,9 +568,14 @@ class TaskOccurrenceService:
         self._assert_can_complete(actor, occurrence)
         if occurrence.status in task_status.TERMINAL:
             raise ValueError("המשימה כבר נסגרה")
-        if actor.role == roles.EMPLOYEE and occurrence.status == task_status.PENDING_REVIEW:
+        as_assignee = employee_can_see_occurrence(
+            actor,
+            assignee_user_id=occurrence.assignee_user_id,
+            branch_id=occurrence.branch_id,
+        )
+        if as_assignee and occurrence.status == task_status.PENDING_REVIEW:
             raise ValueError("המשימה ממתינה לאישור מנהל")
-        if actor.role == roles.EMPLOYEE and occurrence.status not in {
+        if as_assignee and occurrence.status not in {
             task_status.IN_PROGRESS,
         }:
             raise ValueError("יש להתחיל את המשימה לפני הסיום")
@@ -578,7 +596,7 @@ class TaskOccurrenceService:
         note_clean = (note or "").strip() or None
         reason_clean = (not_completed_reason or "").strip() or None
         existing = self._completions.find_by_occurrence(occurrence_id)
-        employee_submission = actor.role == roles.EMPLOYEE
+        employee_submission = as_assignee
         needs_review = (
             employee_submission and completion_status == task_status.COMPLETION_DONE
         )
@@ -656,14 +674,7 @@ class TaskOccurrenceService:
         return data
 
     def approve_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
-        if not can_manage_tasks(actor):
-            raise PermissionError("אין הרשאה לאשר משימות")
-        occurrence = self._occurrences.find_by_id(occurrence_id)
-        if not occurrence:
-            raise ValueError("משימה לא נמצאה")
-        self._assert_branch_access(actor, occurrence.branch_id)
-        if occurrence.status != task_status.PENDING_REVIEW:
-            raise ValueError("המשימה לא ממתינה לאישור")
+        occurrence = self._require_reviewable(actor, occurrence_id)
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
@@ -684,14 +695,7 @@ class TaskOccurrenceService:
     def reopen_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, rejection_note: str | None = None
     ) -> dict:
-        if not can_manage_tasks(actor):
-            raise PermissionError("אין הרשאה לפתוח מחדש משימות")
-        occurrence = self._occurrences.find_by_id(occurrence_id)
-        if not occurrence:
-            raise ValueError("משימה לא נמצאה")
-        self._assert_branch_access(actor, occurrence.branch_id)
-        if occurrence.status != task_status.PENDING_REVIEW:
-            raise ValueError("המשימה לא ממתינה לאישור")
+        occurrence = self._require_reviewable(actor, occurrence_id)
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
@@ -709,6 +713,19 @@ class TaskOccurrenceService:
         data = self._to_api(updated)
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
+
+    def _require_reviewable(self, actor: ActorContext, occurrence_id: str):
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לאשר משימות")
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_branch_access(actor, occurrence.branch_id)
+        if not can_review_assigned_work(actor, assignee_user_id=occurrence.assignee_user_id):
+            raise PermissionError("לא ניתן לאשר או לדחות את המשימה של עצמך")
+        if occurrence.status != task_status.PENDING_REVIEW:
+            raise ValueError("המשימה לא ממתינה לאישור")
+        return occurrence
 
     def cancel_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, apply_to_network: bool = False
@@ -984,7 +1001,13 @@ class TaskOccurrenceService:
         if not self._users:
             raise RuntimeError("user repository required")
         user = self._users.find_by_id(assignee_user_id)
-        if not user or user.role != roles.EMPLOYEE:
+        if not user:
+            raise ValueError("עובד לא שייך לסניף")
+        if user.role == roles.BRANCH_MANAGER:
+            if user.branch_id != branch_id:
+                raise ValueError("עובד לא שייך לסניף")
+            return
+        if user.role != roles.EMPLOYEE:
             raise ValueError("עובד לא שייך לסניף")
         member_ids = UserBranchMembershipRepository(self._users._db).list_branch_ids_for_user(
             user.id
@@ -997,13 +1020,14 @@ class TaskOccurrenceService:
             raise ValueError("עובד לא שייך לסניף")
 
     def _assert_can_complete(self, actor: ActorContext, occurrence) -> None:
+        if employee_can_see_occurrence(
+            actor, assignee_user_id=occurrence.assignee_user_id, branch_id=occurrence.branch_id
+        ):
+            return
         if can_manage_tasks(actor):
             self._assert_branch_access(actor, occurrence.branch_id)
             return
-        if not employee_can_see_occurrence(
-            actor, assignee_user_id=occurrence.assignee_user_id, branch_id=occurrence.branch_id
-        ):
-            raise PermissionError("אין הרשאה לבצע משימה זו")
+        raise PermissionError("אין הרשאה לבצע משימה זו")
 
     def _to_api(self, occurrence, *, already_in_gallery: bool | None = None) -> dict:
         in_gallery = set()

@@ -1,8 +1,9 @@
 """Règles : l'oved se ramène une recette de galerie."""
 from __future__ import annotations
 
-from app.domain import roles, task_status
+from app.domain import task_status
 from app.domain.scope import ActorContext
+from app.domain.task_scope import can_use_employee_work_surface
 
 CLAIMABLE_OPEN_STATUSES = frozenset(
     {
@@ -21,7 +22,7 @@ def gallery_item_claimable_by_employee(
     item_branch_id: str | None,
     actor: ActorContext,
 ) -> bool:
-    if actor.role != roles.EMPLOYEE or not employee_can_claim:
+    if not can_use_employee_work_surface(actor) or not employee_can_claim:
         return False
     if not actor.network_id or item_network_id != actor.network_id:
         return False

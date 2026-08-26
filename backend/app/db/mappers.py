@@ -7,6 +7,8 @@ from datetime import datetime
 import app.db.models as orm
 from app.models.branch import Branch
 from app.models.department import Department
+from app.models.direct_conversation import DirectConversation
+from app.models.direct_message import DirectMessage
 from app.models.invitation import UserInvitation
 from app.models.network import Network
 from app.models.product import Product
@@ -129,6 +131,7 @@ def network_orm_to_domain(row: orm.Network | None) -> Network | None:
         id=str(row.id),
         name=row.name,
         is_active=row.is_active,
+        manages_all_workers=bool(getattr(row, "manages_all_workers", False)),
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
     )
@@ -391,3 +394,33 @@ def task_message_domain_to_api(message: TaskMessage, **extra) -> dict:
     data = message.to_dict()
     data.update(extra)
     return data
+
+
+def direct_conversation_orm_to_domain(row: orm.DirectConversation | None) -> DirectConversation | None:
+    if row is None:
+        return None
+    return DirectConversation(
+        id=str(row.id),
+        scope=row.scope,
+        scope_id=str(row.scope_id),
+        counterpart_user_id=str(row.counterpart_user_id),
+        last_preview=row.last_preview,
+        last_at=parse_datetime_iso(row.last_at) if row.last_at else None,
+        last_sender_user_id=str(row.last_sender_user_id) if row.last_sender_user_id else None,
+        created_at=parse_datetime_iso(row.created_at),
+    )
+
+
+def direct_message_orm_to_domain(row: orm.DirectMessage | None) -> DirectMessage | None:
+    if row is None:
+        return None
+    return DirectMessage(
+        id=str(row.id),
+        conversation_id=str(row.conversation_id),
+        sender_user_id=str(row.sender_user_id),
+        body=row.body,
+        photo_url=row.photo_url,
+        video_url=row.video_url,
+        audio_url=row.audio_url,
+        created_at=parse_datetime_iso(row.created_at),
+    )

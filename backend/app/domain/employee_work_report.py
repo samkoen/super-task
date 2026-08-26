@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from app.domain import task_status
 from app.domain.fixed_task_expiry import counts_in_work_report
 from app.domain.manager_dashboard import duration_minutes, parse_dt
+from app.domain.team_roster import effective_job_function
 from app.models.task_completion import TaskCompletion
 from app.models.task_occurrence import TaskOccurrence
 from app.models.user import User
@@ -82,7 +83,7 @@ def build_employee_report_row(
     return {
         "user_id": employee.id,
         "full_name": employee.full_name,
-        "job_function": employee.job_function,
+        "job_function": effective_job_function(employee.role, employee.job_function),
         "branch_id": bid,
         "branch_name": names.get(bid) if bid else None,
         "is_active": employee.is_active,

@@ -14,7 +14,12 @@ from app.domain.health_rules import (
 from app.domain.scope import ActorContext, assert_branch_visible
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.task_translation_source import task_source_language
-from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.task_scope import (
+    can_manage_tasks,
+    can_use_employee_work_surface,
+    visible_branch_ids_for_tasks,
+)
+from app.domain.team_roster import effective_job_function, worker_roles_for_roster
 from app.models.task_occurrence import TaskOccurrence
 from app.models.user import User
 from app.repositories.branch_repository import BranchRepository
@@ -145,7 +150,7 @@ class DashboardService:
         *,
         due_on: str | None = None,
     ) -> dict:
-        if actor.role != roles.EMPLOYEE:
+        if not can_use_employee_work_surface(actor):
             raise PermissionError("רק עובדים יכולים לראות לוח זה")
         if not actor.branch_id:
             raise ValueError("לעובד חסר שיוך לסניף")
@@ -308,7 +313,10 @@ class DashboardService:
         departments = self._departments.list_departments(branch_id=branch_id)
         by_department = self._department_breakdown(tasks_today, departments, now)
 
-        employees = self._users.list_users(role=roles.EMPLOYEE, branch_ids=[branch_id])
+        employees = self._users.list_users(
+            roles_in=worker_roles_for_roster(actor.role),
+            branch_ids=[branch_id],
+        )
         completion_map = self._completions.find_by_occurrence_ids(
             [
                 t.id
@@ -536,7 +544,7 @@ class DashboardService:
             team.append({
                 "user_id": emp.id,
                 "full_name": emp.full_name,
-                "job_function": emp.job_function,
+                "job_function": effective_job_function(emp.role, emp.job_function),
                 "is_active": is_active,
                 "status": "in_progress" if in_progress else ("active" if is_active else "idle"),
                 "current_task_title": in_progress.title if in_progress else None,
@@ -636,7 +644,7 @@ class DashboardService:
             team.append({
                 "user_id": emp.id,
                 "full_name": emp.full_name,
-                "job_function": emp.job_function,
+                "job_function": effective_job_function(emp.role, emp.job_function),
                 "is_active": is_active,
                 "status": "in_progress" if in_progress else ("active" if is_active else "idle"),
                 "current_task_title": in_progress.title if in_progress else None,
