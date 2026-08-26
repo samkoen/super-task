@@ -17,6 +17,7 @@ from app.domain.start_url import normalize_start_url
 from app.domain.task_kind import FIXED
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.team_roster import worker_roles_for_roster
 from app.domain.task_title_from_description import resolve_create_title
 from app.domain.user_membership import employee_belongs_to_branch
 from app.repositories.branch_repository import BranchRepository
@@ -227,7 +228,10 @@ class TaskTemplateService:
         return {"templates": created, "skipped": skipped}
 
     def _create_network_copy(self, actor, branch, **fields) -> dict | None:
-        employees = self._users.list_users(role=roles.EMPLOYEE, branch_ids=[branch.id])
+        employees = self._users.list_users(
+            roles_in=worker_roles_for_roster(actor.role),
+            branch_ids=[branch.id],
+        )
         first = pick_first_employee(employees)
         if not first:
             return None

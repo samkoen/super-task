@@ -32,7 +32,9 @@ export default function ViewAsEmployeeDialog({ open, onClose }: ViewAsEmployeeDi
     setLoading(true);
     userService
       .listTeam("employee")
-      .then((team) => setEmployees(team.filter((u) => u.is_active)))
+      .then((team) =>
+        setEmployees(team.filter((u) => u.is_active && u.role === "employee")),
+      )
       .catch((e) => setError(e instanceof ApiError ? e.message : he.errorGeneric))
       .finally(() => setLoading(false));
   }, [open]);

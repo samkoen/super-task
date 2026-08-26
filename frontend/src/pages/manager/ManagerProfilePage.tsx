@@ -15,6 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import PageHeader from "../../components/ui/PageHeader";
 import { he } from "../../i18n/he";
+import ManagerNetworkChatSetting from "../../components/manager/ManagerNetworkChatSetting";
 
 export default function ManagerProfilePage() {
   const { user, refresh } = useAuth();
@@ -92,6 +93,7 @@ export default function ManagerProfilePage() {
   return (
     <Box>
       <PageHeader title={he.myAccount} subtitle={he.myAccountSubtitle} />
+      {user.role === "network_manager" && <ManagerNetworkChatSetting />}
 
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3, maxWidth: 560 }}>
         <Typography variant="h6" fontWeight={700} mb={2}>

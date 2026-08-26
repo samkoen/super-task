@@ -69,3 +69,16 @@ def test_start_rejects_missing_user():
     actor = ActorContext(user_id="m1", role=roles.BRANCH_MANAGER, branch_id="s1")
     with pytest.raises(ValueError, match="לא נמצא"):
         service.start(actor, "missing")
+
+
+def test_start_allows_network_manager_to_view_snif_menahel():
+    target = _employee(id="m2", role=roles.BRANCH_MANAGER)
+    service, _ = _service(target)
+    actor = ActorContext(user_id="nm", role=roles.NETWORK_MANAGER, network_id="r1")
+    with patch(
+        "app.services.view_as_service.visible_branch_ids_for_tasks",
+        return_value=["s1"],
+    ):
+        payload = service.start(actor, "m2")
+    assert payload["id"] == "m2"
+    assert payload["role"] == roles.BRANCH_MANAGER

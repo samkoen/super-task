@@ -49,7 +49,7 @@ def test_not_claimable_without_flag():
     )
 
 
-def test_not_claimable_other_snif_or_manager():
+def test_not_claimable_other_snif():
     assert (
         gallery_item_claimable_by_employee(
             employee_can_claim=True,
@@ -59,6 +59,9 @@ def test_not_claimable_other_snif_or_manager():
         )
         is False
     )
+
+
+def test_dual_hat_menahel_can_claim_like_oved():
     manager = ActorContext(
         user_id="m1", role="branch_manager", network_id="n1", branch_id="b1"
     )
@@ -68,6 +71,19 @@ def test_not_claimable_other_snif_or_manager():
             item_network_id="n1",
             item_branch_id=None,
             actor=manager,
+        )
+        is True
+    )
+
+
+def test_network_manager_cannot_claim_gallery():
+    nm = ActorContext(user_id="nm", role="network_manager", network_id="n1")
+    assert (
+        gallery_item_claimable_by_employee(
+            employee_can_claim=True,
+            item_network_id="n1",
+            item_branch_id=None,
+            actor=nm,
         )
         is False
     )

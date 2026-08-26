@@ -14,7 +14,11 @@ from app.domain.task_gallery import (
     resolve_gallery_branch_id,
     resolve_gallery_network_id,
 )
-from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.task_scope import (
+    can_manage_tasks,
+    can_use_employee_work_surface,
+    visible_branch_ids_for_tasks,
+)
 from app.domain.task_title_from_description import resolve_create_title
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
@@ -53,7 +57,7 @@ class TaskGalleryService:
         return [i.to_dict() for i in items]
 
     def list_claimable_for_employee(self, actor: ActorContext) -> list[dict]:
-        if actor.role != roles.EMPLOYEE:
+        if not can_use_employee_work_surface(actor):
             raise PermissionError("אין הרשאה")
         items = self._query_visible(actor, task_kind=None)
         out: list[dict] = []

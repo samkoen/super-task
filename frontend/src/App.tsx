@@ -19,6 +19,7 @@ const AdminBranchPage = lazy(() => import("./pages/admin/AdminBranchPage"));
 const AdminDepartmentsPage = lazy(() => import("./pages/admin/AdminDepartmentsPage"));
 const AdminProductsPage = lazy(() => import("./pages/admin/AdminProductsPage"));
 const ManagerTasksPage = lazy(() => import("./pages/manager/ManagerTasksPage"));
+const ManagerDirectChatsPage = lazy(() => import("./pages/manager/ManagerDirectChatsPage"));
 const ManagerIssuesPage = lazy(() => import("./pages/manager/ManagerIssuesPage"));
 const ManagerTaskGalleryPage = lazy(() => import("./pages/manager/ManagerTaskGalleryPage"));
 const ManagerFixedTasksPage = lazy(() => import("./pages/manager/ManagerFixedTasksPage"));
@@ -234,6 +235,14 @@ export default function App() {
             }
           />
           <Route
+            path="/manager/chats"
+            element={
+              <LazyPage>
+                <ManagerDirectChatsPage />
+              </LazyPage>
+            }
+          />
+          <Route
             path="/manager/issues"
             element={
               <LazyPage>
@@ -268,7 +277,7 @@ export default function App() {
             }
           />
         </Route>
-        <Route element={<ProtectedRoute roles={["employee"]} />}>
+        <Route element={<ProtectedRoute roles={["employee", "branch_manager"]} />}>
           <Route
             path="/employee"
             element={

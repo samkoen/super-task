@@ -41,7 +41,11 @@ def create_network(
     actor = load_actor(request, UserRepository(db))
     if not data:
         return JSONResponse({"error": "חסרים נתונים"}, status_code=400)
-    item = service.create_network(actor, name=str(data.get("name") or ""))
+    item = service.create_network(
+        actor,
+        name=str(data.get("name") or ""),
+        manages_all_workers=bool(data.get("manages_all_workers")),
+    )
     return {"message": "הרשת נוצרה", "network": item}
 
 
@@ -59,7 +63,10 @@ def update_network(
     item = service.update_network(
         actor,
         network_id,
-        name=str(payload.get("name") or ""),
-        is_active=bool(payload.get("is_active", True)),
+        name=None if "name" not in payload else str(payload.get("name") or ""),
+        is_active=None if "is_active" not in payload else bool(payload.get("is_active")),
+        manages_all_workers=(
+            None if "manages_all_workers" not in payload else bool(payload.get("manages_all_workers"))
+        ),
     )
     return {"message": "הרשת עודכנה", "network": item}

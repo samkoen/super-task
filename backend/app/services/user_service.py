@@ -4,6 +4,7 @@ from app.domain import job_functions, roles
 from app.domain.employee_language import normalize_employee_language
 from app.domain.scope import ActorContext, assert_branch_visible
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.team_roster import effective_job_function, worker_roles_for_roster
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.network_repository import NetworkRepository
 from app.repositories.user_branch_membership_repository import UserBranchMembershipRepository
@@ -40,7 +41,13 @@ class UserService:
         branch_ids = visible_branch_ids_for_tasks(actor, self._branch)
         if branch_ids == []:
             return []
-        users = self._repo.list_users(role=role or None, branch_ids=branch_ids)
+        if role == roles.EMPLOYEE:
+            users = self._repo.list_users(
+                roles_in=worker_roles_for_roster(actor.role),
+                branch_ids=branch_ids,
+            )
+        else:
+            users = self._repo.list_users(role=role or None, branch_ids=branch_ids)
         return [self._to_api(u) for u in users]
 
     def create_user(
@@ -291,6 +298,7 @@ class UserService:
 
     def _to_api(self, user) -> dict:
         data = mp.user_domain_to_api(user)
+        data["job_function"] = effective_job_function(user.role, user.job_function)
         if user.network_id:
             network = self._network.find_by_id(user.network_id)
             data["network_name"] = network.name if network else None

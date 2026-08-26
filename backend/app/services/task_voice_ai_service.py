@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from app.domain.employee_language import LANGUAGE_NAMES_EN, normalize_employee_language
 from app.domain.ai_provider import is_voice_ai_configured
-from app.domain import roles
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
+from app.domain.team_roster import effective_job_function, worker_roles_for_roster
 from app.domain.task_voice import TaskVoiceDraft, build_task_voice_prompt, parse_task_voice_response
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.user_repository import UserRepository
@@ -90,13 +90,14 @@ class TaskVoiceAiService:
     def _branch_employees(self, actor: ActorContext, branch_id: str) -> list[dict]:
         branch_ids = visible_branch_ids_for_tasks(actor, self._branches)
         users = self._users.list_users(
-            role=roles.EMPLOYEE, branch_ids=[branch_id] if branch_id else branch_ids
+            roles_in=worker_roles_for_roster(actor.role),
+            branch_ids=[branch_id] if branch_id else branch_ids,
         )
         return [
             {
                 "id": u.id,
                 "full_name": u.full_name,
-                "job_function": u.job_function,
+                "job_function": effective_job_function(u.role, u.job_function),
             }
             for u in users
         ]

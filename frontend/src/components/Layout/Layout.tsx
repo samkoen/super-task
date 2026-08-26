@@ -24,6 +24,7 @@ import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import RepeatIcon from "@mui/icons-material/Repeat";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import AssessmentIcon from "@mui/icons-material/Assessment";
@@ -54,6 +55,7 @@ import {
   managerBottomContentPadCss,
   shouldShowManagerChrome,
 } from "../../utils/managerBottomNav";
+import { usesEmployeeChrome } from "../../utils/employeeSurface";
 import { isViewAsPreview } from "../../utils/viewAsPreview";
 
 const SIDEBAR_BG = "#0B1220";
@@ -90,14 +92,14 @@ function OutletSuspense({ children }: { children?: ReactNode }) {
 function Layout() {
   const { user, loading, logout } = useAuth();
   useTaskEventSource(Boolean(user) && !loading);
-  const isEmployee = user?.role === "employee";
-  useEmployeeNotificationSounds(Boolean(user) && !loading && isEmployee);
   const navigate = useNavigate();
   const location = useLocation();
+  const isEmployee = usesEmployeeChrome(user?.role, location.pathname);
+  useEmployeeNotificationSounds(Boolean(user) && !loading && isEmployee);
   const [mobileOpen, setMobileOpen] = useState(false);
   const overlayNav = shouldUseMainNavOverlay(isNativeApp());
   const showBack = shouldShowAppBack(location.pathname, user?.role);
-  const showManagerChrome = shouldShowManagerChrome(user?.role);
+  const showManagerChrome = shouldShowManagerChrome(user?.role, location.pathname);
 
   const closeMainNav = () => setMobileOpen(false);
 
@@ -121,11 +123,15 @@ function Layout() {
       const items = [
         { text: he.managerArea, icon: <DashboardIcon />, path: "/manager" },
       ];
+      if (user.role === "branch_manager") {
+        items.push({ text: he.employeeArea, icon: <TaskAltIcon />, path: "/employee" });
+      }
       if (user.role === "network_manager") {
         items.push({ text: he.adminBranches, icon: <StoreIcon />, path: "/manager/branches" });
       }
       items.push(
         { text: he.managerEmployees, icon: <PeopleIcon />, path: "/manager/employees" },
+        { text: he.directChatTitle, icon: <ChatOutlinedIcon />, path: "/manager/chats" },
         { text: he.managerReports, icon: <AssessmentIcon />, path: "/manager/reports" },
         { text: he.adminDepartments, icon: <CategoryIcon />, path: "/manager/departments" },
         { text: he.adminProducts, icon: <InventoryIcon />, path: "/manager/products" },
@@ -361,6 +367,23 @@ function Layout() {
           </Box>
           <Box display="flex" alignItems="center" gap={0.5}>
             <NotificationBell />
+            {user?.role === "branch_manager" && (
+              <Button
+                type="button"
+                color="inherit"
+                size="small"
+                onClick={() => navigate("/manager")}
+                sx={{
+                  ...sidebarNavButtonSx,
+                  opacity: 0.85,
+                  borderRadius: 2,
+                  px: 1.5,
+                  "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
+                }}
+              >
+                {he.managerArea}
+              </Button>
+            )}
             <Button
               type="button"
               color="inherit"

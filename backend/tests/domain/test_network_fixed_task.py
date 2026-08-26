@@ -51,7 +51,7 @@ def _template_service(branches, employees_by_branch):
     )
     users = MagicMock()
 
-    def list_users(*, role=None, branch_ids=None):
+    def list_users(*, role=None, branch_ids=None, roles_in=None):
         if not branch_ids:
             return []
         return employees_by_branch.get(branch_ids[0], [])

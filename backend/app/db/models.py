@@ -4,7 +4,20 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -84,6 +97,7 @@ class Network(Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    manages_all_workers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -426,6 +440,75 @@ class TaskGalleryItem(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class DirectConversation(Base):
+    __tablename__ = "direct_conversations"
+    __table_args__ = (
+        UniqueConstraint(
+            "scope",
+            "scope_id",
+            "counterpart_user_id",
+            name="uq_direct_conversations_peer",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    scope_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), nullable=False, index=True)
+    counterpart_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    last_preview: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sender_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class DirectMessage(Base):
+    __tablename__ = "direct_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("direct_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sender_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    body: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class DirectConversationRead(Base):
+    __tablename__ = "direct_conversation_reads"
+
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("direct_conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class IssueReport(Base):

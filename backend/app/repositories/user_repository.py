@@ -38,11 +38,19 @@ class UserRepository:
         return mp.user_orm_to_domain(row), row.password_hash
 
     def list_users(
-        self, role: str | None = None, *, branch_ids: list[str] | None = None
+        self,
+        role: str | None = None,
+        *,
+        roles_in: list[str] | tuple[str, ...] | None = None,
+        branch_ids: list[str] | None = None,
+        network_id: str | None = None,
     ) -> list[User]:
         q = select(orm.User).order_by(orm.User.created_at.desc())
-        if role:
-            q = q.where(orm.User.role == role)
+        wanted = list(roles_in) if roles_in else ([role] if role else [])
+        if wanted:
+            q = q.where(orm.User.role.in_(wanted))
+        if network_id:
+            q = q.where(orm.User.network_id == mp.parse_uuid(network_id))
         if branch_ids is not None:
             uuids = [mp.parse_uuid(i) for i in branch_ids]
             member_ids = (

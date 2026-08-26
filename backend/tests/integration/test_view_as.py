@@ -68,7 +68,9 @@ def test_exit_view_as_restores_manager(app, world_seed):
     me = client.get("/api/auth/me")
     assert me.json()["user"]["id"] == world_seed["manager_id"]
     assert client.get("/api/dashboard/manager").status_code == 200
-    assert client.get("/api/dashboard/employee").status_code == 403
+    own_dash = client.get("/api/dashboard/employee")
+    assert own_dash.status_code == 200
+    assert own_dash.json()["employee"]["id"] == world_seed["manager_id"]
 
 
 def test_view_as_blocks_profile_edit(app, world_seed):

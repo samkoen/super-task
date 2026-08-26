@@ -38,7 +38,7 @@ class EmployeeActivityService:
 
     def set_break(self, user_id: str, *, on_break: bool) -> dict:
         row = self._db.get(orm.User, mp.parse_uuid(user_id))
-        if not row or row.role != roles.EMPLOYEE:
+        if not row or row.role not in {roles.EMPLOYEE, roles.BRANCH_MANAGER}:
             raise PermissionError("רק עובד יכול להכריז על הפסקה")
         now = datetime.now(TZ)
         if on_break:

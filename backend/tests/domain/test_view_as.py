@@ -32,7 +32,7 @@ def test_employee_cannot_view_as_another_employee():
     )
 
 
-def test_inactive_or_manager_target_rejected():
+def test_inactive_target_rejected():
     assert not can_view_as_employee(
         actor_role=roles.NETWORK_MANAGER,
         visible_branch_ids=["s1", "s2"],
@@ -40,10 +40,33 @@ def test_inactive_or_manager_target_rejected():
         target_is_active=False,
         target_branch_ids=["s1"],
     )
+
+
+def test_network_manager_can_view_snif_menahel_as_oved():
+    assert can_view_as_employee(
+        actor_role=roles.NETWORK_MANAGER,
+        visible_branch_ids=["s1", "s2"],
+        target_role=roles.BRANCH_MANAGER,
+        target_is_active=True,
+        target_branch_ids=["s1"],
+    )
+
+
+def test_branch_manager_cannot_view_peer_menahel():
+    assert not can_view_as_employee(
+        actor_role=roles.BRANCH_MANAGER,
+        visible_branch_ids=["s1"],
+        target_role=roles.BRANCH_MANAGER,
+        target_is_active=True,
+        target_branch_ids=["s1"],
+    )
+
+
+def test_cannot_view_as_network_manager():
     assert not can_view_as_employee(
         actor_role=roles.ADMIN,
         visible_branch_ids=None,
-        target_role=roles.BRANCH_MANAGER,
+        target_role=roles.NETWORK_MANAGER,
         target_is_active=True,
         target_branch_ids=["s1"],
     )

@@ -96,6 +96,10 @@ export default function NotificationBell() {
       setIssueReportId(item.issue_report_id);
       return;
     }
+    if (item.kind === "direct_message") {
+      navigate(user?.role === "employee" ? "/employee" : "/manager/chats");
+      return;
+    }
     if (item.occurrence_id && user?.role === "employee") {
       navigate(employeeTaskAlertPath(item.occurrence_id));
     }

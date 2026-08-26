@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import and_ as sa_and, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -123,6 +123,24 @@ def _delete_ids_col(db: Session, model, col, ids: list) -> int:
     return _delete(db, delete(model).where(col.in_(ids)))
 
 
+def _purge_direct_chats(db: Session, scope: NetworkScope) -> int:
+    conds = [
+        sa_and(
+            orm.DirectConversation.scope == "network",
+            orm.DirectConversation.scope_id == scope.network_id,
+        )
+    ]
+    if scope.branch_ids:
+        conds.append(
+            sa_and(
+                orm.DirectConversation.scope == "branch",
+                orm.DirectConversation.scope_id.in_(scope.branch_ids),
+            )
+        )
+    conv_ids = _fetch_ids(db, select(orm.DirectConversation.id).where(or_(*conds)))
+    return _delete_ids(db, orm.DirectConversation, conv_ids)
+
+
 def _purge_catalog(db: Session, scope: NetworkScope) -> tuple[int, int, int, int, int]:
     occ = _delete_ids(db, orm.TaskOccurrence, scope.occ_ids)
     tpl = _delete_ids(db, orm.TaskTemplate, scope.tpl_ids)
@@ -153,6 +171,7 @@ def _purge_org(db: Session, scope: NetworkScope) -> tuple[int, int, int, int, in
 def purge_network(db: Session, network_id: str) -> PurgeCounts:
     scope = collect_network_scope(db, network_id)
     notif, msgs, trans, comps = _purge_task_children(db, scope)
+    _purge_direct_chats(db, scope)
     occ, tpl, gal, issues, stages = _purge_catalog(db, scope)
     products, depts, invitations, users, branches = _purge_org(db, scope)
     networks = _delete(db, delete(orm.Network).where(orm.Network.id == scope.network_id))

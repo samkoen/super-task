@@ -27,6 +27,7 @@ describe("ViewAsEmployeeDialog", () => {
         full_name: "דני עובד",
         email: "050123",
         is_active: true,
+        role: "employee",
         branch_name: "סניף א",
       } as never,
       {
@@ -34,6 +35,14 @@ describe("ViewAsEmployeeDialog", () => {
         full_name: "מוסתר",
         email: "x",
         is_active: false,
+        role: "employee",
+      } as never,
+      {
+        id: "m1",
+        full_name: "מנהל סניף",
+        email: "bm",
+        is_active: true,
+        role: "branch_manager",
       } as never,
     ]);
   });
@@ -43,6 +52,7 @@ describe("ViewAsEmployeeDialog", () => {
     render(<ViewAsEmployeeDialog open onClose={() => {}} />);
     expect(await screen.findByText("דני עובד")).toBeTruthy();
     expect(screen.queryByText("מוסתר")).toBeNull();
+    expect(screen.queryByText("מנהל סניף")).toBeNull();
     fireEvent.click(screen.getByText("דני עובד"));
     await waitFor(() => {
       expect(mocks.viewAs).toHaveBeenCalledWith("e1");

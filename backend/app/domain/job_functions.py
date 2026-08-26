@@ -3,6 +3,7 @@
 HEAD_CASHIER = "head_cashier"
 STOCKERS = "stockers"
 WAREHOUSE_WORKER = "warehouse_worker"
+BRANCH_MANAGER = "branch_manager"
 
 ALL_JOB_FUNCTIONS = frozenset({HEAD_CASHIER, STOCKERS, WAREHOUSE_WORKER})
 
@@ -10,6 +11,7 @@ JOB_FUNCTION_LABELS_HE: dict[str, str] = {
     HEAD_CASHIER: "קופה ראשית",
     STOCKERS: "סדרנים",
     WAREHOUSE_WORKER: "מחסנאי",
+    BRANCH_MANAGER: "מנהל סניף",
 }
 
 

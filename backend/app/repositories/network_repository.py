@@ -27,22 +27,38 @@ class NetworkRepository:
         rows = self._db.execute(q).scalars().all()
         return [r for row in rows if (r := mp.network_orm_to_domain(row))]
 
-    def create(self, *, name: str) -> Network:
+    def create(self, *, name: str, manages_all_workers: bool = False) -> Network:
         import uuid
 
-        row = orm.Network(id=uuid.uuid4(), name=name.strip(), is_active=True)
+        row = orm.Network(
+            id=uuid.uuid4(),
+            name=name.strip(),
+            is_active=True,
+            manages_all_workers=manages_all_workers,
+        )
         self._db.add(row)
         self._db.flush()
         out = mp.network_orm_to_domain(row)
         assert out is not None
         return out
 
-    def update(self, id_: str, *, name: str, is_active: bool) -> Network | None:
+    def update(
+        self,
+        id_: str,
+        *,
+        name: str | None = None,
+        is_active: bool | None = None,
+        manages_all_workers: bool | None = None,
+    ) -> Network | None:
         row = self._db.get(orm.Network, mp.parse_uuid(id_))
         if not row:
             return None
-        row.name = name.strip()
-        row.is_active = is_active
+        if name is not None:
+            row.name = name.strip()
+        if is_active is not None:
+            row.is_active = is_active
+        if manages_all_workers is not None:
+            row.manages_all_workers = bool(manages_all_workers)
         self._db.flush()
         return mp.network_orm_to_domain(row)
 

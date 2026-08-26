@@ -160,6 +160,43 @@ def test_manager_complete_skips_review():
     assert result["status"] == task_status.COMPLETED
 
 
+def test_branch_manager_complete_own_task_sets_pending_review():
+    occurrence = _occurrence(assignee_user_id="mgr-1")
+    pending = _occurrence(status=task_status.PENDING_REVIEW, assignee_user_id="mgr-1")
+    completion = _completion()
+
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    occurrence_repo.update_status.return_value = pending
+    occurrence_repo.get_branch_name.return_value = "Branch"
+    occurrence_repo.get_department_name.return_value = None
+    occurrence_repo.get_assignee_name.return_value = "Manager"
+    occurrence_repo.get_manager_name.return_value = "Network"
+
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    completion_repo.create.return_value = completion
+
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.BRANCH_MANAGER
+    actor.user_id = "mgr-1"
+    actor.branch_id = "b1"
+
+    result = asyncio.run(
+        svc.complete_occurrence(
+            actor,
+            "occ-1",
+            completion_status=task_status.COMPLETION_DONE,
+            photo_path="/uploads/p.jpg",
+        )
+    )
+
+    occurrence_repo.update_status.assert_called_once_with("occ-1", task_status.PENDING_REVIEW)
+    assert result["status"] == task_status.PENDING_REVIEW
+
+
+
 def test_approve_occurrence_closes_task():
     occurrence = _occurrence(status=task_status.PENDING_REVIEW)
     completed = _occurrence(status=task_status.COMPLETED)

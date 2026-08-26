@@ -23,6 +23,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import { ApiError } from "../../services/api";
 import { networkService, type Network } from "../../services/networkService";
+import NetworkManagesAllSwitch from "../../components/network/NetworkManagesAllSwitch";
 import { he } from "../../i18n/he";
 
 export default function AdminNetworkPage() {
@@ -33,6 +34,7 @@ export default function AdminNetworkPage() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [edit, setEdit] = useState<Network | null>(null);
+  const [managesAll, setManagesAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,14 +52,32 @@ export default function AdminNetworkPage() {
     load();
   }, [load]);
 
+  const openCreate = () => {
+    setEdit(null);
+    setName("");
+    setManagesAll(false);
+    setOpen(true);
+  };
+
+  const openEdit = (row: Network) => {
+    setEdit(row);
+    setName(row.name);
+    setManagesAll(Boolean(row.manages_all_workers));
+    setOpen(true);
+  };
+
   const handleSave = async () => {
     setError("");
     try {
       if (edit) {
-        const res = await networkService.update(edit.id, { name, is_active: edit.is_active });
+        const res = await networkService.update(edit.id, {
+          name,
+          is_active: edit.is_active,
+          manages_all_workers: managesAll,
+        });
         setSuccess(res.message);
       } else {
-        const res = await networkService.create(name);
+        const res = await networkService.create(name, managesAll);
         setSuccess(res.message);
       }
       setOpen(false);
@@ -76,7 +96,7 @@ export default function AdminNetworkPage() {
           <Typography variant="h5" fontWeight={700}>{he.adminNetworks}</Typography>
           <Typography variant="body2" color="text.secondary">{he.adminNetworksSubtitle}</Typography>
         </Box>
-        <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setEdit(null); setName(""); setOpen(true); }}>
+        <Button startIcon={<AddIcon />} variant="contained" onClick={openCreate}>
           {he.newNetwork}
         </Button>
       </Box>
@@ -95,12 +115,17 @@ export default function AdminNetworkPage() {
             <TableBody>
               {items.map((r) => (
                 <TableRow key={r.id} hover>
-                  <TableCell>{r.name}</TableCell>
+                  <TableCell>
+                    <Typography>{r.name}</Typography>
+                    {r.manages_all_workers && (
+                      <Chip label={he.networkManagesAllWorkers} size="small" sx={{ mt: 0.5 }} />
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Chip label={r.is_active ? he.active : he.inactive} color={r.is_active ? "success" : "default"} size="small" />
                   </TableCell>
                   <TableCell>
-                    <Button size="small" onClick={() => { setEdit(r); setName(r.name); setOpen(true); }}>{he.edit}</Button>
+                    <Button size="small" onClick={() => openEdit(r)}>{he.edit}</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -118,6 +143,7 @@ export default function AdminNetworkPage() {
               <Typography>{he.active}</Typography>
             </Box>
           )}
+          <NetworkManagesAllSwitch checked={managesAll} onChange={setManagesAll} />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setOpen(false)}>{he.cancel}</Button>
