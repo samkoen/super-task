@@ -166,7 +166,7 @@ export default function GalleryQuickAssignDialog({
           <Typography variant="caption" color="error">{localError}</Typography>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3 }}>
         <Button onClick={onClose} disabled={saving}>{he.cancel}</Button>
         <Button
           variant="contained"

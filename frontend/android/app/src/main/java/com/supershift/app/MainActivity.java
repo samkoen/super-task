@@ -35,15 +35,25 @@ public class MainActivity extends BridgeActivity {
     private void syncNavBottomCssVar(WebView webView) {
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, windowInsets) -> {
             Insets nav = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            Insets status = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars());
             float density = v.getResources().getDisplayMetrics().density;
-            int cssPx = Math.round(nav.bottom / Math.max(density, 1f));
-            // 0px écrase le fallback JS (64px) et laisse les boutons sous la barre Samsung.
-            if (cssPx <= 0) {
-                return windowInsets;
+            int bottomPx = Math.round(nav.bottom / Math.max(density, 1f));
+            int topPx = Math.round(status.top / Math.max(density, 1f));
+            // 0px écrase le fallback JS et laisse les contrôles sous les barres Samsung.
+            StringBuilder js = new StringBuilder();
+            if (bottomPx > 0) {
+                js.append("document.documentElement.style.setProperty('--app-nav-bottom','")
+                    .append(bottomPx)
+                    .append("px');");
             }
-            String js = "document.documentElement.style.setProperty('--app-nav-bottom','"
-                + cssPx + "px')";
-            webView.evaluateJavascript(js, null);
+            if (topPx > 0) {
+                js.append("document.documentElement.style.setProperty('--app-nav-top','")
+                    .append(topPx)
+                    .append("px');");
+            }
+            if (js.length() > 0) {
+                webView.evaluateJavascript(js.toString(), null);
+            }
             return windowInsets;
         });
         ViewCompat.requestApplyInsets(webView);

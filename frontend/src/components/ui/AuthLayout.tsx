@@ -5,6 +5,7 @@ import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import GroupsIcon from "@mui/icons-material/Groups";
 import SpeedIcon from "@mui/icons-material/Speed";
 import { he } from "../../i18n/he";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 
 type AuthLayoutProps = {
   title: string;
@@ -128,6 +129,7 @@ export default function AuthLayout({ title, children }: AuthLayoutProps) {
           alignItems: "center",
           justifyContent: "center",
           p: { xs: 2.5, sm: 4 },
+          pb: { xs: dialogActionsPbCss(), sm: 4 },
           position: "relative",
         }}
       >

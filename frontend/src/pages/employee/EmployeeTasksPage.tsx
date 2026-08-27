@@ -4,7 +4,6 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
-  AppBar,
   Badge,
   Box,
   Button,
@@ -13,17 +12,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   List,
   ListItemButton,
   ListItemText,
   Paper,
   TextField,
-  Toolbar,
   Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { ApiError } from "../../services/api";
@@ -58,6 +54,10 @@ import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCaptu
 import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
 import DirectChatThread from "../../components/chat/DirectChatThread";
+import FullscreenBackAppBar, {
+  fullscreenChatBodySx,
+  fullscreenChatDialogPaperSx,
+} from "../../components/chat/FullscreenBackAppBar";
 import { directChatService, type DirectChatCard } from "../../services/directChatService";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import {
@@ -88,6 +88,7 @@ import {
   waitForInFlightLinkedStart,
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
+import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
@@ -598,7 +599,7 @@ export default function EmployeeTasksPage() {
   const photoUrl = dashboard?.employee?.avatar_url ?? user?.avatar_url;
 
   return (
-    <Box sx={{ maxWidth: 760, mx: "auto", pb: 14, px: { xs: 1, sm: 2 } }}>
+    <Box sx={{ maxWidth: 760, mx: "auto", pb: withSystemBottomInsetCss("112px"), px: { xs: 1, sm: 2 } }}>
       <EmployeeShiftHeader
         dateLabel={todayLabel}
         name={headerName}
@@ -687,7 +688,7 @@ export default function EmployeeTasksPage() {
         elevation={6}
         sx={{
           position: "fixed",
-          bottom: 16,
+          bottom: withSystemBottomInsetCss("16px"),
           left: 16,
           right: 16,
           maxWidth: 520,
@@ -712,16 +713,15 @@ export default function EmployeeTasksPage() {
         </Badge>
       </Paper>
 
-      <Dialog fullScreen open={chatOpen} onClose={closeChat} dir="rtl">
-        <AppBar sx={{ position: "relative" }} color="inherit" elevation={1}>
-          <Toolbar>
-            <IconButton edge="start" onClick={closeChat} aria-label={he.close}>
-              <ArrowForwardIcon />
-            </IconButton>
-            <Typography sx={{ mr: 2 }} variant="h6">{chatTitle}</Typography>
-          </Toolbar>
-        </AppBar>
-        <Box p={2} display="flex" flexDirection="column" sx={{ height: "100%" }}>
+      <Dialog
+        fullScreen
+        open={chatOpen}
+        onClose={closeChat}
+        dir="rtl"
+        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
+      >
+        <FullscreenBackAppBar title={chatTitle} onBack={closeChat} />
+        <Box sx={fullscreenChatBodySx}>
           {chatId && <DirectChatThread conversationId={chatId} onSent={() => void loadChatUnread()} />}
         </Box>
       </Dialog>
@@ -778,7 +778,7 @@ export default function EmployeeTasksPage() {
             <Typography variant="caption" color="warning.main">{he.issueReportRequired}</Typography>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setReportOpen(false)} disabled={reportSaving}>{he.cancel}</Button>
           <Button
             variant="contained"

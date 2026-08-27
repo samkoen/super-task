@@ -66,7 +66,9 @@ describe("managerBottomNav", () => {
 
   it("includes safe-area in bottom chrome spacing css", () => {
     expect(managerBottomContentPadCss()).toContain("env(safe-area-inset-bottom");
+    expect(managerBottomContentPadCss()).toContain("--app-nav-bottom");
     expect(managerBottomContentPadCss()).toContain("112px");
     expect(managerFabBottomCss()).toContain("76px");
+    expect(managerFabBottomCss()).toContain("--app-nav-bottom");
   });
 });

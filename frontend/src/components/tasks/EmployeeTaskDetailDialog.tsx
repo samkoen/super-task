@@ -268,7 +268,7 @@ function TaskDetailActions({
   starting: boolean;
 }) {
   return (
-    <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+    <DialogActions sx={{ px: 3, flexWrap: "wrap", gap: 1 }}>
       <Button onClick={onClose}>{he.close}</Button>
       {capture ? (
         <EmployeeDoTaskButton

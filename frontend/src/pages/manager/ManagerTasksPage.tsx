@@ -795,7 +795,7 @@ export default function ManagerTasksPage() {
             />
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setDeleting(null)} disabled={deleteSaving}>{he.cancel}</Button>
           <Button
             color="error"

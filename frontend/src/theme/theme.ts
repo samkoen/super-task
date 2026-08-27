@@ -1,5 +1,5 @@
 import { alpha, createTheme } from "@mui/material/styles";
-import { dialogActionsPbCss } from "../utils/systemInsets";
+import { dialogActionsPbCss, withSystemBottomInsetCss } from "../utils/systemInsets";
 
 /** Deep teal — retail ops brand */
 const primaryMain = "#0A6B5C";
@@ -181,6 +181,16 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           paddingBottom: dialogActionsPbCss(),
+        },
+      },
+    },
+    MuiSnackbar: {
+      styleOverrides: {
+        root: {
+          "&.MuiSnackbar-anchorOriginBottomCenter, &.MuiSnackbar-anchorOriginBottomLeft, &.MuiSnackbar-anchorOriginBottomRight":
+            {
+              bottom: withSystemBottomInsetCss("24px"),
+            },
         },
       },
     },
