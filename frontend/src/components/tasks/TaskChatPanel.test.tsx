@@ -78,8 +78,10 @@ describe("TaskChatPanel", () => {
 
   it("reloads the thread when a chat SSE event arrives", async () => {
     vi.mocked(taskService.listMessages)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
+      .mockResolvedValueOnce({ messages: [], has_more: false })
+      .mockResolvedValueOnce({
+        has_more: false,
+        messages: [
         {
           id: "m2",
           occurrence_id: "occ-1",
@@ -93,7 +95,8 @@ describe("TaskChatPanel", () => {
           audio_url: null,
           created_at: "2026-07-22T10:05:00.000Z",
         },
-      ]);
+        ],
+      });
 
     render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
     await waitFor(() => expect(screen.getByText(he.taskChatEmpty)).toBeTruthy());
@@ -112,8 +115,10 @@ describe("TaskChatPanel", () => {
 
   it("posts text then reloads thread so both sides see the message", async () => {
     vi.mocked(taskService.listMessages)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
+      .mockResolvedValueOnce({ messages: [], has_more: false })
+      .mockResolvedValueOnce({
+        has_more: false,
+        messages: [
         {
           id: "m3",
           occurrence_id: "occ-1",
@@ -127,7 +132,8 @@ describe("TaskChatPanel", () => {
           audio_url: null,
           created_at: "2026-07-22T11:00:00.000Z",
         },
-      ]);
+        ],
+      });
     vi.mocked(taskService.postMessage).mockResolvedValue({
       chat_message: {
         id: "m3",
