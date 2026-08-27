@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
 from app.db import mappers as mp
+from app.domain.chat_page import page_from_newest_first
 from app.models.task_message import TaskMessage
 
 
@@ -15,13 +17,43 @@ class TaskMessageRepository:
     def __init__(self, db: Session):
         self._db = db
 
-    def list_for_occurrence(self, occurrence_id: str) -> list[TaskMessage]:
+    def list_page(
+        self,
+        occurrence_id: str,
+        *,
+        limit: int,
+        before_id: str | None = None,
+    ) -> tuple[list[TaskMessage], bool]:
+        occ_uuid = mp.parse_uuid(occurrence_id)
+        q = select(orm.TaskMessage).where(orm.TaskMessage.occurrence_id == occ_uuid)
+        cursor = self._cursor(before_id, occ_uuid)
+        if cursor is not None:
+            q = q.where(orm.TaskMessage.id != cursor.id).where(
+                or_(
+                    orm.TaskMessage.created_at < cursor.created_at,
+                    and_(
+                        orm.TaskMessage.created_at == cursor.created_at,
+                        orm.TaskMessage.id < cursor.id,
+                    ),
+                )
+            )
         rows = self._db.scalars(
-            select(orm.TaskMessage)
-            .where(orm.TaskMessage.occurrence_id == mp.parse_uuid(occurrence_id))
-            .order_by(orm.TaskMessage.created_at.asc())
+            q.order_by(orm.TaskMessage.created_at.desc(), orm.TaskMessage.id.desc()).limit(limit + 1)
         ).all()
-        return [m for m in (mp.task_message_orm_to_domain(r) for r in rows) if m]
+        page = page_from_newest_first(rows, limit)
+        items = [m for row in page.items if (m := mp.task_message_orm_to_domain(row))]
+        return items, page.has_more
+
+    def _cursor(self, before_id: str | None, occ_uuid):
+        if not before_id:
+            return None
+        try:
+            row = self._db.get(orm.TaskMessage, mp.parse_uuid(before_id))
+        except ValueError:
+            return None
+        if not row or row.occurrence_id != occ_uuid:
+            return None
+        return row
 
     def create(
         self,
@@ -47,6 +79,7 @@ class TaskMessageRepository:
             audio_url=(audio_url or "").strip() or None,
             audio_transcript=(audio_transcript or "").strip() or None,
             audio_transcript_sender=(audio_transcript_sender or "").strip() or None,
+            created_at=datetime.now(timezone.utc),
         )
         self._db.add(row)
         self._db.flush()

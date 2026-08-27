@@ -188,3 +188,22 @@ def test_network_manager_chats_with_oved_when_configured(app, world_seed, client
     inbox = client_emp.get("/api/direct-chats")
     scopes = {item["scope"] for item in inbox.json()["managers"]}
     assert "network" in scopes
+
+
+def test_messages_paginate_newest_first(client_emp, client_mgr, world_seed):
+    conv_id = _open_mine(client_emp)
+    for body in ("אחת", "שתיים", "שלוש"):
+        posted = client_emp.post(f"/api/direct-chats/{conv_id}/messages", json={"body": body})
+        assert posted.status_code == 200, posted.text
+    first = client_mgr.get(f"/api/direct-chats/{conv_id}/messages", params={"limit": 2})
+    assert first.status_code == 200, first.text
+    page = first.json()
+    assert [m["body"] for m in page["messages"]] == ["שתיים", "שלוש"]
+    assert page["has_more"] is True
+    older = client_mgr.get(
+        f"/api/direct-chats/{conv_id}/messages",
+        params={"limit": 2, "before": page["messages"][0]["id"]},
+    )
+    assert older.status_code == 200, older.text
+    assert [m["body"] for m in older.json()["messages"]] == ["אחת"]
+    assert older.json()["has_more"] is False

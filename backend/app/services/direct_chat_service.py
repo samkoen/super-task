@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.domain import roles
+from app.domain.chat_page import clamp_chat_page_size
 from app.domain.direct_chat import (
     SCOPE_BRANCH,
     SCOPE_NETWORK,
@@ -78,10 +79,20 @@ class DirectChatService:
         conv = self._convs.get_or_create(*scope, peer.id)
         return self._open(actor, conv)
 
-    def list_messages(self, actor: ActorContext, conversation_id: str) -> list[dict]:
+    def list_messages(
+        self,
+        actor: ActorContext,
+        conversation_id: str,
+        *,
+        limit: int | None = None,
+        before: str | None = None,
+    ) -> dict:
         conv = self._require_conv(actor, conversation_id)
         self._reads.mark_read(conv.id, actor.user_id)
-        return [self._message_api(m) for m in self._messages.list_for_conversation(conv.id)]
+        items, has_more = self._messages.list_page(
+            conv.id, limit=clamp_chat_page_size(limit), before_id=before
+        )
+        return {"messages": [self._message_api(m) for m in items], "has_more": has_more}
 
     def post_message(
         self,
@@ -154,9 +165,13 @@ class DirectChatService:
     def _open(self, actor: ActorContext, conv: DirectConversation) -> dict:
         self._reads.mark_read(conv.id, actor.user_id)
         peer = self._users.find_by_id(conv.counterpart_user_id)
+        items, has_more = self._messages.list_page(
+            conv.id, limit=clamp_chat_page_size(None), before_id=None
+        )
         return {
             "conversation": conv.to_dict(),
-            "messages": [self._message_api(m) for m in self._messages.list_for_conversation(conv.id)],
+            "messages": [self._message_api(m) for m in items],
+            "has_more": has_more,
             "peer": self._peer_api(peer) if peer else None,
         }
 

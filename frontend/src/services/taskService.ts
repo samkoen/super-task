@@ -349,9 +349,10 @@ export const taskService = {
     return response.data;
   },
 
-  listMessages: async (occurrenceId: string) => {
-    const response = await api.get<TaskMessage[]>(
+  listMessages: async (occurrenceId: string, opts?: { before?: string; limit?: number }) => {
+    const response = await api.get<{ messages: TaskMessage[]; has_more: boolean }>(
       `/tasks/occurrences/${occurrenceId}/messages`,
+      { params: { before: opts?.before, limit: opts?.limit } },
     );
     return response.data;
   },

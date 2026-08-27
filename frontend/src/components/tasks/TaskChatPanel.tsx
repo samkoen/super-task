@@ -20,6 +20,7 @@ import {
   type PendingMedia,
 } from "../../utils/pendingMedia";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
+import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 
@@ -36,12 +37,13 @@ interface TaskChatPanelProps {
   pollMs?: number | false;
 }
 
-function normalizeMessages(data: unknown): TaskMessage[] {
-  if (Array.isArray(data)) return data as TaskMessage[];
+function asTaskChatPage(data: unknown): { messages: TaskMessage[]; has_more: boolean } {
+  if (Array.isArray(data)) return { messages: data as TaskMessage[], has_more: false };
   if (data && typeof data === "object" && Array.isArray((data as { messages?: unknown }).messages)) {
-    return (data as { messages: TaskMessage[] }).messages;
+    const page = data as { messages: TaskMessage[]; has_more?: boolean };
+    return { messages: page.messages, has_more: Boolean(page.has_more) };
   }
-  return [];
+  return { messages: [], has_more: false };
 }
 
 export default function TaskChatPanel({
@@ -52,12 +54,10 @@ export default function TaskChatPanel({
   pollMs,
 }: TaskChatPanelProps) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<TaskMessage[]>([]);
   const [body, setBody] = useState("");
   const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
   const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
   const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
@@ -83,37 +83,25 @@ export default function TaskChatPanel({
     setPendingAudio(null);
   }, []);
 
-  const load = useCallback(async (opts?: { quiet?: boolean }) => {
-    const quiet = Boolean(opts?.quiet);
-    if (!quiet) {
-      setLoading(true);
-      setError("");
-    }
+  const fetchPage = useCallback(async (before?: string) => {
     try {
-      const data = await taskService.listMessages(occurrenceId);
-      setMessages(normalizeMessages(data));
+      return asTaskChatPage(await taskService.listMessages(occurrenceId, { before }));
     } catch (e) {
-      if (!quiet) {
-        setError(e instanceof ApiError ? e.message : he.errorGeneric);
-      }
-    } finally {
-      if (!quiet) setLoading(false);
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      throw e;
     }
   }, [occurrenceId]);
 
-  const refreshQuiet = useCallback(() => {
-    void load({ quiet: true });
-  }, [load]);
+  const { messages, hasMore, loading, loadingOlder, loadLatest, loadOlder, stickToBottom } =
+    usePagedChatMessages({ enabled: true, fetchPage });
+
+  useTaskChatLiveSync(occurrenceId, () => void loadLatest(true), { pollMs });
 
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  useTaskChatLiveSync(occurrenceId, refreshQuiet, { pollMs });
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
-  }, [messages.length, loading]);
+    if (stickToBottom.current) {
+      bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+    }
+  }, [messages.length, loading, stickToBottom]);
 
   useEffect(() => {
     return () => {
@@ -153,7 +141,8 @@ export default function TaskChatPanel({
         audio_url,
       });
       // Recharger le fil pour que les 2 côtés voient display_* + médias ACL-ok.
-      await load();
+      stickToBottom.current = true;
+      await loadLatest(true);
       setBody("");
       clearPending();
       onOccurrenceUpdated?.(result.occurrence.status);
@@ -229,6 +218,11 @@ export default function TaskChatPanel({
             borderColor: "divider",
           }}
         >
+          {hasMore && (
+            <Button type="button" size="small" onClick={() => void loadOlder()} disabled={loadingOlder}>
+              {loadingOlder ? <CircularProgress size={16} /> : he.chatLoadOlder}
+            </Button>
+          )}
           {messages.map((msg) => {
             const mine = Boolean(user?.id && msg.sender_user_id === user.id);
             const fromEmployee = msg.sender_role === "employee" || (!mine && !msg.sender_role);

@@ -37,6 +37,7 @@ export interface DirectChatInbox {
 export interface DirectChatOpened {
   conversation: { id: string };
   messages: DirectChatMessage[];
+  has_more?: boolean;
   peer: { id: string; full_name: string; role: string; avatar_url?: string | null } | null;
 }
 
@@ -69,11 +70,12 @@ export const directChatService = {
     const { data } = await api.post<DirectChatOpened>(`/direct-chats/with/${userId}`);
     return data;
   },
-  listMessages: async (conversationId: string) => {
-    const { data } = await api.get<{ messages: DirectChatMessage[] }>(
+  listMessages: async (conversationId: string, opts?: { before?: string; limit?: number }) => {
+    const { data } = await api.get<{ messages: DirectChatMessage[]; has_more: boolean }>(
       `/direct-chats/${conversationId}/messages`,
+      { params: { before: opts?.before, limit: opts?.limit } },
     );
-    return data.messages;
+    return data;
   },
   send: async (conversationId: string, payload: DirectChatPayload) => {
     const { data } = await api.post(`/direct-chats/${conversationId}/messages`, payload);

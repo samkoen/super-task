@@ -25,6 +25,7 @@ import {
   type PendingMedia,
 } from "../../utils/pendingMedia";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
+import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import CompletionMediaPreview from "../tasks/CompletionMediaPreview";
 
@@ -40,12 +41,10 @@ export default function DirectChatThread({
   onSent,
 }: DirectChatThreadProps) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<DirectChatMessage[]>([]);
   const [body, setBody] = useState("");
   const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
   const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
   const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
-  const [loading, setLoading] = useState(!broadcast);
   const [sending, setSending] = useState(false);
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
@@ -53,25 +52,28 @@ export default function DirectChatThread({
   const pendingRef = useRef({ photo: null as PendingMedia | null, video: null as PendingMedia | null, audio: null as PendingMedia | null });
   pendingRef.current = { photo: pendingPhoto, video: pendingVideo, audio: pendingAudio };
 
-  const load = useCallback(async (quiet = false) => {
-    if (broadcast || !conversationId) return;
-    if (!quiet) setLoading(true);
+  const fetchPage = useCallback(async (before?: string) => {
+    if (!conversationId) return { messages: [] as DirectChatMessage[], has_more: false };
     try {
-      setMessages(await directChatService.listMessages(conversationId));
+      return await directChatService.listMessages(conversationId, { before });
     } catch (e) {
-      if (!quiet) setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      if (!quiet) setLoading(false);
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+      throw e;
     }
-  }, [broadcast, conversationId]);
+  }, [conversationId]);
 
-  useDirectChatLiveSync(broadcast ? null : conversationId, () => void load(true));
+  const paged = usePagedChatMessages({
+    enabled: Boolean(conversationId) && !broadcast,
+    fetchPage,
+  });
+  const { messages, hasMore, loading, loadingOlder, loadLatest, loadOlder, stickToBottom } = paged;
+
+  useDirectChatLiveSync(broadcast ? null : conversationId, () => void loadLatest(true));
   useEffect(() => {
-    void load();
-  }, [load]);
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
+    if (stickToBottom.current) {
+      bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+    }
+  }, [messages.length, loading, stickToBottom]);
   useEffect(() => () => {
     revokePendingMedia(pendingRef.current.photo);
     revokePendingMedia(pendingRef.current.video);
@@ -97,7 +99,8 @@ export default function DirectChatThread({
         await directChatService.broadcast(payload);
       } else if (conversationId) {
         await directChatService.send(conversationId, payload);
-        await load(true);
+        stickToBottom.current = true;
+        await loadLatest(true);
       }
       setBody("");
       revokePendingMedia(pendingPhoto);
@@ -124,7 +127,14 @@ export default function DirectChatThread({
       ) : messages.length === 0 ? (
         <Typography variant="body2" color="text.secondary">{he.directChatEmpty}</Typography>
       ) : (
-        <MessageList messages={messages} myId={user?.id} bottomRef={bottomRef} />
+        <MessageList
+          messages={messages}
+          myId={user?.id}
+          bottomRef={bottomRef}
+          hasMore={hasMore}
+          loadingOlder={loadingOlder}
+          onLoadOlder={() => void loadOlder()}
+        />
       )}
       <TextField
         value={body}
@@ -190,16 +200,27 @@ function MessageList({
   messages,
   myId,
   bottomRef,
+  hasMore,
+  loadingOlder,
+  onLoadOlder,
 }: {
   messages: DirectChatMessage[];
   myId?: string;
   bottomRef: Ref<HTMLDivElement>;
+  hasMore: boolean;
+  loadingOlder: boolean;
+  onLoadOlder: () => void;
 }) {
   return (
     <Box sx={{
       flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1,
       p: 1.25, bgcolor: "grey.100", borderRadius: 2, minHeight: 220,
     }}>
+      {hasMore && (
+        <Button type="button" size="small" onClick={onLoadOlder} disabled={loadingOlder}>
+          {loadingOlder ? <CircularProgress size={16} /> : he.chatLoadOlder}
+        </Button>
+      )}
       {messages.map((msg) => {
         const mine = Boolean(myId && msg.sender_user_id === myId);
         const text = msg.body?.trim();

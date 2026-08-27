@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
 from app.db import mappers as mp
+from app.domain.chat_page import page_from_newest_first
 from app.models.direct_conversation import DirectConversation
 from app.models.direct_message import DirectMessage
 
@@ -83,13 +84,43 @@ class DirectMessageRepository:
     def __init__(self, db: Session):
         self._db = db
 
-    def list_for_conversation(self, conversation_id: str) -> list[DirectMessage]:
+    def list_page(
+        self,
+        conversation_id: str,
+        *,
+        limit: int,
+        before_id: str | None = None,
+    ) -> tuple[list[DirectMessage], bool]:
+        conv_uuid = mp.parse_uuid(conversation_id)
+        q = select(orm.DirectMessage).where(orm.DirectMessage.conversation_id == conv_uuid)
+        cursor = self._cursor(before_id, conv_uuid)
+        if cursor is not None:
+            q = q.where(orm.DirectMessage.id != cursor.id).where(
+                or_(
+                    orm.DirectMessage.created_at < cursor.created_at,
+                    and_(
+                        orm.DirectMessage.created_at == cursor.created_at,
+                        orm.DirectMessage.id < cursor.id,
+                    ),
+                )
+            )
         rows = self._db.execute(
-            select(orm.DirectMessage)
-            .where(orm.DirectMessage.conversation_id == mp.parse_uuid(conversation_id))
-            .order_by(orm.DirectMessage.created_at.asc())
+            q.order_by(orm.DirectMessage.created_at.desc(), orm.DirectMessage.id.desc()).limit(limit + 1)
         ).scalars().all()
-        return [m for row in rows if (m := mp.direct_message_orm_to_domain(row))]
+        page = page_from_newest_first(rows, limit)
+        items = [m for row in page.items if (m := mp.direct_message_orm_to_domain(row))]
+        return items, page.has_more
+
+    def _cursor(self, before_id: str | None, conv_uuid):
+        if not before_id:
+            return None
+        try:
+            row = self._db.get(orm.DirectMessage, mp.parse_uuid(before_id))
+        except ValueError:
+            return None
+        if not row or row.conversation_id != conv_uuid:
+            return None
+        return row
 
     def create(
         self,

@@ -85,7 +85,7 @@ def test_network_manager_opens_oved_when_flag():
     svc, convs, messages, _r, users = _svc(network=_flag_on())
     users.find_by_id.return_value = _user()
     convs.get_or_create.return_value = _conv(scope="network", scope_id="n1")
-    messages.list_for_conversation.return_value = []
+    messages.list_page.return_value = ([], False)
     nm = ActorContext("nm", roles.NETWORK_MANAGER, "n1", None)
     opened = svc.open_with(nm, "e1")
     assert opened["conversation"]["id"] == "c1"
@@ -110,7 +110,7 @@ def test_oved_opens_network_thread_when_flag_and_no_bm():
     svc, convs, messages, _r, users = _svc(network=_flag_on())
     users.list_users.return_value = []
     convs.get_or_create.return_value = _conv(id="cn", scope="network", scope_id="n1")
-    messages.list_for_conversation.return_value = []
+    messages.list_page.return_value = ([], False)
     oved = ActorContext("e1", roles.EMPLOYEE, "n1", "b1")
     opened = svc.open_mine(oved)
     convs.get_or_create.assert_called_with("network", "n1", "e1")
@@ -130,7 +130,7 @@ def test_branch_manager_opens_oved_and_lists_inbox():
     convs.find.return_value = None
     messages.unread_count.return_value = 2
     reads.last_read_at.return_value = None
-    messages.list_for_conversation.return_value = []
+    messages.list_page.return_value = ([], False)
     bm = ActorContext("m1", roles.BRANCH_MANAGER, "n1", "b1")
     opened = svc.open_with(bm, "e1")
     assert opened["conversation"]["id"] == "c1"
@@ -203,3 +203,28 @@ def test_oved_inbox_counts_unread_on_mine():
     assert inbox["items"] == []
     assert inbox["unread_count"] == 3
     assert inbox["managers"][0]["scope"] == "branch"
+
+
+def test_list_messages_returns_capped_page():
+    svc, convs, messages, _r, users = _svc()
+    convs.get.return_value = _conv()
+    users.find_by_id.return_value = _user()
+    created = DirectMessage(
+        id="msg1",
+        conversation_id="c1",
+        sender_user_id="e1",
+        body="שלום",
+        photo_url=None,
+        video_url=None,
+        audio_url=None,
+        created_at="2026-08-26T08:01:00+03:00",
+    )
+    messages.list_page.return_value = ([created], True)
+    bm = ActorContext("m1", roles.BRANCH_MANAGER, "n1", "b1")
+    page = svc.list_messages(bm, "c1", limit=2, before="old")
+    assert page["has_more"] is True
+    assert page["messages"][0]["body"] == "שלום"
+    messages.list_page.assert_called_once_with("c1", limit=2, before_id="old")
+    messages.list_page.reset_mock()
+    svc.list_messages(bm, "c1", limit=999)
+    messages.list_page.assert_called_once_with("c1", limit=50, before_id=None)

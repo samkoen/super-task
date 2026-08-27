@@ -19,8 +19,26 @@ vi.mock("../../services/directChatService", () => ({
   },
 }));
 
+vi.mock("../../hooks/useDirectChatLiveSync", () => ({
+  useDirectChatLiveSync: () => undefined,
+}));
+
 vi.mock("../../utils/mediaUrl", () => ({ mediaUrl: (p: string | null) => p }));
 vi.mock("../media/MediaCaptureActions", () => ({ default: () => null }));
+
+function msg(id: string, body: string) {
+  return {
+    id,
+    conversation_id: "c1",
+    sender_user_id: "emp-1",
+    sender_name: "עובד",
+    body,
+    photo_url: null,
+    video_url: null,
+    audio_url: null,
+    created_at: "2026-08-26T08:00:00+03:00",
+  };
+}
 
 describe("DirectChatThread", () => {
   beforeEach(() => {
@@ -29,7 +47,7 @@ describe("DirectChatThread", () => {
   });
 
   it("shows an empty thread then sends text", async () => {
-    vi.mocked(directChatService.listMessages).mockResolvedValue([]);
+    vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
     vi.mocked(directChatService.send).mockResolvedValue({});
     render(<DirectChatThread conversationId="c1" />);
     await waitFor(() => expect(screen.getByText(he.directChatEmpty)).toBeTruthy());
@@ -40,5 +58,17 @@ describe("DirectChatThread", () => {
     await waitFor(() => {
       expect(directChatService.send).toHaveBeenCalledWith("c1", expect.objectContaining({ body: "שלום מנהל" }));
     });
+  });
+
+  it("loads only the latest page then prepends older messages", async () => {
+    vi.mocked(directChatService.listMessages)
+      .mockResolvedValueOnce({ messages: [msg("m2", "חדש")], has_more: true })
+      .mockResolvedValueOnce({ messages: [msg("m1", "ישן")], has_more: false });
+    render(<DirectChatThread conversationId="c1" />);
+    await waitFor(() => expect(screen.getByText("חדש")).toBeTruthy());
+    expect(screen.queryByText("ישן")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: he.chatLoadOlder }));
+    await waitFor(() => expect(screen.getByText("ישן")).toBeTruthy());
+    expect(directChatService.listMessages).toHaveBeenLastCalledWith("c1", { before: "m2" });
   });
 });

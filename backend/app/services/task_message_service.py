@@ -14,6 +14,7 @@ from app.domain.audio_transcription_fallback import (
 )
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
+from app.domain.chat_page import clamp_chat_page_size
 from app.domain.scope import ActorContext
 from app.domain.task_chat import (
     can_employee_post,
@@ -84,11 +85,23 @@ class TaskMessageService:
         self._branches = branch_repo
         self._completions = completion_repo
 
-    def list_messages(self, actor: ActorContext, occurrence_id: str) -> list[dict]:
+    def list_messages(
+        self,
+        actor: ActorContext,
+        occurrence_id: str,
+        *,
+        limit: int | None = None,
+        before: str | None = None,
+    ) -> dict:
         occurrence = self._require_occurrence(occurrence_id)
         self._assert_can_access(actor, occurrence)
-        items = self._messages.list_for_occurrence(occurrence_id)
-        return [self._to_api(m, actor=actor) for m in items]
+        items, has_more = self._messages.list_page(
+            occurrence_id, limit=clamp_chat_page_size(limit), before_id=before
+        )
+        return {
+            "messages": [self._to_api(m, actor=actor) for m in items],
+            "has_more": has_more,
+        }
 
     async def post_message(
         self,

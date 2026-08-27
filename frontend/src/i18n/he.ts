@@ -444,6 +444,7 @@ export const he = {
   taskChatEmpty: "אין הודעות עדיין",
   taskChatPlaceholder: "כתבו הודעה או שאלה…",
   taskChatSend: "שליחה",
+  chatLoadOlder: "הודעות קודמות",
   taskChatAskQuestion: "שאלה / הודעה",
   taskChatOpen: "פתח צ׳אט",
   taskChatHint: "במקום לסמן לא בוצע — שלחו שאלה כאן",

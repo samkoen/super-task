@@ -104,11 +104,13 @@ def list_direct_messages(
     request: Request,
     db: Session = Depends(get_db),
     service: DirectChatService = Depends(get_direct_chat_service),
+    limit: int | None = Query(None),
+    before: str | None = Query(None),
 ):
     actor = load_actor(request, UserRepository(db))
-    items = service.list_messages(actor, conversation_id)
+    page = service.list_messages(actor, conversation_id, limit=limit, before=before)
     db.commit()
-    return {"messages": items}
+    return page
 
 
 @router.post("/{conversation_id}/messages")
