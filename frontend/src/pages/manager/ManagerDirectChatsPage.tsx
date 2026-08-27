@@ -1,19 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  AppBar,
   Badge,
   Box,
   Button,
   Dialog,
-  IconButton,
   List,
   ListItemAvatar,
   ListItemButton,
   ListItemText,
-  Toolbar,
   Typography,
 } from "@mui/material";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import { ApiError } from "../../services/api";
@@ -24,6 +20,10 @@ import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
 import DirectChatThread from "../../components/chat/DirectChatThread";
+import FullscreenBackAppBar, {
+  fullscreenChatBodySx,
+  fullscreenChatDialogPaperSx,
+} from "../../components/chat/FullscreenBackAppBar";
 import {
   directChatService,
   type DirectChatCard,
@@ -128,30 +128,28 @@ export default function ManagerDirectChatsPage() {
         </List>
       )}
 
-      <Dialog fullScreen open={Boolean(openId)} onClose={closeThread} dir="rtl">
-        <AppBar sx={{ position: "relative" }} color="inherit" elevation={1}>
-          <Toolbar>
-            <IconButton edge="start" onClick={closeThread} aria-label={he.close}>
-              <ArrowForwardIcon />
-            </IconButton>
-            <Typography sx={{ mr: 2 }} variant="h6">{openTitle}</Typography>
-          </Toolbar>
-        </AppBar>
-        <Box p={2} display="flex" flexDirection="column" sx={{ height: "100%" }}>
+      <Dialog
+        fullScreen
+        open={Boolean(openId)}
+        onClose={closeThread}
+        dir="rtl"
+        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
+      >
+        <FullscreenBackAppBar title={openTitle} onBack={closeThread} />
+        <Box sx={fullscreenChatBodySx}>
           {openId && <DirectChatThread conversationId={openId} onSent={() => void load()} />}
         </Box>
       </Dialog>
 
-      <Dialog fullScreen open={broadcastOpen} onClose={() => setBroadcastOpen(false)} dir="rtl">
-        <AppBar sx={{ position: "relative" }} color="inherit" elevation={1}>
-          <Toolbar>
-            <IconButton edge="start" onClick={() => setBroadcastOpen(false)} aria-label={he.close}>
-              <ArrowForwardIcon />
-            </IconButton>
-            <Typography sx={{ mr: 2 }} variant="h6">{he.directChatBroadcast}</Typography>
-          </Toolbar>
-        </AppBar>
-        <Box p={2} display="flex" flexDirection="column" sx={{ height: "100%" }}>
+      <Dialog
+        fullScreen
+        open={broadcastOpen}
+        onClose={() => setBroadcastOpen(false)}
+        dir="rtl"
+        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
+      >
+        <FullscreenBackAppBar title={he.directChatBroadcast} onBack={() => setBroadcastOpen(false)} />
+        <Box sx={fullscreenChatBodySx}>
           <DirectChatThread
             conversationId={null}
             broadcast

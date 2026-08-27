@@ -131,7 +131,7 @@ export default function IssueReportDetailDialog({
           </>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3 }}>
         <Button onClick={onClose}>{he.close}</Button>
       </DialogActions>
     </Dialog>

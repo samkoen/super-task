@@ -17,6 +17,7 @@ import {
 } from "../../services/directChatService";
 import { he } from "../../i18n/he";
 import { formatTime } from "../../utils/dashboardTime";
+import { systemBottomInsetCss } from "../../utils/systemInsets";
 import {
   replacePendingMedia,
   revokePendingMedia,
@@ -115,7 +116,7 @@ export default function DirectChatThread({
   };
 
   return (
-    <Box display="flex" flexDirection="column" gap={1.5} sx={{ minHeight: 0, flex: 1 }}>
+    <Box display="flex" flexDirection="column" gap={1.5} sx={{ minHeight: 0, flex: 1, pb: systemBottomInsetCss() }}>
       {broadcast ? (
         <Alert severity="info">{he.directChatBroadcastHint}</Alert>
       ) : loading ? (

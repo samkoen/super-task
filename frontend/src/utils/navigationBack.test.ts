@@ -11,6 +11,7 @@ describe("shouldShowAppBack", () => {
 
   it("shows on nested pages", () => {
     expect(shouldShowAppBack("/manager/tasks", "branch_manager")).toBe(true);
+    expect(shouldShowAppBack("/manager/chats", "branch_manager")).toBe(true);
     expect(shouldShowAppBack("/manager/issues", "network_manager")).toBe(true);
     expect(shouldShowAppBack("/admin/users", "admin")).toBe(true);
   });

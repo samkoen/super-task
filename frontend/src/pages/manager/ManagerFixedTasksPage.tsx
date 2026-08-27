@@ -598,7 +598,7 @@ export default function ManagerFixedTasksPage() {
             />
           </DialogContent>
         )}
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button
             color="error"
             onClick={() => editing && openDelete(editing)}
@@ -640,7 +640,7 @@ export default function ManagerFixedTasksPage() {
             />
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setDeleting(null)} disabled={deleteSaving}>{he.cancel}</Button>
           <Button
             color="error"

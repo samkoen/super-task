@@ -531,7 +531,7 @@ export default function ManagerEmployeesPage() {
             ))}
           </TextField>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setOpen(false)} disabled={saving}>{he.cancel}</Button>
           <Button variant="contained" onClick={handleSave} disabled={saving}>
             {saving ? <CircularProgress size={22} color="inherit" /> : he.submit}
@@ -551,7 +551,7 @@ export default function ManagerEmployeesPage() {
             <Typography fontWeight={600} mt={1}>{accessTarget.full_name}</Typography>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setAccessConfirmOpen(false)} disabled={saving}>{he.cancel}</Button>
           <Button
             variant="contained"
@@ -589,7 +589,7 @@ export default function ManagerEmployeesPage() {
             dir="ltr"
           />
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setPasswordOpen(false)} disabled={saving}>{he.cancel}</Button>
           <Button variant="contained" onClick={handlePasswordReset} disabled={saving}>
             {saving ? <CircularProgress size={22} color="inherit" /> : he.submit}

@@ -117,7 +117,7 @@ export default function AdminBranchPage() {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setOpen(false)}>{he.cancel}</Button>
           <Button variant="contained" onClick={handleSave}>{he.submit}</Button>
         </DialogActions>

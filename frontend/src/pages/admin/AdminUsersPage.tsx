@@ -182,7 +182,7 @@ export default function AdminUsersPage() {
             </TextField>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setOpen(false)} disabled={saving}>{he.cancel}</Button>
           <Button variant="contained" onClick={handleCreate} disabled={saving}>
             {saving ? <CircularProgress size={22} color="inherit" /> : he.submit}

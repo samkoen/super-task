@@ -217,7 +217,7 @@ export default function TaskOccurrenceEditDialog({
           </>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3 }}>
         <Button onClick={onClose} disabled={saving || loading}>
           {he.cancel}
         </Button>

@@ -150,7 +150,7 @@ export default function TaskCompletionReviewDialog({
 
         {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+      <DialogActions sx={{ px: 3, flexWrap: "wrap", gap: 1 }}>
         <Button onClick={handleClose} disabled={saving}>
           {he.cancel}
         </Button>

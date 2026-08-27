@@ -516,7 +516,7 @@ export default function ManagerTaskGalleryPage() {
             dir="ltr"
           />
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setOpenForm(false)}>{he.cancel}</Button>
           <Button
             variant="contained"

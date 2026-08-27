@@ -3,6 +3,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import { Box, Fab } from "@mui/material";
 import { he } from "../../i18n/he";
 import BackButton from "../ui/BackButton";
+import { systemTopInsetCss } from "../../utils/systemInsets";
 
 interface MobileMenuTopBarProps {
   showBack: boolean;
@@ -32,7 +33,7 @@ export default function MobileMenuTopBar({
         mb: 1.5,
         mx: { xs: -0.5, sm: 0 },
         px: 0.5,
-        pt: "max(8px, env(safe-area-inset-top, 0px))",
+        pt: `max(8px, ${systemTopInsetCss()})`,
         bgcolor: "background.default",
       }}
     >

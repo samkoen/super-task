@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Alert, Snackbar } from "@mui/material";
+import { withSystemBottomInsetCss } from "../utils/systemInsets";
 
 export type FeedbackSeverity = "success" | "error" | "info" | "warning";
 
@@ -49,6 +50,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           setOpen(false);
         }}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        sx={{ bottom: withSystemBottomInsetCss("24px") }}
       >
         <Alert
           severity={severity}

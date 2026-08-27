@@ -22,6 +22,7 @@ import { NOTIFICATION_EVENT } from "../../constants/events";
 import { employeeTaskAlertPath, shouldOpenEmployeeTaskAlert } from "../../utils/notificationNavigation";
 import IssueReportDetailDialog from "../issues/IssueReportDetailDialog";
 import { he } from "../../i18n/he";
+import { dialogActionsPbCss, systemTopInsetCss } from "../../utils/systemInsets";
 
 function formatWhen(iso: string) {
   try {
@@ -118,7 +119,8 @@ export default function NotificationBell() {
           sx={{
             width: { xs: "100vw", sm: 360 },
             p: 2,
-            pt: "max(12px, env(safe-area-inset-top, 0px))",
+            pt: `max(12px, ${systemTopInsetCss()})`,
+            pb: dialogActionsPbCss(),
             minHeight: "100%",
           }}
         >

@@ -55,6 +55,7 @@ import {
   managerBottomContentPadCss,
   shouldShowManagerChrome,
 } from "../../utils/managerBottomNav";
+import { dialogActionsPbCss, systemTopInsetCss } from "../../utils/systemInsets";
 import { usesEmployeeChrome } from "../../utils/employeeSurface";
 import { isViewAsPreview } from "../../utils/viewAsPreview";
 
@@ -66,6 +67,10 @@ const drawerPaperSx = {
   width: SIDEBAR_WIDTH,
   height: "100vh",
   maxHeight: "100vh",
+  "@supports (height: 100dvh)": {
+    height: "100dvh",
+    maxHeight: "100dvh",
+  },
   overflow: "hidden",
   border: "none",
   bgcolor: SIDEBAR_BG,
@@ -294,7 +299,7 @@ function Layout() {
         })}
       </List>
 
-      <Box sx={{ p: 2, borderTop: `1px solid ${alpha("#fff", 0.08)}` }}>
+      <Box sx={{ p: 2, pb: dialogActionsPbCss(), borderTop: `1px solid ${alpha("#fff", 0.08)}` }}>
         <ViewAsPicker fullWidth dark />
         <Button
           fullWidth
@@ -332,6 +337,7 @@ function Layout() {
             alignItems: "center",
             px: { xs: 2, sm: 2.5 },
             py: 1.25,
+            pt: `calc(10px + ${systemTopInsetCss()})`,
             color: "#fff",
             bgcolor: SIDEBAR_BG,
             backgroundImage: `

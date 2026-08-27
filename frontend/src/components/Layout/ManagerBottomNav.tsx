@@ -12,6 +12,7 @@ import {
   resolveManagerBottomTab,
   type ManagerBottomTab,
 } from "../../utils/managerBottomNav";
+import { systemBottomInsetCss } from "../../utils/systemInsets";
 
 const ICONS: Record<ManagerBottomTab, ReactNode> = {
   home: <DashboardIcon />,
@@ -50,7 +51,7 @@ export default function ManagerBottomNav({ forceVisible = false }: ManagerBottom
         borderColor: "divider",
         // Force paint WebView
         transform: "translateZ(0)",
-        pb: "env(safe-area-inset-bottom, 0px)",
+        pb: systemBottomInsetCss(),
       }}
     >
       <BottomNavigation

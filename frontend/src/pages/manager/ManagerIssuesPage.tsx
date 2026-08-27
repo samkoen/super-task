@@ -204,7 +204,7 @@ export default function ManagerIssuesPage() {
         <DialogContent>
           <Typography>{he.issueReportDeleteConfirm}</Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3 }}>
           <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
             {he.cancel}
           </Button>
