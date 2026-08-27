@@ -35,7 +35,9 @@ beforeEach(() => {
 
 describe("TaskChatPanel", () => {
   it("shows text and photo from both participants", async () => {
-    vi.mocked(taskService.listMessages).mockResolvedValue([
+    vi.mocked(taskService.listMessages).mockResolvedValue({
+      has_more: false,
+      messages: [
       {
         id: "m1",
         occurrence_id: "occ-1",
@@ -62,7 +64,8 @@ describe("TaskChatPanel", () => {
         audio_url: null,
         created_at: "2026-07-22T10:05:00.000Z",
       },
-    ]);
+    ],
+    });
 
     render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
 
@@ -158,5 +161,50 @@ describe("TaskChatPanel", () => {
       expect(onUpdated).toHaveBeenCalledWith("awaiting_response");
     });
     expect(taskService.listMessages).toHaveBeenCalledTimes(2);
+  });
+
+  it("prepends older task messages on demand", async () => {
+    vi.mocked(taskService.listMessages)
+      .mockResolvedValueOnce({
+        has_more: true,
+        messages: [
+          {
+            id: "m2",
+            occurrence_id: "occ-1",
+            sender_user_id: "emp-1",
+            sender_role: "employee",
+            sender_name: "עובד",
+            body: "חדש",
+            display_body: "חדש",
+            photo_url: null,
+            video_url: null,
+            audio_url: null,
+            created_at: "2026-07-22T10:05:00.000Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        has_more: false,
+        messages: [
+          {
+            id: "m1",
+            occurrence_id: "occ-1",
+            sender_user_id: "emp-1",
+            sender_role: "employee",
+            sender_name: "עובד",
+            body: "ישן",
+            display_body: "ישן",
+            photo_url: null,
+            video_url: null,
+            audio_url: null,
+            created_at: "2026-07-22T10:00:00.000Z",
+          },
+        ],
+      });
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
+    await waitFor(() => expect(screen.getByText("חדש")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: he.chatLoadOlder }));
+    await waitFor(() => expect(screen.getByText("ישן")).toBeTruthy());
+    expect(taskService.listMessages).toHaveBeenLastCalledWith("occ-1", { before: "m2" });
   });
 });

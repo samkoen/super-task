@@ -89,7 +89,7 @@ def test_ad_hoc_reject_via_reopen_creates_chat_message(
 
     messages = client_emp.get(f"/api/tasks/occurrences/{occ_id}/messages")
     assert messages.status_code == 200
-    assert any(m["body"] == "תקן את התמונה" for m in messages.json())
+    assert any(m["body"] == "תקן את התמונה" for m in messages.json()["messages"])
 
 
 def test_task_created_notification_and_mark_read(client_mgr, client_emp, world_seed):

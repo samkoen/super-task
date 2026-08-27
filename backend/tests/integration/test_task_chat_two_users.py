@@ -15,7 +15,7 @@ def _messages_url(occurrence_id: str) -> str:
 def _last(client: TestClient, occurrence_id: str) -> dict:
     response = client.get(_messages_url(occurrence_id))
     assert response.status_code == 200, response.text
-    items = response.json()
+    items = response.json()["messages"]
     assert items, "expected at least one message"
     return items[-1]
 
@@ -157,3 +157,25 @@ def test_other_employee_cannot_post(app, chat_seed, mock_i18n):
         json={"body": "intrus"},
     )
     assert denied.status_code == 403
+
+
+def test_task_messages_paginate_newest_first(client_emp, client_mgr, occurrence_id, mock_i18n):
+    for body in ("אחת", "שתיים", "שלוש"):
+        posted = client_emp.post(_messages_url(occurrence_id), json={"body": body})
+        assert posted.status_code == 201, posted.text
+    first = client_mgr.get(_messages_url(occurrence_id), params={"limit": 2})
+    assert first.status_code == 200, first.text
+    page = first.json()
+    assert page["has_more"] is True
+    assert len(page["messages"]) == 2
+    cursor_id = page["messages"][0]["id"]
+    older = client_mgr.get(
+        _messages_url(occurrence_id),
+        params={"limit": 2, "before": cursor_id},
+    )
+    assert older.status_code == 200, older.text
+    older_ids = [m["id"] for m in older.json()["messages"]]
+    assert cursor_id not in older_ids
+    assert older.json()["has_more"] is False
+    bodies = [m["body"] for m in page["messages"]] + [m["body"] for m in older.json()["messages"]]
+    assert set(bodies) == {"אחת", "שתיים", "שלוש"}

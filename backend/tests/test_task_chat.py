@@ -173,9 +173,10 @@ def test_employee_cannot_post_while_pending_review():
 def test_list_messages_returns_display_body_for_manager():
     occurrence = _occurrence(status=task_status.AWAITING_RESPONSE)
     message_repo = MagicMock()
-    message_repo.list_for_occurrence.return_value = [
-        _message(body="sawasdee", body_translated="שלום"),
-    ]
+    message_repo.list_page.return_value = (
+        [_message(body="sawasdee", body_translated="שלום")],
+        False,
+    )
     occurrence_repo = MagicMock()
     occurrence_repo.find_by_id.return_value = occurrence
     user_repo = MagicMock()
@@ -195,9 +196,10 @@ def test_list_messages_returns_display_body_for_manager():
         branch_id="b1",
         network_id="n1",
     )
-    items = service.list_messages(actor, "occ-1")
-    assert items[0]["display_body"] == "שלום"
-    assert items[0]["body"] == "sawasdee"
+    page = service.list_messages(actor, "occ-1")
+    assert page["has_more"] is False
+    assert page["messages"][0]["display_body"] == "שלום"
+    assert page["messages"][0]["body"] == "sawasdee"
 
 
 def test_chat_audio_pair_keeps_audio_with_fallback_when_gemini_fails():

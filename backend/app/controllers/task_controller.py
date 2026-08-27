@@ -546,9 +546,11 @@ def list_task_messages(
     request: Request,
     service: TaskMessageService = Depends(get_message_service),
     db: Session = Depends(get_db),
+    limit: int | None = Query(None),
+    before: str | None = Query(None),
 ):
     actor = load_actor(request, UserRepository(db))
-    return service.list_messages(actor, occurrence_id)
+    return service.list_messages(actor, occurrence_id, limit=limit, before=before)
 
 
 @router.post("/occurrences/{occurrence_id}/messages", status_code=201)
