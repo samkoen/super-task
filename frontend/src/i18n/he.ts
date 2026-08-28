@@ -430,6 +430,7 @@ export const he = {
   mediaCaptureUnknown: "לא ניתן להפעיל את המצלמה או המיקרופון",
   mediaCaptureRetry: "נסו שוב",
   mediaCaptureEnableCamera: "הפעל מצלמה",
+  mediaCaptureFlipCamera: "החלף מצלמה",
   mediaCaptureEnableHint: "לחצו להפעלת המצלמה ואשרו גישה כשמופיעה הבקשה",
   mediaCaptureUnsupported: "הדפדפן לא תומך בצילום או הקלטה (נדרש HTTPS)",
   taskStatusLabels: {

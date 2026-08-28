@@ -58,4 +58,26 @@ describe("useVideoRecorder", () => {
     expect(result.current.stream).toBeNull();
     expect(result.current.previewReady).toBe(false);
   });
+
+  it("flips the live preview to the selfie camera", async () => {
+    const stream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    vi.stubGlobal("navigator", {
+      mediaDevices: { getUserMedia },
+    });
+
+    const { result } = renderHook(() => useVideoRecorder());
+
+    await act(async () => {
+      await result.current.startPreview();
+    });
+    await act(async () => {
+      result.current.flip();
+    });
+    await waitFor(() => {
+      expect(result.current.facing).toBe("user");
+    });
+    const last = getUserMedia.mock.calls.at(-1)?.[0] as { video?: { facingMode?: { ideal?: string } } };
+    expect(last.video?.facingMode?.ideal).toBe("user");
+  });
 });

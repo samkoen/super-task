@@ -22,6 +22,7 @@ import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { useCameraStream } from "../../hooks/useCameraStream";
 import { useVideoRecorder } from "../../hooks/useVideoRecorder";
 import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./PhotoAnnotationCanvas";
+import CameraFacingPreview from "./CameraFacingPreview";
 import { he } from "../../i18n/he";
 import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
 import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
@@ -84,6 +85,7 @@ export function PhotoCaptureDialog({
   onCapture,
   onSkip,
   title,
+  annotate = true,
 }: {
   open: boolean;
   uploading: boolean;
@@ -93,14 +95,17 @@ export function PhotoCaptureDialog({
   /** Si fourni : bouton « continuer sans photo » (avant capture). */
   onSkip?: () => void;
   title?: string;
+  /** Faux pour un avatar : aperçu brut, sans flèches / ellipses. */
+  annotate?: boolean;
 }) {
-  const { supported, active, starting, error, onVideoRef, start } = camera;
+  const { supported, active, starting, error, facing, onVideoRef, start, flip } = camera;
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [capturing, setCapturing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [confirming, setConfirming] = useState(false);
   const annotationRef = useRef<PhotoAnnotationCanvasHandle | null>(null);
+  const shotPreviewUrl = useBlobPreviewUrl(!annotate ? previewBlob : null);
 
   useEffect(() => {
     if (!open) {
@@ -126,9 +131,10 @@ export function PhotoCaptureDialog({
     if (!previewBlob || previewBlob.size === 0 || uploading || confirming) return;
     setConfirming(true);
     try {
-      const file = annotationRef.current
-        ? await annotationRef.current.exportFile()
-        : blobToFile(previewBlob, `task-photo-${Date.now()}.jpg`, "image/jpeg");
+      const file =
+        annotate && annotationRef.current
+          ? await annotationRef.current.exportFile()
+          : blobToFile(previewBlob, `task-photo-${Date.now()}.jpg`, "image/jpeg");
       await onCapture(file);
       onClose();
     } finally {
@@ -147,15 +153,22 @@ export function PhotoCaptureDialog({
       <DialogTitle>{title ?? he.mediaCapturePhotoTitle}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1, overflowY: "auto" }}>
         {hasPreview && previewBlob ? (
-          <PhotoAnnotationCanvas ref={annotationRef} imageBlob={previewBlob} />
+          annotate ? (
+            <PhotoAnnotationCanvas ref={annotationRef} imageBlob={previewBlob} />
+          ) : (
+            <Box
+              component="img"
+              src={shotPreviewUrl ?? undefined}
+              alt=""
+              sx={{ width: "100%", borderRadius: 1, maxHeight: "45vh", objectFit: "contain", bgcolor: "black" }}
+            />
+          )
         ) : (
-          <Box
-            component="video"
-            ref={onVideoRef}
-            playsInline
-            autoPlay
-            muted
-            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
+          <CameraFacingPreview
+            onVideoRef={onVideoRef}
+            facing={facing}
+            onFlip={flip}
+            flipDisabled={starting || capturing}
           />
         )}
         {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
@@ -261,6 +274,8 @@ function VideoCaptureDialog({
     startRecording,
     stopRecording,
     reset,
+    facing,
+    flip,
   } = recorder;
   const previewUrl = useBlobPreviewUrl(blob);
   const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
@@ -301,14 +316,11 @@ function VideoCaptureDialog({
             sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
           />
         ) : (
-          <Box
-            key="live-camera"
-            component="video"
-            ref={onVideoRef}
-            playsInline
-            autoPlay
-            muted
-            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
+          <CameraFacingPreview
+            onVideoRef={onVideoRef}
+            facing={facing}
+            onFlip={flip}
+            flipDisabled={starting || recording}
           />
         )}
         {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
@@ -501,8 +513,8 @@ export default function MediaCaptureActions({
   videoDoneLabel,
   onCapture,
 }: MediaCaptureActionsProps) {
-  const photoCamera = useCameraStream();
-  const videoRecorder = useVideoRecorder();
+  const photoCamera = useCameraStream({ defaultFacing: "environment" });
+  const videoRecorder = useVideoRecorder({ defaultFacing: "environment" });
   const [photoOpen, setPhotoOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);

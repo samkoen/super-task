@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   blobToFile,
+  cameraConstraints,
   capturePhotoFromVideo,
   classifyMediaError,
   getUserMediaWithFallback,
   normalizePhotoOrientation,
+  oppositeCameraFacing,
   pickVideoRecorderMimeType,
 } from "./mediaCapture";
 
@@ -25,6 +27,15 @@ describe("mediaCapture", () => {
     expect(classifyMediaError(new DOMException("denied", "NotAllowedError"))).toBe("permission");
     expect(classifyMediaError(new DOMException("missing", "NotFoundError"))).toBe("device");
     expect(classifyMediaError(new Error("other"))).toBe("unknown");
+  });
+
+  it("cameraConstraints prefers the requested facing then a generic fallback", () => {
+    expect(oppositeCameraFacing("environment")).toBe("user");
+    expect(cameraConstraints("user", false)[0]).toEqual({
+      video: { facingMode: { ideal: "user" } },
+      audio: false,
+    });
+    expect(cameraConstraints("environment", true)[1]).toEqual({ video: true, audio: true });
   });
 
   it("getUserMediaWithFallback tries softer constraints after device errors", async () => {

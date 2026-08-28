@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   attachStreamToVideo,
+  cameraConstraints,
   classifyMediaError,
   getUserMediaWithFallback,
   isMediaCaptureSupported,
+  oppositeCameraFacing,
   pickVideoRecorderMimeType,
-  VIDEO_CAMERA_CONSTRAINTS,
+  type CameraFacing,
 } from "../utils/mediaCapture";
 
-export function useVideoRecorder() {
+export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
+  const initialFacing = options?.defaultFacing ?? "environment";
   const [recording, setRecording] = useState(false);
   const [previewReady, setPreviewReady] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -16,6 +19,7 @@ export function useVideoRecorder() {
   const [error, setError] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [facing, setFacing] = useState<CameraFacing>(initialFacing);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -23,6 +27,7 @@ export function useVideoRecorder() {
   const sessionRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const tickRef = useRef<number | null>(null);
+  const facingRef = useRef<CameraFacing>(initialFacing);
 
   const supported = isMediaCaptureSupported();
 
@@ -57,10 +62,10 @@ export function useVideoRecorder() {
     }
   }, []);
 
-  const startPreview = useCallback(async () => {
+  const startPreview = useCallback(async (): Promise<"ready" | "failed" | "cancelled"> => {
     if (!supported) {
       setError("unsupported");
-      return;
+      return "failed";
     }
     const session = sessionRef.current + 1;
     sessionRef.current = session;
@@ -75,10 +80,12 @@ export function useVideoRecorder() {
       videoRef.current.srcObject = null;
     }
     try {
-      const nextStream = await getUserMediaWithFallback(VIDEO_CAMERA_CONSTRAINTS);
+      const nextStream = await getUserMediaWithFallback(
+        cameraConstraints(facingRef.current, true),
+      );
       if (session !== sessionRef.current) {
         nextStream.getTracks().forEach((track) => track.stop());
-        return;
+        return "cancelled";
       }
       streamRef.current = nextStream;
       setStream(nextStream);
@@ -86,13 +93,15 @@ export function useVideoRecorder() {
         await attachStreamToVideo(videoRef.current, nextStream);
       }
       setPreviewReady(true);
+      return "ready";
     } catch (caught) {
-      if (session !== sessionRef.current) return;
+      if (session !== sessionRef.current) return "cancelled";
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       setStream(null);
       setPreviewReady(false);
       setError(classifyMediaError(caught));
+      return "failed";
     } finally {
       if (session === sessionRef.current) {
         setStarting(false);
@@ -100,11 +109,25 @@ export function useVideoRecorder() {
     }
   }, [supported]);
 
+  const flip = useCallback(async () => {
+    if (recording) return;
+    const previous = facingRef.current;
+    facingRef.current = oppositeCameraFacing(previous);
+    setFacing(facingRef.current);
+    const result = await startPreview();
+    if (result !== "failed") return;
+    facingRef.current = previous;
+    setFacing(previous);
+    await startPreview();
+  }, [recording, startPreview]);
+
   const startRecording = useCallback(() => {
     const currentStream = streamRef.current;
     if (!currentStream || recording) return;
     const mimeType = pickVideoRecorderMimeType();
-    const recorder = mimeType ? new MediaRecorder(currentStream, { mimeType }) : new MediaRecorder(currentStream);
+    const recorder = mimeType
+      ? new MediaRecorder(currentStream, { mimeType })
+      : new MediaRecorder(currentStream);
     chunksRef.current = [];
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);
@@ -165,6 +188,7 @@ export function useVideoRecorder() {
     elapsedSeconds,
     error,
     stream,
+    facing,
     videoRef,
     onVideoRef,
     startPreview,
@@ -172,5 +196,6 @@ export function useVideoRecorder() {
     stopRecording,
     cleanup,
     reset,
+    flip,
   };
 }

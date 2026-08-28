@@ -1,34 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   attachStreamToVideo,
+  cameraConstraints,
   classifyMediaError,
   getUserMediaWithFallback,
   isMediaCaptureSupported,
-  PHOTO_CAMERA_CONSTRAINTS,
+  oppositeCameraFacing,
+  type CameraFacing,
 } from "../utils/mediaCapture";
 
-export function useCameraStream() {
+export type { CameraFacing };
+
+type UseCameraStreamOptions = {
+  defaultFacing?: CameraFacing;
+};
+
+export function useCameraStream(options?: UseCameraStreamOptions) {
+  const initialFacing = options?.defaultFacing ?? "environment";
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [facing, setFacing] = useState<CameraFacing>(initialFacing);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef(0);
+  const facingRef = useRef<CameraFacing>(initialFacing);
 
   const supported = isMediaCaptureSupported();
 
-  const stop = useCallback(() => {
-    sessionRef.current += 1;
+  const releaseStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setStream(null);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+  }, []);
+
+  const stop = useCallback(() => {
+    sessionRef.current += 1;
+    releaseStream();
     setActive(false);
     setStarting(false);
-  }, []);
+  }, [releaseStream]);
 
   const onVideoRef = useCallback((node: HTMLVideoElement | null) => {
     videoRef.current = node;
@@ -38,27 +53,24 @@ export function useCameraStream() {
     }
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (): Promise<"ready" | "failed" | "cancelled"> => {
     if (!supported) {
       setError("unsupported");
-      return;
+      return "failed";
     }
     const session = sessionRef.current + 1;
     sessionRef.current = session;
     setError("");
     setStarting(true);
     setActive(false);
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setStream(null);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    releaseStream();
     try {
-      const nextStream = await getUserMediaWithFallback(PHOTO_CAMERA_CONSTRAINTS);
+      const nextStream = await getUserMediaWithFallback(
+        cameraConstraints(facingRef.current, false),
+      );
       if (session !== sessionRef.current) {
         nextStream.getTracks().forEach((track) => track.stop());
-        return;
+        return "cancelled";
       }
       streamRef.current = nextStream;
       setStream(nextStream);
@@ -66,19 +78,30 @@ export function useCameraStream() {
         await attachStreamToVideo(videoRef.current, nextStream);
       }
       setActive(true);
+      return "ready";
     } catch (caught) {
-      if (session !== sessionRef.current) return;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      setStream(null);
+      if (session !== sessionRef.current) return "cancelled";
+      releaseStream();
       setActive(false);
       setError(classifyMediaError(caught));
+      return "failed";
     } finally {
       if (session === sessionRef.current) {
         setStarting(false);
       }
     }
-  }, [supported]);
+  }, [releaseStream, supported]);
+
+  const flip = useCallback(async () => {
+    const previous = facingRef.current;
+    facingRef.current = oppositeCameraFacing(previous);
+    setFacing(facingRef.current);
+    const result = await start();
+    if (result !== "failed") return;
+    facingRef.current = previous;
+    setFacing(previous);
+    await start();
+  }, [start]);
 
   useEffect(() => {
     if (!stream || !videoRef.current) return;
@@ -93,9 +116,11 @@ export function useCameraStream() {
     starting,
     error,
     stream,
+    facing,
     videoRef,
     onVideoRef,
     start,
     stop,
+    flip,
   };
 }
