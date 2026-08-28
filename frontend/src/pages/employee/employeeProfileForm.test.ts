@@ -40,4 +40,10 @@ describe("employee account route", () => {
     expect(src).toContain('path: "/employee/account"');
     expect(src).toContain("navigate(\"/employee/account\")");
   });
+
+  it("imports language from src/domain, not pages/domain", () => {
+    const src = readFileSync(resolve(__dirname, "./employeeProfileForm.ts"), "utf8");
+    expect(src).toContain('from "../../domain/employeeLanguages"');
+    expect(src).not.toContain('from "../domain/employeeLanguages"');
+  });
 });
