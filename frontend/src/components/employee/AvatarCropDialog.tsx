@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { blobToFile } from "../../utils/mediaCapture";
-import { cropAvatarToJpeg, type AvatarCrop } from "../../utils/cropAvatar";
+import { cropAvatarToJpeg, avatarPreviewLayout, type AvatarCrop } from "../../utils/cropAvatar";
 import { loadImageElement } from "../../utils/photoAnnotation";
 import { he } from "../../i18n/he";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
@@ -26,6 +26,33 @@ type AvatarCropDialogProps = {
 };
 
 const DEFAULT_CROP: AvatarCrop = { panX: 0, panY: 0, zoom: 1.2 };
+
+function CropPreviewImage({ imageUrl, crop }: { imageUrl: string; crop: AvatarCrop }) {
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setSize({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = imageUrl;
+  }, [imageUrl]);
+  const layout = size ? avatarPreviewLayout(size.w, size.h, crop) : null;
+  if (!layout) return null;
+  return (
+    <Box
+      component="img"
+      src={imageUrl}
+      alt=""
+      draggable={false}
+      sx={{
+        position: "absolute",
+        width: `${layout.widthPct}%`,
+        height: `${layout.heightPct}%`,
+        left: `${layout.leftPct}%`,
+        top: `${layout.topPct}%`,
+        maxWidth: "none",
+      }}
+    />
+  );
+}
 
 export default function AvatarCropDialog({
   open,
@@ -105,26 +132,11 @@ export default function AvatarCropDialog({
             cursor: "grab",
           }}
         >
-          {imageUrl ? (
-            <Box
-              component="img"
-              src={imageUrl}
-              alt=""
-              draggable={false}
-              sx={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                transform: `translate(${crop.panX * 12}%, ${crop.panY * 12}%) scale(${crop.zoom})`,
-              }}
-            />
-          ) : null}
+          {imageUrl ? <CropPreviewImage imageUrl={imageUrl} crop={crop} /> : null}
           <Box
             sx={{
               position: "absolute",
-              inset: "8%",
+              inset: 0,
               borderRadius: "50%",
               boxShadow: "0 0 0 999px rgba(0,0,0,0.45)",
               border: "2px solid #fff",

@@ -25,6 +25,25 @@ export function avatarSourceRect(
   return { sx, sy, sw: side, sh: side };
 }
 
+/** Positionne la photo dans le viseur pour qu'il montre exactement `avatarSourceRect`. */
+export function avatarPreviewLayout(
+  imageWidth: number,
+  imageHeight: number,
+  crop: AvatarCrop,
+): { widthPct: number; heightPct: number; leftPct: number; topPct: number } {
+  const { sx, sy, sw } = avatarSourceRect(imageWidth, imageHeight, crop);
+  return {
+    widthPct: (imageWidth / sw) * 100,
+    heightPct: (imageHeight / sw) * 100,
+    leftPct: zeroPct((-sx / sw) * 100),
+    topPct: zeroPct((-sy / sw) * 100),
+  };
+}
+
+function zeroPct(value: number): number {
+  return value === 0 ? 0 : value;
+}
+
 export async function cropAvatarToJpeg(
   image: HTMLImageElement,
   crop: AvatarCrop,
