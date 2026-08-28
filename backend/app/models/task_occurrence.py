@@ -32,6 +32,7 @@ class TaskOccurrence:
     min_video_seconds: int | None = None
     completion_requirements: list | None = None
     is_work_start: bool = False
+    is_work_end: bool = False
     start_url: str | None = None
     network_group_id: str | None = None
 
@@ -53,6 +54,7 @@ class TaskOccurrence:
             "min_video_seconds": self.min_video_seconds,
             "completion_requirements": self.completion_requirements or [],
             "is_work_start": self.is_work_start,
+            "is_work_end": self.is_work_end,
             "start_url": self.start_url,
             "network_group_id": self.network_group_id,
             "photo_required": self.photo_required,

@@ -9,6 +9,7 @@ from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
+from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
@@ -92,7 +93,11 @@ def _emit_task_event(
     _notify_occurrence(event_type, item)
     assignee = item.get("assignee_user_id")
     if assignee:
-        activity = EmployeeActivityService(UserRepository(db), TaskOccurrenceRepository(db))
+        activity = EmployeeActivityService(
+            UserRepository(db),
+            TaskOccurrenceRepository(db),
+            break_repo=EmployeeBreakRepository(db),
+        )
         if event_type == "task_started":
             activity.on_task_started(str(assignee))
             db.commit()
@@ -190,6 +195,7 @@ def create_template(
             min_video_seconds=payload.get("min_video_seconds"),
             completion_requirements=payload.get("completion_requirements"),
             is_work_start=bool(payload.get("is_work_start")),
+            is_work_end=bool(payload.get("is_work_end")),
             start_url=payload.get("start_url"),
             branch_ids=_parse_optional_ids(payload.get("branch_ids")),
         )
@@ -221,6 +227,7 @@ def create_template(
         min_video_seconds=payload.get("min_video_seconds"),
         completion_requirements=payload.get("completion_requirements"),
         is_work_start=bool(payload.get("is_work_start")),
+        is_work_end=bool(payload.get("is_work_end")),
         start_url=payload.get("start_url"),
     )
     emit_item = _sse_payload_from_create_template(item)
@@ -259,6 +266,7 @@ def update_template(
         completion_requirements=payload.get("completion_requirements"),
         update_completion_requirements="completion_requirements" in payload,
         is_work_start=payload.get("is_work_start") if "is_work_start" in payload else None,
+        is_work_end=payload.get("is_work_end") if "is_work_end" in payload else None,
         start_url=payload.get("start_url") if "start_url" in payload else None,
         apply_to_network=bool(payload.get("apply_to_network")),
     )

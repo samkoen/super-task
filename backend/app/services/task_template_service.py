@@ -15,6 +15,7 @@ from app.domain.completion_media import packed_media_fields, parse_requirements_
 from app.domain.ops_category import normalize_ops_category
 from app.domain.start_url import normalize_start_url
 from app.domain.task_kind import FIXED
+from app.domain.work_start import normalize_work_flags
 from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.domain.team_roster import worker_roles_for_roster
@@ -91,6 +92,7 @@ class TaskTemplateService:
         min_video_seconds: int | None = None,
         completion_requirements: object | None = None,
         is_work_start: bool = False,
+        is_work_end: bool = False,
         start_url: str | None = None,
         network_group_id: str | None = None,
     ) -> dict:
@@ -120,7 +122,7 @@ class TaskTemplateService:
                 min_video_seconds=min_video_seconds,
             )
         )
-        work_start = bool(is_work_start)
+        work_start, work_end = normalize_work_flags(is_work_start, is_work_end)
         link = normalize_start_url(start_url)
         photo, video, audio = self._isolate_external_media(
             reference_photo_url, reference_video_url, reference_audio_url
@@ -146,6 +148,7 @@ class TaskTemplateService:
             source_gallery_item_id=gallery_id,
             ops_category=category,
             is_work_start=work_start,
+            is_work_end=work_end,
             start_url=link,
             network_group_id=network_group_id,
             **media_fields,
@@ -178,6 +181,7 @@ class TaskTemplateService:
         min_video_seconds: int | None = None,
         completion_requirements: object | None = None,
         is_work_start: bool = False,
+        is_work_end: bool = False,
         start_url: str | None = None,
         branch_ids: list[str] | None = None,
     ) -> dict:
@@ -210,6 +214,7 @@ class TaskTemplateService:
                 min_video_seconds=min_video_seconds,
                 completion_requirements=completion_requirements,
                 is_work_start=is_work_start,
+                is_work_end=is_work_end,
                 start_url=start_url,
                 network_group_id=group_id,
             )
@@ -272,6 +277,7 @@ class TaskTemplateService:
         completion_requirements: object | None = None,
         update_completion_requirements: bool = False,
         is_work_start: bool | None = None,
+        is_work_end: bool | None = None,
         start_url: str | None = None,
         apply_to_network: bool = False,
     ) -> dict:
@@ -293,6 +299,7 @@ class TaskTemplateService:
             completion_requirements=completion_requirements,
             update_completion_requirements=update_completion_requirements,
             is_work_start=is_work_start,
+            is_work_end=is_work_end,
             start_url=start_url,
         )
         if apply_to_network:
@@ -345,6 +352,11 @@ class TaskTemplateService:
             )
             self._occurrences.update_completion_requirements(occ.id, guides)
             self._occurrences.update_start_url(occ.id, getattr(template, "start_url", None))
+            self._occurrences.update_work_flags(
+                occ.id,
+                is_work_start=bool(getattr(template, "is_work_start", False)),
+                is_work_end=bool(getattr(template, "is_work_end", False)),
+            )
 
     def _purge_open_occurrences(self, template_id: str) -> list[dict]:
         if not self._occurrences:
@@ -421,7 +433,11 @@ class TaskTemplateService:
                       reference_photo_url, reference_video_url, reference_audio_url,
                       ops_category, update_ops_category, min_video_seconds,
                       update_min_video_seconds, completion_requirements,
-                      update_completion_requirements, is_work_start, start_url) -> dict:
+                      update_completion_requirements, is_work_start, is_work_end, start_url) -> dict:
+        start, end = normalize_work_flags(
+            existing.is_work_start if is_work_start is None else bool(is_work_start),
+            getattr(existing, "is_work_end", False) if is_work_end is None else bool(is_work_end),
+        )
         payload = {
             "title": title,
             "description": description,
@@ -435,7 +451,8 @@ class TaskTemplateService:
                 normalize_ops_category(ops_category) if update_ops_category else existing.ops_category
             ),
             "update_ops_category": update_ops_category,
-            "is_work_start": existing.is_work_start if is_work_start is None else bool(is_work_start),
+            "is_work_start": start,
+            "is_work_end": end,
             "start_url": (
                 existing.start_url if start_url is None else normalize_start_url(start_url)
             ),

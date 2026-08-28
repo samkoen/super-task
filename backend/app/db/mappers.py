@@ -13,6 +13,7 @@ from app.models.invitation import UserInvitation
 from app.models.network import Network
 from app.models.product import Product
 from app.models.promotion_stage import PromotionStage
+from app.models.employee_break_interval import EmployeeBreakInterval
 from app.models.task_completion import TaskCompletion
 from app.models.task_message import TaskMessage
 from app.models.task_occurrence import TaskOccurrence
@@ -275,6 +276,7 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),
+        is_work_end=bool(getattr(row, "is_work_end", False)),
         start_url=getattr(row, "start_url", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
@@ -332,6 +334,7 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),
+        is_work_end=bool(getattr(row, "is_work_end", False)),
         start_url=getattr(row, "start_url", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
@@ -426,4 +429,17 @@ def direct_message_orm_to_domain(row: orm.DirectMessage | None) -> DirectMessage
         video_url=row.video_url,
         audio_url=row.audio_url,
         created_at=parse_datetime_iso(row.created_at),
+    )
+
+
+def employee_break_orm_to_domain(
+    row: orm.EmployeeBreakInterval | None,
+) -> EmployeeBreakInterval | None:
+    if row is None:
+        return None
+    return EmployeeBreakInterval(
+        id=str(row.id),
+        user_id=str(row.user_id),
+        started_at=parse_datetime_iso(row.started_at),
+        ended_at=parse_datetime_iso(row.ended_at) if row.ended_at else None,
     )

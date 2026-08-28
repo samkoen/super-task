@@ -87,6 +87,7 @@ type EditForm = {
   ops_category: OpsCategory | "";
   completion_requirements: CompletionRequirement[];
   is_work_start: boolean;
+  is_work_end: boolean;
   start_url: string;
   apply_to_network: boolean;
 };
@@ -158,6 +159,7 @@ export default function ManagerFixedTasksPage() {
       ops_category: tpl.ops_category ?? "",
       completion_requirements: effectiveRequirements(tpl),
       is_work_start: Boolean(tpl.is_work_start),
+      is_work_end: Boolean(tpl.is_work_end),
       start_url: tpl.start_url ?? "",
       apply_to_network: defaultApplyEditToNetwork(tpl, canPickBranch, networkIds),
     });
@@ -186,6 +188,7 @@ export default function ManagerFixedTasksPage() {
         ops_category: payload.ops_category,
         completion_requirements,
         is_work_start: payload.is_work_start,
+        is_work_end: payload.is_work_end,
         start_url: payload.start_url,
         ...media,
       });
@@ -254,6 +257,7 @@ export default function ManagerFixedTasksPage() {
         ops_category: editForm.ops_category || null,
         completion_requirements,
         is_work_start: editForm.is_work_start,
+        is_work_end: editForm.is_work_end,
         start_url: editForm.start_url,
         apply_to_network: editForm.apply_to_network,
         ...media,
@@ -304,6 +308,7 @@ export default function ManagerFixedTasksPage() {
         ops_category: tpl.ops_category ?? null,
         completion_requirements: effectiveRequirements(tpl),
         is_work_start: Boolean(tpl.is_work_start),
+        is_work_end: Boolean(tpl.is_work_end),
         start_url: tpl.start_url ?? null,
         reference_photo_url: tpl.reference_photo_url,
         reference_video_url: tpl.reference_video_url,
@@ -547,10 +552,31 @@ export default function ManagerFixedTasksPage() {
               control={
                 <Checkbox
                   checked={editForm.is_work_start}
-                  onChange={(e) => setEditForm({ ...editForm, is_work_start: e.target.checked })}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      is_work_start: e.target.checked,
+                      is_work_end: e.target.checked ? false : editForm.is_work_end,
+                    })
+                  }
                 />
               }
               label={he.workStartTask}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={editForm.is_work_end}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      is_work_end: e.target.checked,
+                      is_work_start: e.target.checked ? false : editForm.is_work_start,
+                    })
+                  }
+                />
+              }
+              label={he.workEndTask}
             />
             <TextField
               label={he.startUrl}

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.actor import load_actor
 from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
+from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
 from app.services.employee_activity_service import EmployeeActivityService
@@ -15,7 +16,11 @@ router = APIRouter()
 
 
 def _service(db: Session) -> EmployeeActivityService:
-    return EmployeeActivityService(UserRepository(db), TaskOccurrenceRepository(db))
+    return EmployeeActivityService(
+        UserRepository(db),
+        TaskOccurrenceRepository(db),
+        break_repo=EmployeeBreakRepository(db),
+    )
 
 
 @router.get("/break")

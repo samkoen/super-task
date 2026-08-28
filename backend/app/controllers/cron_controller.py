@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core import config
 from app.dependencies import get_db
 from app.domain.notification_retention import notification_purge_cutoff
+from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
@@ -69,6 +70,7 @@ def scan_employee_inactivity(
         UserRepository(db),
         TaskOccurrenceRepository(db),
         NotificationRepository(db),
+        EmployeeBreakRepository(db),
     )
     result = activity.run_inactivity_scan()
     pending = result.pop("pending", [])

@@ -22,6 +22,38 @@ from app.repositories.user_repository import UserRepository
 TZ = ZoneInfo("Asia/Jerusalem")
 
 
+def resolve_team_report_scope(
+    actor: ActorContext,
+    branch_id: str | None,
+    branches: BranchRepository,
+) -> tuple[list[str], str | None, str]:
+    visible = visible_branch_ids_for_tasks(actor, branches)
+    bid = (branch_id or "").strip()
+
+    if not bid:
+        if actor.role == roles.BRANCH_MANAGER:
+            bid = (actor.branch_id or "").strip()
+            if not bid:
+                raise ValueError("נדרש סניף")
+        else:
+            ids = (
+                [s.id for s in branches.list_branches()]
+                if visible is None
+                else visible
+            )
+            if not ids:
+                raise ValueError("אין סניפים בדוח")
+            return ids, None, "כל הרשת"
+
+    if visible is not None and bid not in visible:
+        raise PermissionError("אין הרשאה לסניף זה")
+    branch = branches.find_by_id(bid)
+    if not branch:
+        raise ValueError("סניף לא נמצא")
+    assert_branch_visible(actor, branch.network_id, branch.id)
+    return [bid], bid, branch.name
+
+
 class EmployeeReportService:
     def __init__(
         self,
@@ -44,7 +76,9 @@ class EmployeeReportService:
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה לדוחות")
-        branch_ids, scope_branch_id, scope_label = self._resolve_scope(actor, branch_id)
+        branch_ids, scope_branch_id, scope_label = resolve_team_report_scope(
+            actor, branch_id, self._branches
+        )
         due_from, due_to = resolve_report_range(period, today=datetime.now(TZ).date())
         employees = self._users.list_users(
             roles_in=worker_roles_for_roster(actor.role),
@@ -84,33 +118,3 @@ class EmployeeReportService:
             "charts": charts,
             "employees": rows,
         }
-
-    def _resolve_scope(
-        self, actor: ActorContext, branch_id: str | None
-    ) -> tuple[list[str], str | None, str]:
-        visible = visible_branch_ids_for_tasks(actor, self._branches)
-        bid = (branch_id or "").strip()
-
-        if not bid:
-            if actor.role == roles.BRANCH_MANAGER:
-                bid = (actor.branch_id or "").strip()
-                if not bid:
-                    raise ValueError("נדרש סניף")
-            else:
-                # admin / network_manager : tout le périmètre visible
-                ids = (
-                    [s.id for s in self._branches.list_branches()]
-                    if visible is None
-                    else visible
-                )
-                if not ids:
-                    raise ValueError("אין סניפים בדוח")
-                return ids, None, "כל הרשת"
-
-        if visible is not None and bid not in visible:
-            raise PermissionError("אין הרשאה לסניף זה")
-        branch = self._branches.find_by_id(bid)
-        if not branch:
-            raise ValueError("סניף לא נמצא")
-        assert_branch_visible(actor, branch.network_id, branch.id)
-        return [bid], bid, branch.name

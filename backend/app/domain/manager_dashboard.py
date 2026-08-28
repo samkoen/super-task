@@ -89,6 +89,7 @@ def build_timeline_item(
         "is_manager_next": bool(task.manager_next_at),
         "reference_photo_url": task.reference_photo_url,
         "is_work_start": bool(getattr(task, "is_work_start", False)),
+        "is_work_end": bool(getattr(task, "is_work_end", False)),
         "start_url": getattr(task, "start_url", None),
         "min_video_seconds": getattr(task, "min_video_seconds", None),
     }

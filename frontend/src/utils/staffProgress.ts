@@ -3,6 +3,15 @@ import { formatTime } from "./dashboardTime";
 
 export const STAFF_DEPARTURE_TIME = "15:00";
 
+function isClosedPunch(task: TimelineTask): boolean {
+  return (
+    task.status === "completed" ||
+    task.status === "pending_review" ||
+    task.segment === "completed" ||
+    task.segment === "pending_review"
+  );
+}
+
 export type StaffSegmentKey =
   | "approved"
   | "awaiting_approval"
@@ -20,7 +29,8 @@ export interface StaffProgress {
   segments: StaffSegments;
   total: number;
   arrivedAt: string | null;
-  departureTime: typeof STAFF_DEPARTURE_TIME;
+  departedAt: string | null;
+  departureTime: string;
 }
 
 const SEGMENT_ORDER: StaffSegmentKey[] = [
@@ -71,15 +81,7 @@ export function computeStaffSegments(tasks: TimelineTask[]): StaffSegments {
 /** Arrivée = tâche שעון נוכחות fermée (started_at), sinon plus tôt started_at. */
 export function computeArrivedAt(tasks: TimelineTask[]): string | null {
   const flagged = tasks.filter((t) => t.is_work_start);
-  const pool = flagged.length
-    ? flagged.filter(
-        (t) =>
-          t.status === "completed" ||
-          t.status === "pending_review" ||
-          t.segment === "completed" ||
-          t.segment === "pending_review",
-      )
-    : tasks;
+  const pool = flagged.length ? flagged.filter(isClosedPunch) : tasks;
   let earliest: string | null = null;
   let earliestMs = Number.POSITIVE_INFINITY;
   for (const task of pool) {
@@ -92,6 +94,21 @@ export function computeArrivedAt(tasks: TimelineTask[]): string | null {
   return earliest;
 }
 
+/** Sortie = completed_at de la tâche סיום משמרת fermée. */
+export function computeDepartedAt(tasks: TimelineTask[]): string | null {
+  const flagged = tasks.filter((t) => t.is_work_end).filter(isClosedPunch);
+  let latest: string | null = null;
+  let latestMs = Number.NEGATIVE_INFINITY;
+  for (const task of flagged) {
+    if (!task.completed_at) continue;
+    const ms = new Date(task.completed_at).getTime();
+    if (Number.isNaN(ms) || ms <= latestMs) continue;
+    latestMs = ms;
+    latest = task.completed_at;
+  }
+  return latest;
+}
+
 export function computeStaffProgress(member: TeamMember): StaffProgress {
   const tasks = memberTasks(member);
   const segments = computeStaffSegments(tasks);
@@ -100,11 +117,13 @@ export function computeStaffProgress(member: TeamMember): StaffProgress {
     segments.awaiting_approval +
     segments.attention +
     segments.not_started;
+  const departedAt = computeDepartedAt(tasks);
   return {
     segments,
     total,
     arrivedAt: computeArrivedAt(tasks),
-    departureTime: STAFF_DEPARTURE_TIME,
+    departedAt,
+    departureTime: departedAt ? formatTime(departedAt) : STAFF_DEPARTURE_TIME,
   };
 }
 
@@ -135,11 +154,12 @@ export function segmentPercents(segments: StaffSegments, total: number): Record<
 
 export function formatPresenceLabel(
   arrivedAt: string | null,
-  departureTime: string,
-  labels: { arrival: string; departure: string; notArrived: string },
+  departedAt: string | null,
+  labels: { arrival: string; departure: string; notArrived: string; stillOnShift: string },
 ): string {
   if (!arrivedAt) return labels.notArrived;
-  return `${labels.arrival} ${formatTime(arrivedAt)} · ${labels.departure} ${departureTime}`;
+  const dep = departedAt ? formatTime(departedAt) : labels.stillOnShift;
+  return `${labels.arrival} ${formatTime(arrivedAt)} · ${labels.departure} ${dep}`;
 }
 
 export function groupMemberTasks(tasks: TimelineTask[]): {

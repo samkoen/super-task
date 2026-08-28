@@ -100,6 +100,7 @@ class TaskTemplateRepository:
         min_video_seconds: int | None = None,
         completion_requirements: list | None = None,
         is_work_start: bool = False,
+        is_work_end: bool = False,
         start_url: str | None = None,
         network_group_id: str | None = None,
     ) -> TaskTemplate:
@@ -121,6 +122,7 @@ class TaskTemplateRepository:
             min_video_seconds=min_video_seconds,
             completion_requirements=completion_requirements,
             is_work_start=bool(is_work_start),
+            is_work_end=bool(is_work_end),
             start_url=(start_url or "").strip() or None,
             network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             photo_required=photo_required,
@@ -162,6 +164,7 @@ class TaskTemplateRepository:
         update_completion_requirements: bool = False,
         photo_required: bool | None = None,
         is_work_start: bool | None = None,
+        is_work_end: bool | None = None,
         start_url: str | None = None,
         update_start_url: bool = False,
     ) -> TaskTemplate | None:
@@ -185,6 +188,8 @@ class TaskTemplateRepository:
             row.photo_required = bool(photo_required)
         if is_work_start is not None:
             row.is_work_start = bool(is_work_start)
+        if is_work_end is not None:
+            row.is_work_end = bool(is_work_end)
         if update_start_url:
             row.start_url = (start_url or "").strip() or None
         if reference_photo_url is not None:

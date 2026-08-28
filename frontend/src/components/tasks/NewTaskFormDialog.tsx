@@ -66,6 +66,7 @@ export interface NewTaskFormSubmitPayload {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
 }
 
@@ -122,6 +123,7 @@ export default function NewTaskFormDialog({
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [completionRequirements, setCompletionRequirements] = useState<CompletionRequirement[]>([]);
   const [isWorkStart, setIsWorkStart] = useState(false);
+  const [isWorkEnd, setIsWorkEnd] = useState(false);
   const [startUrl, setStartUrl] = useState("");
   const [media, setMedia] = useState<TaskReferenceMediaValue>(EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
@@ -148,6 +150,7 @@ export default function NewTaskFormDialog({
     setSelectedBranchIds(defaultBranchId ? [defaultBranchId] : []);
     setCompletionRequirements([]);
     setIsWorkStart(false);
+    setIsWorkEnd(false);
     setStartUrl("");
     setMedia(initialMedia ?? EMPTY_MEDIA);
     setLocalError("");
@@ -238,6 +241,7 @@ export default function NewTaskFormDialog({
         branch_ids: branchScope.branch_ids,
         completion_requirements: completionRequirements,
         is_work_start: isWorkStart,
+        is_work_end: isWorkEnd,
         start_url: startUrl.trim() || null,
         media,
       });
@@ -270,6 +274,7 @@ export default function NewTaskFormDialog({
       apply_to_network: false,
       completion_requirements: completionRequirements,
       is_work_start: taskKind === "fixed" ? isWorkStart : false,
+      is_work_end: taskKind === "fixed" ? isWorkEnd : false,
       start_url: startUrl.trim() || null,
       media,
     });
@@ -450,7 +455,11 @@ export default function NewTaskFormDialog({
               control={
                 <Checkbox
                   checked={isWorkStart}
-                  onChange={(e) => setIsWorkStart(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsWorkStart(checked);
+                    if (checked) setIsWorkEnd(false);
+                  }}
                   disabled={saving}
                 />
               }
@@ -459,6 +468,27 @@ export default function NewTaskFormDialog({
                   <Typography variant="body2">{he.workStartTask}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {he.workStartTaskHint}
+                  </Typography>
+                </Box>
+              }
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isWorkEnd}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsWorkEnd(checked);
+                    if (checked) setIsWorkStart(false);
+                  }}
+                  disabled={saving}
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2">{he.workEndTask}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {he.workEndTaskHint}
                   </Typography>
                 </Box>
               }

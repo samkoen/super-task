@@ -712,6 +712,7 @@ class DashboardService:
             "min_video_seconds": task.min_video_seconds,
             "completion_requirements": getattr(task, "completion_requirements", None) or [],
             "is_work_start": task.is_work_start,
+            "is_work_end": bool(getattr(task, "is_work_end", False)),
             "start_url": getattr(task, "start_url", None),
             "reference_photo_url": task.reference_photo_url,
             "reference_video_url": task.reference_video_url,

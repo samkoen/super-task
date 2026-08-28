@@ -185,6 +185,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     min_video_seconds: task.min_video_seconds ?? null,
     completion_requirements: task.completion_requirements ?? [],
     is_work_start: task.is_work_start,
+    is_work_end: task.is_work_end,
     start_url: task.start_url ?? null,
     reference_photo_url: task.reference_photo_url ?? null,
     reference_video_url: task.reference_video_url ?? null,

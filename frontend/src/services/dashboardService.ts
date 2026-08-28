@@ -67,6 +67,7 @@ export interface TimelineTask {
   is_manager_next?: boolean;
   reference_photo_url?: string | null;
   is_work_start?: boolean;
+  is_work_end?: boolean;
   min_video_seconds?: number | null;
 }
 
@@ -166,6 +167,7 @@ export interface EmployeeTaskCard {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;

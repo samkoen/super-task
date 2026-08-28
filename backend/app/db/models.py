@@ -228,6 +228,7 @@ class TaskTemplate(Base):
     min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
     completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_work_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
@@ -284,6 +285,7 @@ class TaskOccurrence(Base):
     min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
     completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_work_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
@@ -558,6 +560,22 @@ class UserNotification(Base):
         Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class EmployeeBreakInterval(Base):
+    __tablename__ = "employee_break_intervals"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

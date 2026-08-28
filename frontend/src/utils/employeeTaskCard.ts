@@ -19,6 +19,7 @@ export function employeeCardToOccurrence(card: EmployeeTaskCard): TaskOccurrence
     min_video_seconds: card.min_video_seconds,
     completion_requirements: card.completion_requirements,
     is_work_start: card.is_work_start,
+    is_work_end: card.is_work_end,
     start_url: card.start_url,
     reference_photo_url: card.reference_photo_url,
     reference_video_url: card.reference_video_url,

@@ -126,10 +126,11 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
   const tasks = useMemo(() => memberTasks(member), [member]);
   const groups = useMemo(() => groupMemberTasks(tasks), [tasks]);
   const role = jobLabel(member.job_function);
-  const presence = formatPresenceLabel(progress.arrivedAt, progress.departureTime, {
+  const presence = formatPresenceLabel(progress.arrivedAt, progress.departedAt, {
     arrival: he.dashboardStaffArrival,
     departure: he.dashboardStaffDeparture,
     notArrived: he.dashboardStaffNotArrived,
+    stillOnShift: he.dashboardStaffStillOnShift,
   });
 
   const handleToggleNext = async (task: TimelineTask, enabled: boolean) => {

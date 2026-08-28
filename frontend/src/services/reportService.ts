@@ -63,11 +63,79 @@ export interface EmployeeWorkReport {
   employees: EmployeeWorkReportRow[];
 }
 
+export type AttendanceAnomalyCode =
+  | "missing_clock_in"
+  | "missing_clock_out"
+  | "inverted"
+  | "overlap"
+  | "open_break"
+  | "idle"
+  | string;
+
+export interface AttendanceAnomaly {
+  code: AttendanceAnomalyCode;
+  day: string;
+}
+
+export interface AttendanceDayRow {
+  day: string;
+  clock_in: string | null;
+  clock_out: string | null;
+  break_minutes: number;
+  worked_minutes: number | null;
+  overtime_minutes: number;
+  idle_count: number;
+  anomalies: AttendanceAnomalyCode[];
+}
+
+export interface AttendanceEmployeeRow {
+  user_id: string;
+  full_name: string;
+  job_function: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
+  is_active: boolean;
+  clock_in: string | null;
+  clock_out: string | null;
+  worked_minutes: number;
+  overtime_minutes: number;
+  break_minutes: number;
+  days_present: number;
+  idle_count: number;
+  anomalies: AttendanceAnomaly[];
+  days: AttendanceDayRow[];
+}
+
+export interface AttendanceReportSummary {
+  employees_count: number;
+  total_worked_minutes: number;
+  total_overtime_minutes: number;
+  total_break_minutes: number;
+  alert_count: number;
+}
+
+export interface AttendanceReport {
+  period: ReportPeriod;
+  due_from: string;
+  due_to: string;
+  branch_id: string | null;
+  branch_name: string | null;
+  network_wide?: boolean;
+  summary: AttendanceReportSummary;
+  employees: AttendanceEmployeeRow[];
+}
+
 export const reportService = {
   teamEmployees: async (params: { branch_id?: string; period?: ReportPeriod }) => {
     const query: { branch_id?: string; period?: ReportPeriod } = { period: params.period };
     if (params.branch_id) query.branch_id = params.branch_id;
     const response = await api.get<EmployeeWorkReport>("/reports/employees", { params: query });
+    return response.data;
+  },
+  teamAttendance: async (params: { branch_id?: string; period?: ReportPeriod }) => {
+    const query: { branch_id?: string; period?: ReportPeriod } = { period: params.period };
+    if (params.branch_id) query.branch_id = params.branch_id;
+    const response = await api.get<AttendanceReport>("/reports/attendance", { params: query });
     return response.data;
   },
 };

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TeamMember, TimelineTask } from "../services/dashboardService";
 import {
   computeArrivedAt,
+  computeDepartedAt,
   computeStaffProgress,
   computeStaffSegments,
   formatPresenceLabel,
@@ -88,6 +89,7 @@ describe("staffProgress segments", () => {
 
     const progress = computeStaffProgress(member(tasks));
     expect(progress.total).toBe(4);
+    expect(progress.departedAt).toBeNull();
     expect(progress.departureTime).toBe("15:00");
     expect(progress.arrivedAt).toBe("2026-07-14T08:15:00+03:00");
   });
@@ -125,13 +127,34 @@ describe("staffProgress segments", () => {
     ).toBeNull();
   });
 
+  it("uses closed work-end task for clock-out", () => {
+    expect(
+      computeDepartedAt([
+        task({
+          id: "other",
+          status: "completed",
+          segment: "completed",
+          completed_at: "2026-07-14T12:00:00+03:00",
+        }),
+        task({
+          id: "punch-out",
+          status: "completed",
+          segment: "completed",
+          completed_at: "2026-07-14T16:10:00+03:00",
+          is_work_end: true,
+        }),
+      ]),
+    ).toBe("2026-07-14T16:10:00+03:00");
+  });
+
   it("returns not arrived when no started_at", () => {
     expect(computeArrivedAt([task({ id: "1", status: "pending", segment: "upcoming" })])).toBeNull();
     expect(
-      formatPresenceLabel(null, "15:00", {
+      formatPresenceLabel(null, null, {
         arrival: "הגעה",
         departure: "יציאה",
         notArrived: "טרם הגיע",
+        stillOnShift: "עדיין במשמרת",
       }),
     ).toBe("טרם הגיע");
   });
