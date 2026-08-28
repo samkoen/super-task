@@ -195,6 +195,11 @@ def update_current_user(
             last_name=str(payload.get("last_name") or ""),
             phone=(str(payload.get("phone")).strip() if payload.get("phone") else None),
             email=str(payload.get("email") or ""),
+            preferred_language=(
+                str(payload.get("preferred_language"))
+                if "preferred_language" in payload
+                else None
+            ),
             active_branch_id=request.session.get("active_branch_id"),
         )
     except ValueError as e:

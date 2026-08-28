@@ -45,6 +45,41 @@ def test_update_me_ok():
     repo.update_profile.assert_called_once()
 
 
+def test_update_me_changes_language():
+    repo = MagicMock()
+    repo.find_by_id.return_value = _user()
+    repo.find_by_email.return_value = None
+    repo.update_profile.return_value = _user(preferred_language="fr")
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    out = service.update_me(
+        "u1",
+        first_name="Mena",
+        last_name="Hel",
+        email="mgr@test.com",
+        preferred_language="fr",
+    )
+    assert out["preferred_language"] == "fr"
+    assert repo.update_profile.call_args.kwargs["preferred_language"] == "fr"
+
+
+def test_update_me_unknown_language_falls_back_to_hebrew():
+    repo = MagicMock()
+    repo.find_by_id.return_value = _user()
+    repo.find_by_email.return_value = None
+    repo.update_profile.return_value = _user(preferred_language="he")
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    service.update_me(
+        "u1",
+        first_name="Mena",
+        last_name="Hel",
+        email="mgr@test.com",
+        preferred_language="xx",
+    )
+    assert repo.update_profile.call_args.kwargs["preferred_language"] == "he"
+
+
 def test_set_my_avatar_ok():
     repo = MagicMock()
     repo.find_by_id.return_value = _user()

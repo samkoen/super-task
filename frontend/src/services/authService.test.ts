@@ -27,12 +27,14 @@ describe("authService profile", () => {
       last_name: "B",
       email: "a@test.com",
       phone: "050",
+      preferred_language: "th",
     });
     expect(mockPatch).toHaveBeenCalledWith("/auth/me", {
       first_name: "A",
       last_name: "B",
       email: "a@test.com",
       phone: "050",
+      preferred_language: "th",
     });
   });
 

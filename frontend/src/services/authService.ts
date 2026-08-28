@@ -1,4 +1,4 @@
-import api, { type User } from "./api";
+import api, { type EmployeeLanguage, type User } from "./api";
 
 export const authService = {
   login: async (email: string, password: string) => {
@@ -54,6 +54,7 @@ export const authService = {
     last_name: string;
     email: string;
     phone?: string;
+    preferred_language?: EmployeeLanguage;
   }) => {
     const response = await api.patch<{ user: User; message: string }>("/auth/me", payload);
     return response.data;

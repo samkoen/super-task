@@ -270,6 +270,7 @@ class UserRepository:
         last_name: str,
         phone: str | None = None,
         email: str | None = None,
+        preferred_language: str | None = None,
     ) -> User | None:
         try:
             row = self._db.get(orm.User, mp.parse_uuid(user_id))
@@ -282,5 +283,7 @@ class UserRepository:
         row.phone = phone
         if email is not None:
             row.email = email.lower().strip()
+        if preferred_language is not None:
+            row.preferred_language = preferred_language
         self._db.flush()
         return mp.user_orm_to_domain(row)

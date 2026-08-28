@@ -68,6 +68,7 @@ class AuthService:
         last_name: str,
         phone: str | None = None,
         email: str,
+        preferred_language: str | None = None,
         active_branch_id: str | None = None,
     ) -> dict:
         user = self.user_repository.find_by_id(user_id)
@@ -84,12 +85,18 @@ class AuthService:
         if other and other.id != user_id:
             raise ValueError("המזהה כבר קיים")
         phone_val = (phone or "").strip() or None
+        language = None
+        if preferred_language is not None:
+            from app.domain.employee_language import normalize_employee_language
+
+            language = normalize_employee_language(preferred_language)
         updated = self.user_repository.update_profile(
             user_id,
             first_name=fn,
             last_name=ln,
             phone=phone_val,
             email=login,
+            preferred_language=language,
         )
         assert updated is not None
         return self._user_api(updated, active_branch_id=active_branch_id)

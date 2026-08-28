@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Drawer,
+  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -149,7 +150,10 @@ function Layout() {
       );
       return items;
     }
-    return [{ text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" }];
+    return [
+      { text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" },
+      { text: he.myAccount, icon: <AccountCircleIcon />, path: "/employee/account" },
+    ];
   }, [user]);
 
   const handleLogout = () => {
@@ -348,6 +352,17 @@ function Layout() {
           </Box>
           <Box display="flex" alignItems="center" gap={0.5}>
             <NotificationBell />
+            <IconButton
+              color="inherit"
+              aria-label={he.myAccount}
+              onClick={() => navigate("/employee/account")}
+              sx={{
+                opacity: location.pathname === "/employee/account" ? 1 : 0.85,
+                "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
+              }}
+            >
+              <AccountCircleIcon />
+            </IconButton>
             {user?.role === "branch_manager" && (
               <Button
                 type="button"
