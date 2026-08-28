@@ -17,7 +17,7 @@ IS_SERVERLESS = IS_VERCEL or bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 _DEFAULT_SECRET = "dev-secret-key-change-in-production"
 SECRET_KEY = os.environ.get("SECRET_KEY", _DEFAULT_SECRET)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-APP_NAME = os.environ.get("APP_NAME", "Super")
+APP_NAME = os.environ.get("APP_NAME", "סופר-מן")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 IS_PRODUCTION = ENVIRONMENT == "production" or IS_VERCEL
 

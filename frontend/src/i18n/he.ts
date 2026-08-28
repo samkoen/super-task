@@ -1,5 +1,6 @@
 export const he = {
-  appName: "Super",
+  appName: "סופר-מן",
+  appNameLatin: "super-man",
   appSubtitle: "ניהול רשת סופרמרקטים",
   authLayoutLead: "פלטפורמה אחת לניהול משימות, עובדים וסניפים — בזמן אמת, בעברית.",
   authFormHint: "הזינו את פרטי ההתחברות שקיבלתם מהמנהל.",

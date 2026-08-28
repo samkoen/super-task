@@ -7,7 +7,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 const config: CapacitorConfig = {
   appId: "com.supershift.app",
-  appName: "SuperShift",
+  appName: "super-man",
   webDir: "dist",
   android: {
     allowMixedContent: true,

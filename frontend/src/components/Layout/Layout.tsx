@@ -26,8 +26,8 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
-import StorefrontIcon from "@mui/icons-material/Storefront";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
@@ -180,20 +180,7 @@ function Layout() {
     >
       <Box sx={{ ...sidebarHeaderSx, borderBottomColor: alpha("#fff", 0.08) }}>
         <Box display="flex" alignItems="center" gap={1.25} mb={2}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
-              display: "grid",
-              placeItems: "center",
-              bgcolor: alpha(SIDEBAR_ACCENT, 0.2),
-              color: SIDEBAR_ACCENT,
-              border: `1px solid ${alpha(SIDEBAR_ACCENT, 0.35)}`,
-            }}
-          >
-            <StorefrontIcon fontSize="small" />
-          </Box>
+          <AppBrandMark size={40} />
           <Box minWidth={0}>
             <Typography variant="subtitle1" fontWeight={800} noWrap letterSpacing="-0.02em">
               {he.appName}
@@ -349,19 +336,7 @@ function Layout() {
           }}
         >
           <Box display="flex" alignItems="center" gap={1.25}>
-            <Box
-              sx={{
-                width: 34,
-                height: 34,
-                borderRadius: 1.5,
-                display: "grid",
-                placeItems: "center",
-                bgcolor: alpha(SIDEBAR_ACCENT, 0.2),
-                color: SIDEBAR_ACCENT,
-              }}
-            >
-              <StorefrontIcon sx={{ fontSize: 20 }} />
-            </Box>
+            <AppBrandMark size={34} />
             <Box>
               <Typography variant="subtitle1" fontWeight={800} lineHeight={1.2}>
                 {he.appName}

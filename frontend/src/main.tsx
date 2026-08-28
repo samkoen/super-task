@@ -9,8 +9,10 @@ import { FeedbackProvider } from "./context/FeedbackContext";
 import { emotionCache } from "./emotion/caches";
 import { theme } from "./theme/theme";
 import { applyAndroidNavBottomFallback } from "./utils/systemInsets";
+import { he } from "./i18n/he";
 
 applyAndroidNavBottomFallback();
+document.title = he.appNameLatin;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
