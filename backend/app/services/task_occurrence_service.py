@@ -20,6 +20,7 @@ from app.domain.audio_transcription_fallback import (
 )
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
+from app.domain.quality_rating import normalize_quality_rating
 from app.domain.task_translation_source import task_source_language
 from app.domain.scope import ActorContext
 from app.domain.start_url import normalize_start_url
@@ -674,16 +675,20 @@ class TaskOccurrenceService:
         data["completion"] = mp.task_completion_domain_to_api(completion)
         return data
 
-    def approve_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
+    def approve_occurrence(
+        self, actor: ActorContext, occurrence_id: str, *, quality_rating: object = None
+    ) -> dict:
         occurrence = self._require_reviewable(actor, occurrence_id)
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
+        stars = normalize_quality_rating(quality_rating)
         reviewed = self._completions.update_review(
             occurrence_id,
             manager_review_status=task_status.REVIEW_APPROVED,
             manager_reviewed_by_id=actor.user_id,
             manager_reviewed_at=datetime.now(TZ),
+            quality_rating=stars,
         )
         assert reviewed is not None
         updated = self._occurrences.update_status(occurrence_id, task_status.COMPLETED)

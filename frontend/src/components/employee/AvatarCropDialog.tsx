@@ -20,6 +20,7 @@ type AvatarCropDialogProps = {
   open: boolean;
   file: File | null;
   uploading?: boolean;
+  busyLabel?: string;
   onClose: () => void;
   onConfirm: (file: File) => void | Promise<void>;
 };
@@ -30,6 +31,7 @@ export default function AvatarCropDialog({
   open,
   file,
   uploading = false,
+  busyLabel,
   onClose,
   onConfirm,
 }: AvatarCropDialogProps) {
@@ -151,7 +153,7 @@ export default function AvatarCropDialog({
           disabled={!file || saving || uploading}
           startIcon={saving || uploading ? <CircularProgress size={18} color="inherit" /> : undefined}
         >
-          {saving || uploading ? he.loading : he.avatarCropConfirm}
+          {saving || uploading ? busyLabel || he.loading : he.avatarCropConfirm}
         </Button>
       </DialogActions>
     </Dialog>

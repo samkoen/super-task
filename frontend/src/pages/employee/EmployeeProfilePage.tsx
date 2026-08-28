@@ -71,9 +71,9 @@ export default function EmployeeProfilePage() {
   const handleAvatarCapture = async (file: File) => {
     setAvatarUploading(true);
     try {
-      await authService.uploadAvatar(file);
+      await authService.stylizeAvatar(file);
       await refresh();
-      showSuccess(he.employeePhotoUpdated);
+      showSuccess(he.employeePhotoStylized);
       setAvatarOpen(false);
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -123,9 +123,16 @@ export default function EmployeeProfilePage() {
             editable={!preview}
             onEdit={() => setAvatarOpen(true)}
           />
-          <Typography variant="body2" color="text.secondary">
-            {he.avatarCropHint}
-          </Typography>
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              {he.avatarCropHint}
+            </Typography>
+            {user.excellence_slogan ? (
+              <Typography variant="subtitle2" fontWeight={700} color="primary" sx={{ mt: 0.5 }}>
+                {user.excellence_slogan}
+              </Typography>
+            ) : null}
+          </Box>
         </Box>
         <Typography variant="h6" fontWeight={700} mb={2}>
           {he.profileDetails}
@@ -246,6 +253,7 @@ export default function EmployeeProfilePage() {
       <EmployeeAvatarCapture
         open={avatarOpen}
         uploading={avatarUploading}
+        uploadingLabel={he.avatarStylizing}
         onClose={() => setAvatarOpen(false)}
         onCapture={handleAvatarCapture}
       />

@@ -88,7 +88,29 @@ def test_set_my_avatar_ok():
     service = AuthService(repo)
     out = service.set_my_avatar("u1", "/uploads/avatars/a.jpg")
     assert out["avatar_url"] == "/uploads/avatars/a.jpg"
-    repo.update_avatar.assert_called_once_with("u1", "/uploads/avatars/a.jpg")
+    repo.update_avatar.assert_called_once_with(
+        "u1", "/uploads/avatars/a.jpg", excellence_slogan=None
+    )
+
+
+def test_set_my_avatar_stores_excellence_slogan():
+    repo = MagicMock()
+    repo.find_by_id.return_value = _user()
+    repo.update_avatar.return_value = _user(
+        avatar_url="/uploads/avatars/a.jpg",
+        excellence_slogan="מצוינות כל יום",
+    )
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    out = service.set_my_avatar(
+        "u1",
+        "/uploads/avatars/a.jpg",
+        excellence_slogan="מצוינות כל יום",
+    )
+    assert out["excellence_slogan"] == "מצוינות כל יום"
+    repo.update_avatar.assert_called_once_with(
+        "u1", "/uploads/avatars/a.jpg", excellence_slogan="מצוינות כל יום"
+    )
 
 
 def test_set_my_avatar_rejects_javascript():

@@ -17,6 +17,7 @@ interface EmployeeAvatarCaptureProps {
   uploading: boolean;
   onClose: () => void;
   onCapture: (file: File) => void | Promise<void>;
+  uploadingLabel?: string;
 }
 
 export default function EmployeeAvatarCapture({
@@ -24,6 +25,7 @@ export default function EmployeeAvatarCapture({
   uploading,
   onClose,
   onCapture,
+  uploadingLabel,
 }: EmployeeAvatarCaptureProps) {
   const camera = useCameraStream({ defaultFacing: "user" });
   const [cropFile, setCropFile] = useState<File | null>(null);
@@ -83,6 +85,7 @@ export default function EmployeeAvatarCapture({
         open={Boolean(cropFile)}
         file={cropFile}
         uploading={uploading}
+        busyLabel={uploadingLabel}
         onClose={handleCropClose}
         onConfirm={handleCropConfirm}
       />

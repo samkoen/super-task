@@ -19,6 +19,7 @@ import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { reopenNoteError } from "../../utils/taskReview";
+import QualityRatingStars from "./QualityRatingStars";
 
 interface TaskCompletionReviewDialogProps {
   task: TaskOccurrence | null;
@@ -34,6 +35,7 @@ export default function TaskCompletionReviewDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [rating, setRating] = useState<number | null>(null);
 
   const completion = task?.completion;
   const open = Boolean(task);
@@ -43,6 +45,7 @@ export default function TaskCompletionReviewDialog({
   useEffect(() => {
     setNote("");
     setError("");
+    setRating(null);
   }, [task?.id]);
 
   const handleClose = () => {
@@ -68,11 +71,16 @@ export default function TaskCompletionReviewDialog({
     }
   };
 
-  const handleApprove = () =>
+  const handleApprove = () => {
+    if (rating == null) {
+      setError(he.qualityRatingRequired);
+      return;
+    }
     void runAction(async () => {
-      await taskService.approve(task!.id);
+      await taskService.approve(task!.id, { quality_rating: rating });
       return he.taskApprovedSuccess;
     });
+  };
 
   const handleReopen = () => {
     const noteErr = reopenNoteError(note);
@@ -124,6 +132,17 @@ export default function TaskCompletionReviewDialog({
         )}
 
         {isReview && (
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+              {he.qualityRating}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
+              {he.qualityRatingHint}
+            </Typography>
+            <QualityRatingStars value={rating} onChange={setRating} />
+          </Box>
+        )}
+        {isReview && (
           <TextField
             label={he.taskReopenNote}
             value={note}
@@ -160,7 +179,12 @@ export default function TaskCompletionReviewDialog({
           </Button>
         )}
         {isReview && (
-          <Button variant="contained" color="success" onClick={handleApprove} disabled={saving}>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleApprove}
+            disabled={saving || rating == null}
+          >
             {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
           </Button>
         )}

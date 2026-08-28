@@ -21,6 +21,7 @@ from app.domain.view_as import attach_preview_meta
 from app.repositories.invitation_repository import InvitationRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
+from app.services.excellence_avatar_service import ExcellenceAvatarService
 from app.services.invitation_service import InvitationService
 from app.services.media_upload_service import upload_attachment
 from app.services.view_as_service import ViewAsService
@@ -30,6 +31,10 @@ router = APIRouter()
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     return AuthService(UserRepository(db))
+
+
+def get_excellence_avatar_service() -> ExcellenceAvatarService:
+    return ExcellenceAvatarService()
 
 
 def get_invitation_service(db: Session = Depends(get_db)) -> InvitationService:
@@ -229,6 +234,44 @@ async def upload_my_avatar(
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     return {"message": "התמונה עודכנה", "user": user, "url": uploaded["url"]}
+
+
+@router.post("/me/avatar/excellence")
+async def stylize_my_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    service: AuthService = Depends(get_auth_service),
+    excellence: ExcellenceAvatarService = Depends(get_excellence_avatar_service),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse({"error": "לא מחובר"}, status_code=401)
+    if request.session.get(SESSION_PREVIEW_AS_KEY):
+        return JSONResponse({"error": "לא ניתן לערוך פרופיל במצב צפייה כעובד"}, status_code=403)
+    me = service.get_user_by_id(str(user_id))
+    if not me:
+        return JSONResponse({"error": "משתמש לא נמצא"}, status_code=401)
+    try:
+        result = await excellence.stylize(
+            photo_bytes=await file.read(),
+            mime_type=file.content_type or "image/jpeg",
+            user_id=str(user_id),
+            first_name=str(me.get("first_name") or ""),
+        )
+        user = service.set_my_avatar(
+            str(user_id),
+            result.url,
+            excellence_slogan=result.slogan,
+            active_branch_id=request.session.get(SESSION_ACTIVE_BRANCH_KEY),
+        )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {
+        "message": "התמונה עוצבה בסגנון סופר-מן",
+        "user": user,
+        "url": result.url,
+        "used_ai": result.used_ai,
+    }
 
 
 @router.post("/change-password")

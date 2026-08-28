@@ -47,3 +47,37 @@ def test_request_with_retries_does_not_repeat_404(monkeypatch):
 
     assert exc.value.retryable is False
     assert post.await_count == 1
+
+
+def test_image_models_chain_starts_with_configured_model(monkeypatch):
+    monkeypatch.setattr("app.core.config.GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+    monkeypatch.setattr(
+        "app.core.config.GEMINI_IMAGE_FALLBACK_MODELS",
+        "gemini-2.0-flash-preview-image-generation",
+    )
+    chain = gc._image_models_chain()
+    assert chain[0] == "gemini-2.5-flash-image"
+    assert "gemini-2.0-flash-preview-image-generation" in chain
+
+
+def test_generate_image_from_photo_extracts_bytes(monkeypatch):
+    import base64
+
+    raw = base64.b64encode(b"img").decode("ascii")
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [{"inlineData": {"mimeType": "image/png", "data": raw}}]
+                }
+            }
+        ]
+    }
+    monkeypatch.setattr(gc, "_post_generate", AsyncMock(return_value=response))
+    monkeypatch.setattr("app.core.config.GEMINI_API_KEY", "k")
+    monkeypatch.setattr("app.core.config.GEMINI_RETRY_COUNT", 0)
+    data, mime = asyncio.run(gc.generate_image_from_photo(b"src", "image/jpeg", "prompt"))
+    assert data == b"img"
+    assert mime == "image/png"

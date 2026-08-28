@@ -3,6 +3,8 @@ import FreeBreakfastIcon from "@mui/icons-material/FreeBreakfast";
 import { he } from "../../i18n/he";
 import { EmployeeShiftProgress, shiftStatusLabel } from "./employeeShiftStatus";
 import EmployeeAvatar from "./EmployeeAvatar";
+import EmployeeQualityRating from "./EmployeeQualityRating";
+import type { QualityRatingSummary } from "../../utils/qualityRating";
 
 interface EmployeeShiftHeaderProps {
   dateLabel?: string;
@@ -11,11 +13,13 @@ interface EmployeeShiftHeaderProps {
   photoEditable?: boolean;
   onEditPhoto?: () => void;
   meta?: string;
+  slogan?: string | null;
   onShift: boolean;
   onBreak: boolean;
   breakBusy?: boolean;
   progress?: number | null;
   onToggleBreak: () => void;
+  qualityRating?: QualityRatingSummary | null;
 }
 
 function ShiftIdentity({
@@ -24,9 +28,10 @@ function ShiftIdentity({
   photoEditable,
   onEditPhoto,
   meta,
+  slogan,
 }: Pick<
   EmployeeShiftHeaderProps,
-  "name" | "photoUrl" | "photoEditable" | "onEditPhoto" | "meta"
+  "name" | "photoUrl" | "photoEditable" | "onEditPhoto" | "meta" | "slogan"
 >) {
   return (
     <Box display="flex" alignItems="center" gap={1.25} flex={1} minWidth={0}>
@@ -48,6 +53,11 @@ function ShiftIdentity({
         {meta ? (
           <Typography variant="caption" color="text.secondary" display="block">
             {meta}
+          </Typography>
+        ) : null}
+        {slogan ? (
+          <Typography variant="body2" fontWeight={700} color="primary" display="block">
+            {slogan}
           </Typography>
         ) : null}
       </Box>
@@ -101,11 +111,13 @@ export default function EmployeeShiftHeader({
   photoEditable = false,
   onEditPhoto,
   meta,
+  slogan,
   onShift,
   onBreak,
   breakBusy = false,
   progress = null,
   onToggleBreak,
+  qualityRating,
 }: EmployeeShiftHeaderProps) {
   return (
     <Box mb={1.5}>
@@ -133,6 +145,7 @@ export default function EmployeeShiftHeader({
           photoEditable={photoEditable}
           onEditPhoto={onEditPhoto}
           meta={meta}
+          slogan={slogan}
         />
         <ShiftPresence
           onShift={onShift}
@@ -141,6 +154,11 @@ export default function EmployeeShiftHeader({
           onToggleBreak={onToggleBreak}
         />
       </Paper>
+      {qualityRating != null ? (
+        <Box mt={1}>
+          <EmployeeQualityRating summary={qualityRating} />
+        </Box>
+      ) : null}
       {progress != null ? <EmployeeShiftProgress progress={progress} /> : null}
     </Box>
   );

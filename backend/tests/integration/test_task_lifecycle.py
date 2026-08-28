@@ -59,10 +59,14 @@ def test_ad_hoc_create_start_complete_approve(
     assert body["completion"]["manager_review_status"] == "pending"
     assert body["completion"]["photo_path"] == photo_url
 
-    approved = client_mgr.post(f"/api/tasks/occurrences/{occ_id}/approve")
+    approved = client_mgr.post(
+        f"/api/tasks/occurrences/{occ_id}/approve",
+        json={"quality_rating": 4},
+    )
     assert approved.status_code == 200, approved.text
     assert approved.json()["occurrence"]["status"] == "completed"
     assert approved.json()["occurrence"]["completion"]["manager_review_status"] == "approved"
+    assert approved.json()["occurrence"]["completion"]["quality_rating"] == 4
 
 
 def test_ad_hoc_reject_via_reopen_creates_chat_message(

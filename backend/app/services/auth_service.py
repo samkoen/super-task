@@ -106,6 +106,7 @@ class AuthService:
         user_id: str,
         avatar_url: str | None,
         *,
+        excellence_slogan: str | None = None,
         active_branch_id: str | None = None,
     ) -> dict:
         from app.domain.avatar_url import normalize_avatar_url
@@ -114,7 +115,9 @@ class AuthService:
         if not user or not user.is_active:
             raise ValueError("משתמש לא נמצא")
         cleaned = normalize_avatar_url(avatar_url)
-        updated = self.user_repository.update_avatar(user_id, cleaned)
+        updated = self.user_repository.update_avatar(
+            user_id, cleaned, excellence_slogan=excellence_slogan
+        )
         assert updated is not None
         return self._user_api(updated, active_branch_id=active_branch_id)
 

@@ -70,13 +70,22 @@ describe("TaskCompletionReviewDialog", () => {
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={onClose} onDone={onDone} />,
     );
+    fireEvent.click(screen.getByRole("radio", { name: "4 Stars" }));
     fireEvent.click(screen.getByRole("button", { name: he.taskApproveClose }));
     await waitFor(() => {
-      expect(taskService.approve).toHaveBeenCalledWith("occ-1");
+      expect(taskService.approve).toHaveBeenCalledWith("occ-1", { quality_rating: 4 });
       expect(onDone).toHaveBeenCalledWith(he.taskApprovedSuccess);
       expect(onClose).toHaveBeenCalled();
     });
     expect(taskService.reopen).not.toHaveBeenCalled();
+  });
+
+  it("blocks approve until a rating is chosen", () => {
+    render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: he.taskApproveClose })).toHaveProperty("disabled", true);
+    expect(taskService.approve).not.toHaveBeenCalled();
   });
 
   it("blocks reopen without a remark", () => {

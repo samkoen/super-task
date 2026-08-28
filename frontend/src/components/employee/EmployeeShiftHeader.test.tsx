@@ -50,4 +50,17 @@ describe("EmployeeShiftHeader", () => {
     );
     expect(screen.getByRole("button", { name: he.employeeChangePhoto })).toBeTruthy();
   });
+
+  it("shows the excellence slogan under the name", () => {
+    render(
+      <EmployeeShiftHeader
+        name="מרדכי ייגר"
+        slogan="מצוינות כל יום"
+        onShift
+        onBreak={false}
+        onToggleBreak={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("מצוינות כל יום")).toBeTruthy();
+  });
 });

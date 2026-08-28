@@ -221,12 +221,29 @@ def test_approve_occurrence_closes_task():
     actor.user_id = "mgr-1"
     actor.branch_id = "b1"
 
-    result = svc.approve_occurrence(actor, "occ-1")
+    result = svc.approve_occurrence(actor, "occ-1", quality_rating=4)
 
     occurrence_repo.update_status.assert_called_once_with("occ-1", task_status.COMPLETED)
     occurrence_repo.set_media_purge_after.assert_called_once()
     assert result["status"] == task_status.COMPLETED
     assert result["completion"]["manager_review_status"] == task_status.REVIEW_APPROVED
+    assert completion_repo.update_review.call_args.kwargs["quality_rating"] == 4
+
+
+def test_approve_occurrence_requires_rating():
+    occurrence = _occurrence(status=task_status.PENDING_REVIEW)
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = _completion()
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.BRANCH_MANAGER
+    actor.user_id = "mgr-1"
+    actor.branch_id = "b1"
+    with pytest.raises(ValueError, match="1 ל-5"):
+        svc.approve_occurrence(actor, "occ-1")
+    occurrence_repo.update_status.assert_not_called()
 
 
 def test_branch_manager_cannot_approve_own_submission():

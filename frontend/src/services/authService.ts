@@ -70,6 +70,18 @@ export const authService = {
     return response.data;
   },
 
+  stylizeAvatar: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await api.post<{
+      user: User;
+      message: string;
+      url: string;
+      used_ai: boolean;
+    }>("/auth/me/avatar/excellence", form, { timeout: 120_000 });
+    return response.data;
+  },
+
   changePassword: async (current_password: string, new_password: string) => {
     const response = await api.post<{ message: string }>("/auth/change-password", {
       current_password,

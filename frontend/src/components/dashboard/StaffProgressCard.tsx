@@ -26,6 +26,7 @@ import {
   memberTasks,
 } from "../../utils/staffProgress";
 import StaffProgressBar from "./StaffProgressBar";
+import EmployeeQualityRating from "../employee/EmployeeQualityRating";
 
 interface StaffProgressCardProps {
   member: TeamMember;
@@ -207,6 +208,9 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
         </Box>
 
         <StaffProgressBar segments={progress.segments} total={progress.total} />
+        <Box mt={1}>
+          <EmployeeQualityRating summary={member.quality_rating} />
+        </Box>
         <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
           {he.dashboardTasksProgress(progress.segments.approved, progress.total)}
           {" · "}

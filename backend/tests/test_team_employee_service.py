@@ -281,7 +281,9 @@ def test_branch_manager_can_set_employee_avatar():
     result = service.set_team_employee_avatar(actor, "e1", "/uploads/avatars/a.jpg")
 
     assert result["avatar_url"] == "/uploads/avatars/a.jpg"
-    repo.update_avatar.assert_called_once_with("e1", "/uploads/avatars/a.jpg")
+    repo.update_avatar.assert_called_once_with(
+        "e1", "/uploads/avatars/a.jpg", excellence_slogan=None
+    )
 
 
 def test_reset_password_rejects_short_password():

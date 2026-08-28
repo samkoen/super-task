@@ -55,7 +55,7 @@ import {
 import { managerWelcomeSubtitle } from "../../utils/managerWelcomeSubtitle";
 
 /** Masqué temporairement — remettre à true pour réafficher. */
-const SHOW_STAFF_PROGRESS = false;
+const SHOW_STAFF_PROGRESS = true;
 const SHOW_DEPARTMENT_PROGRESS = false;
 
 function dashboardTitle(branchName: string | undefined): string {

@@ -12,6 +12,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -50,6 +51,7 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     preferred_language: Mapped[str] = mapped_column(String(8), nullable=False, default="he")
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    excellence_slogan: Mapped[str | None] = mapped_column(String(120), nullable=True)
     on_break_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idle_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     inactivity_notified_at: Mapped[datetime | None] = mapped_column(
@@ -361,6 +363,7 @@ class TaskCompletion(Base):
         DateTime(timezone=True), nullable=True
     )
     rejection_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    quality_rating: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     completed_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

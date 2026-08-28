@@ -512,10 +512,10 @@ export default function EmployeeTasksPage() {
   const handleAvatarCapture = async (file: File) => {
     setAvatarUploading(true);
     try {
-      await authService.uploadAvatar(file);
+      await authService.stylizeAvatar(file);
       await refresh();
       await load(true);
-      showSuccess(he.employeePhotoUpdated);
+      showSuccess(he.employeePhotoStylized);
       setAvatarOpen(false);
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -606,6 +606,7 @@ export default function EmployeeTasksPage() {
         photoUrl={photoUrl}
         photoEditable
         onEditPhoto={() => setAvatarOpen(true)}
+        slogan={dashboard?.employee?.excellence_slogan ?? user?.excellence_slogan}
         meta={[
           headerBranch ? `${he.branch}: ${headerBranch}` : "",
           headerJob ? jobLabel(headerJob) : "",
@@ -617,11 +618,13 @@ export default function EmployeeTasksPage() {
         breakBusy={breakBusy}
         progress={progress}
         onToggleBreak={() => void handleToggleBreak()}
+        qualityRating={dashboard?.employee?.quality_rating}
       />
 
       <EmployeeAvatarCapture
         open={avatarOpen}
         uploading={avatarUploading}
+        uploadingLabel={he.avatarStylizing}
         onClose={() => setAvatarOpen(false)}
         onCapture={handleAvatarCapture}
       />

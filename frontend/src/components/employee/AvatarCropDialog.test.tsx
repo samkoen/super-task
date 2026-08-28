@@ -23,4 +23,22 @@ describe("AvatarCropDialog", () => {
     expect(screen.getByText(he.avatarCropHint)).toBeTruthy();
     expect(screen.getByRole("slider", { name: he.avatarCropZoom })).toBeTruthy();
   });
+
+  it("shows the Super-Man stylizing label while uploading", () => {
+    URL.createObjectURL = vi.fn(() => "blob:avatar");
+    URL.revokeObjectURL = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <AvatarCropDialog
+          open
+          uploading
+          busyLabel={he.avatarStylizing}
+          file={new File(["x"], "face.jpg", { type: "image/jpeg" })}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText(he.avatarStylizing)).toBeTruthy();
+  });
 });

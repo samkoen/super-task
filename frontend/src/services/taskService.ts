@@ -109,6 +109,7 @@ export interface TaskCompletion {
   manager_reviewed_by_id?: string | null;
   manager_reviewed_at?: string | null;
   rejection_note?: string | null;
+  quality_rating?: number | null;
 }
 
 export interface TaskOccurrence {
@@ -333,9 +334,10 @@ export const taskService = {
     return response.data;
   },
 
-  approve: async (occurrenceId: string) => {
+  approve: async (occurrenceId: string, payload: { quality_rating: number }) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
-      `/tasks/occurrences/${occurrenceId}/approve`
+      `/tasks/occurrences/${occurrenceId}/approve`,
+      payload,
     );
     return response.data;
   },

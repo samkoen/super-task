@@ -229,7 +229,13 @@ class UserRepository:
         self._db.flush()
         return mp.user_orm_to_domain(row)
 
-    def update_avatar(self, user_id: str, avatar_url: str | None) -> User | None:
+    def update_avatar(
+        self,
+        user_id: str,
+        avatar_url: str | None,
+        *,
+        excellence_slogan: str | None = None,
+    ) -> User | None:
         try:
             row = self._db.get(orm.User, mp.parse_uuid(user_id))
         except ValueError:
@@ -237,6 +243,7 @@ class UserRepository:
         if not row:
             return None
         row.avatar_url = avatar_url
+        row.excellence_slogan = excellence_slogan
         self._db.flush()
         return mp.user_orm_to_domain(row)
 

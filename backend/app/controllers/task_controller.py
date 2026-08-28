@@ -508,11 +508,15 @@ async def complete_occurrence(
 def approve_occurrence(
     occurrence_id: str,
     request: Request,
+    data: dict[str, Any] | None = Body(default=None),
     service: TaskOccurrenceService = Depends(get_occurrence_service),
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
-    item = service.approve_occurrence(actor, occurrence_id)
+    payload = data or {}
+    item = service.approve_occurrence(
+        actor, occurrence_id, quality_rating=payload.get("quality_rating")
+    )
     _emit_task_event(db, "task_approved", item)
     return {"message": "המשימה אושרה ונסגרה", "occurrence": item}
 

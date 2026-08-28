@@ -1,4 +1,5 @@
 import api from "./api";
+import type { QualityRatingSummary } from "../utils/qualityRating";
 import type { CompletionRequirement } from "../utils/completionMedia";
 import type { TaskCompletion, TaskKind, TaskStatus } from "./taskService";
 
@@ -82,6 +83,7 @@ export interface TeamMember {
   open_tasks: number;
   timeline: TimelineTask[];
   overdue_backlog: TimelineTask[];
+  quality_rating?: QualityRatingSummary;
 }
 
 export interface TaskQueues {
@@ -189,6 +191,8 @@ export interface EmployeeDashboard {
     branch_name: string | null;
     preferred_language?: string;
     avatar_url?: string | null;
+    excellence_slogan?: string | null;
+    quality_rating?: QualityRatingSummary;
   };
   progress_percent: number;
   on_shift: boolean;

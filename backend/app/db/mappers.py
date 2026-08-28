@@ -66,6 +66,7 @@ def user_orm_to_domain(row: orm.User | None) -> User | None:
         email_verified=row.email_verified,
         preferred_language=getattr(row, "preferred_language", None) or "he",
         avatar_url=getattr(row, "avatar_url", None),
+        excellence_slogan=getattr(row, "excellence_slogan", None),
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
     )
@@ -87,6 +88,7 @@ def user_domain_to_api(user: User) -> dict:
         "email_verified": user.email_verified,
         "preferred_language": user.preferred_language,
         "avatar_url": user.avatar_url,
+        "excellence_slogan": user.excellence_slogan,
     }
 
 
@@ -365,6 +367,7 @@ def task_completion_orm_to_domain(row: orm.TaskCompletion | None) -> TaskComplet
         manager_reviewed_by_id=str(row.manager_reviewed_by_id) if row.manager_reviewed_by_id else None,
         manager_reviewed_at=parse_datetime_iso(row.manager_reviewed_at) if row.manager_reviewed_at else None,
         rejection_note=row.rejection_note,
+        quality_rating=getattr(row, "quality_rating", None),
     )
 
 
