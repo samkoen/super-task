@@ -53,6 +53,27 @@ class NotificationRepository:
         rows = self._db.execute(q).scalars().all()
         return [n for row in rows if (n := self._to_domain(row))]
 
+    def list_by_kinds_in_range(
+        self,
+        *,
+        user_ids: list[str],
+        kinds: list[str],
+        created_from: datetime,
+        created_to: datetime,
+    ) -> list[UserNotification]:
+        if not user_ids or not kinds:
+            return []
+        q = (
+            select(orm.UserNotification)
+            .where(orm.UserNotification.user_id.in_([mp.parse_uuid(i) for i in user_ids]))
+            .where(orm.UserNotification.kind.in_(kinds))
+            .where(orm.UserNotification.created_at >= created_from)
+            .where(orm.UserNotification.created_at < created_to)
+            .order_by(orm.UserNotification.created_at.asc())
+        )
+        rows = self._db.execute(q).scalars().all()
+        return [n for row in rows if (n := self._to_domain(row))]
+
     def count_unread(self, user_id: str) -> int:
         q = (
             select(orm.UserNotification)

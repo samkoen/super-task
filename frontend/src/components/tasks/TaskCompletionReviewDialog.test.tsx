@@ -63,6 +63,15 @@ beforeEach(() => {
 });
 
 describe("TaskCompletionReviewDialog", () => {
+  it("places chat above completion media", () => {
+    render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    const chat = screen.getByTestId("task-chat-panel");
+    const preview = screen.getByTestId("completion-preview");
+    expect(chat.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("approves and closes the task", async () => {
     vi.mocked(taskService.approve).mockResolvedValue({} as never);
     const onDone = vi.fn();
@@ -70,13 +79,22 @@ describe("TaskCompletionReviewDialog", () => {
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={onClose} onDone={onDone} />,
     );
+    fireEvent.click(screen.getByRole("radio", { name: he.qualityStarLabel(4) }));
     fireEvent.click(screen.getByRole("button", { name: he.taskApproveClose }));
     await waitFor(() => {
-      expect(taskService.approve).toHaveBeenCalledWith("occ-1");
+      expect(taskService.approve).toHaveBeenCalledWith("occ-1", { quality_rating: 4 });
       expect(onDone).toHaveBeenCalledWith(he.taskApprovedSuccess);
       expect(onClose).toHaveBeenCalled();
     });
     expect(taskService.reopen).not.toHaveBeenCalled();
+  });
+
+  it("blocks approve until a rating is chosen", () => {
+    render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: he.taskApproveClose })).toHaveProperty("disabled", true);
+    expect(taskService.approve).not.toHaveBeenCalled();
   });
 
   it("blocks reopen without a remark", () => {

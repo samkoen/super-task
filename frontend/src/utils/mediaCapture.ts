@@ -42,15 +42,24 @@ export async function getUserMediaWithFallback(
   throw lastError ?? new DOMException("No device", "NotFoundError");
 }
 
-export const PHOTO_CAMERA_CONSTRAINTS: MediaStreamConstraints[] = [
-  { video: { facingMode: { ideal: "environment" } }, audio: false },
-  { video: true, audio: false },
-];
+export type CameraFacing = "user" | "environment";
 
-export const VIDEO_CAMERA_CONSTRAINTS: MediaStreamConstraints[] = [
-  { video: { facingMode: { ideal: "environment" } }, audio: true },
-  { video: true, audio: true },
-];
+export function oppositeCameraFacing(facing: CameraFacing): CameraFacing {
+  return facing === "user" ? "environment" : "user";
+}
+
+export function cameraConstraints(
+  facing: CameraFacing,
+  audio: boolean,
+): MediaStreamConstraints[] {
+  return [
+    { video: { facingMode: { ideal: facing } }, audio },
+    { video: true, audio },
+  ];
+}
+
+export const PHOTO_CAMERA_CONSTRAINTS = cameraConstraints("environment", false);
+export const VIDEO_CAMERA_CONSTRAINTS = cameraConstraints("environment", true);
 
 export async function attachStreamToVideo(
   video: HTMLVideoElement,

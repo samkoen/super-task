@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     _configure_logging()
     assert_secure_runtime_config()
-    app = FastAPI(title="Super API", redirect_slashes=False, lifespan=lifespan)
+    app = FastAPI(title="super-man API", redirect_slashes=False, lifespan=lifespan)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):

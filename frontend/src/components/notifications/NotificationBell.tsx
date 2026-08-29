@@ -18,7 +18,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import { useAuth } from "../../context/AuthContext";
 import { notificationService, type AppNotification } from "../../services/notificationService";
-import { NOTIFICATION_EVENT } from "../../constants/events";
+import { NOTIFICATION_EVENT, type TaskChangeDetail } from "../../constants/events";
+import { shouldDeliverEmployeeAlert } from "../../utils/employeeBreakMute";
 import { employeeTaskAlertPath, shouldOpenEmployeeTaskAlert } from "../../utils/notificationNavigation";
 import IssueReportDetailDialog from "../issues/IssueReportDetailDialog";
 import { he } from "../../i18n/he";
@@ -37,7 +38,7 @@ function formatWhen(iso: string) {
   }
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ muteIncoming = false }: { muteIncoming?: boolean }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -64,12 +65,14 @@ export default function NotificationBell() {
   }, [refresh]);
 
   useEffect(() => {
-    const onNotify = () => {
+    const onNotify = (ev: Event) => {
+      const detail = (ev as CustomEvent<TaskChangeDetail>).detail;
+      if (!shouldDeliverEmployeeAlert(muteIncoming, detail?.kind)) return;
       void refresh();
     };
     window.addEventListener(NOTIFICATION_EVENT, onNotify);
     return () => window.removeEventListener(NOTIFICATION_EVENT, onNotify);
-  }, [refresh]);
+  }, [refresh, muteIncoming]);
 
   const closeAlerts = () => setOpen(false);
 

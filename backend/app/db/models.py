@@ -12,6 +12,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -50,6 +51,7 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     preferred_language: Mapped[str] = mapped_column(String(8), nullable=False, default="he")
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    excellence_slogan: Mapped[str | None] = mapped_column(String(120), nullable=True)
     on_break_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idle_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     inactivity_notified_at: Mapped[datetime | None] = mapped_column(
@@ -226,6 +228,7 @@ class TaskTemplate(Base):
     min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
     completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_work_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
@@ -282,6 +285,7 @@ class TaskOccurrence(Base):
     min_video_seconds: Mapped[int | None] = mapped_column(nullable=True)
     completion_requirements: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_work_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
@@ -304,6 +308,12 @@ class TaskOccurrence(Base):
     )
     manager_next_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
+    )
+    chat_follow_up_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    chat_resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -361,6 +371,7 @@ class TaskCompletion(Base):
         DateTime(timezone=True), nullable=True
     )
     rejection_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    quality_rating: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     completed_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
@@ -555,6 +566,22 @@ class UserNotification(Base):
         Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class EmployeeBreakInterval(Base):
+    __tablename__ = "employee_break_intervals"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

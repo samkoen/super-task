@@ -27,12 +27,14 @@ describe("authService profile", () => {
       last_name: "B",
       email: "a@test.com",
       phone: "050",
+      preferred_language: "th",
     });
     expect(mockPatch).toHaveBeenCalledWith("/auth/me", {
       first_name: "A",
       last_name: "B",
       email: "a@test.com",
       phone: "050",
+      preferred_language: "th",
     });
   });
 
@@ -67,5 +69,23 @@ describe("authService profile", () => {
     const [path, body] = mockPost.mock.calls[0];
     expect(path).toBe("/auth/me/avatar");
     expect(body).toBeInstanceOf(FormData);
+  });
+
+  it("stylizeAvatar posts the photo to /auth/me/avatar/excellence", async () => {
+    const file = new File(["x"], "face.jpg", { type: "image/jpeg" });
+    mockPost.mockResolvedValue({
+      data: {
+        message: "ok",
+        user: { id: "1", excellence_slogan: "מצוינות כל יום" },
+        url: "/uploads/avatars/a.jpg",
+        used_ai: true,
+      },
+    });
+    await authService.stylizeAvatar(file);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [path, body, config] = mockPost.mock.calls[0];
+    expect(path).toBe("/auth/me/avatar/excellence");
+    expect(body).toBeInstanceOf(FormData);
+    expect(config).toEqual({ timeout: 120_000 });
   });
 });

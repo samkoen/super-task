@@ -60,6 +60,24 @@ async def upload_attachment(*, kind: str, folder: str, file: UploadFile) -> dict
     return {"url": url, "kind": kind}
 
 
+def save_photo_bytes(*, folder: str, data: bytes) -> str:
+    if not data:
+        raise ValueError("חסרה תמונה")
+    if len(data) > PHOTO_MAX_BYTES:
+        limit_mb = PHOTO_MAX_BYTES // (1024 * 1024)
+        raise ValueError(f"הקובץ גדול מדי (מקסימום {limit_mb}MB)")
+    try:
+        payload, ext, content_type = compress_photo_bytes(data)
+    except Exception as exc:
+        raise ValueError("תמונה לא תקינה") from exc
+    return blob_storage.put_bytes(
+        folder=folder,
+        data=payload,
+        ext=ext,
+        content_type=content_type,
+    )
+
+
 def _kind_config_for(kind: str) -> tuple[set[str], int]:
     config = _KIND_CONFIG.get(kind)
     if not config:

@@ -35,6 +35,7 @@ from app.domain.employee_task_focus import (
     sort_in_progress_focus_first,
 )
 from app.domain.store_kpis import build_store_kpis
+from app.domain.quality_rating import aggregate_quality_ratings, empty_quality_summary
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -211,6 +212,9 @@ class DashboardService:
         progress = int(round(counts["completion_rate"] * 100))
         on_shift = len(in_progress) > 0 or len(awaiting_response) > 0
         language = user.preferred_language if user else "he"
+        quality = self._quality_summaries([actor.user_id]).get(
+            actor.user_id, empty_quality_summary()
+        )
 
         async def localize_cards(tasks: list[TaskOccurrence]) -> list[dict]:
             cards = [self._employee_task_card(t) for t in tasks]
@@ -228,6 +232,8 @@ class DashboardService:
                 "branch_name": branch_name,
                 "preferred_language": language,
                 "avatar_url": user.avatar_url if user else None,
+                "excellence_slogan": user.excellence_slogan if user else None,
+                "quality_rating": quality,
             },
             "progress_percent": progress,
             "on_shift": on_shift,
@@ -484,6 +490,14 @@ class DashboardService:
             "completion_rate": counts["completion_rate"],
         }
 
+    def _quality_summaries(self, user_ids: list[str]) -> dict[str, dict]:
+        raw = self._completions.list_quality_ratings_by_assignee(user_ids)
+        rows = raw if isinstance(raw, list) else []
+        grouped: dict[str, list[tuple[str | None, int]]] = {uid: [] for uid in user_ids}
+        for user_id, rating, category in rows:
+            grouped.setdefault(user_id, []).append((category, rating))
+        return {uid: aggregate_quality_ratings(items) for uid, items in grouped.items()}
+
     def _team_timelines(
         self,
         employees: list[User],
@@ -506,6 +520,7 @@ class DashboardService:
                 continue
             overdue_by_assignee.setdefault(task.assignee_user_id, []).append(task)
 
+        qualities = self._quality_summaries([emp.id for emp in employees])
         team = []
         for emp in employees:
             emp_tasks = by_assignee.get(emp.id, [])
@@ -554,6 +569,7 @@ class DashboardService:
                 "open_tasks": sum(1 for t in emp_tasks if t.status in task_status.ACTIVE),
                 "timeline": timeline,
                 "overdue_backlog": backlog,
+                "quality_rating": qualities.get(emp.id, empty_quality_summary()),
             })
         team.sort(key=lambda m: (not m["is_active"], m["full_name"]))
         return team
@@ -632,6 +648,7 @@ class DashboardService:
             if task.assignee_user_id:
                 by_assignee.setdefault(task.assignee_user_id, []).append(task)
 
+        qualities = self._quality_summaries([emp.id for emp in employees])
         team = []
         for emp in employees:
             emp_tasks = by_assignee.get(emp.id, [])
@@ -651,6 +668,7 @@ class DashboardService:
                 "current_department_name": current_department,
                 "completed_today": completed_today,
                 "open_tasks": sum(1 for t in emp_tasks if t.status in task_status.ACTIVE),
+                "quality_rating": qualities.get(emp.id, empty_quality_summary()),
             })
         team.sort(key=lambda m: (not m["is_active"], m["full_name"]))
         return team
@@ -694,6 +712,7 @@ class DashboardService:
             "min_video_seconds": task.min_video_seconds,
             "completion_requirements": getattr(task, "completion_requirements", None) or [],
             "is_work_start": task.is_work_start,
+            "is_work_end": bool(getattr(task, "is_work_end", False)),
             "start_url": getattr(task, "start_url", None),
             "reference_photo_url": task.reference_photo_url,
             "reference_video_url": task.reference_video_url,

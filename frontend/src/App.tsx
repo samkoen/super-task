@@ -27,6 +27,7 @@ const ManagerEmployeesPage = lazy(() => import("./pages/manager/ManagerEmployees
 const ManagerReportsPage = lazy(() => import("./pages/manager/ManagerReportsPage"));
 const ManagerProfilePage = lazy(() => import("./pages/manager/ManagerProfilePage"));
 const EmployeeTasksPage = lazy(() => import("./pages/employee/EmployeeTasksPage"));
+const EmployeeProfilePage = lazy(() => import("./pages/employee/EmployeeProfilePage"));
 
 function PageLoader() {
   return (
@@ -283,6 +284,14 @@ export default function App() {
             element={
               <LazyPage>
                 <EmployeeTasksPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/employee/account"
+            element={
+              <LazyPage>
+                <EmployeeProfilePage />
               </LazyPage>
             }
           />

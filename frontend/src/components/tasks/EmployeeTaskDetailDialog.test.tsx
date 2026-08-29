@@ -60,6 +60,13 @@ function capture(overrides: Partial<EmployeeTaskCaptureProps> = {}): EmployeeTas
 }
 
 describe("EmployeeTaskDetailDialog", () => {
+  it("places chat above the description so it stays reachable", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    const chat = screen.getByTestId("task-chat-panel");
+    const description = screen.getByText("לצלם את המדף");
+    expect(chat.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("offers to reopen the start url", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     render(

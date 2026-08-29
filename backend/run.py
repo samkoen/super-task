@@ -50,7 +50,7 @@ def main() -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_interrupt)
 
-    print(f"\n=== Super API (FastAPI / Uvicorn) ===\n  http://127.0.0.1:{port}/health\n")
+    print(f"\n=== super-man API (FastAPI / Uvicorn) ===\n  http://127.0.0.1:{port}/health\n")
 
     log_level = os.environ.get("LOG_LEVEL", "debug" if os.environ.get("ENVIRONMENT", "development") == "development" else "info").lower()
 

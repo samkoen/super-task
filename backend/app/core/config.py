@@ -17,7 +17,7 @@ IS_SERVERLESS = IS_VERCEL or bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 _DEFAULT_SECRET = "dev-secret-key-change-in-production"
 SECRET_KEY = os.environ.get("SECRET_KEY", _DEFAULT_SECRET)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-APP_NAME = os.environ.get("APP_NAME", "Super")
+APP_NAME = os.environ.get("APP_NAME", "סופר-מן")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 IS_PRODUCTION = ENVIRONMENT == "production" or IS_VERCEL
 
@@ -146,6 +146,12 @@ GEMINI_GENERATION_FALLBACK_MODELS = os.environ.get(
 )
 GEMINI_RETRY_COUNT = int(os.environ.get("GEMINI_RETRY_COUNT", "2"))
 GEMINI_RETRY_DELAY_SECONDS = float(os.environ.get("GEMINI_RETRY_DELAY_SECONDS", "2"))
+DEFAULT_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+DEFAULT_GEMINI_IMAGE_FALLBACK_MODELS = "gemini-2.0-flash-preview-image-generation"
+GEMINI_IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", DEFAULT_GEMINI_IMAGE_MODEL).strip()
+GEMINI_IMAGE_FALLBACK_MODELS = os.environ.get(
+    "GEMINI_IMAGE_FALLBACK_MODELS", DEFAULT_GEMINI_IMAGE_FALLBACK_MODELS
+)
 
 OPENCODE_SERVER_URL = os.environ.get("OPENCODE_SERVER_URL", "").strip()
 OPENCODE_SERVER_USERNAME = os.environ.get("OPENCODE_SERVER_USERNAME", "opencode").strip()

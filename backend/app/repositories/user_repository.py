@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -20,6 +21,14 @@ class UserRepository:
             return None
         row = self._db.get(orm.User, uid)
         return mp.user_orm_to_domain(row)
+
+    def on_break_since(self, user_id: str) -> datetime | None:
+        try:
+            uid = mp.parse_uuid(user_id)
+        except ValueError:
+            return None
+        row = self._db.get(orm.User, uid)
+        return getattr(row, "on_break_since", None) if row else None
 
     def find_by_email(self, email: str) -> Optional[User]:
         row = self._db.execute(
@@ -229,7 +238,13 @@ class UserRepository:
         self._db.flush()
         return mp.user_orm_to_domain(row)
 
-    def update_avatar(self, user_id: str, avatar_url: str | None) -> User | None:
+    def update_avatar(
+        self,
+        user_id: str,
+        avatar_url: str | None,
+        *,
+        excellence_slogan: str | None = None,
+    ) -> User | None:
         try:
             row = self._db.get(orm.User, mp.parse_uuid(user_id))
         except ValueError:
@@ -237,6 +252,7 @@ class UserRepository:
         if not row:
             return None
         row.avatar_url = avatar_url
+        row.excellence_slogan = excellence_slogan
         self._db.flush()
         return mp.user_orm_to_domain(row)
 
@@ -270,6 +286,7 @@ class UserRepository:
         last_name: str,
         phone: str | None = None,
         email: str | None = None,
+        preferred_language: str | None = None,
     ) -> User | None:
         try:
             row = self._db.get(orm.User, mp.parse_uuid(user_id))
@@ -282,5 +299,7 @@ class UserRepository:
         row.phone = phone
         if email is not None:
             row.email = email.lower().strip()
+        if preferred_language is not None:
+            row.preferred_language = preferred_language
         self._db.flush()
         return mp.user_orm_to_domain(row)

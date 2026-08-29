@@ -32,8 +32,11 @@ class TaskOccurrence:
     min_video_seconds: int | None = None
     completion_requirements: list | None = None
     is_work_start: bool = False
+    is_work_end: bool = False
     start_url: str | None = None
     network_group_id: str | None = None
+    chat_follow_up_at: str | None = None
+    chat_resolved_at: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -53,6 +56,7 @@ class TaskOccurrence:
             "min_video_seconds": self.min_video_seconds,
             "completion_requirements": self.completion_requirements or [],
             "is_work_start": self.is_work_start,
+            "is_work_end": self.is_work_end,
             "start_url": self.start_url,
             "network_group_id": self.network_group_id,
             "photo_required": self.photo_required,
@@ -64,6 +68,8 @@ class TaskOccurrence:
             "started_at": self.started_at,
             "started_by_id": self.started_by_id,
             "manager_next_at": self.manager_next_at,
+            "chat_follow_up_at": self.chat_follow_up_at,
+            "chat_resolved_at": self.chat_resolved_at,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from app.domain import roles
-from app.domain.notification_rules import notification_sound_for, recipients_for_task_event
+from app.domain.break_notify import muted_employee_sound
+from app.domain.notification_rules import SOUND_NONE, notification_sound_for, recipients_for_task_event
 from app.realtime.sse_hub import sse_hub
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.user_repository import UserRepository
@@ -53,6 +54,7 @@ class NotificationService:
         task_title: str | None = None,
         created_by_user_id: str | None = None,
         message_override: str | None = None,
+        force_sound: bool = False,
     ) -> list[tuple[str, str, str, str]]:
         """Persist notifications; caller must commit before push_task_event_sse.
 
@@ -81,7 +83,7 @@ class NotificationService:
         for user_id in recipient_ids:
             user = self._users.find_by_id(user_id)
             is_employee = bool(user and user.role == roles.EMPLOYEE)
-            sound = notification_sound_for(event_type, recipient_is_employee=is_employee)
+            sound = self._sound_for(event_type, user_id, is_employee, force_sound)
             # Messages côté manager pour idle / started / completed.
             row_title, row_message = title, message
             if event_type == "task_started" and not is_employee:
@@ -105,6 +107,7 @@ class NotificationService:
         recipient_ids: set[str],
         branch_id: str | None,
         preview: str,
+        force_sound: bool = False,
     ) -> list[tuple[str, str, str, str]]:
         title, base_message = _TASK_LABELS["direct_message"]
         message = f"{base_message}: {preview}" if preview else base_message
@@ -112,7 +115,7 @@ class NotificationService:
         for user_id in recipient_ids:
             user = self._users.find_by_id(user_id)
             is_employee = bool(user and user.role == roles.EMPLOYEE)
-            sound = notification_sound_for("direct_message", recipient_is_employee=is_employee)
+            sound = self._sound_for("direct_message", user_id, is_employee, force_sound)
             row = self._repo.create(
                 user_id=user_id,
                 kind="direct_message",
@@ -122,6 +125,29 @@ class NotificationService:
             )
             pending.append((user_id, row.id, "direct_message", sound))
         return pending
+
+    def publish_break_ring(self, *, user_id: str, branch_id: str | None) -> list[tuple[str, str, str, str]]:
+        title, message = "הודעה דחופה", "המנהל שלח הודעה עם צליל בזמן הפסקה"
+        sound = self._sound_for("direct_message", user_id, True, force_sound=True)
+        row = self._repo.create(
+            user_id=user_id,
+            kind="break_override",
+            title=title,
+            message=message,
+            branch_id=branch_id,
+        )
+        return [(user_id, row.id, "break_override", sound)]
+
+    def _sound_for(
+        self, event_type: str, user_id: str, is_employee: bool, force_sound: bool
+    ) -> str:
+        sound = notification_sound_for(event_type, recipient_is_employee=is_employee)
+        if muted_employee_sound(
+            on_break=bool(self._users.on_break_since(user_id)),
+            force_sound=force_sound,
+        ):
+            return SOUND_NONE
+        return sound
 
     @staticmethod
     def push_task_event_sse(pending: list[tuple]) -> None:

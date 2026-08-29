@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 
 import httpx
@@ -258,3 +259,101 @@ async def generate_from_audio(
         timeout_seconds=timeout_seconds or config.GEMINI_GENERATION_TIMEOUT_SECONDS,
         use_generation_fallbacks=True,
     )
+
+
+def _image_models_chain() -> list[str]:
+    primary = config.GEMINI_IMAGE_MODEL.strip() or config.DEFAULT_GEMINI_IMAGE_MODEL
+    chain = [primary]
+    for model in _parse_models_csv(config.GEMINI_IMAGE_FALLBACK_MODELS):
+        if model not in chain:
+            chain.append(model)
+    return chain
+
+
+async def _request_json_once(model: str, api_key: str, body: dict, timeout: float) -> dict:
+    response = await _post_generate(model, api_key, body, timeout)
+    if response.status_code >= 400:
+        detail = _parse_api_error(response)
+        logger.warning("Gemini API %s model=%s: %s", response.status_code, model, detail)
+        raise GeminiError(
+            _user_message(response.status_code, model, detail),
+            retryable=_is_retryable_status(response.status_code),
+        )
+    return response.json()
+
+
+async def _request_json_with_retries(
+    model: str, api_key: str, body: dict, timeout: float
+) -> dict:
+    retries = max(0, config.GEMINI_RETRY_COUNT)
+    delay = config.GEMINI_RETRY_DELAY_SECONDS
+    last: GeminiError | None = None
+    for attempt in range(retries + 1):
+        try:
+            return await _request_json_once(model, api_key, body, timeout)
+        except GeminiError as exc:
+            last = exc
+            if not exc.retryable or attempt >= retries:
+                break
+            await asyncio.sleep(delay * (attempt + 1))
+    assert last is not None
+    raise last
+
+
+async def _generate_json_across_models(
+    models: list[str], api_key: str, body: dict, timeout: float
+) -> dict:
+    last_error: GeminiError | None = None
+    for model in models:
+        try:
+            return await _request_json_with_retries(model, api_key, body, timeout)
+        except GeminiError as exc:
+            last_error = exc
+            if model != models[-1]:
+                logger.info("Gemini image fallback: %s failed, trying next model", model)
+    assert last_error is not None
+    raise last_error
+
+
+def _image_body(photo_b64: str, mime: str, prompt: str) -> dict:
+    return {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {"inline_data": {"mime_type": mime, "data": photo_b64}},
+                    {"text": prompt},
+                ],
+            }
+        ],
+        "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+    }
+
+
+async def generate_image_from_photo(
+    photo_bytes: bytes,
+    mime_type: str,
+    prompt: str,
+) -> tuple[bytes, str]:
+    from app.domain.excellence_avatar import extract_inline_image
+
+    api_key = config.GEMINI_API_KEY
+    if not api_key:
+        hint = (
+            "הוסף GEMINI_API_KEY ב-Vercel → Settings → Environment Variables."
+            if config.IS_VERCEL
+            else "הוסף GEMINI_API_KEY לקובץ backend/.env."
+        )
+        raise GeminiError(f"שירות AI אינו מוגדר. {hint}", retryable=False)
+    mime = (mime_type or "image/jpeg").split(";")[0].strip() or "image/jpeg"
+    encoded = base64.b64encode(photo_bytes).decode("ascii")
+    payload = await _generate_json_across_models(
+        _image_models_chain(),
+        api_key,
+        _image_body(encoded, mime, prompt),
+        config.GEMINI_GENERATION_TIMEOUT_SECONDS,
+    )
+    try:
+        return extract_inline_image(payload)
+    except ValueError as exc:
+        raise GeminiError(str(exc), retryable=False) from exc

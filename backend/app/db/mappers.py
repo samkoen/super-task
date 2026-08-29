@@ -13,6 +13,7 @@ from app.models.invitation import UserInvitation
 from app.models.network import Network
 from app.models.product import Product
 from app.models.promotion_stage import PromotionStage
+from app.models.employee_break_interval import EmployeeBreakInterval
 from app.models.task_completion import TaskCompletion
 from app.models.task_message import TaskMessage
 from app.models.task_occurrence import TaskOccurrence
@@ -66,6 +67,7 @@ def user_orm_to_domain(row: orm.User | None) -> User | None:
         email_verified=row.email_verified,
         preferred_language=getattr(row, "preferred_language", None) or "he",
         avatar_url=getattr(row, "avatar_url", None),
+        excellence_slogan=getattr(row, "excellence_slogan", None),
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
     )
@@ -87,6 +89,7 @@ def user_domain_to_api(user: User) -> dict:
         "email_verified": user.email_verified,
         "preferred_language": user.preferred_language,
         "avatar_url": user.avatar_url,
+        "excellence_slogan": user.excellence_slogan,
     }
 
 
@@ -273,6 +276,7 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),
+        is_work_end=bool(getattr(row, "is_work_end", False)),
         start_url=getattr(row, "start_url", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
@@ -327,9 +331,20 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
             if getattr(row, "manager_next_at", None)
             else None
         ),
+        chat_follow_up_at=(
+            parse_datetime_iso(row.chat_follow_up_at)
+            if getattr(row, "chat_follow_up_at", None)
+            else None
+        ),
+        chat_resolved_at=(
+            parse_datetime_iso(row.chat_resolved_at)
+            if getattr(row, "chat_resolved_at", None)
+            else None
+        ),
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),
+        is_work_end=bool(getattr(row, "is_work_end", False)),
         start_url=getattr(row, "start_url", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
@@ -365,6 +380,7 @@ def task_completion_orm_to_domain(row: orm.TaskCompletion | None) -> TaskComplet
         manager_reviewed_by_id=str(row.manager_reviewed_by_id) if row.manager_reviewed_by_id else None,
         manager_reviewed_at=parse_datetime_iso(row.manager_reviewed_at) if row.manager_reviewed_at else None,
         rejection_note=row.rejection_note,
+        quality_rating=getattr(row, "quality_rating", None),
     )
 
 
@@ -423,4 +439,17 @@ def direct_message_orm_to_domain(row: orm.DirectMessage | None) -> DirectMessage
         video_url=row.video_url,
         audio_url=row.audio_url,
         created_at=parse_datetime_iso(row.created_at),
+    )
+
+
+def employee_break_orm_to_domain(
+    row: orm.EmployeeBreakInterval | None,
+) -> EmployeeBreakInterval | None:
+    if row is None:
+        return None
+    return EmployeeBreakInterval(
+        id=str(row.id),
+        user_id=str(row.user_id),
+        started_at=parse_datetime_iso(row.started_at),
+        ended_at=parse_datetime_iso(row.ended_at) if row.ended_at else None,
     )

@@ -9,12 +9,16 @@ from sqlalchemy import exists, select
 from app.db import mappers as mp
 from app.db import models as orm
 from app.domain import roles, task_status
+from app.domain.scope import ActorContext
+from app.domain.task_scope import can_manage_tasks
+from app.domain.break_notify import break_alert_payload
 from app.domain.employee_inactivity import (
     idle_reason,
     idle_threshold_reached,
     kind_for_reason,
     should_evaluate_idle,
 )
+from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
@@ -30,10 +34,12 @@ class EmployeeActivityService:
         user_repo: UserRepository,
         occurrence_repo: TaskOccurrenceRepository,
         notification_repo: NotificationRepository | None = None,
+        break_repo: EmployeeBreakRepository | None = None,
     ):
         self._users = user_repo
         self._occurrences = occurrence_repo
         self._notifications = notification_repo
+        self._breaks = break_repo
         self._db = user_repo._db  # noqa: SLF001 — session partagée
 
     def set_break(self, user_id: str, *, on_break: bool) -> dict:
@@ -42,18 +48,29 @@ class EmployeeActivityService:
             raise PermissionError("רק עובד יכול להכריז על הפסקה")
         now = datetime.now(TZ)
         if on_break:
-            row.on_break_since = now
+            self._start_break(row, user_id, now)
         else:
-            row.on_break_since = None
-            # Fin de pause = nouvel épisode potentiel.
-            if not self._has_in_progress(user_id):
-                row.idle_since = now
-                row.inactivity_notified_at = None
+            self._end_break(row, user_id, now)
         self._db.flush()
         return {
             "on_break": bool(row.on_break_since),
             "on_break_since": row.on_break_since.isoformat() if row.on_break_since else None,
         }
+
+    def _start_break(self, row, user_id: str, now: datetime) -> None:
+        if row.on_break_since:
+            return
+        row.on_break_since = now
+        if self._breaks:
+            self._breaks.open_interval(user_id, now)
+
+    def _end_break(self, row, user_id: str, now: datetime) -> None:
+        if self._breaks:
+            self._breaks.close_open(user_id, now)
+        row.on_break_since = None
+        if not self._has_in_progress(user_id):
+            row.idle_since = now
+            row.inactivity_notified_at = None
 
     def get_break_state(self, user_id: str) -> dict:
         row = self._db.get(orm.User, mp.parse_uuid(user_id))
@@ -64,12 +81,46 @@ class EmployeeActivityService:
             "on_break_since": row.on_break_since.isoformat() if row.on_break_since else None,
         }
 
+    def ring_on_break(self, actor: ActorContext, target_user_id: str) -> dict:
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לשלוח צליל")
+        if self._notifications is None:
+            raise RuntimeError("notification_repo required")
+        target = self._users.find_by_id(target_user_id)
+        if not target:
+            raise ValueError("משתמש לא נמצא")
+        self._assert_ring_scope(actor, target)
+        since = self._users.on_break_since(target_user_id)
+        if not since:
+            raise ValueError("העובד לא בהפסקה")
+        pending = NotificationService(self._notifications, self._users).publish_break_ring(
+            user_id=target_user_id,
+            branch_id=target.branch_id,
+        )
+        return {
+            "ok": True,
+            "pending": pending,
+            "recipient_break": break_alert_payload(since, now=datetime.now(TZ)),
+        }
+
+    @staticmethod
+    def _assert_ring_scope(actor: ActorContext, target) -> None:
+        if actor.role == roles.ADMIN:
+            return
+        if actor.role == roles.NETWORK_MANAGER and target.network_id == actor.network_id:
+            return
+        if actor.role == roles.BRANCH_MANAGER and target.branch_id == actor.branch_id:
+            return
+        raise PermissionError("אין הרשאה לעובד זה")
+
     def on_task_started(self, user_id: str) -> None:
         row = self._db.get(orm.User, mp.parse_uuid(user_id))
         if not row:
             return
         row.idle_since = None
         row.inactivity_notified_at = None
+        if row.on_break_since and self._breaks:
+            self._breaks.close_open(user_id, datetime.now(TZ))
         row.on_break_since = None
         self._db.flush()
 

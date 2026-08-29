@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from app.domain import roles
@@ -44,6 +45,7 @@ def _svc(*, network=None):
     messages = MagicMock()
     reads = MagicMock()
     users = MagicMock()
+    users.on_break_since.return_value = None
     return (
         DirectChatService(convs, messages, reads, users, network_repo=network),
         convs,
@@ -167,7 +169,33 @@ def test_post_rejects_empty_and_notifies_shared_box(_notify):
     messages.create.return_value = created
     result = svc.post_message(oved, "c1", body="שלום")
     assert result["message"]["body"] == "שלום"
+    assert "recipient_break" not in result
 
+
+@patch("app.services.direct_chat_service.notify_direct_message")
+def test_manager_post_includes_break_alert(_notify):
+    svc, convs, messages, reads, users = _svc()
+    convs.get.return_value = _conv()
+    users.find_by_id.return_value = _user()
+    users.list_users.return_value = [
+        _user(id="m1", email="m1@x.com", first_name="א", last_name="א", role=roles.BRANCH_MANAGER),
+    ]
+    start = datetime(2026, 8, 28, 10, 0, tzinfo=timezone.utc)
+    users.on_break_since.return_value = start
+    messages.create.return_value = DirectMessage(
+        id="msg1",
+        conversation_id="c1",
+        sender_user_id="m1",
+        body="דחוף",
+        photo_url=None,
+        video_url=None,
+        audio_url=None,
+        created_at="2026-08-28T10:15:00+00:00",
+    )
+    bm = ActorContext("m1", roles.BRANCH_MANAGER, "n1", "b1")
+    result = svc.post_message(bm, "c1", body="דחוף")
+    assert result["recipient_user_id"] == "e1"
+    assert result["recipient_break"]["on_break"] is True
 
 @patch("app.services.direct_chat_service.notify_direct_message")
 def test_broadcast_posts_to_each_oved(_notify):

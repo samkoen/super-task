@@ -1,6 +1,7 @@
 """Tests pointage — tâche is_work_start fermée."""
 from app.domain import task_status
-from app.domain.work_start import clock_in_at
+from app.domain.work_start import clock_in_at, normalize_work_flags
+import pytest
 from types import SimpleNamespace
 
 
@@ -8,6 +9,16 @@ def _task(**kw):
     base = dict(is_work_start=False, status=task_status.PENDING, started_at=None)
     base.update(kw)
     return SimpleNamespace(**base)
+
+
+def test_normalize_rejects_both_flags():
+    with pytest.raises(ValueError):
+        normalize_work_flags(True, True)
+
+
+def test_normalize_work_flags_ok():
+    assert normalize_work_flags(True, False) == (True, False)
+    assert normalize_work_flags(False, True) == (False, True)
 
 
 def test_clock_in_fallback_earliest_start():

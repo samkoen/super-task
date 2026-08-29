@@ -18,6 +18,7 @@ class User:
     email_verified: bool = False
     preferred_language: str = "he"
     avatar_url: Optional[str] = None
+    excellence_slogan: Optional[str] = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -52,6 +53,7 @@ class User:
             "email_verified",
             "preferred_language",
             "avatar_url",
+            "excellence_slogan",
             "created_at",
             "updated_at",
         }

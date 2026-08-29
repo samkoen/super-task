@@ -87,8 +87,11 @@ def build_timeline_item(
         "task_kind": task.task_kind,
         "manager_next_at": task.manager_next_at,
         "is_manager_next": bool(task.manager_next_at),
+        "chat_follow_up_at": getattr(task, "chat_follow_up_at", None),
+        "chat_resolved_at": getattr(task, "chat_resolved_at", None),
         "reference_photo_url": task.reference_photo_url,
         "is_work_start": bool(getattr(task, "is_work_start", False)),
+        "is_work_end": bool(getattr(task, "is_work_end", False)),
         "start_url": getattr(task, "start_url", None),
         "min_video_seconds": getattr(task, "min_video_seconds", None),
     }

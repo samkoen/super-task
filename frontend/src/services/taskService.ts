@@ -57,6 +57,7 @@ export interface TaskTemplate {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
   network_group_id?: string | null;
   is_network_task?: boolean;
@@ -87,6 +88,7 @@ export interface UpdateTaskTemplatePayload {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
   apply_to_network?: boolean;
 }
@@ -109,6 +111,7 @@ export interface TaskCompletion {
   manager_reviewed_by_id?: string | null;
   manager_reviewed_at?: string | null;
   rejection_note?: string | null;
+  quality_rating?: number | null;
 }
 
 export interface TaskOccurrence {
@@ -130,6 +133,7 @@ export interface TaskOccurrence {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
@@ -152,6 +156,8 @@ export interface TaskOccurrence {
   can_add_to_gallery?: boolean;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  chat_follow_up_at?: string | null;
+  chat_resolved_at?: string | null;
   network_group_id?: string | null;
   is_network_task?: boolean;
 }
@@ -176,6 +182,7 @@ export interface CreateTaskTemplatePayload {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
 }
 
@@ -317,6 +324,21 @@ export const taskService = {
     return response.data;
   },
 
+  resolveChatTask: async (occurrenceId: string) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/chat-resolve`,
+    );
+    return response.data;
+  },
+
+  setChatFollowUp: async (occurrenceId: string, followUpAt: string) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/chat-follow-up`,
+      { follow_up_at: followUpAt },
+    );
+    return response.data;
+  },
+
   delegate: async (occurrenceId: string, assigneeUserId: string) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/delegate`,
@@ -333,9 +355,10 @@ export const taskService = {
     return response.data;
   },
 
-  approve: async (occurrenceId: string) => {
+  approve: async (occurrenceId: string, payload: { quality_rating: number }) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
-      `/tasks/occurrences/${occurrenceId}/approve`
+      `/tasks/occurrences/${occurrenceId}/approve`,
+      payload,
     );
     return response.data;
   },
@@ -370,6 +393,12 @@ export const taskService = {
       message: string;
       chat_message: TaskMessage;
       occurrence: TaskOccurrence;
+      recipient_break?: {
+        on_break: boolean;
+        on_break_since: string;
+        elapsed_seconds: number;
+      } | null;
+      recipient_user_id?: string;
     }>(`/tasks/occurrences/${occurrenceId}/messages`, payload);
     return response.data;
   },

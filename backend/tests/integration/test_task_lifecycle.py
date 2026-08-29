@@ -29,6 +29,18 @@ def _upload_photo(client, jpeg_bytes: bytes) -> str:
     return upload.json()["url"]
 
 
+def _submit_for_review(client_mgr, client_emp, world_seed, jpeg_bytes) -> str:
+    occ_id = _create_ad_hoc(client_mgr, world_seed)["id"]
+    assert client_emp.post(f"/api/tasks/occurrences/{occ_id}/start").status_code == 200
+    photo_url = _upload_photo(client_emp, jpeg_bytes)
+    completed = client_emp.post(
+        f"/api/tasks/occurrences/{occ_id}/complete",
+        json={"status": "completed", "photo_path": photo_url},
+    )
+    assert completed.status_code == 200, completed.text
+    return occ_id
+
+
 def test_ad_hoc_create_start_complete_approve(
     client_mgr, client_emp, world_seed, jpeg_bytes
 ):
@@ -59,10 +71,48 @@ def test_ad_hoc_create_start_complete_approve(
     assert body["completion"]["manager_review_status"] == "pending"
     assert body["completion"]["photo_path"] == photo_url
 
-    approved = client_mgr.post(f"/api/tasks/occurrences/{occ_id}/approve")
+    approved = client_mgr.post(
+        f"/api/tasks/occurrences/{occ_id}/approve",
+        json={"quality_rating": 4},
+    )
     assert approved.status_code == 200, approved.text
     assert approved.json()["occurrence"]["status"] == "completed"
     assert approved.json()["occurrence"]["completion"]["manager_review_status"] == "approved"
+    assert approved.json()["occurrence"]["completion"]["quality_rating"] == 4
+
+
+def test_approve_without_quality_rating_is_400(
+    client_mgr, client_emp, world_seed, jpeg_bytes
+):
+    occ_id = _submit_for_review(client_mgr, client_emp, world_seed, jpeg_bytes)
+    approved = client_mgr.post(f"/api/tasks/occurrences/{occ_id}/approve", json={})
+    assert approved.status_code == 400, approved.text
+    assert "1 ל-5" in approved.json()["error"]
+
+
+def test_dashboards_expose_quality_after_approve(
+    client_mgr, client_emp, world_seed, jpeg_bytes
+):
+    occ_id = _submit_for_review(client_mgr, client_emp, world_seed, jpeg_bytes)
+    assert (
+        client_mgr.post(
+            f"/api/tasks/occurrences/{occ_id}/approve",
+            json={"quality_rating": 4},
+        ).status_code
+        == 200
+    )
+    emp_dash = client_emp.get("/api/dashboard/employee")
+    assert emp_dash.status_code == 200, emp_dash.text
+    quality = emp_dash.json()["employee"]["quality_rating"]
+    assert quality["count"] == 1
+    assert quality["average"] == 4
+    mgr_dash = client_mgr.get("/api/dashboard/manager")
+    assert mgr_dash.status_code == 200, mgr_dash.text
+    member = next(
+        m for m in mgr_dash.json()["team"] if m["user_id"] == world_seed["employee_id"]
+    )
+    assert member["quality_rating"]["count"] == 1
+    assert member["quality_rating"]["average"] == 4
 
 
 def test_ad_hoc_reject_via_reopen_creates_chat_message(

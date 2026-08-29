@@ -16,6 +16,8 @@ vi.mock("../../services/taskService", () => ({
     uploadPhoto: vi.fn(),
     uploadVideo: vi.fn(),
     uploadAudio: vi.fn(),
+    resolveChatTask: vi.fn(),
+    setChatFollowUp: vi.fn(),
   },
 }));
 
@@ -27,10 +29,42 @@ vi.mock("../media/MediaCaptureActions", () => ({
   default: () => null,
 }));
 
+vi.mock("../chat/ChatComposerBar", async () => {
+  const { he } = await import("../../i18n/he");
+  return {
+    default: (props: {
+      body: string;
+      onBodyChange: (value: string) => void;
+      onSendText: () => void;
+      onSendMedia: (file: File, kind: "photo" | "video" | "audio") => void;
+    }) => (
+      <>
+        <input
+          placeholder={he.taskChatPlaceholder}
+          value={props.body}
+          onChange={(e) => props.onBodyChange(e.target.value)}
+        />
+        <button type="button" onClick={props.onSendText}>
+          {he.taskChatSend}
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onSendMedia(new File(["x"], "a.jpg", { type: "image/jpeg" }), "photo")
+          }
+        >
+          send-photo
+        </button>
+      </>
+    ),
+  };
+});
+
 beforeEach(() => {
   vi.mocked(taskService.listMessages).mockReset();
   vi.mocked(taskService.postMessage).mockReset();
   vi.mocked(taskService.uploadPhoto).mockReset();
+  vi.mocked(taskService.resolveChatTask).mockReset();
 });
 
 describe("TaskChatPanel", () => {
@@ -159,12 +193,9 @@ describe("TaskChatPanel", () => {
     await waitFor(() => {
       expect(taskService.postMessage).toHaveBeenCalledWith("occ-1", {
         body: "הנה",
-        photo_url: undefined,
-        video_url: undefined,
-        audio_url: undefined,
       });
       expect(screen.getByText("הנה")).toBeTruthy();
-      expect(onUpdated).toHaveBeenCalledWith("awaiting_response");
+      expect(onUpdated).toHaveBeenCalledWith("awaiting_response", he.taskChatSent);
     });
     expect(taskService.listMessages).toHaveBeenCalledTimes(2);
   });
@@ -212,5 +243,25 @@ describe("TaskChatPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: he.chatLoadOlder }));
     await waitFor(() => expect(screen.getByText("ישן")).toBeTruthy());
     expect(taskService.listMessages).toHaveBeenLastCalledWith("occ-1", { before: "m2" });
+    expect(taskService.resolveChatTask).not.toHaveBeenCalled();
+  });
+
+  it("uploads a photo and posts it immediately", async () => {
+    vi.mocked(taskService.listMessages).mockResolvedValue({ messages: [], has_more: false });
+    vi.mocked(taskService.uploadPhoto).mockResolvedValue({ url: "/uploads/p.jpg" } as never);
+    vi.mocked(taskService.postMessage).mockResolvedValue({
+      occurrence: { id: "occ-1", status: "awaiting_response" },
+    } as never);
+
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
+    await waitFor(() => expect(screen.getByText(he.taskChatEmpty)).toBeTruthy());
+    fireEvent.click(screen.getByText("send-photo"));
+
+    await waitFor(() => {
+      expect(taskService.uploadPhoto).toHaveBeenCalled();
+      expect(taskService.postMessage).toHaveBeenCalledWith("occ-1", {
+        photo_url: "/uploads/p.jpg",
+      });
+    });
   });
 });

@@ -20,11 +20,14 @@ describe("EmployeeShiftHeader", () => {
     expect(screen.getByText("יום שלישי, 25 באוגוסט 2026")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "אחמד קאטוש" })).toBeTruthy();
     expect(screen.getByText("אק")).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.employeeBreakStart }).textContent).toContain(
+      he.employeeBreakStart,
+    );
     fireEvent.click(screen.getByRole("button", { name: he.employeeBreakStart }));
     expect(onToggleBreak).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the end-break tooltip while on break", () => {
+  it("uses the end-break label while on break", () => {
     render(
       <EmployeeShiftHeader
         name="אחמד קאטוש"
@@ -49,5 +52,18 @@ describe("EmployeeShiftHeader", () => {
       />,
     );
     expect(screen.getByRole("button", { name: he.employeeChangePhoto })).toBeTruthy();
+  });
+
+  it("shows the excellence slogan under the name", () => {
+    render(
+      <EmployeeShiftHeader
+        name="מרדכי ייגר"
+        slogan="מצוינות כל יום"
+        onShift
+        onBreak={false}
+        onToggleBreak={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("מצוינות כל יום")).toBeTruthy();
   });
 });

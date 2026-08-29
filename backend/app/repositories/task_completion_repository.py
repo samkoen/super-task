@@ -38,6 +38,38 @@ class TaskCompletionRepository:
                 result[str(row.occurrence_id)] = domain
         return result
 
+    def list_quality_ratings_by_assignee(
+        self, user_ids: list[str]
+    ) -> list[tuple[str, int, str | None]]:
+        if not user_ids:
+            return []
+        try:
+            uuids = [mp.parse_uuid(uid) for uid in user_ids]
+        except ValueError:
+            return []
+        rows = (
+            self._db.query(
+                orm.TaskOccurrence.assignee_user_id,
+                orm.TaskCompletion.quality_rating,
+                orm.TaskOccurrence.ops_category,
+            )
+            .join(
+                orm.TaskOccurrence,
+                orm.TaskOccurrence.id == orm.TaskCompletion.occurrence_id,
+            )
+            .filter(
+                orm.TaskOccurrence.assignee_user_id.in_(uuids),
+                orm.TaskCompletion.quality_rating.isnot(None),
+                orm.TaskCompletion.manager_review_status == "approved",
+            )
+            .all()
+        )
+        return [
+            (str(assignee_id), int(rating), category)
+            for assignee_id, rating, category in rows
+            if assignee_id is not None and rating is not None
+        ]
+
     def create(
         self,
         *,
@@ -108,6 +140,7 @@ class TaskCompletionRepository:
         row.manager_reviewed_by_id = None
         row.manager_reviewed_at = None
         row.rejection_note = None
+        row.quality_rating = None
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)
 
@@ -119,6 +152,7 @@ class TaskCompletionRepository:
         manager_reviewed_by_id: str,
         manager_reviewed_at,
         rejection_note: str | None = None,
+        quality_rating: int | None = None,
     ) -> TaskCompletion | None:
         row = (
             self._db.query(orm.TaskCompletion)
@@ -131,6 +165,7 @@ class TaskCompletionRepository:
         row.manager_reviewed_by_id = mp.parse_uuid(manager_reviewed_by_id)
         row.manager_reviewed_at = manager_reviewed_at
         row.rejection_note = rejection_note
+        row.quality_rating = quality_rating
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)
 

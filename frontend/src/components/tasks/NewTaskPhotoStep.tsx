@@ -25,7 +25,7 @@ export default function NewTaskPhotoStep({
   onSkip,
   onPhoto,
 }: NewTaskPhotoStepProps) {
-  const camera = useCameraStream();
+  const camera = useCameraStream({ defaultFacing: "environment" });
 
   useEffect(() => {
     if (!open) {

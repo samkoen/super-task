@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Drawer,
+  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -26,12 +27,15 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
-import StorefrontIcon from "@mui/icons-material/Storefront";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationBell from "../notifications/NotificationBell";
+import ChatAlertBanner from "../notifications/ChatAlertBanner";
 import { useAuth } from "../../context/AuthContext";
+import { useEmployeeBreakMute } from "../../hooks/useEmployeeBreakMute";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
+import { useNativeTaskChatAlerts } from "../../hooks/useNativeTaskChatAlerts";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
 import { SIDEBAR_WIDTH } from "../../constants/layout";
@@ -100,7 +104,14 @@ function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isEmployee = usesEmployeeChrome(user?.role, location.pathname);
-  useEmployeeNotificationSounds(Boolean(user) && !loading && isEmployee);
+  const employeeAlertsOn = Boolean(user) && !loading && isEmployee;
+  const breakMuted = useEmployeeBreakMute(employeeAlertsOn);
+  useEmployeeNotificationSounds(employeeAlertsOn, breakMuted);
+  const chatAlerts = useNativeTaskChatAlerts({
+    enabled: Boolean(user) && !loading,
+    onBreak: breakMuted,
+    role: user?.role,
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const overlayNav = shouldUseMainNavOverlay(isNativeApp());
   const showBack = shouldShowAppBack(location.pathname, user?.role);
@@ -149,7 +160,10 @@ function Layout() {
       );
       return items;
     }
-    return [{ text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" }];
+    return [
+      { text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" },
+      { text: he.myAccount, icon: <AccountCircleIcon />, path: "/employee/account" },
+    ];
   }, [user]);
 
   const handleLogout = () => {
@@ -180,20 +194,7 @@ function Layout() {
     >
       <Box sx={{ ...sidebarHeaderSx, borderBottomColor: alpha("#fff", 0.08) }}>
         <Box display="flex" alignItems="center" gap={1.25} mb={2}>
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
-              display: "grid",
-              placeItems: "center",
-              bgcolor: alpha(SIDEBAR_ACCENT, 0.2),
-              color: SIDEBAR_ACCENT,
-              border: `1px solid ${alpha(SIDEBAR_ACCENT, 0.35)}`,
-            }}
-          >
-            <StorefrontIcon fontSize="small" />
-          </Box>
+          <AppBrandMark size={40} />
           <Box minWidth={0}>
             <Typography variant="subtitle1" fontWeight={800} noWrap letterSpacing="-0.02em">
               {he.appName}
@@ -232,7 +233,7 @@ function Layout() {
               {user?.full_name}
             </Typography>
           </Box>
-          <NotificationBell />
+          <NotificationBell muteIncoming={breakMuted} />
         </Box>
         {isEmployee && (user?.branches?.length ?? 0) >= 2 && (
           <Box mt={1.5}>
@@ -349,19 +350,7 @@ function Layout() {
           }}
         >
           <Box display="flex" alignItems="center" gap={1.25}>
-            <Box
-              sx={{
-                width: 34,
-                height: 34,
-                borderRadius: 1.5,
-                display: "grid",
-                placeItems: "center",
-                bgcolor: alpha(SIDEBAR_ACCENT, 0.2),
-                color: SIDEBAR_ACCENT,
-              }}
-            >
-              <StorefrontIcon sx={{ fontSize: 20 }} />
-            </Box>
+            <AppBrandMark size={34} />
             <Box>
               <Typography variant="subtitle1" fontWeight={800} lineHeight={1.2}>
                 {he.appName}
@@ -372,7 +361,18 @@ function Layout() {
             </Box>
           </Box>
           <Box display="flex" alignItems="center" gap={0.5}>
-            <NotificationBell />
+            <NotificationBell muteIncoming={breakMuted} />
+            <IconButton
+              color="inherit"
+              aria-label={he.myAccount}
+              onClick={() => navigate("/employee/account")}
+              sx={{
+                opacity: location.pathname === "/employee/account" ? 1 : 0.85,
+                "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
+              }}
+            >
+              <AccountCircleIcon />
+            </IconButton>
             {user?.role === "branch_manager" && (
               <Button
                 type="button"
@@ -425,6 +425,11 @@ function Layout() {
           {showBack && <BackButton />}
           <OutletSuspense />
         </Box>
+        <ChatAlertBanner
+          alert={chatAlerts.banner}
+          onOpen={chatAlerts.open}
+          onClose={chatAlerts.dismiss}
+        />
       </Box>
     );
   }
@@ -521,6 +526,11 @@ function Layout() {
           <ManagerBottomNav forceVisible={overlayNav} />
         </>
       )}
+      <ChatAlertBanner
+        alert={chatAlerts.banner}
+        onOpen={chatAlerts.open}
+        onClose={chatAlerts.dismiss}
+      />
     </Box>
   );
 }

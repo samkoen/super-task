@@ -6,12 +6,14 @@ import {
   CircularProgress,
   MenuItem,
   Paper,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -19,14 +21,17 @@ import { ApiError } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import {
   reportService,
+  type AttendanceReport,
   type EmployeeWorkReport,
   type ReportPeriod,
 } from "../../services/reportService";
 import { useAuth } from "../../context/AuthContext";
 import PageHeader from "../../components/ui/PageHeader";
 import ManagerReportCharts from "../../components/reports/ManagerReportCharts";
+import ManagerAttendanceTable from "../../components/reports/ManagerAttendanceTable";
 import { he } from "../../i18n/he";
 import type { JobFunction } from "../../services/api";
+import { formatDurationMinutes } from "../../utils/attendanceFormat";
 import {
   parseBranchFromSearch,
   writeManagerScopeBranchId,
@@ -35,6 +40,7 @@ import { useSearchParams } from "react-router-dom";
 
 const PERIODS: ReportPeriod[] = ["today", "7d", "30d"];
 const ALL_NETWORK = "";
+type ReportTab = "tasks" | "attendance";
 
 function pctLabel(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -60,6 +66,7 @@ export default function ManagerReportsPage() {
   const canPickBranch = user?.role === "network_manager" || user?.role === "admin";
   const [branches, setBranches] = useState<Branch[]>([]);
   const [period, setPeriod] = useState<ReportPeriod>("today");
+  const [tab, setTab] = useState<ReportTab>("tasks");
   const [branchId, setBranchId] = useState(() => {
     if (!(user?.role === "network_manager" || user?.role === "admin")) {
       return user?.branch_id || "";
@@ -67,6 +74,7 @@ export default function ManagerReportsPage() {
     return parseBranchFromSearch(searchParams) || ALL_NETWORK;
   });
   const [data, setData] = useState<EmployeeWorkReport | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -82,18 +90,25 @@ export default function ManagerReportsPage() {
     setError("");
     try {
       if (scopeBranch) writeManagerScopeBranchId(scopeBranch);
-      const report = await reportService.teamEmployees({
+      const query = {
         ...(scopeBranch ? { branch_id: scopeBranch } : {}),
         period,
-      });
-      setData(report);
+      };
+      if (tab === "attendance") {
+        setAttendance(await reportService.teamAttendance(query));
+        setData(null);
+      } else {
+        setData(await reportService.teamEmployees(query));
+        setAttendance(null);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
       setData(null);
+      setAttendance(null);
     } finally {
       setLoading(false);
     }
-  }, [canPickBranch, scopeBranch, period]);
+  }, [canPickBranch, scopeBranch, period, tab]);
 
   useEffect(() => {
     if (!canPickBranch) return;
@@ -118,14 +133,30 @@ export default function ManagerReportsPage() {
   }, [branchId, canPickBranch, setSearchParams]);
 
   const summary = data?.summary;
-  const scopeLabel = data?.branch_name || (data?.network_wide ? he.reportAllNetwork : "");
+  const attendanceSummary = attendance?.summary;
+  const scopeLabel =
+    data?.branch_name ||
+    attendance?.branch_name ||
+    (data?.network_wide || attendance?.network_wide ? he.reportAllNetwork : "");
+  const subtitle =
+    tab === "attendance" ? he.attendanceSubtitle : he.managerReportsSubtitle;
+  const durationLabels = { hours: he.reportHoursShort, minutes: he.reportMinutesShort };
 
   return (
     <Box>
       <PageHeader
         title={he.managerReports}
-        subtitle={scopeLabel ? `${he.managerReportsSubtitle} · ${scopeLabel}` : he.managerReportsSubtitle}
+        subtitle={scopeLabel ? `${subtitle} · ${scopeLabel}` : subtitle}
       />
+
+      <Tabs
+        value={tab}
+        onChange={(_, value: ReportTab) => setTab(value)}
+        sx={{ mb: 2 }}
+      >
+        <Tab value="tasks" label={he.reportTabTasks} />
+        <Tab value="attendance" label={he.reportTabAttendance} />
+      </Tabs>
 
       <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
         <TextField
@@ -167,7 +198,7 @@ export default function ManagerReportsPage() {
         </Alert>
       )}
 
-      {summary && (
+      {summary && tab === "tasks" && (
         <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
           <Chip label={`${he.reportAvgCompletion}: ${pctLabel(summary.avg_completion_pct)}`} />
           <Chip label={`${he.reportTotalCompleted}: ${summary.total_completed}`} />
@@ -178,10 +209,27 @@ export default function ManagerReportsPage() {
         </Box>
       )}
 
-      {loading && !data ? (
+      {attendanceSummary && tab === "attendance" && (
+        <Box display="flex" gap={1.5} flexWrap="wrap" mb={2}>
+          <Chip
+            label={`${he.attendanceTotalHours}: ${formatDurationMinutes(attendanceSummary.total_worked_minutes, durationLabels)}`}
+          />
+          <Chip
+            label={`${he.attendanceTotalOvertime}: ${formatDurationMinutes(attendanceSummary.total_overtime_minutes, durationLabels)}`}
+          />
+          <Chip
+            color={attendanceSummary.alert_count > 0 ? "warning" : "default"}
+            label={`${he.attendanceAlertEmployees}: ${attendanceSummary.alert_count}`}
+          />
+        </Box>
+      )}
+
+      {loading ? (
         <Box display="flex" justifyContent="center" py={8}>
           <CircularProgress />
         </Box>
+      ) : tab === "attendance" ? (
+        attendance && <ManagerAttendanceTable report={attendance} />
       ) : (
         <>
           {data && <ManagerReportCharts report={data} />}

@@ -14,5 +14,6 @@ describe("shouldShowAppBack", () => {
     expect(shouldShowAppBack("/manager/chats", "branch_manager")).toBe(true);
     expect(shouldShowAppBack("/manager/issues", "network_manager")).toBe(true);
     expect(shouldShowAppBack("/admin/users", "admin")).toBe(true);
+    expect(shouldShowAppBack("/employee/account", "employee")).toBe(true);
   });
 });

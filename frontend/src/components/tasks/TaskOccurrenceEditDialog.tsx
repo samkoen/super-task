@@ -141,6 +141,19 @@ export default function TaskOccurrenceEditDialog({
           </Box>
         ) : (
           <>
+            <TaskChatPanel
+              key={`chat-${target.id}`}
+              occurrenceId={target.id}
+              occurrenceStatus={target.status}
+              chatFollowUpAt={target.chat_follow_up_at}
+              chatResolvedAt={target.chat_resolved_at}
+              compact
+              composeEnabled={canComposeTaskChat(target.status, false)}
+              onOccurrenceUpdated={(_status, notice) => {
+                showSuccess(notice ?? he.taskChatSent);
+                onSaved?.(notice ?? he.taskChatSent);
+              }}
+            />
             <CoreEditFields form={form} setForm={setForm} />
             <AssigneeField
               target={target}
@@ -203,16 +216,6 @@ export default function TaskOccurrenceEditDialog({
               }
               disabled={saving}
               onError={showError}
-            />
-            <TaskChatPanel
-              key={`chat-${target.id}`}
-              occurrenceId={target.id}
-              compact
-              composeEnabled={canComposeTaskChat(target.status, false)}
-              onOccurrenceUpdated={() => {
-                showSuccess(he.taskChatSent);
-                onSaved?.(he.taskChatSent);
-              }}
             />
           </>
         )}

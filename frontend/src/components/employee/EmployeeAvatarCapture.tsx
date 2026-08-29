@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PhotoCaptureDialog } from "../media/MediaCaptureActions";
 import { useCameraStream } from "../../hooks/useCameraStream";
 import { he } from "../../i18n/he";
+import AvatarCropDialog from "./AvatarCropDialog";
 
 function afterPaint(run: () => void) {
   if (typeof requestAnimationFrame === "function") {
@@ -16,6 +17,7 @@ interface EmployeeAvatarCaptureProps {
   uploading: boolean;
   onClose: () => void;
   onCapture: (file: File) => void | Promise<void>;
+  uploadingLabel?: string;
 }
 
 export default function EmployeeAvatarCapture({
@@ -23,11 +25,14 @@ export default function EmployeeAvatarCapture({
   uploading,
   onClose,
   onCapture,
+  uploadingLabel,
 }: EmployeeAvatarCaptureProps) {
-  const camera = useCameraStream();
+  const camera = useCameraStream({ defaultFacing: "user" });
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const skipParentClose = useRef(false);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || cropFile) {
       camera.stop();
       return;
     }
@@ -36,21 +41,54 @@ export default function EmployeeAvatarCapture({
     });
     return () => camera.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, cropFile]);
 
-  const handleClose = useCallback(() => {
+  const handlePhotoDialogClose = useCallback(() => {
     camera.stop();
+    if (skipParentClose.current) {
+      skipParentClose.current = false;
+      return;
+    }
     onClose();
   }, [camera, onClose]);
 
+  const handlePhotoTaken = useCallback((file: File) => {
+    skipParentClose.current = true;
+    setCropFile(file);
+  }, []);
+
+  const handleCropClose = useCallback(() => {
+    setCropFile(null);
+    onClose();
+  }, [onClose]);
+
+  const handleCropConfirm = useCallback(
+    async (file: File) => {
+      await onCapture(file);
+      setCropFile(null);
+    },
+    [onCapture],
+  );
+
   return (
-    <PhotoCaptureDialog
-      open={open}
-      uploading={uploading}
-      camera={camera}
-      onClose={handleClose}
-      onCapture={onCapture}
-      title={he.employeeChangePhoto}
-    />
+    <>
+      <PhotoCaptureDialog
+        open={open && !cropFile}
+        uploading={false}
+        camera={camera}
+        onClose={handlePhotoDialogClose}
+        onCapture={handlePhotoTaken}
+        title={he.employeeChangePhoto}
+        annotate={false}
+      />
+      <AvatarCropDialog
+        open={Boolean(cropFile)}
+        file={cropFile}
+        uploading={uploading}
+        busyLabel={uploadingLabel}
+        onClose={handleCropClose}
+        onConfirm={handleCropConfirm}
+      />
+    </>
   );
 }

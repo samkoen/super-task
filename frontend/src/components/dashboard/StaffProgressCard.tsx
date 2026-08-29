@@ -26,6 +26,7 @@ import {
   memberTasks,
 } from "../../utils/staffProgress";
 import StaffProgressBar from "./StaffProgressBar";
+import EmployeeQualityRating from "../employee/EmployeeQualityRating";
 
 interface StaffProgressCardProps {
   member: TeamMember;
@@ -125,10 +126,11 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
   const tasks = useMemo(() => memberTasks(member), [member]);
   const groups = useMemo(() => groupMemberTasks(tasks), [tasks]);
   const role = jobLabel(member.job_function);
-  const presence = formatPresenceLabel(progress.arrivedAt, progress.departureTime, {
+  const presence = formatPresenceLabel(progress.arrivedAt, progress.departedAt, {
     arrival: he.dashboardStaffArrival,
     departure: he.dashboardStaffDeparture,
     notArrived: he.dashboardStaffNotArrived,
+    stillOnShift: he.dashboardStaffStillOnShift,
   });
 
   const handleToggleNext = async (task: TimelineTask, enabled: boolean) => {
@@ -207,6 +209,9 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
         </Box>
 
         <StaffProgressBar segments={progress.segments} total={progress.total} />
+        <Box mt={1}>
+          <EmployeeQualityRating summary={member.quality_rating} />
+        </Box>
         <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
           {he.dashboardTasksProgress(progress.segments.approved, progress.total)}
           {" · "}

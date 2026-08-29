@@ -25,4 +25,9 @@ export const employeeActivityService = {
     );
     return response.data;
   },
+
+  ring: async (userId: string) => {
+    const response = await api.post("/employee-activity/break/ring", { user_id: userId });
+    return response.data;
+  },
 };

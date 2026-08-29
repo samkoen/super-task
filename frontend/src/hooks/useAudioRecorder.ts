@@ -8,6 +8,7 @@ export function useAudioRecorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const waitersRef = useRef<Array<(blob: Blob | null) => void>>([]);
 
   const supported =
     typeof window !== "undefined" &&
@@ -51,6 +52,8 @@ export function useAudioRecorder() {
         setBlob(next);
         cleanupStream();
         setRecording(false);
+        const result = next.size > 0 ? next : null;
+        waitersRef.current.splice(0).forEach((resolve) => resolve(result));
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
@@ -71,5 +74,14 @@ export function useAudioRecorder() {
     }
   }, [cleanupStream]);
 
-  return { supported, recording, blob, error, start, stop, reset };
+  const stopAndWait = useCallback((): Promise<Blob | null> => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") return Promise.resolve(null);
+    return new Promise((resolve) => {
+      waitersRef.current.push(resolve);
+      recorder.stop();
+    });
+  }, []);
+
+  return { supported, recording, blob, error, start, stop, stopAndWait, reset };
 }

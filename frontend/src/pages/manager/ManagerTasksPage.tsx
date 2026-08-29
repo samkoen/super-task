@@ -386,6 +386,7 @@ export default function ManagerTasksPage() {
           min_video_seconds: payload.min_video_seconds,
           completion_requirements,
           is_work_start: payload.is_work_start,
+          is_work_end: payload.is_work_end,
           start_url: payload.start_url,
           ...media,
         });

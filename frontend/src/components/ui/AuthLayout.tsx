@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { alpha, Box, Card, CardContent, Typography } from "@mui/material";
-import StorefrontIcon from "@mui/icons-material/Storefront";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import AppBrandMark from "./AppBrandMark";
 import GroupsIcon from "@mui/icons-material/Groups";
 import SpeedIcon from "@mui/icons-material/Speed";
 import { he } from "../../i18n/he";
@@ -69,19 +69,7 @@ export default function AuthLayout({ title, children }: AuthLayoutProps) {
               border: `1px solid ${alpha("#fff", 0.1)}`,
             }}
           >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: 2,
-                display: "grid",
-                placeItems: "center",
-                bgcolor: alpha("#1A9B86", 0.25),
-                color: "#5EEAD4",
-              }}
-            >
-              <StorefrontIcon />
-            </Box>
+            <AppBrandMark size={42} />
             <Typography variant="h5" fontWeight={800} letterSpacing="-0.02em">
               {he.appName}
             </Typography>
@@ -146,7 +134,7 @@ export default function AuthLayout({ title, children }: AuthLayoutProps) {
             px: 2.5,
           }}
         >
-          <StorefrontIcon color="primary" />
+          <AppBrandMark size={32} />
           <Typography variant="h6" fontWeight={800} color="primary.main">
             {he.appName}
           </Typography>

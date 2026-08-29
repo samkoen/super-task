@@ -24,10 +24,12 @@ import {
   uploadPendingMedia,
   type PendingMedia,
 } from "../../utils/pendingMedia";
+import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import CompletionMediaPreview from "../tasks/CompletionMediaPreview";
+import BreakAlertDialog from "./BreakAlertDialog";
 
 interface DirectChatThreadProps {
   conversationId: string | null;
@@ -48,6 +50,7 @@ export default function DirectChatThread({
   const [sending, setSending] = useState(false);
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
+  const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pendingRef = useRef({ photo: null as PendingMedia | null, video: null as PendingMedia | null, audio: null as PendingMedia | null });
   pendingRef.current = { photo: pendingPhoto, video: pendingVideo, audio: pendingAudio };
@@ -98,7 +101,8 @@ export default function DirectChatThread({
       if (broadcast) {
         await directChatService.broadcast(payload);
       } else if (conversationId) {
-        await directChatService.send(conversationId, payload);
+        const sent = await directChatService.send(conversationId, payload);
+        setBreakAlert(parseRecipientBreak(sent));
         stickToBottom.current = true;
         await loadLatest(true);
       }
@@ -175,6 +179,7 @@ export default function DirectChatThread({
       >
         {broadcast ? he.directChatBroadcast : he.taskChatSend}
       </Button>
+      <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
     </Box>
   );
 }

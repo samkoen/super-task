@@ -1,9 +1,9 @@
-"""Generate Android launcher mipmaps + web favicons from SuperShift icon."""
+"""Generate Android launcher mipmaps + web favicons from super-man icon."""
 from pathlib import Path
 
 from PIL import Image
 
-SRC = Path(__file__).resolve().parents[1] / "public" / "supershift-app-icon.png"
+SRC = Path(__file__).resolve().parents[1] / "public" / "super-man-app-icon.png"
 RES = Path(__file__).resolve().parents[1] / "android" / "app" / "src" / "main" / "res"
 PUBLIC = Path(__file__).resolve().parents[1] / "public"
 

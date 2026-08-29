@@ -230,6 +230,7 @@ class TaskOccurrenceRepository:
         min_video_seconds: int | None = None,
         completion_requirements: list | None = None,
         is_work_start: bool = False,
+        is_work_end: bool = False,
         start_url: str | None = None,
         network_group_id: str | None = None,
     ) -> TaskOccurrence:
@@ -251,6 +252,7 @@ class TaskOccurrenceRepository:
             min_video_seconds=min_video_seconds,
             completion_requirements=completion_requirements,
             is_work_start=bool(is_work_start),
+            is_work_end=bool(is_work_end),
             start_url=(start_url or "").strip() or None,
             network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             manager_user_id=mp.parse_uuid(manager_user_id) if manager_user_id else None,
@@ -274,8 +276,35 @@ class TaskOccurrenceRepository:
         if not row:
             return None
         row.status = status
+        if status == task_status.AWAITING_RESPONSE:
+            row.chat_follow_up_at = None
+            row.chat_resolved_at = None
         if status in task_status.TERMINAL:
             row.manager_next_at = None
+            row.chat_follow_up_at = None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def resolve_chat_task(
+        self, id_: str, *, resolved_at: datetime, status: str
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.chat_resolved_at = resolved_at
+        row.chat_follow_up_at = None
+        row.status = status
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def set_chat_follow_up(
+        self, id_: str, *, follow_up_at: datetime
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.chat_follow_up_at = follow_up_at
+        row.chat_resolved_at = None
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
@@ -360,6 +389,17 @@ class TaskOccurrenceRepository:
         if not row:
             return None
         row.start_url = (start_url or "").strip() or None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def update_work_flags(
+        self, id_: str, *, is_work_start: bool, is_work_end: bool
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.is_work_start = bool(is_work_start)
+        row.is_work_end = bool(is_work_end)
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

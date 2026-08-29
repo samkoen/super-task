@@ -49,6 +49,22 @@ function baseTask(over: Partial<TaskOccurrence> = {}): TaskOccurrence {
 }
 
 describe("TaskOccurrenceCard", () => {
+  it("keeps the chat button under the title so the manager need not scroll", () => {
+    render(
+      <TaskOccurrenceCard
+        task={baseTask()}
+        index={0}
+        onEdit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const title = screen.getByText("ניקיון מדף");
+    const chat = screen.getByRole("button", { name: he.taskChatSection });
+    const due = screen.getByText(he.dueAt, { exact: false });
+    expect(title.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chat.compareDocumentPosition(due) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("hides chat panel on menahel card by default", () => {
     render(
       <TaskOccurrenceCard

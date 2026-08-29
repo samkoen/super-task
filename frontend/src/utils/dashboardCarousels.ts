@@ -1,4 +1,5 @@
 import type { TaskQueues, TimelineTask } from "../services/dashboardService";
+import { isContinuousChatTask, isPendingFollowUpTask } from "./chatTaskFollowUp";
 
 /** Priorité haute (cadre rouge/orange) — questions / ממתין לתגובה (phase chat). */
 export type ActionQueueReason = "awaiting_response" | "pending_review";
@@ -17,14 +18,15 @@ export function isFilterAll(value: string | null): boolean {
   return !value;
 }
 
-/** שורה 1 SPEC — שאלות עובדים בלבד (ממתין לתגובה). */
-export function buildQuestionsQueue(queues: TaskQueues | null | undefined): ActionQueueItem[] {
+/** שורה 1 SPEC — שאלות עובדים בלבד (ממתין לתגובה), hors rappel futur. */
+export function buildQuestionsQueue(
+  queues: TaskQueues | null | undefined,
+  nowMs = Date.now(),
+): ActionQueueItem[] {
   if (!queues) return [];
-  const fromReview = (queues.pending_review ?? []).filter(
-    (t) => t.status === "awaiting_response" || t.segment === "awaiting_response",
-  );
-  const fromUpcoming = (queues.upcoming ?? []).filter((t) => t.status === "awaiting_response");
-  const fromInProgress = (queues.in_progress ?? []).filter((t) => t.status === "awaiting_response");
+  const fromReview = (queues.pending_review ?? []).filter((t) => isContinuousChatTask(t, nowMs));
+  const fromUpcoming = (queues.upcoming ?? []).filter((t) => isContinuousChatTask(t, nowMs));
+  const fromInProgress = (queues.in_progress ?? []).filter((t) => isContinuousChatTask(t, nowMs));
   const seen = new Set<string>();
   const out: ActionQueueItem[] = [];
   for (const task of [...fromReview, ...fromUpcoming, ...fromInProgress]) {
@@ -56,13 +58,27 @@ export function buildActionQueue(queues: TaskQueues | null | undefined): ActionQ
   return [...buildQuestionsQueue(queues), ...buildPendingReviewQueue(queues)];
 }
 
-/** Tâches du jour pas encore terminées (hors revue photo / terminées). */
-export function buildPendingTasks(queues: TaskQueues | null | undefined): TimelineTask[] {
+/** Tâches du jour pas encore terminées + rappels chat en attente de מעקב. */
+export function buildPendingTasks(
+  queues: TaskQueues | null | undefined,
+  nowMs = Date.now(),
+): TimelineTask[] {
   if (!queues) return [];
+  const parked = [
+    ...(queues.pending_review ?? []),
+    ...(queues.in_progress ?? []),
+    ...(queues.upcoming ?? []),
+  ].filter((t) => isPendingFollowUpTask(t, nowMs));
   const open = [...(queues.in_progress ?? []), ...(queues.upcoming ?? [])].filter(
     (t) => t.status !== "awaiting_response",
   );
-  return open.sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+  const seen = new Set(parked.map((t) => t.id));
+  const merged = [...parked, ...open.filter((t) => !seen.has(t.id))];
+  return merged.sort((a, b) => {
+    const aAt = a.chat_follow_up_at ?? a.due_at;
+    const bAt = b.chat_follow_up_at ?? b.due_at;
+    return new Date(aAt).getTime() - new Date(bAt).getTime();
+  });
 }
 
 export function filterPendingTasks(

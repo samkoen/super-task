@@ -1,4 +1,5 @@
 import api from "./api";
+import type { QualityRatingSummary } from "../utils/qualityRating";
 import type { CompletionRequirement } from "../utils/completionMedia";
 import type { TaskCompletion, TaskKind, TaskStatus } from "./taskService";
 
@@ -64,8 +65,11 @@ export interface TimelineTask {
   task_kind: TaskKind;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  chat_follow_up_at?: string | null;
+  chat_resolved_at?: string | null;
   reference_photo_url?: string | null;
   is_work_start?: boolean;
+  is_work_end?: boolean;
   min_video_seconds?: number | null;
 }
 
@@ -82,6 +86,7 @@ export interface TeamMember {
   open_tasks: number;
   timeline: TimelineTask[];
   overdue_backlog: TimelineTask[];
+  quality_rating?: QualityRatingSummary;
 }
 
 export interface TaskQueues {
@@ -164,6 +169,7 @@ export interface EmployeeTaskCard {
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
+  is_work_end?: boolean;
   start_url?: string | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
@@ -189,6 +195,8 @@ export interface EmployeeDashboard {
     branch_name: string | null;
     preferred_language?: string;
     avatar_url?: string | null;
+    excellence_slogan?: string | null;
+    quality_rating?: QualityRatingSummary;
   };
   progress_percent: number;
   on_shift: boolean;

@@ -34,6 +34,7 @@ import {
 import { taskService, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
 import { employeeActivityService } from "../../services/employeeActivityService";
+import { dispatchBreakChange } from "../../utils/employeeBreakMute";
 import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -185,6 +186,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     min_video_seconds: task.min_video_seconds ?? null,
     completion_requirements: task.completion_requirements ?? [],
     is_work_start: task.is_work_start,
+    is_work_end: task.is_work_end,
     start_url: task.start_url ?? null,
     reference_photo_url: task.reference_photo_url ?? null,
     reference_video_url: task.reference_video_url ?? null,
@@ -265,6 +267,7 @@ export default function EmployeeTasksPage() {
       ]);
       setDashboard(data);
       setOnBreak(Boolean(breakState.on_break));
+      dispatchBreakChange(Boolean(breakState.on_break));
       const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
       const allTasks = [
         ...data.urgent_tasks,
@@ -484,7 +487,7 @@ export default function EmployeeTasksPage() {
       });
       clearCompletionMedia();
       setDetailTask(null);
-      playTaskEndSound();
+      if (!onBreak) playTaskEndSound();
       showSuccess(he.taskSubmitSuccess);
       await load();
     } catch (e) {
@@ -501,6 +504,7 @@ export default function EmployeeTasksPage() {
         ? await employeeActivityService.endBreak()
         : await employeeActivityService.startBreak();
       setOnBreak(Boolean(res.on_break));
+      dispatchBreakChange(Boolean(res.on_break));
       showSuccess(onBreak ? he.employeeBreakEnded : he.employeeBreakStarted);
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -512,10 +516,10 @@ export default function EmployeeTasksPage() {
   const handleAvatarCapture = async (file: File) => {
     setAvatarUploading(true);
     try {
-      await authService.uploadAvatar(file);
+      await authService.stylizeAvatar(file);
       await refresh();
       await load(true);
-      showSuccess(he.employeePhotoUpdated);
+      showSuccess(he.employeePhotoStylized);
       setAvatarOpen(false);
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
@@ -606,6 +610,7 @@ export default function EmployeeTasksPage() {
         photoUrl={photoUrl}
         photoEditable
         onEditPhoto={() => setAvatarOpen(true)}
+        slogan={dashboard?.employee?.excellence_slogan ?? user?.excellence_slogan}
         meta={[
           headerBranch ? `${he.branch}: ${headerBranch}` : "",
           headerJob ? jobLabel(headerJob) : "",
@@ -617,11 +622,13 @@ export default function EmployeeTasksPage() {
         breakBusy={breakBusy}
         progress={progress}
         onToggleBreak={() => void handleToggleBreak()}
+        qualityRating={dashboard?.employee?.quality_rating}
       />
 
       <EmployeeAvatarCapture
         open={avatarOpen}
         uploading={avatarUploading}
+        uploadingLabel={he.avatarStylizing}
         onClose={() => setAvatarOpen(false)}
         onCapture={handleAvatarCapture}
       />

@@ -204,7 +204,7 @@ class UserService:
             raise ValueError("משתמש לא נמצא")
         self._assert_can_manage_team_member(actor, target)
         cleaned = normalize_avatar_url(avatar_url)
-        updated = self._repo.update_avatar(user_id, cleaned)
+        updated = self._repo.update_avatar(user_id, cleaned, excellence_slogan=None)
         assert updated is not None
         return self._to_api(updated)
 
