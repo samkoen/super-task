@@ -251,6 +251,7 @@ export const he = {
   qualityRatingRequired: "יש לבחור דירוג בין 1 ל-5",
   qualityRatingNone: "אין דירוג עדיין",
   qualityRatingCount: (count: number) => (count === 1 ? "משימה אחת" : `${count} משימות`),
+  qualityStarLabel: (n: number) => (n === 1 ? "כוכב אחד" : `${n} כוכבים`),
   fixedTaskApplyToNetwork: "כל הסניפים ברשת",
   fixedTaskApplyToNetworkHint: "המשימה תועתק לכל סניף ותשויך לעובד הראשון בכל סניף",
   fixedTaskScopeOne: "סניף אחד",

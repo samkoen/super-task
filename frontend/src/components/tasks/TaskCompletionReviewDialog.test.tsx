@@ -79,7 +79,7 @@ describe("TaskCompletionReviewDialog", () => {
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={onClose} onDone={onDone} />,
     );
-    fireEvent.click(screen.getByRole("radio", { name: "4 Stars" }));
+    fireEvent.click(screen.getByRole("radio", { name: he.qualityStarLabel(4) }));
     fireEvent.click(screen.getByRole("button", { name: he.taskApproveClose }));
     await waitFor(() => {
       expect(taskService.approve).toHaveBeenCalledWith("occ-1", { quality_rating: 4 });
