@@ -63,6 +63,15 @@ beforeEach(() => {
 });
 
 describe("TaskCompletionReviewDialog", () => {
+  it("places chat above completion media", () => {
+    render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    const chat = screen.getByTestId("task-chat-panel");
+    const preview = screen.getByTestId("completion-preview");
+    expect(chat.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("approves and closes the task", async () => {
     vi.mocked(taskService.approve).mockResolvedValue({} as never);
     const onDone = vi.fn();

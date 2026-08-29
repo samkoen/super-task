@@ -106,6 +106,17 @@ export default function TaskCompletionReviewDialog({
           </Typography>
         )}
         {task && (
+          <TaskChatPanel
+            key={task.id}
+            occurrenceId={task.id}
+            compact
+            composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
+            onOccurrenceUpdated={() => {
+              onDone(he.taskChatSent);
+            }}
+          />
+        )}
+        {task && (
           <TaskReferenceMediaDisplay
             reference_photo_url={task.reference_photo_url}
             reference_video_url={task.reference_video_url}
@@ -152,18 +163,6 @@ export default function TaskCompletionReviewDialog({
             multiline
             minRows={2}
             disabled={saving}
-          />
-        )}
-
-        {task && (
-          <TaskChatPanel
-            key={task.id}
-            occurrenceId={task.id}
-            compact
-            composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
-            onOccurrenceUpdated={() => {
-              onDone(he.taskChatSent);
-            }}
           />
         )}
 

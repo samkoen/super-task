@@ -28,6 +28,7 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
   const startedAtRef = useRef<number | null>(null);
   const tickRef = useRef<number | null>(null);
   const facingRef = useRef<CameraFacing>(initialFacing);
+  const waitersRef = useRef<Array<(blob: Blob | null) => void>>([]);
 
   const supported = isMediaCaptureSupported();
 
@@ -144,6 +145,8 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
       setBlob(next);
       setRecording(false);
       detachLivePreview();
+      const result = next.size > 0 ? next : null;
+      waitersRef.current.splice(0).forEach((resolve) => resolve(result));
     };
     mediaRecorderRef.current = recorder;
     recorder.start();
@@ -164,6 +167,15 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
       return;
     }
     setRecording(false);
+  }, []);
+
+  const stopAndWait = useCallback((): Promise<Blob | null> => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") return Promise.resolve(null);
+    return new Promise((resolve) => {
+      waitersRef.current.push(resolve);
+      recorder.stop();
+    });
   }, []);
 
   const cleanup = useCallback(() => {
@@ -194,6 +206,7 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
     startPreview,
     startRecording,
     stopRecording,
+    stopAndWait,
     cleanup,
     reset,
     flip,

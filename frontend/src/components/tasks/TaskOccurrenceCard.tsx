@@ -404,65 +404,13 @@ export default function TaskOccurrenceCard({
             )}
           </Box>
 
-          <Typography variant="body2" fontWeight={600} dir="ltr" sx={{ textAlign: "start" }}>
-            {he.dueAt}: {formatDueAt(task.due_at)}
-          </Typography>
-
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
-            <Chip
-              size="small"
-              color={URGENCY_COLOR[urgency]}
-              label={he.taskUrgencyLabels[urgency]}
-              variant={urgency === "normal" ? "outlined" : "filled"}
-            />
-            <TaskStatusChip status={task.status} />
-            {isManagerNextTask(task) && (
-              <Chip
-                size="small"
-                color="primary"
-                label={isEmployeeMode ? he.employeeManagerNextTask : he.managerNextTask}
-              />
-            )}
-            {urgent && <Chip size="small" color="error" label={he.employeeUrgentTasks} />}
-            {carryOver && (
-              <Chip
-                size="small"
-                color="warning"
-                label={
-                  openingDayIso(task)
-                    ? he.employeeTaskCreatedOn(formatHebrewDayShort(openingDayIso(task)!))
-                    : he.employeeCarryOverTask
-                }
-              />
-            )}
-          </Box>
-
-          {canMarkNext && onSetManagerNext && (
-            <FormControlLabel
-              sx={{ m: 0, alignSelf: "flex-start" }}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={isManagerNextTask(task)}
-                  onChange={(e) => onSetManagerNext(task, e.target.checked)}
-                />
-              }
-              label={
-                <Typography variant="caption" color="text.secondary">
-                  {he.managerNextTask}
-                </Typography>
-              }
-            />
-          )}
-
           {isEmployeeMode ? (
             <>
               <Button
-                size="small"
                 variant={instructionsOpen ? "contained" : "outlined"}
                 startIcon={<ChatIcon />}
                 onClick={() => setInstructionsOpen((v) => !v)}
-                sx={{ alignSelf: "flex-start" }}
+                sx={{ alignSelf: "flex-start", minHeight: 48, px: 2, fontWeight: 800 }}
               >
                 {he.taskChatSection}
               </Button>
@@ -521,15 +469,65 @@ export default function TaskOccurrenceCard({
             canEdit &&
             onEdit && (
               <Button
-                size="small"
                 variant="outlined"
                 startIcon={<ChatIcon />}
                 onClick={() => onEdit(task)}
-                sx={{ alignSelf: "flex-start" }}
+                sx={{ alignSelf: "flex-start", minHeight: 48, px: 2, fontWeight: 800 }}
               >
                 {he.taskChatSection}
               </Button>
             )
+          )}
+
+          <Typography variant="body2" fontWeight={600} dir="ltr" sx={{ textAlign: "start" }}>
+            {he.dueAt}: {formatDueAt(task.due_at)}
+          </Typography>
+
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
+            <Chip
+              size="small"
+              color={URGENCY_COLOR[urgency]}
+              label={he.taskUrgencyLabels[urgency]}
+              variant={urgency === "normal" ? "outlined" : "filled"}
+            />
+            <TaskStatusChip status={task.status} />
+            {isManagerNextTask(task) && (
+              <Chip
+                size="small"
+                color="primary"
+                label={isEmployeeMode ? he.employeeManagerNextTask : he.managerNextTask}
+              />
+            )}
+            {urgent && <Chip size="small" color="error" label={he.employeeUrgentTasks} />}
+            {carryOver && (
+              <Chip
+                size="small"
+                color="warning"
+                label={
+                  openingDayIso(task)
+                    ? he.employeeTaskCreatedOn(formatHebrewDayShort(openingDayIso(task)!))
+                    : he.employeeCarryOverTask
+                }
+              />
+            )}
+          </Box>
+
+          {canMarkNext && onSetManagerNext && (
+            <FormControlLabel
+              sx={{ m: 0, alignSelf: "flex-start" }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={isManagerNextTask(task)}
+                  onChange={(e) => onSetManagerNext(task, e.target.checked)}
+                />
+              }
+              label={
+                <Typography variant="caption" color="text.secondary">
+                  {he.managerNextTask}
+                </Typography>
+              }
+            />
           )}
 
           {onListen && onStopListen && (

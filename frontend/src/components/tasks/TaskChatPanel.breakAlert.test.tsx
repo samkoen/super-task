@@ -21,6 +21,27 @@ vi.mock("../../services/taskService", () => ({
 
 vi.mock("../../utils/mediaUrl", () => ({ mediaUrl: (p: string | null) => p }));
 vi.mock("../media/MediaCaptureActions", () => ({ default: () => null }));
+vi.mock("../chat/ChatComposerBar", async () => {
+  const { he } = await import("../../i18n/he");
+  return {
+    default: (props: {
+      body: string;
+      onBodyChange: (value: string) => void;
+      onSendText: () => void;
+    }) => (
+      <>
+        <input
+          placeholder={he.taskChatPlaceholder}
+          value={props.body}
+          onChange={(e) => props.onBodyChange(e.target.value)}
+        />
+        <button type="button" onClick={props.onSendText}>
+          {he.taskChatSend}
+        </button>
+      </>
+    ),
+  };
+});
 
 describe("TaskChatPanel break alert", () => {
   beforeEach(() => {

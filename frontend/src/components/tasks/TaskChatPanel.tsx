@@ -4,26 +4,19 @@ import {
   Box,
   Button,
   CircularProgress,
-  TextField,
   Typography,
 } from "@mui/material";
-import SendIcon from "@mui/icons-material/Send";
 import { ApiError } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { taskService, type TaskMessage } from "../../services/taskService";
 import { he } from "../../i18n/he";
 import { formatTime } from "../../utils/dashboardTime";
-import {
-  replacePendingMedia,
-  revokePendingMedia,
-  uploadPendingMedia,
-  type PendingMedia,
-} from "../../utils/pendingMedia";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
-import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
+import type { MediaKind } from "../media/MediaCaptureActions";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import BreakAlertDialog from "../chat/BreakAlertDialog";
+import ChatComposerBar from "../chat/ChatComposerBar";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 
 interface TaskChatPanelProps {
@@ -57,34 +50,10 @@ export default function TaskChatPanel({
 }: TaskChatPanelProps) {
   const { user } = useAuth();
   const [body, setBody] = useState("");
-  const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
-  const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
-  const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
   const [sending, setSending] = useState(false);
-  const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
   const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const pendingRef = useRef({
-    photo: null as PendingMedia | null,
-    video: null as PendingMedia | null,
-    audio: null as PendingMedia | null,
-  });
-
-  pendingRef.current = {
-    photo: pendingPhoto,
-    video: pendingVideo,
-    audio: pendingAudio,
-  };
-
-  const clearPending = useCallback(() => {
-    revokePendingMedia(pendingRef.current.photo);
-    revokePendingMedia(pendingRef.current.video);
-    revokePendingMedia(pendingRef.current.audio);
-    setPendingPhoto(null);
-    setPendingVideo(null);
-    setPendingAudio(null);
-  }, []);
 
   const fetchPage = useCallback(async (before?: string) => {
     try {
@@ -106,54 +75,41 @@ export default function TaskChatPanel({
     }
   }, [messages.length, loading, stickToBottom]);
 
-  useEffect(() => {
-    return () => {
-      revokePendingMedia(pendingRef.current.photo);
-      revokePendingMedia(pendingRef.current.video);
-      revokePendingMedia(pendingRef.current.audio);
-    };
-  }, []);
-
-  const handleCapture = (file: File, kind: MediaKind) => {
-    setError("");
-    if (kind === "photo") setPendingPhoto((prev) => replacePendingMedia(prev, file));
-    else if (kind === "video") setPendingVideo((prev) => replacePendingMedia(prev, file));
-    else setPendingAudio((prev) => replacePendingMedia(prev, file));
+  const finishPosted = async (result: Awaited<ReturnType<typeof taskService.postMessage>>) => {
+    setBreakAlert(parseRecipientBreak(result));
+    stickToBottom.current = true;
+    await loadLatest(true);
+    setBody("");
+    onOccurrenceUpdated?.(result.occurrence.status);
   };
 
   const handleSend = async () => {
-    if (!body.trim() && !pendingPhoto && !pendingVideo && !pendingAudio) {
+    if (!body.trim()) {
       setError(he.taskChatNeedContent);
       return;
     }
     setSending(true);
     setError("");
     try {
-      if (pendingPhoto) setUploadingKind("photo");
-      const photo_url = await uploadPendingMedia(pendingPhoto, taskService.uploadPhoto);
-      if (pendingVideo) setUploadingKind("video");
-      const video_url = await uploadPendingMedia(pendingVideo, taskService.uploadVideo);
-      if (pendingAudio) setUploadingKind("audio");
-      const audio_url = await uploadPendingMedia(pendingAudio, taskService.uploadAudio);
-      setUploadingKind(null);
-
-      const result = await taskService.postMessage(occurrenceId, {
-        body: body.trim() || undefined,
-        photo_url,
-        video_url,
-        audio_url,
-      });
-      setBreakAlert(parseRecipientBreak(result));
-      // Recharger le fil pour que les 2 côtés voient display_* + médias ACL-ok.
-      stickToBottom.current = true;
-      await loadLatest(true);
-      setBody("");
-      clearPending();
-      onOccurrenceUpdated?.(result.occurrence.status);
+      const result = await taskService.postMessage(occurrenceId, { body: body.trim() });
+      await finishPosted(result);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
-      setUploadingKind(null);
+      setSending(false);
+    }
+  };
+
+  const sendInstantMedia = async (file: File, kind: MediaKind) => {
+    setSending(true);
+    setError("");
+    try {
+      const uploaded = await uploadChatKind(file, kind);
+      const result = await taskService.postMessage(occurrenceId, uploaded);
+      await finishPosted(result);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
       setSending(false);
     }
   };
@@ -281,59 +237,25 @@ export default function TaskChatPanel({
       )}
 
       {composeEnabled && (
-        <>
-          <TextField
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={he.taskChatPlaceholder}
-            fullWidth
-            multiline
-            minRows={compact ? 2 : 3}
-            disabled={sending}
+        <Box sx={{ position: "sticky", bottom: 0, bgcolor: "background.paper", pt: 0.5, zIndex: 1 }}>
+          <ChatComposerBar
+            body={body}
+            onBodyChange={setBody}
+            sending={sending}
+            error={error}
+            onSendText={() => void handleSend()}
+            onSendMedia={(file, kind) => void sendInstantMedia(file, kind)}
           />
-          <MediaCaptureActions
-            density="icon"
-            photoAdded={Boolean(pendingPhoto)}
-            videoAdded={Boolean(pendingVideo)}
-            audioAdded={Boolean(pendingAudio)}
-            uploadingKind={uploadingKind}
-            disabled={sending}
-            onCapture={(file, kind) => handleCapture(file, kind)}
-          />
-          {(pendingPhoto || pendingVideo || pendingAudio) && (
-            <CompletionMediaPreview
-              photo_path={pendingPhoto?.previewUrl}
-              video_path={pendingVideo?.previewUrl}
-              audio_path={pendingAudio?.previewUrl}
-              disabled={sending}
-              transcriptFallback={false}
-              onRemovePhoto={() => {
-                revokePendingMedia(pendingPhoto);
-                setPendingPhoto(null);
-              }}
-              onRemoveVideo={() => {
-                revokePendingMedia(pendingVideo);
-                setPendingVideo(null);
-              }}
-              onRemoveAudio={() => {
-                revokePendingMedia(pendingAudio);
-                setPendingAudio(null);
-              }}
-            />
-          )}
-          {error && <Alert severity="error">{error}</Alert>}
-          <Button
-            variant="contained"
-            startIcon={sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
-            onClick={() => void handleSend()}
-            disabled={sending || Boolean(uploadingKind)}
-          >
-            {he.taskChatSend}
-          </Button>
-        </>
+        </Box>
       )}
       {!composeEnabled && error && <Alert severity="error">{error}</Alert>}
       <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
     </Box>
   );
+}
+
+async function uploadChatKind(file: File, kind: MediaKind) {
+  if (kind === "photo") return { photo_url: (await taskService.uploadPhoto(file)).url };
+  if (kind === "video") return { video_url: (await taskService.uploadVideo(file)).url };
+  return { audio_url: (await taskService.uploadAudio(file)).url };
 }
