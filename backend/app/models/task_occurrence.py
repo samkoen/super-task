@@ -35,6 +35,8 @@ class TaskOccurrence:
     is_work_end: bool = False
     start_url: str | None = None
     network_group_id: str | None = None
+    chat_follow_up_at: str | None = None
+    chat_resolved_at: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -66,6 +68,8 @@ class TaskOccurrence:
             "started_at": self.started_at,
             "started_by_id": self.started_by_id,
             "manager_next_at": self.manager_next_at,
+            "chat_follow_up_at": self.chat_follow_up_at,
+            "chat_resolved_at": self.chat_resolved_at,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,

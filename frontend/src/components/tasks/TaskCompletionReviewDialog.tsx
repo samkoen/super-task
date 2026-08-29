@@ -109,10 +109,13 @@ export default function TaskCompletionReviewDialog({
           <TaskChatPanel
             key={task.id}
             occurrenceId={task.id}
+            occurrenceStatus={task.status}
+            chatFollowUpAt={task.chat_follow_up_at}
+            chatResolvedAt={task.chat_resolved_at}
             compact
             composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
-            onOccurrenceUpdated={() => {
-              onDone(he.taskChatSent);
+            onOccurrenceUpdated={(_status, notice) => {
+              onDone(notice ?? he.taskChatSent);
             }}
           />
         )}

@@ -120,6 +120,24 @@ describe("buildActionQueue", () => {
 });
 
 describe("buildPendingTasks + filters", () => {
+  it("parks a reminded chat task in pending until follow-up time", () => {
+    const now = new Date("2026-08-29T22:00:00+03:00").getTime();
+    const withReminder: TaskQueues = {
+      ...queues,
+      pending_review: [
+        ...queues.pending_review,
+        task({
+          id: "q-park",
+          status: "awaiting_response" as TimelineTask["status"],
+          segment: "awaiting_response",
+          chat_follow_up_at: "2026-08-30T10:00:00+03:00",
+        }),
+      ],
+    };
+    expect(buildQuestionsQueue(withReminder, now).map((i) => i.task.id)).toEqual([]);
+    expect(buildPendingTasks(withReminder, now).map((t) => t.id)).toContain("q-park");
+  });
+
   it("includes in_progress and upcoming, excludes pending_review", () => {
     const pending = buildPendingTasks(queues);
     expect(pending.map((t) => t.id).sort()).toEqual(["ip1", "ov1", "up1"]);

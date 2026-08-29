@@ -331,6 +331,16 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
             if getattr(row, "manager_next_at", None)
             else None
         ),
+        chat_follow_up_at=(
+            parse_datetime_iso(row.chat_follow_up_at)
+            if getattr(row, "chat_follow_up_at", None)
+            else None
+        ),
+        chat_resolved_at=(
+            parse_datetime_iso(row.chat_resolved_at)
+            if getattr(row, "chat_resolved_at", None)
+            else None
+        ),
         min_video_seconds=getattr(row, "min_video_seconds", None),
         completion_requirements=parse_json_list(getattr(row, "completion_requirements", None)),
         is_work_start=bool(getattr(row, "is_work_start", False)),

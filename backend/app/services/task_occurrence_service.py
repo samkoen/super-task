@@ -24,6 +24,7 @@ from app.domain.quality_rating import normalize_quality_rating
 from app.domain.task_translation_source import task_source_language
 from app.domain.scope import ActorContext
 from app.domain.start_url import normalize_start_url
+from app.domain.task_chat_followup import parse_future_follow_up, status_after_chat_resolve
 from app.domain.task_kind import AD_HOC
 from app.domain.task_scope import (
     branch_manager_owns_delegation,
@@ -495,6 +496,36 @@ class TaskOccurrenceService:
             updated = self._occurrences.set_manager_next(occurrence_id, manager_next_at=None)
         assert updated is not None
         return self._to_api(updated)
+
+    def resolve_chat_task(self, actor: ActorContext, occurrence_id: str) -> dict:
+        occurrence = self._require_open_chat_task(actor, occurrence_id)
+        updated = self._occurrences.resolve_chat_task(
+            occurrence_id,
+            resolved_at=datetime.now(TZ),
+            status=status_after_chat_resolve(occurrence.status),
+        )
+        assert updated is not None
+        return self._to_api(updated)
+
+    def set_chat_follow_up(
+        self, actor: ActorContext, occurrence_id: str, *, follow_up_at: str
+    ) -> dict:
+        self._require_open_chat_task(actor, occurrence_id)
+        when = parse_future_follow_up(follow_up_at, datetime.now(TZ))
+        updated = self._occurrences.set_chat_follow_up(occurrence_id, follow_up_at=when)
+        assert updated is not None
+        return self._to_api(updated)
+
+    def _require_open_chat_task(self, actor: ActorContext, occurrence_id: str):
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לנהל מטלת צ׳אט")
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_branch_access(actor, occurrence.branch_id)
+        if occurrence.status != task_status.AWAITING_RESPONSE:
+            raise ValueError("אין מטלת צ׳אט פתוחה")
+        return occurrence
 
     @staticmethod
     def _pack_attachments(attachments: list) -> dict:

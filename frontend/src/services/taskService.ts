@@ -156,6 +156,8 @@ export interface TaskOccurrence {
   can_add_to_gallery?: boolean;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  chat_follow_up_at?: string | null;
+  chat_resolved_at?: string | null;
   network_group_id?: string | null;
   is_network_task?: boolean;
 }
@@ -318,6 +320,21 @@ export const taskService = {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/manager-next`,
       { enabled },
+    );
+    return response.data;
+  },
+
+  resolveChatTask: async (occurrenceId: string) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/chat-resolve`,
+    );
+    return response.data;
+  },
+
+  setChatFollowUp: async (occurrenceId: string, followUpAt: string) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/chat-follow-up`,
+      { follow_up_at: followUpAt },
     );
     return response.data;
   },

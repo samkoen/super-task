@@ -466,6 +466,38 @@ def set_manager_next(
     }
 
 
+@router.post("/occurrences/{occurrence_id}/chat-resolve")
+@handle_controller_errors
+def resolve_chat_task(
+    occurrence_id: str,
+    request: Request,
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    item = service.resolve_chat_task(actor, occurrence_id)
+    _emit_task_event(db, "task_chat_resolved", item)
+    return {"message": "המטלה הועברה לארכיון", "occurrence": item}
+
+
+@router.post("/occurrences/{occurrence_id}/chat-follow-up")
+@handle_controller_errors
+def set_chat_follow_up(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    item = service.set_chat_follow_up(
+        actor, occurrence_id, follow_up_at=str(payload.get("follow_up_at") or "")
+    )
+    _emit_task_event(db, "task_chat_follow_up", item)
+    return {"message": "התזכורת נשמרה", "occurrence": item}
+
+
 @router.post("/occurrences/{occurrence_id}/delegate")
 @handle_controller_errors
 def delegate_occurrence(

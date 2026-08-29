@@ -237,6 +237,8 @@ def test_list_messages_returns_display_body_for_manager():
     assert page["has_more"] is False
     assert page["messages"][0]["display_body"] == "שלום"
     assert page["messages"][0]["body"] == "sawasdee"
+    occurrence_repo.update_status.assert_not_called()
+    occurrence_repo.resolve_chat_task.assert_not_called()
 
 
 def test_chat_audio_pair_keeps_audio_with_fallback_when_gemini_fails():

@@ -2,6 +2,7 @@ import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
 import type { TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
+import { isPendingFollowUpTask } from "../../utils/chatTaskFollowUp";
 import TaskPhotoThumb from "../tasks/TaskPhotoThumb";
 
 function statusAccent(status: string): string {
@@ -85,6 +86,14 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
               size="small"
               color="error"
               label={he.timelineSegmentOverdue}
+              sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
+            />
+          )}
+          {isPendingFollowUpTask(task) && (
+            <Chip
+              size="small"
+              color="info"
+              label={he.chatTaskFollowUpChip(formatDueAt(task.chat_follow_up_at!))}
               sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
             />
           )}

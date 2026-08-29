@@ -14,14 +14,21 @@ import { formatTime } from "../../utils/dashboardTime";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import type { MediaKind } from "../media/MediaCaptureActions";
+import type { TaskStatus } from "../../services/taskService";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import BreakAlertDialog from "../chat/BreakAlertDialog";
 import ChatComposerBar from "../chat/ChatComposerBar";
+import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
+import ChatTaskActions from "../chat/ChatTaskActions";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
+import { isOpenChatTask } from "../../utils/chatTaskFollowUp";
 
 interface TaskChatPanelProps {
   occurrenceId: string;
-  onOccurrenceUpdated?: (status: string) => void;
+  occurrenceStatus?: TaskStatus;
+  chatFollowUpAt?: string | null;
+  chatResolvedAt?: string | null;
+  onOccurrenceUpdated?: (status: string, notice?: string) => void;
   compact?: boolean;
   /** Si false : fil visible, pas de composition (statut terminé / annulé…). */
   composeEnabled?: boolean;
@@ -43,6 +50,9 @@ function asTaskChatPage(data: unknown): { messages: TaskMessage[]; has_more: boo
 
 export default function TaskChatPanel({
   occurrenceId,
+  occurrenceStatus,
+  chatFollowUpAt,
+  chatResolvedAt,
   onOccurrenceUpdated,
   compact = false,
   composeEnabled = true,
@@ -53,7 +63,20 @@ export default function TaskChatPanel({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
+  const [status, setStatus] = useState(occurrenceStatus);
+  const [resolvedAt, setResolvedAt] = useState(chatResolvedAt);
+  const [followUpAt, setFollowUpAt] = useState(chatFollowUpAt);
+  const [remindOpen, setRemindOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const canManage =
+    user?.role === "branch_manager" || user?.role === "network_manager" || user?.role === "admin";
+  const showChatActions = canManage && isOpenChatTask(status, resolvedAt);
+
+  useEffect(() => {
+    setStatus(occurrenceStatus);
+    setResolvedAt(chatResolvedAt);
+    setFollowUpAt(chatFollowUpAt);
+  }, [occurrenceStatus, chatResolvedAt, chatFollowUpAt]);
 
   const fetchPage = useCallback(async (before?: string) => {
     try {
@@ -80,7 +103,7 @@ export default function TaskChatPanel({
     stickToBottom.current = true;
     await loadLatest(true);
     setBody("");
-    onOccurrenceUpdated?.(result.occurrence.status);
+    onOccurrenceUpdated?.(result.occurrence.status, he.taskChatSent);
   };
 
   const handleSend = async () => {
@@ -114,6 +137,27 @@ export default function TaskChatPanel({
     }
   };
 
+  const runChatAction = async (action: () => Promise<{ occurrence: { status: string; chat_resolved_at?: string | null; chat_follow_up_at?: string | null } }>) => {
+    setSending(true);
+    setError("");
+    try {
+      const result = await action();
+      setStatus(result.occurrence.status as TaskStatus);
+      setResolvedAt(result.occurrence.chat_resolved_at);
+      setFollowUpAt(result.occurrence.chat_follow_up_at);
+      onOccurrenceUpdated?.(
+        result.occurrence.status,
+        result.occurrence.chat_follow_up_at && !result.occurrence.chat_resolved_at
+          ? he.chatTaskReminderSet
+          : he.chatTaskCompleted,
+      );
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setSending(false);
+    }
+  };
+
   const lastEmployeeQuestion = [...messages]
     .reverse()
     .find((m) => m.sender_role === "employee");
@@ -123,6 +167,13 @@ export default function TaskChatPanel({
       <Typography variant="subtitle2" fontWeight={700}>
         {he.taskChatTitle}
       </Typography>
+      {showChatActions && (
+        <ChatTaskActions
+          disabled={sending}
+          onComplete={() => void runChatAction(() => taskService.resolveChatTask(occurrenceId))}
+          onRemind={() => setRemindOpen(true)}
+        />
+      )}
 
       {user?.role !== "employee" && lastEmployeeQuestion && (
         <Alert severity="warning" sx={{ alignItems: "flex-start" }}>
@@ -250,6 +301,16 @@ export default function TaskChatPanel({
       )}
       {!composeEnabled && error && <Alert severity="error">{error}</Alert>}
       <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
+      <ChatFollowUpDialog
+        open={remindOpen}
+        initialIso={followUpAt}
+        saving={sending}
+        onClose={() => setRemindOpen(false)}
+        onSave={(iso) => {
+          setRemindOpen(false);
+          void runChatAction(() => taskService.setChatFollowUp(occurrenceId, iso));
+        }}
+      />
     </Box>
   );
 }

@@ -65,6 +65,8 @@ export interface TimelineTask {
   task_kind: TaskKind;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  chat_follow_up_at?: string | null;
+  chat_resolved_at?: string | null;
   reference_photo_url?: string | null;
   is_work_start?: boolean;
   is_work_end?: boolean;

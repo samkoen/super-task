@@ -16,6 +16,8 @@ vi.mock("../../services/taskService", () => ({
     uploadPhoto: vi.fn(),
     uploadVideo: vi.fn(),
     uploadAudio: vi.fn(),
+    resolveChatTask: vi.fn(),
+    setChatFollowUp: vi.fn(),
   },
 }));
 
@@ -62,6 +64,7 @@ beforeEach(() => {
   vi.mocked(taskService.listMessages).mockReset();
   vi.mocked(taskService.postMessage).mockReset();
   vi.mocked(taskService.uploadPhoto).mockReset();
+  vi.mocked(taskService.resolveChatTask).mockReset();
 });
 
 describe("TaskChatPanel", () => {
@@ -192,7 +195,7 @@ describe("TaskChatPanel", () => {
         body: "הנה",
       });
       expect(screen.getByText("הנה")).toBeTruthy();
-      expect(onUpdated).toHaveBeenCalledWith("awaiting_response");
+      expect(onUpdated).toHaveBeenCalledWith("awaiting_response", he.taskChatSent);
     });
     expect(taskService.listMessages).toHaveBeenCalledTimes(2);
   });
@@ -240,6 +243,7 @@ describe("TaskChatPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: he.chatLoadOlder }));
     await waitFor(() => expect(screen.getByText("ישן")).toBeTruthy());
     expect(taskService.listMessages).toHaveBeenLastCalledWith("occ-1", { before: "m2" });
+    expect(taskService.resolveChatTask).not.toHaveBeenCalled();
   });
 
   it("uploads a photo and posts it immediately", async () => {

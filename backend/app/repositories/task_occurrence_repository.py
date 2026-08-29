@@ -276,8 +276,35 @@ class TaskOccurrenceRepository:
         if not row:
             return None
         row.status = status
+        if status == task_status.AWAITING_RESPONSE:
+            row.chat_follow_up_at = None
+            row.chat_resolved_at = None
         if status in task_status.TERMINAL:
             row.manager_next_at = None
+            row.chat_follow_up_at = None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def resolve_chat_task(
+        self, id_: str, *, resolved_at: datetime, status: str
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.chat_resolved_at = resolved_at
+        row.chat_follow_up_at = None
+        row.status = status
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def set_chat_follow_up(
+        self, id_: str, *, follow_up_at: datetime
+    ) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.chat_follow_up_at = follow_up_at
+        row.chat_resolved_at = None
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
