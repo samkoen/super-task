@@ -25,6 +25,11 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true,
     },
+    LocalNotifications: {
+      smallIcon: "ic_launcher",
+      iconColor: "#1A9B86",
+      sound: "default",
+    },
   },
 };
 

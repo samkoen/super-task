@@ -410,6 +410,7 @@ export const he = {
   notificationsEmpty: "אין התראות",
   notificationsMarkAllRead: "סימון הכל כנקרא",
   notificationsClose: "סגירת התראות",
+  taskChatAlertChannel: "הודעות משימה",
   noTasks: "אין משימות",
   noTasksFiltered: "אין משימות שתואמות את המסננים",
   noTasksFilteredHint: "נסו לשנות תאריך, עובד, סטטוס או סניף.",

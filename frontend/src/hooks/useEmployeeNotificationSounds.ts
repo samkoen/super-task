@@ -19,10 +19,8 @@ export function useEmployeeNotificationSounds(enabled: boolean, muted = false) {
       const detail = (ev as CustomEvent<TaskChangeDetail>).detail;
       if (!shouldDeliverEmployeeAlert(muted, detail?.kind)) return;
       const fromPayload = detail?.sound as NotificationSoundKind | undefined;
-      const kind =
-        fromPayload && fromPayload !== "none"
-          ? fromPayload
-          : soundKindFromNotificationKind(detail?.kind);
+      if (fromPayload === "none") return;
+      const kind = fromPayload || soundKindFromNotificationKind(detail?.kind);
       playNotificationSound(kind);
     };
 

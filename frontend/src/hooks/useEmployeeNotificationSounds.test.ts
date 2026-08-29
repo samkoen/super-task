@@ -38,4 +38,13 @@ describe("useEmployeeNotificationSounds", () => {
     );
     expect(playNotificationSound).toHaveBeenCalledWith("task_end");
   });
+
+  it("does not play when the payload explicitly mutes sound", () => {
+    renderHook(() => useEmployeeNotificationSounds(true, false));
+    window.dispatchEvent(
+      new CustomEvent(NOTIFICATION_EVENT, { detail: { kind: "task_message_manager", sound: "none" } }),
+    );
+    expect(playNotificationSound).not.toHaveBeenCalled();
+  });
 });
+

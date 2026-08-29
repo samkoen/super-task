@@ -31,9 +31,11 @@ import AssessmentIcon from "@mui/icons-material/Assessment";
 import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationBell from "../notifications/NotificationBell";
+import ChatAlertBanner from "../notifications/ChatAlertBanner";
 import { useAuth } from "../../context/AuthContext";
 import { useEmployeeBreakMute } from "../../hooks/useEmployeeBreakMute";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
+import { useNativeTaskChatAlerts } from "../../hooks/useNativeTaskChatAlerts";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
 import { SIDEBAR_WIDTH } from "../../constants/layout";
@@ -105,6 +107,11 @@ function Layout() {
   const employeeAlertsOn = Boolean(user) && !loading && isEmployee;
   const breakMuted = useEmployeeBreakMute(employeeAlertsOn);
   useEmployeeNotificationSounds(employeeAlertsOn, breakMuted);
+  const chatAlerts = useNativeTaskChatAlerts({
+    enabled: Boolean(user) && !loading,
+    onBreak: breakMuted,
+    role: user?.role,
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const overlayNav = shouldUseMainNavOverlay(isNativeApp());
   const showBack = shouldShowAppBack(location.pathname, user?.role);
@@ -418,6 +425,11 @@ function Layout() {
           {showBack && <BackButton />}
           <OutletSuspense />
         </Box>
+        <ChatAlertBanner
+          alert={chatAlerts.banner}
+          onOpen={chatAlerts.open}
+          onClose={chatAlerts.dismiss}
+        />
       </Box>
     );
   }
@@ -514,6 +526,11 @@ function Layout() {
           <ManagerBottomNav forceVisible={overlayNav} />
         </>
       )}
+      <ChatAlertBanner
+        alert={chatAlerts.banner}
+        onOpen={chatAlerts.open}
+        onClose={chatAlerts.dismiss}
+      />
     </Box>
   );
 }

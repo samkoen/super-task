@@ -17,6 +17,7 @@ describe("soundKindFromNotificationKind", () => {
 
   it("maps employee questions to manager_question sound", () => {
     expect(soundKindFromNotificationKind("task_message_employee")).toBe("manager_question");
+    expect(soundKindFromNotificationKind("task_message_manager")).toBe("task_end");
     expect(soundKindFromNotificationKind("awaiting_response")).toBe("manager_question");
     expect(soundKindFromNotificationKind("break_override")).toBe("manager_question");
   });
