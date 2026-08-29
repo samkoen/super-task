@@ -14,8 +14,9 @@ from app.domain.audio_transcription_fallback import (
 )
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
+from app.domain.break_notify import break_alert_payload
 from app.domain.chat_page import clamp_chat_page_size
-from app.domain.scope import ActorContext
+from app.domain.task_scope import can_manage_tasks
 from app.domain.task_chat import (
     can_employee_post,
     can_manager_post,
@@ -30,7 +31,6 @@ from app.domain.task_chat_i18n import (
     languages_differ,
     normalize_pair,
 )
-from app.domain.task_scope import can_manage_tasks
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_message_repository import TaskMessageRepository
@@ -164,11 +164,24 @@ class TaskMessageService:
 
         updated = self._occurrences.find_by_id(occurrence_id)
         assert updated is not None
-        return {
+        result = {
             "message": self._to_api(message, actor=actor),
             "occurrence": mp.task_occurrence_domain_to_api(updated),
             "event_type": message_event_type(actor.role),
         }
+        result.update(self._recipient_break_fields(actor, occurrence.assignee_user_id))
+        return result
+
+    def _recipient_break_fields(self, actor: ActorContext, assignee_user_id: str | None) -> dict:
+        if not can_manage_tasks(actor) or not assignee_user_id:
+            return {}
+        alert = break_alert_payload(
+            self._users.on_break_since(assignee_user_id),
+            now=datetime.now(TZ),
+        )
+        if not alert:
+            return {}
+        return {"recipient_break": alert, "recipient_user_id": assignee_user_id}
 
     async def _enrich_i18n(self, message, *, actor: ActorContext, occurrence):
         sender_lang, recipient_lang = self._resolve_languages(actor, occurrence)

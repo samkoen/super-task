@@ -149,6 +149,7 @@ export function soundKindFromNotificationKind(kind: string | undefined): Notific
   if (kind === "task_created" || kind === "task_delegated") return "new_task";
   if (kind === "task_cancelled" || kind === "task_reopened") return "task_end";
   if (kind === "task_message_employee" || kind === "awaiting_response") return "manager_question";
+  if (kind === "break_override") return "manager_question";
   if (kind.startsWith("employee_idle")) return "alert";
   return "none";
 }

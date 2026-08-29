@@ -589,6 +589,8 @@ async def post_task_message(
         "message": "ההודעה נשלחה",
         "chat_message": result["message"],
         "occurrence": result["occurrence"],
+        "recipient_break": result.get("recipient_break"),
+        "recipient_user_id": result.get("recipient_user_id"),
     }
 
 

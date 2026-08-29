@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import NotificationBell from "./NotificationBell";
+import { NOTIFICATION_EVENT } from "../../constants/events";
 import { he } from "../../i18n/he";
 import { notificationService } from "../../services/notificationService";
 
@@ -86,5 +87,20 @@ describe("NotificationBell", () => {
     await waitFor(() => {
       expect(navigate).toHaveBeenCalledWith("/employee?task=occ-1");
     });
+  });
+
+  it("skips live refresh while muted except for an emergency ring", async () => {
+    vi.mocked(notificationService.list).mockResolvedValue({ items: [], unread_count: 0 });
+    render(<NotificationBell muteIncoming />);
+    await waitFor(() => expect(notificationService.list).toHaveBeenCalled());
+    vi.mocked(notificationService.list).mockClear();
+    window.dispatchEvent(
+      new CustomEvent(NOTIFICATION_EVENT, { detail: { kind: "task_created", sound: "none" } }),
+    );
+    expect(notificationService.list).not.toHaveBeenCalled();
+    window.dispatchEvent(
+      new CustomEvent(NOTIFICATION_EVENT, { detail: { kind: "break_override", sound: "task_end" } }),
+    );
+    await waitFor(() => expect(notificationService.list).toHaveBeenCalledTimes(1));
   });
 });

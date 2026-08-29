@@ -4,6 +4,9 @@ export const TASK_CHANGE_EVENT = "super:task-change";
 /** Dispatched when a persisted notification arrives over SSE. */
 export const NOTIFICATION_EVENT = "super:notification";
 
+/** Dispatched when the oved starts or ends a pause (הפסקה). */
+export const BREAK_CHANGE_EVENT = "super:break-change";
+
 export interface TaskChangeDetail {
   type?: string;
   branch_id?: string;

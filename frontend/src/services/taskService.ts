@@ -376,6 +376,12 @@ export const taskService = {
       message: string;
       chat_message: TaskMessage;
       occurrence: TaskOccurrence;
+      recipient_break?: {
+        on_break: boolean;
+        on_break_since: string;
+        elapsed_seconds: number;
+      } | null;
+      recipient_user_id?: string;
     }>(`/tasks/occurrences/${occurrenceId}/messages`, payload);
     return response.data;
   },

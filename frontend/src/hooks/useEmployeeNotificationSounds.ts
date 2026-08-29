@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { NOTIFICATION_EVENT, type TaskChangeDetail } from "../constants/events";
+import { shouldDeliverEmployeeAlert } from "../utils/employeeBreakMute";
 import {
   bindNotificationAudioUnlock,
   playNotificationSound,
@@ -8,7 +9,7 @@ import {
 } from "../utils/notificationSounds";
 
 /** Joue les sons d'alerte uniquement pour le rôle employé. */
-export function useEmployeeNotificationSounds(enabled: boolean) {
+export function useEmployeeNotificationSounds(enabled: boolean, muted = false) {
   useEffect(() => {
     if (!enabled) return;
 
@@ -16,6 +17,7 @@ export function useEmployeeNotificationSounds(enabled: boolean) {
 
     const onNotify = (ev: Event) => {
       const detail = (ev as CustomEvent<TaskChangeDetail>).detail;
+      if (!shouldDeliverEmployeeAlert(muted, detail?.kind)) return;
       const fromPayload = detail?.sound as NotificationSoundKind | undefined;
       const kind =
         fromPayload && fromPayload !== "none"
@@ -29,5 +31,5 @@ export function useEmployeeNotificationSounds(enabled: boolean) {
       unbind();
       window.removeEventListener(NOTIFICATION_EVENT, onNotify);
     };
-  }, [enabled]);
+  }, [enabled, muted]);
 }

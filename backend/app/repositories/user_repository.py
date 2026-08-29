@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -20,6 +21,14 @@ class UserRepository:
             return None
         row = self._db.get(orm.User, uid)
         return mp.user_orm_to_domain(row)
+
+    def on_break_since(self, user_id: str) -> datetime | None:
+        try:
+            uid = mp.parse_uuid(user_id)
+        except ValueError:
+            return None
+        row = self._db.get(orm.User, uid)
+        return getattr(row, "on_break_since", None) if row else None
 
     def find_by_email(self, email: str) -> Optional[User]:
         row = self._db.execute(

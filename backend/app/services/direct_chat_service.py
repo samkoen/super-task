@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.domain import roles
+from app.domain.break_notify import break_alert_payload
 from app.domain.chat_page import clamp_chat_page_size
 from app.domain.direct_chat import (
     SCOPE_BRANCH,
@@ -106,7 +107,9 @@ class DirectChatService:
     ) -> dict:
         conv = self._require_conv(actor, conversation_id)
         message = self._write_message(actor, conv, body, photo_url, video_url, audio_url)
-        return {"message": self._message_api(message), "conversation": conv.to_dict()}
+        result = {"message": self._message_api(message), "conversation": conv.to_dict()}
+        result.update(self._recipient_break_fields(actor, conv.counterpart_user_id))
+        return result
 
     def broadcast(
         self,
@@ -311,6 +314,17 @@ class DirectChatService:
             "last_at": conv.last_at if conv else None,
             "unread_count": unread,
         }
+
+    def _recipient_break_fields(self, actor: ActorContext, recipient_user_id: str) -> dict:
+        if actor.role == roles.EMPLOYEE:
+            return {}
+        alert = break_alert_payload(
+            self._users.on_break_since(recipient_user_id),
+            now=datetime.now(timezone.utc),
+        )
+        if not alert:
+            return {}
+        return {"recipient_break": alert, "recipient_user_id": recipient_user_id}
 
     def _peer_api(self, user: User) -> dict:
         return {

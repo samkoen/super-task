@@ -23,6 +23,8 @@ import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import CompletionMediaPreview from "./CompletionMediaPreview";
+import BreakAlertDialog from "../chat/BreakAlertDialog";
+import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 
 interface TaskChatPanelProps {
   occurrenceId: string;
@@ -61,6 +63,7 @@ export default function TaskChatPanel({
   const [sending, setSending] = useState(false);
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
+  const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pendingRef = useRef({
     photo: null as PendingMedia | null,
@@ -140,6 +143,7 @@ export default function TaskChatPanel({
         video_url,
         audio_url,
       });
+      setBreakAlert(parseRecipientBreak(result));
       // Recharger le fil pour que les 2 côtés voient display_* + médias ACL-ok.
       stickToBottom.current = true;
       await loadLatest(true);
@@ -329,6 +333,7 @@ export default function TaskChatPanel({
         </>
       )}
       {!composeEnabled && error && <Alert severity="error">{error}</Alert>}
+      <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
     </Box>
   );
 }

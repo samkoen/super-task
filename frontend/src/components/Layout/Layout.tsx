@@ -32,6 +32,7 @@ import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import NotificationBell from "../notifications/NotificationBell";
 import { useAuth } from "../../context/AuthContext";
+import { useEmployeeBreakMute } from "../../hooks/useEmployeeBreakMute";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
@@ -101,7 +102,9 @@ function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isEmployee = usesEmployeeChrome(user?.role, location.pathname);
-  useEmployeeNotificationSounds(Boolean(user) && !loading && isEmployee);
+  const employeeAlertsOn = Boolean(user) && !loading && isEmployee;
+  const breakMuted = useEmployeeBreakMute(employeeAlertsOn);
+  useEmployeeNotificationSounds(employeeAlertsOn, breakMuted);
   const [mobileOpen, setMobileOpen] = useState(false);
   const overlayNav = shouldUseMainNavOverlay(isNativeApp());
   const showBack = shouldShowAppBack(location.pathname, user?.role);
@@ -223,7 +226,7 @@ function Layout() {
               {user?.full_name}
             </Typography>
           </Box>
-          <NotificationBell />
+          <NotificationBell muteIncoming={breakMuted} />
         </Box>
         {isEmployee && (user?.branches?.length ?? 0) >= 2 && (
           <Box mt={1.5}>
@@ -351,7 +354,7 @@ function Layout() {
             </Box>
           </Box>
           <Box display="flex" alignItems="center" gap={0.5}>
-            <NotificationBell />
+            <NotificationBell muteIncoming={breakMuted} />
             <IconButton
               color="inherit"
               aria-label={he.myAccount}

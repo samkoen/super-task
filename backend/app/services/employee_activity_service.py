@@ -9,6 +9,9 @@ from sqlalchemy import exists, select
 from app.db import mappers as mp
 from app.db import models as orm
 from app.domain import roles, task_status
+from app.domain.scope import ActorContext
+from app.domain.task_scope import can_manage_tasks
+from app.domain.break_notify import break_alert_payload
 from app.domain.employee_inactivity import (
     idle_reason,
     idle_threshold_reached,
@@ -77,6 +80,38 @@ class EmployeeActivityService:
             "on_break": bool(row.on_break_since),
             "on_break_since": row.on_break_since.isoformat() if row.on_break_since else None,
         }
+
+    def ring_on_break(self, actor: ActorContext, target_user_id: str) -> dict:
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לשלוח צליל")
+        if self._notifications is None:
+            raise RuntimeError("notification_repo required")
+        target = self._users.find_by_id(target_user_id)
+        if not target:
+            raise ValueError("משתמש לא נמצא")
+        self._assert_ring_scope(actor, target)
+        since = self._users.on_break_since(target_user_id)
+        if not since:
+            raise ValueError("העובד לא בהפסקה")
+        pending = NotificationService(self._notifications, self._users).publish_break_ring(
+            user_id=target_user_id,
+            branch_id=target.branch_id,
+        )
+        return {
+            "ok": True,
+            "pending": pending,
+            "recipient_break": break_alert_payload(since, now=datetime.now(TZ)),
+        }
+
+    @staticmethod
+    def _assert_ring_scope(actor: ActorContext, target) -> None:
+        if actor.role == roles.ADMIN:
+            return
+        if actor.role == roles.NETWORK_MANAGER and target.network_id == actor.network_id:
+            return
+        if actor.role == roles.BRANCH_MANAGER and target.branch_id == actor.branch_id:
+            return
+        raise PermissionError("אין הרשאה לעובד זה")
 
     def on_task_started(self, user_id: str) -> None:
         row = self._db.get(orm.User, mp.parse_uuid(user_id))

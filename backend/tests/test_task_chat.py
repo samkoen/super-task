@@ -132,6 +132,7 @@ def test_manager_reply_returns_in_progress():
     user_repo.find_by_id.return_value = MagicMock(
         full_name="מנהל", role=roles.BRANCH_MANAGER, preferred_language="he"
     )
+    user_repo.on_break_since.return_value = None
     branch = MagicMock(id="b1", network_id="n1")
     branch_repo = MagicMock()
     branch_repo.find_by_id.return_value = branch
@@ -151,9 +152,45 @@ def test_manager_reply_returns_in_progress():
         "occ-1", task_status.IN_PROGRESS
     )
     assert result["event_type"] == "task_message_manager"
+    assert result.get("recipient_break") is None
 
 
-def test_employee_cannot_post_while_pending_review():
+def test_manager_reply_includes_break_alert():
+    occurrence = _occurrence(status=task_status.AWAITING_RESPONSE)
+    message_repo = MagicMock()
+    created = _message(id="m2", sender_user_id="mgr-1", body="דחוף")
+    message_repo.create.return_value = created
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.side_effect = [
+        occurrence,
+        _occurrence(status=task_status.IN_PROGRESS),
+    ]
+    user_repo = MagicMock()
+    user_repo.find_by_id.return_value = MagicMock(
+        full_name="מנהל", role=roles.BRANCH_MANAGER, preferred_language="he"
+    )
+    start = datetime(2026, 8, 28, 10, 0, tzinfo=TZ)
+    user_repo.on_break_since.return_value = start
+    branch = MagicMock(id="b1", network_id="n1")
+    branch_repo = MagicMock()
+    branch_repo.find_by_id.return_value = branch
+    service = TaskMessageService(
+        message_repo, occurrence_repo, user_repo, branch_repo
+    )
+    actor = ActorContext(
+        user_id="mgr-1",
+        role=roles.BRANCH_MANAGER,
+        branch_id="b1",
+        network_id="n1",
+    )
+    with patch.object(service, "_enrich_i18n", new=AsyncMock(return_value=created)):
+        result = asyncio.run(service.post_message(actor, "occ-1", body="דחוף"))
+    assert result["recipient_user_id"] == "emp-1"
+    assert result["recipient_break"]["on_break"] is True
+    assert result["recipient_break"]["on_break_since"] == start.isoformat()
+
+
+def test_employee_cannot_post_when_pending_review():
     occurrence = _occurrence(status=task_status.PENDING_REVIEW)
     occurrence_repo = MagicMock()
     occurrence_repo.find_by_id.return_value = occurrence

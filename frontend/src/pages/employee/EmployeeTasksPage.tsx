@@ -34,6 +34,7 @@ import {
 import { taskService, type TaskTranslation, type TaskOccurrence } from "../../services/taskService";
 import { issueReportService } from "../../services/issueReportService";
 import { employeeActivityService } from "../../services/employeeActivityService";
+import { dispatchBreakChange } from "../../utils/employeeBreakMute";
 import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -266,6 +267,7 @@ export default function EmployeeTasksPage() {
       ]);
       setDashboard(data);
       setOnBreak(Boolean(breakState.on_break));
+      dispatchBreakChange(Boolean(breakState.on_break));
       const lang = (data.employee.preferred_language as EmployeeLanguage) || "he";
       const allTasks = [
         ...data.urgent_tasks,
@@ -485,7 +487,7 @@ export default function EmployeeTasksPage() {
       });
       clearCompletionMedia();
       setDetailTask(null);
-      playTaskEndSound();
+      if (!onBreak) playTaskEndSound();
       showSuccess(he.taskSubmitSuccess);
       await load();
     } catch (e) {
@@ -502,6 +504,7 @@ export default function EmployeeTasksPage() {
         ? await employeeActivityService.endBreak()
         : await employeeActivityService.startBreak();
       setOnBreak(Boolean(res.on_break));
+      dispatchBreakChange(Boolean(res.on_break));
       showSuccess(onBreak ? he.employeeBreakEnded : he.employeeBreakStarted);
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
