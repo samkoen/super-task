@@ -1,4 +1,4 @@
-import type { EmployeeLanguage } from "../domain/employeeLanguages";
+import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 
 export type EmployeeProfileForm = {
   first_name: string;

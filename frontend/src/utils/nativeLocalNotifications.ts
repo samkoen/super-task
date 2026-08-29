@@ -22,7 +22,7 @@ type LocalNotificationsApi = {
       extra?: Record<string, string | null>;
       channelId?: string;
     }>;
-  }) => Promise<void>;
+  }) => Promise<unknown>;
   addListener: (
     event: "localNotificationActionPerformed",
     cb: (ev: { notification: { extra?: { occurrenceId?: string; kind?: string } } }) => void,
