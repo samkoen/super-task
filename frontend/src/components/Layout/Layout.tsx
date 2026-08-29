@@ -24,7 +24,6 @@ import InventoryIcon from "@mui/icons-material/Inventory";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import RepeatIcon from "@mui/icons-material/Repeat";
-import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AssessmentIcon from "@mui/icons-material/Assessment";
@@ -154,7 +153,6 @@ function Layout() {
         { text: he.managerTasks, icon: <TaskAltIcon />, path: "/manager/tasks" },
         { text: he.managerFixedTasks, icon: <RepeatIcon />, path: "/manager/fixed-tasks" },
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/manager/gallery" },
-        { text: he.managerIssues, icon: <ReportProblemIcon />, path: "/manager/issues" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
         { text: he.myAccount, icon: <AccountCircleIcon />, path: "/manager/account" },
       );
