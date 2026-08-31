@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import EmployeeShiftHeader from "./EmployeeShiftHeader";
+import EmployeeShiftHeader, { employeeShiftHeaderPaperSx } from "./EmployeeShiftHeader";
 import { he } from "../../i18n/he";
 
 describe("EmployeeShiftHeader", () => {
@@ -52,6 +52,25 @@ describe("EmployeeShiftHeader", () => {
       />,
     );
     expect(screen.getByRole("button", { name: he.employeeChangePhoto })).toBeTruthy();
+  });
+
+  it("stacks identity above break controls on a phone", () => {
+    expect(employeeShiftHeaderPaperSx.flexDirection).toEqual({ xs: "column", sm: "row" });
+    const onToggleBreak = vi.fn();
+    render(
+      <EmployeeShiftHeader
+        name="מולוד קאטוש"
+        meta={`${he.branch}: שפע רבי עקיבא · סדרנים`}
+        onShift={false}
+        onBreak={false}
+        onToggleBreak={onToggleBreak}
+      />,
+    );
+    const heading = screen.getByRole("heading", { name: "מולוד קאטוש" });
+    const meta = screen.getByText(`${he.branch}: שפע רבי עקיבא · סדרנים`);
+    const breakBtn = screen.getByRole("button", { name: he.employeeBreakStart });
+    expect(heading.compareDocumentPosition(meta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(meta.compareDocumentPosition(breakBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows the excellence slogan under the name", () => {
