@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from typing import Any
@@ -28,6 +29,7 @@ def send_transactional_html_email(
     to_email: str,
     subject: str,
     html_content: str,
+    attachments: list[tuple[str, bytes]] | None = None,
 ) -> dict[str, Any]:
     key = brevo_api_key()
     sender = brevo_sender_email()
@@ -44,6 +46,12 @@ def send_transactional_html_email(
         "subject": (subject or "").strip() or "(sans objet)",
         "htmlContent": html_content or "<p></p>",
     }
+    if attachments:
+        payload["attachment"] = [
+            {"name": name, "content": base64.b64encode(data).decode("ascii")}
+            for name, data in attachments
+            if data
+        ]
 
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = Request(BREVO_SMTP_API_URL, data=body, method="POST")

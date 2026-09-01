@@ -64,6 +64,7 @@ BREVO_SANDBOX_RECIPIENT = os.environ.get("BREVO_SANDBOX_RECIPIENT", "")
 EMAIL_VERIFY_EXPIRE_HOURS = int(os.environ.get("EMAIL_VERIFY_EXPIRE_HOURS", "48"))
 INVITE_EXPIRE_HOURS = int(os.environ.get("INVITE_EXPIRE_HOURS", "168"))
 PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", "6"))
+SYSTEM_BUG_EMAIL = os.environ.get("SYSTEM_BUG_EMAIL", "skoen7665210@gmail.com").strip()
 
 
 def prepare_database_url(raw: str) -> str:

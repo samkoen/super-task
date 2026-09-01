@@ -22,9 +22,23 @@ export function useAudioRecorder() {
   }, []);
 
   const reset = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = () => {
+        cleanupStream();
+        setRecording(false);
+        waitersRef.current.splice(0).forEach((resolve) => resolve(null));
+      };
+      recorder.stop();
+    } else {
+      cleanupStream();
+      setRecording(false);
+    }
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
     setBlob(null);
     setError("");
-  }, []);
+  }, [cleanupStream]);
 
   const start = useCallback(async () => {
     if (!supported) {
