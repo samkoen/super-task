@@ -54,6 +54,7 @@ import MobileMenuTopBar from "./MobileMenuTopBar";
 import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
 import ViewAsBanner from "./ViewAsBanner";
 import ViewAsPicker from "./ViewAsPicker";
+import SystemBugLauncher from "../systemBug/SystemBugLauncher";
 import {
   managerBottomContentPadCss,
   shouldShowManagerChrome,
@@ -428,6 +429,7 @@ function Layout() {
           onOpen={chatAlerts.open}
           onClose={chatAlerts.dismiss}
         />
+        <SystemBugLauncher />
       </Box>
     );
   }
@@ -529,6 +531,7 @@ function Layout() {
         onOpen={chatAlerts.open}
         onClose={chatAlerts.dismiss}
       />
+      <SystemBugLauncher />
     </Box>
   );
 }

@@ -30,6 +30,7 @@ from app.controllers import (
     notification_controller,
     product_controller,
     promotion_stage_controller,
+    system_bug_controller,
     task_controller,
     task_gallery_controller,
     user_controller,
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
         task_gallery_controller.router, prefix="/api/task-gallery", tags=["task-gallery"]
     )
     app.include_router(issue_report_controller.router, prefix="/api/issue-reports", tags=["issue-reports"])
+    app.include_router(system_bug_controller.router, prefix="/api/system-bugs", tags=["system-bugs"])
     app.include_router(direct_chat_controller.router, prefix="/api/direct-chats", tags=["direct-chats"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(

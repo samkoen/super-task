@@ -37,6 +37,7 @@ def deliver_html_email(
     subject: str,
     html_content: str,
     kind: str,
+    attachments: list[tuple[str, bytes]] | None = None,
 ) -> bool:
     orig_to, recipient, sandbox = _resolve_recipient(to_email)
     if not orig_to:
@@ -44,16 +45,20 @@ def deliver_html_email(
         return False
 
     if sandbox and not brevo_sandbox_recipient().strip():
-        return _log_simulation(orig_to, orig_to, True, subject, html_content, kind)
+        return _log_simulation(
+            orig_to, orig_to, True, subject, html_content, kind, attachments
+        )
 
     if not recipient:
         logger.error("[email:%s] Sandbox sans destinataire", kind)
         return False
 
     if brevo_credentials_ok():
-        return _send_via_brevo(orig_to, recipient, sandbox, subject, html_content, kind)
+        return _send_via_brevo(
+            orig_to, recipient, sandbox, subject, html_content, kind, attachments
+        )
 
-    return _log_simulation(orig_to, recipient, sandbox, subject, html_content, kind)
+    return _log_simulation(orig_to, recipient, sandbox, subject, html_content, kind, attachments)
 
 
 def _send_via_brevo(
@@ -63,12 +68,14 @@ def _send_via_brevo(
     subject: str,
     html_content: str,
     kind: str,
+    attachments: list[tuple[str, bytes]] | None = None,
 ) -> bool:
     try:
         resp = send_transactional_html_email(
             to_email=recipient,
             subject=subject,
             html_content=html_content,
+            attachments=attachments,
         )
         mid = resp.get("messageId") or resp.get("message_id") if isinstance(resp, dict) else None
         mode = "Brevo sandbox" if sandbox else "Brevo"
@@ -87,11 +94,15 @@ def _log_simulation(
     subject: str,
     html_content: str,
     kind: str,
+    attachments: list[tuple[str, bytes]] | None = None,
 ) -> bool:
     mode = "SIMULATION" if sandbox else "SIMULATION (Brevo non configuré)"
     _safe_print(f"\n--- E-mail {mode} ({kind}) ---")
     _safe_print(f"To: {recipient}" + (f" (demande: {orig_to})" if orig_to != recipient else ""))
     _safe_print(f"Subject: {subject}")
+    if attachments:
+        names = ", ".join(name for name, _ in attachments)
+        _safe_print(f"Attachments: {names}")
     match = re.search(r'href="([^"]+(?:verify-email|accept-invite)[^"]*)"', html_content)
     if match:
         _safe_print(f"Link: {match.group(1)}")
