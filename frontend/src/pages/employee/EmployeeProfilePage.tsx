@@ -19,14 +19,12 @@ import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import { EMPLOYEE_LANGUAGES, EMPLOYEE_LANGUAGE_LABELS } from "../../domain/employeeLanguages";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
-import { isViewAsPreview } from "../../utils/viewAsPreview";
 import { he } from "../../i18n/he";
 import { employeeProfileFormFromUser, type EmployeeProfileForm } from "./employeeProfileForm";
 
 export default function EmployeeProfilePage() {
   const { user, refresh } = useAuth();
   const { showSuccess, showError } = useFeedback();
-  const preview = isViewAsPreview(user);
   const [saving, setSaving] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -49,7 +47,7 @@ export default function EmployeeProfilePage() {
   }, [user]);
 
   const handleSaveProfile = async () => {
-    if (!user || preview) return;
+    if (!user) return;
     setSaving(true);
     try {
       const res = await authService.updateProfile({
@@ -83,7 +81,6 @@ export default function EmployeeProfilePage() {
   };
 
   const handleChangePassword = async () => {
-    if (preview) return;
     if (passwordForm.new_password !== passwordForm.confirm_password) {
       showError(he.passwordMismatch);
       return;
@@ -120,7 +117,7 @@ export default function EmployeeProfilePage() {
             name={user.full_name}
             photoUrl={user.avatar_url}
             size={88}
-            editable={!preview}
+            editable
             onEdit={() => setAvatarOpen(true)}
           />
           <Box>
@@ -144,7 +141,6 @@ export default function EmployeeProfilePage() {
             onChange={(e) => setForm({ ...form, first_name: e.target.value })}
             required
             fullWidth
-            disabled={preview}
           />
           <TextField
             label={he.lastName}
@@ -152,7 +148,6 @@ export default function EmployeeProfilePage() {
             onChange={(e) => setForm({ ...form, last_name: e.target.value })}
             required
             fullWidth
-            disabled={preview}
           />
           <TextField
             select
@@ -163,7 +158,6 @@ export default function EmployeeProfilePage() {
             }
             required
             fullWidth
-            disabled={preview}
           >
             {EMPLOYEE_LANGUAGES.map((lang) => (
               <MenuItem key={lang} value={lang}>
@@ -177,13 +171,12 @@ export default function EmployeeProfilePage() {
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             fullWidth
             dir="ltr"
-            disabled={preview}
           />
           <Box>
             <Button
               variant="contained"
               onClick={() => void handleSaveProfile()}
-              disabled={saving || preview}
+              disabled={saving}
             >
               {saving ? <CircularProgress size={22} color="inherit" /> : he.saveProfile}
             </Button>
@@ -210,7 +203,6 @@ export default function EmployeeProfilePage() {
             required
             fullWidth
             dir="ltr"
-            disabled={preview}
           />
           <TextField
             label={he.newPassword}
@@ -220,7 +212,6 @@ export default function EmployeeProfilePage() {
             required
             fullWidth
             dir="ltr"
-            disabled={preview}
           />
           <TextField
             label={he.confirmPassword}
@@ -232,7 +223,6 @@ export default function EmployeeProfilePage() {
             required
             fullWidth
             dir="ltr"
-            disabled={preview}
           />
           {!passwordForm.new_password ||
           passwordForm.new_password === passwordForm.confirm_password ? null : (
@@ -242,7 +232,7 @@ export default function EmployeeProfilePage() {
             <Button
               variant="contained"
               onClick={() => void handleChangePassword()}
-              disabled={savingPassword || preview}
+              disabled={savingPassword}
             >
               {savingPassword ? <CircularProgress size={22} color="inherit" /> : he.changePassword}
             </Button>

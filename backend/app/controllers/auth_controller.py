@@ -13,6 +13,7 @@ from app.auth.actor import (
     clear_preview_session,
     load_actor,
     load_real_actor,
+    session_acting_user_id,
 )
 from app.auth.session_roles import MANAGER_ROLES
 from app.controllers.controller_helpers import handle_controller_errors
@@ -39,6 +40,15 @@ def get_excellence_avatar_service() -> ExcellenceAvatarService:
 
 def get_invitation_service(db: Session = Depends(get_db)) -> InvitationService:
     return InvitationService(InvitationRepository(db), UserRepository(db))
+
+
+def _with_preview_meta(request: Request, service: AuthService, user: dict) -> dict:
+    preview_id = request.session.get(SESSION_PREVIEW_AS_KEY)
+    real_id = request.session.get("user_id")
+    if not (preview_id and real_id):
+        return user
+    real = service.get_user_by_id(str(real_id))
+    return attach_preview_meta(user, real) if real else user
 
 
 @router.get("/invitation-preview")
@@ -187,11 +197,9 @@ def update_current_user(
     data: dict[str, Any] | None = Body(default=None),
     service: AuthService = Depends(get_auth_service),
 ):
-    user_id = request.session.get("user_id")
+    user_id = session_acting_user_id(request)
     if not user_id:
         return JSONResponse({"error": "לא מחובר"}, status_code=401)
-    if request.session.get(SESSION_PREVIEW_AS_KEY):
-        return JSONResponse({"error": "לא ניתן לערוך פרופיל במצב צפייה כעובד"}, status_code=403)
     payload = data or {}
     try:
         user = service.update_me(
@@ -209,8 +217,9 @@ def update_current_user(
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    request.session["user_email"] = user["email"]
-    return {"message": "הפרופיל עודכן", "user": user}
+    if not request.session.get(SESSION_PREVIEW_AS_KEY):
+        request.session["user_email"] = user["email"]
+    return {"message": "הפרופיל עודכן", "user": _with_preview_meta(request, service, user)}
 
 
 @router.post("/me/avatar")
@@ -219,11 +228,9 @@ async def upload_my_avatar(
     file: UploadFile = File(...),
     service: AuthService = Depends(get_auth_service),
 ):
-    user_id = request.session.get("user_id")
+    user_id = session_acting_user_id(request)
     if not user_id:
         return JSONResponse({"error": "לא מחובר"}, status_code=401)
-    if request.session.get(SESSION_PREVIEW_AS_KEY):
-        return JSONResponse({"error": "לא ניתן לערוך פרופיל במצב צפייה כעובד"}, status_code=403)
     uploaded = await upload_attachment(kind="photo", folder="avatars", file=file)
     try:
         user = service.set_my_avatar(
@@ -233,7 +240,11 @@ async def upload_my_avatar(
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    return {"message": "התמונה עודכנה", "user": user, "url": uploaded["url"]}
+    return {
+        "message": "התמונה עודכנה",
+        "user": _with_preview_meta(request, service, user),
+        "url": uploaded["url"],
+    }
 
 
 @router.post("/me/avatar/excellence")
@@ -243,11 +254,9 @@ async def stylize_my_avatar(
     service: AuthService = Depends(get_auth_service),
     excellence: ExcellenceAvatarService = Depends(get_excellence_avatar_service),
 ):
-    user_id = request.session.get("user_id")
+    user_id = session_acting_user_id(request)
     if not user_id:
         return JSONResponse({"error": "לא מחובר"}, status_code=401)
-    if request.session.get(SESSION_PREVIEW_AS_KEY):
-        return JSONResponse({"error": "לא ניתן לערוך פרופיל במצב צפייה כעובד"}, status_code=403)
     me = service.get_user_by_id(str(user_id))
     if not me:
         return JSONResponse({"error": "משתמש לא נמצא"}, status_code=401)
@@ -268,7 +277,7 @@ async def stylize_my_avatar(
         return JSONResponse({"error": str(e)}, status_code=400)
     return {
         "message": "התמונה עוצבה בסגנון סופר-מן",
-        "user": user,
+        "user": _with_preview_meta(request, service, user),
         "url": result.url,
         "used_ai": result.used_ai,
     }
@@ -280,11 +289,9 @@ def change_password(
     data: dict[str, Any] | None = Body(default=None),
     service: AuthService = Depends(get_auth_service),
 ):
-    user_id = request.session.get("user_id")
+    user_id = session_acting_user_id(request)
     if not user_id:
         return JSONResponse({"error": "לא מחובר"}, status_code=401)
-    if request.session.get(SESSION_PREVIEW_AS_KEY):
-        return JSONResponse({"error": "לא ניתן לערוך פרופיל במצב צפייה כעובד"}, status_code=403)
     payload = data or {}
     try:
         service.change_password(
@@ -318,12 +325,7 @@ def set_active_branch(
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     request.session[SESSION_ACTIVE_BRANCH_KEY] = user["active_branch_id"]
-    preview_id = request.session.get(SESSION_PREVIEW_AS_KEY)
-    if preview_id:
-        real = service.get_user_by_id(str(request.session["user_id"]))
-        if real:
-            user = attach_preview_meta(user, real)
-    return {"user": user}
+    return {"user": _with_preview_meta(request, service, user)}
 
 
 @router.post("/view-as")
@@ -374,12 +376,7 @@ def _session_user_payload(request: Request, service: AuthService) -> dict:
     )
     if not user:
         raise HTTPException(status_code=404, detail="משתמש לא נמצא")
-    preview_id = request.session.get(SESSION_PREVIEW_AS_KEY)
-    real_id = str(request.session.get("user_id") or "")
-    if preview_id and real_id:
-        real = service.get_user_by_id(real_id)
-        if real:
-            user = attach_preview_meta(user, real)
+    user = _with_preview_meta(request, service, user)
     if user.get("active_branch_id"):
         request.session[SESSION_ACTIVE_BRANCH_KEY] = user["active_branch_id"]
     return user

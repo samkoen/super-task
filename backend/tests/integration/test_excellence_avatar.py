@@ -52,7 +52,8 @@ def test_stylize_keeps_photo_and_slogan_when_gemini_fails(
     assert response.json()["user"]["avatar_url"]
 
 
-def test_view_as_cannot_stylize_avatar(app, world_seed, jpeg_bytes):
+def test_view_as_stylizes_employee_avatar(app, world_seed, jpeg_bytes, monkeypatch):
+    _fake_stylize(monkeypatch)
     client = login_client(app, MGR_EMAIL)
     preview = client.post("/api/auth/view-as", json={"user_id": world_seed["employee_id"]})
     assert preview.status_code == 200, preview.text
@@ -60,6 +61,10 @@ def test_view_as_cannot_stylize_avatar(app, world_seed, jpeg_bytes):
         "/api/auth/me/avatar/excellence",
         files={"file": ("face.jpg", jpeg_bytes, "image/jpeg")},
     )
-    assert response.status_code == 403
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["user"]["id"] == world_seed["employee_id"]
+    assert body["user"]["is_preview"] is True
+    assert body["user"]["avatar_url"]
     me = login_client(app, EMP_EMAIL).get("/api/auth/me")
-    assert me.json()["user"]["excellence_slogan"] is None
+    assert me.json()["user"]["excellence_slogan"]

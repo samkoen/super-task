@@ -73,14 +73,23 @@ def test_exit_view_as_restores_manager(app, world_seed):
     assert own_dash.json()["employee"]["id"] == world_seed["manager_id"]
 
 
-def test_view_as_blocks_profile_edit(app, world_seed):
+def test_view_as_edits_employee_profile_not_manager(app, world_seed):
     client = login_client(app, MGR_EMAIL)
+    before_mgr = client.get("/api/auth/me").json()["user"]["first_name"]
     client.post("/api/auth/view-as", json={"user_id": world_seed["employee_id"]})
     response = client.patch(
         "/api/auth/me",
         json={"first_name": "X", "last_name": "Y", "email": EMP_EMAIL},
     )
-    assert response.status_code == 403
+    assert response.status_code == 200, response.text
+    body = response.json()["user"]
+    assert body["id"] == world_seed["employee_id"]
+    assert body["first_name"] == "X"
+    assert body["is_preview"] is True
+    emp = login_client(app, EMP_EMAIL).get("/api/auth/me").json()["user"]
+    assert emp["first_name"] == "X"
+    mgr = login_client(app, MGR_EMAIL).get("/api/auth/me").json()["user"]
+    assert mgr["first_name"] == before_mgr
 
 
 def test_login_clears_stale_preview(app, world_seed):

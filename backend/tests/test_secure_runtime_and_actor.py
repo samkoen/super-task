@@ -6,7 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from app.auth.actor import load_actor, require_admin_actor, require_manager_actor
+from app.auth.actor import (
+    load_actor,
+    require_admin_actor,
+    require_manager_actor,
+    session_acting_user_id,
+)
 from app.domain import roles
 
 
@@ -93,6 +98,16 @@ def test_load_actor_preview_does_not_overwrite_session_role(monkeypatch):
     assert actor.role == roles.EMPLOYEE
     assert request.session["user_role"] == roles.BRANCH_MANAGER
     assert request.session["user_id"] == "m1"
+
+
+def test_session_acting_user_id_prefers_preview_employee():
+    request = MagicMock()
+    request.session = {"user_id": "m1", "preview_as_user_id": "e1"}
+    assert session_acting_user_id(request) == "e1"
+    request.session = {"user_id": "m1"}
+    assert session_acting_user_id(request) == "m1"
+    request.session = {}
+    assert session_acting_user_id(request) is None
 
 
 def test_require_manager_actor_ok():

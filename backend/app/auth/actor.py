@@ -52,6 +52,15 @@ def clear_preview_session(request: Request) -> None:
     request.session.pop(SESSION_PREVIEW_AS_KEY, None)
 
 
+def session_acting_user_id(request: Request) -> str | None:
+    """Utilisateur effectif : oved en צפייה כעובד, sinon le compte connecté."""
+    preview = request.session.get(SESSION_PREVIEW_AS_KEY)
+    if preview:
+        return str(preview)
+    uid = request.session.get("user_id")
+    return str(uid) if uid else None
+
+
 def _session_user(request: Request, user_repo: UserRepository):
     user_id = require_user_id(request)
     user = user_repo.find_by_id(user_id)
