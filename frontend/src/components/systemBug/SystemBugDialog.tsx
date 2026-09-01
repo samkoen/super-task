@@ -41,8 +41,7 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
     if (props.open) return;
     setNote("");
     audio.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when dialog closes
-  }, [props.open]);
+  }, [props.open, audio.reset]);
 
   useEffect(() => {
     if (!audio.recording) return;
@@ -72,7 +71,17 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
         <Button
           variant="contained"
           disabled={sending}
-          onClick={() => void sendSystemBug({ ...props, note, sending, setSending, audioBlob: audio.blob })}
+          onClick={() =>
+            void sendSystemBug({
+              ...props,
+              note,
+              sending,
+              setSending,
+              audioBlob: audio.blob,
+              recording: audio.recording,
+              stopAndWait: audio.stopAndWait,
+            })
+          }
         >
           {sending ? <CircularProgress size={22} color="inherit" /> : he.systemBugSend}
         </Button>
@@ -155,16 +164,32 @@ function SystemBugFields({
   );
 }
 
+export async function resolveSystemBugAudio(audio: {
+  recording: boolean;
+  blob: Blob | null;
+  stopAndWait: () => Promise<Blob | null>;
+}): Promise<Blob | null> {
+  if (!audio.recording) return audio.blob;
+  return audio.stopAndWait();
+}
+
 async function sendSystemBug(
   args: SystemBugDialogProps & {
     note: string;
     sending: boolean;
     setSending: (v: boolean) => void;
     audioBlob: Blob | null;
+    recording: boolean;
+    stopAndWait: () => Promise<Blob | null>;
   },
 ) {
   if (args.sending) return;
-  if (!args.note.trim() && !args.audioBlob) {
+  const audioBlob = await resolveSystemBugAudio({
+    recording: args.recording,
+    blob: args.audioBlob,
+    stopAndWait: args.stopAndWait,
+  });
+  if (!args.note.trim() && !audioBlob) {
     args.onError(he.systemBugNeedExplain);
     return;
   }
@@ -178,7 +203,7 @@ async function sendSystemBug(
       preview: args.preview,
       branchName: args.branchName,
       screenshot: args.screenshot,
-      audio: args.audioBlob,
+      audio: audioBlob,
     });
     args.onSent();
     args.onClose();
