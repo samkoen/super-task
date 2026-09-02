@@ -43,6 +43,7 @@ export default function DirectChatThread({
   const { user } = useAuth();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const sendLock = useRef(false);
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
   const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
@@ -140,6 +141,7 @@ export default function DirectChatThread({
               audio,
               conversationId,
               broadcast,
+              sendLock,
               setAudioDock,
               setSending,
               setError,
@@ -224,21 +226,22 @@ async function postDirectMedia(args: {
   }
 }
 
-async function sendDockedDirectAudio(args: {
-  audio: ReturnType<typeof useAudioRecorder>;
-  conversationId: string | null;
-  broadcast: boolean;
-  setAudioDock: (open: boolean) => void;
-  setSending: (value: boolean) => void;
-  setError: (value: string) => void;
-  setUploadingKind: (kind: MediaKind | null) => void;
-  loadLatest: (force?: boolean) => Promise<unknown>;
-  stickToBottom: { current: boolean };
-  setBreakAlert: (value: BreakAlertTarget | null) => void;
-  onSent?: () => void;
-}) {
-  const blob = await args.audio.stopAndWait();
-  if (!blob) return;
+async function postDockedAudioFile(
+  blob: Blob,
+  args: {
+    audio: ReturnType<typeof useAudioRecorder>;
+    conversationId: string | null;
+    broadcast: boolean;
+    setAudioDock: (open: boolean) => void;
+    setSending: (value: boolean) => void;
+    setError: (value: string) => void;
+    setUploadingKind: (kind: MediaKind | null) => void;
+    loadLatest: (force?: boolean) => Promise<unknown>;
+    stickToBottom: { current: boolean };
+    setBreakAlert: (value: BreakAlertTarget | null) => void;
+    onSent?: () => void;
+  },
+) {
   const file = blobToFile(blob, `chat-audio-${Date.now()}.webm`, blob.type || "audio/webm");
   await postDirectMedia({
     file,
@@ -261,6 +264,47 @@ async function sendDockedDirectAudio(args: {
       args.onSent?.();
     },
   });
+}
+
+function closeEmptyDockedAudio(args: {
+  audio: ReturnType<typeof useAudioRecorder>;
+  setAudioDock: (open: boolean) => void;
+  setError: (value: string) => void;
+}) {
+  args.setError(he.chatAudioEmpty);
+  args.audio.reset();
+  args.setAudioDock(false);
+}
+
+async function sendDockedDirectAudio(args: {
+  audio: ReturnType<typeof useAudioRecorder>;
+  conversationId: string | null;
+  broadcast: boolean;
+  sendLock: { current: boolean };
+  setAudioDock: (open: boolean) => void;
+  setSending: (value: boolean) => void;
+  setError: (value: string) => void;
+  setUploadingKind: (kind: MediaKind | null) => void;
+  loadLatest: (force?: boolean) => Promise<unknown>;
+  stickToBottom: { current: boolean };
+  setBreakAlert: (value: BreakAlertTarget | null) => void;
+  onSent?: () => void;
+}) {
+  if (args.sendLock.current) return;
+  args.sendLock.current = true;
+  args.setSending(true);
+  args.setError("");
+  try {
+    const blob = await args.audio.stopAndWait();
+    if (!blob) {
+      closeEmptyDockedAudio(args);
+      return;
+    }
+    await postDockedAudioFile(blob, args);
+  } finally {
+    args.sendLock.current = false;
+    args.setSending(false);
+  }
 }
 
 function DirectChatComposeFields({

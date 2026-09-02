@@ -24,18 +24,48 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
 }));
 
 vi.mock("../../utils/mediaUrl", () => ({ mediaUrl: (p: string | null) => p }));
+const audioMocks = vi.hoisted(() => ({
+  stopAndWait: vi.fn(),
+  reset: vi.fn(),
+  start: vi.fn(),
+}));
+
+vi.mock("../../hooks/useAudioRecorder", () => ({
+  useAudioRecorder: () => ({
+    supported: true,
+    recording: true,
+    paused: false,
+    blob: null,
+    error: "",
+    elapsedSeconds: 2,
+    start: audioMocks.start,
+    pause: vi.fn(),
+    resume: vi.fn(),
+    stop: vi.fn(),
+    stopAndWait: audioMocks.stopAndWait,
+    reset: audioMocks.reset,
+  }),
+}));
+
 vi.mock("../media/MediaCaptureActions", () => ({
   default: ({
     onCapture,
+    onAudioStart,
   }: {
     onCapture: (file: File, kind: "photo" | "video" | "audio") => void;
+    onAudioStart?: () => void;
   }) => (
-    <button
-      type="button"
-      onClick={() => onCapture(new File(["x"], "p.jpg", { type: "image/jpeg" }), "photo")}
-    >
-      add-photo
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => onCapture(new File(["x"], "p.jpg", { type: "image/jpeg" }), "photo")}
+      >
+        add-photo
+      </button>
+      <button type="button" onClick={() => onAudioStart?.()}>
+        add-audio
+      </button>
+    </>
   ),
 }));
 
@@ -58,6 +88,10 @@ describe("DirectChatThread", () => {
     vi.mocked(directChatService.listMessages).mockReset();
     vi.mocked(directChatService.send).mockReset();
     vi.mocked(directChatService.uploadPhoto).mockReset();
+    vi.mocked(directChatService.uploadAudio).mockReset();
+    audioMocks.stopAndWait.mockReset();
+    audioMocks.reset.mockReset();
+    audioMocks.start.mockReset();
   });
 
   it("shows an empty thread then sends text", async () => {
@@ -110,5 +144,39 @@ describe("DirectChatThread", () => {
       expect(directChatService.send).toHaveBeenCalledWith("c1", { photo_url: "/uploads/p.jpg" });
     });
     expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
+  });
+
+  it("closes the dock and shows an error when the recording is empty", async () => {
+    vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
+    audioMocks.stopAndWait.mockResolvedValue(null);
+    render(<DirectChatThread conversationId="c1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "add-audio" }));
+    fireEvent.click(screen.getByRole("button", { name: he.chatAudioSend }));
+    await waitFor(() => expect(screen.getByText(he.chatAudioEmpty)).toBeTruthy());
+    expect(audioMocks.reset).toHaveBeenCalled();
+    expect(directChatService.uploadAudio).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: he.chatAudioSend })).toBeNull();
+  });
+
+  it("sends docked audio only once if the send button is tapped twice", async () => {
+    vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
+    let release: (blob: Blob) => void = () => undefined;
+    audioMocks.stopAndWait.mockReturnValue(
+      new Promise<Blob | null>((resolve) => {
+        release = (blob) => resolve(blob);
+      }),
+    );
+    vi.mocked(directChatService.uploadAudio).mockResolvedValue({ url: "/uploads/a.webm", kind: "audio" });
+    vi.mocked(directChatService.send).mockResolvedValue({});
+    render(<DirectChatThread conversationId="c1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "add-audio" }));
+    const send = screen.getByRole("button", { name: he.chatAudioSend });
+    fireEvent.click(send);
+    fireEvent.click(send);
+    expect(audioMocks.stopAndWait).toHaveBeenCalledTimes(1);
+    release(new Blob(["x"], { type: "audio/webm" }));
+    await waitFor(() => {
+      expect(directChatService.uploadAudio).toHaveBeenCalledTimes(1);
+    });
   });
 });

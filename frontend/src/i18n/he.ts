@@ -523,6 +523,7 @@ export const he = {
   chatAudioResume: "המשך",
   chatAudioPlay: "נגן",
   chatAudioSend: "שליחת הקלטה",
+  chatAudioEmpty: "לא ניתן לשלוח את ההקלטה — נסו שוב",
   chatAudioButtons: "הקלטה עם כפתורים",
   chatAudioStart: "התחל הקלטה",
   chatAudioDiscard: "מחק",

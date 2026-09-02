@@ -36,9 +36,10 @@ describe("employee account route", () => {
   });
 
   it("appears in the oved menu", () => {
-    const src = readFileSync(resolve(__dirname, "../../components/Layout/Layout.tsx"), "utf8");
-    expect(src).toContain('path: "/employee/account"');
-    expect(src).toContain("navigate(\"/employee/account\")");
+    const layout = readFileSync(resolve(__dirname, "../../components/Layout/Layout.tsx"), "utf8");
+    expect(layout).toContain('path: "/employee/account"');
+    const chrome = readFileSync(resolve(__dirname, "../../components/Layout/EmployeeChromeMenu.tsx"), "utf8");
+    expect(chrome).toContain('navigate("/employee/account")');
   });
 
   it("imports language from src/domain, not pages/domain", () => {
