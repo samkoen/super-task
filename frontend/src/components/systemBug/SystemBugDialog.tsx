@@ -50,8 +50,14 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
   }, [audio.recording, audio.stop]);
 
   return (
-    <Dialog open={props.open} onClose={sending ? undefined : props.onClose} fullWidth maxWidth="sm" dir="rtl">
-      <DialogTitle>{he.systemBug}</DialogTitle>
+    <Dialog
+      open={props.open}
+      onClose={sending ? undefined : props.onClose}
+      fullWidth
+      maxWidth="sm"
+      dir="rtl"
+    >
+      <DialogTitle data-system-bug-dialog="">{he.systemBug}</DialogTitle>
       <DialogContent>
         <SystemBugFields
           note={note}

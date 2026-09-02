@@ -80,6 +80,19 @@ export default function EmployeeProfilePage() {
     }
   };
 
+  const handleAvatarDelete = async () => {
+    setAvatarUploading(true);
+    try {
+      await authService.deleteAvatar();
+      await refresh();
+      showSuccess(he.employeePhotoDeleted);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleChangePassword = async () => {
     if (passwordForm.new_password !== passwordForm.confirm_password) {
       showError(he.passwordMismatch);
@@ -119,6 +132,7 @@ export default function EmployeeProfilePage() {
             size={88}
             editable
             onEdit={() => setAvatarOpen(true)}
+            onDelete={user.avatar_url ? () => void handleAvatarDelete() : undefined}
           />
           <Box>
             <Typography variant="body2" color="text.secondary">

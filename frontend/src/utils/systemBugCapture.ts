@@ -3,7 +3,7 @@ export function isSystemBugUi(node: Node): boolean {
 }
 
 export async function captureViewportPng(): Promise<Blob | null> {
-  const root = document.getElementById("root");
+  const root = document.body;
   if (!root) return null;
   try {
     const { toBlob } = await import("html-to-image");

@@ -80,6 +80,17 @@ def test_update_me_unknown_language_falls_back_to_hebrew():
     assert repo.update_profile.call_args.kwargs["preferred_language"] == "he"
 
 
+def test_set_my_avatar_clears_photo():
+    repo = MagicMock()
+    repo.find_by_id.return_value = _user(avatar_url="/uploads/avatars/a.jpg")
+    repo.update_avatar.return_value = _user(avatar_url=None)
+    repo._db = MagicMock()
+    service = AuthService(repo)
+    out = service.set_my_avatar("u1", None)
+    assert out["avatar_url"] is None
+    repo.update_avatar.assert_called_once_with("u1", None, excellence_slogan=None)
+
+
 def test_set_my_avatar_ok():
     repo = MagicMock()
     repo.find_by_id.return_value = _user()

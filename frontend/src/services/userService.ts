@@ -88,4 +88,11 @@ export const userService = {
     );
     return response.data;
   },
+
+  deleteTeamAvatar: async (id: string) => {
+    const response = await api.delete<{ user: User; message: string }>(
+      `/users/team/${id}/avatar`,
+    );
+    return response.data;
+  },
 };

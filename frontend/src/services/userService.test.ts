@@ -107,4 +107,12 @@ describe("userService team employee methods", () => {
     expect(path).toBe("/users/team/6/avatar");
     expect(body).toBeInstanceOf(FormData);
   });
+
+  it("deleteTeamAvatar deletes the photo", async () => {
+    mockDelete.mockResolvedValue({
+      data: { message: "ok", user: { id: "6", avatar_url: null } },
+    });
+    await userService.deleteTeamAvatar("6");
+    expect(mockDelete).toHaveBeenCalledWith("/users/team/6/avatar");
+  });
 });

@@ -115,6 +115,19 @@ async def upload_team_employee_avatar(
     return {"message": "התמונה עודכנה", "user": user, "url": uploaded["url"]}
 
 
+@router.delete("/team/{user_id}/avatar")
+@handle_controller_errors
+def delete_team_employee_avatar(
+    user_id: str,
+    request: Request,
+    service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    user = service.set_team_employee_avatar(actor, user_id, None)
+    return {"message": "התמונה נמחקה", "user": user}
+
+
 @router.delete("/team/{user_id}")
 @handle_controller_errors
 def deactivate_team_employee(

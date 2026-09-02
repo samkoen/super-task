@@ -10,6 +10,7 @@ from app.domain.system_bug import (
     MAX_NOTE_LEN,
     MAX_SCREENSHOT_BYTES,
     has_system_bug_explanation,
+    parse_system_bug_emails,
     parse_trail,
     system_bug_subject,
 )
@@ -36,12 +37,25 @@ class SystemBugService:
         shot = _capped(screenshot, MAX_SCREENSHOT_BYTES)
         if not has_system_bug_explanation(note, has_audio=bool(audio_bytes)):
             raise ValueError("הוסיפו טקסט או הקלטה")
-        to_email = SYSTEM_BUG_EMAIL
-        if not to_email:
+        recipients = parse_system_bug_emails(SYSTEM_BUG_EMAIL)
+        if not recipients:
             raise ValueError("יעד הדיווח אינו מוגדר")
         subject = system_bug_subject(route=route, role=actor.role, version=app_version)
         html = _html_body(actor, note, route, parse_trail(trail_raw), app_version, extra or {})
         attachments = _attachments(shot, audio_bytes)
+        if not _deliver_to_all(recipients, subject, html, attachments):
+            raise RuntimeError("שליחת הדיווח נכשלה")
+        return {"ok": True, "subject": subject}
+
+
+def _deliver_to_all(
+    recipients: list[str],
+    subject: str,
+    html: str,
+    attachments: list[Attachment],
+) -> bool:
+    sent = True
+    for to_email in recipients:
         ok = deliver_html_email(
             to_email=to_email,
             subject=subject,
@@ -49,9 +63,8 @@ class SystemBugService:
             kind="system-bug",
             attachments=attachments,
         )
-        if not ok:
-            raise RuntimeError("שליחת הדיווח נכשלה")
-        return {"ok": True, "subject": subject}
+        sent = sent and ok
+    return sent
 
 
 def _capped(data: bytes | None, limit: int) -> bytes | None:

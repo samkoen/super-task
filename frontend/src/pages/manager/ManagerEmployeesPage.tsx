@@ -145,6 +145,19 @@ export default function ManagerEmployeesPage() {
     setOpen(true);
   };
 
+  const clearAvatar = async () => {
+    setAvatarFile(null);
+    setAvatarPreview("");
+    if (!edit) return;
+    try {
+      await userService.deleteTeamAvatar(edit.id);
+      setSuccess(he.employeePhotoDeleted);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
   const openAccessConfirm = (employee: User) => {
     setAccessTarget(employee);
     setAccessConfirmOpen(true);
@@ -403,6 +416,7 @@ export default function ManagerEmployeesPage() {
               name={`${form.first_name} ${form.last_name}`.trim() || he.employeeAvatar}
               photoUrl={avatarPreview || null}
               size={72}
+              onDelete={avatarPreview ? () => void clearAvatar() : undefined}
             />
             <Box>
               <Button component="label" variant="outlined" size="small">

@@ -1,6 +1,7 @@
 from app.domain.system_bug import (
     clip_route_trail,
     has_system_bug_explanation,
+    parse_system_bug_emails,
     parse_trail,
     system_bug_subject,
 )
@@ -23,3 +24,10 @@ def test_trail_keeps_last_eight_and_parses_json():
     assert clip_route_trail(paths) == paths[-8:]
     assert parse_trail('["/a","/b"]') == ["/a", "/b"]
     assert parse_trail("/a,/b") == ["/a", "/b"]
+
+
+def test_parse_system_bug_emails_splits_and_dedupes():
+    assert parse_system_bug_emails(
+        "skoen7665210@gmail.com, Bircat9172@gmail.com,skoen7665210@gmail.com"
+    ) == ["skoen7665210@gmail.com", "Bircat9172@gmail.com"]
+    assert parse_system_bug_emails("  ") == []

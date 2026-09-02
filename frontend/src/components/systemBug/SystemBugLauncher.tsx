@@ -17,6 +17,7 @@ import {
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { pushRouteTrail, readRouteTrail } from "../../utils/routeTrail";
 import { captureViewportPng } from "../../utils/systemBugCapture";
+import { pickSystemBugPortalHost } from "../../utils/systemBugPortal";
 import { systemBugAppVersion, systemBugPreviewLabel } from "../../utils/systemBugMeta";
 import SystemBugDialog from "./SystemBugDialog";
 
@@ -60,7 +61,11 @@ function SystemBugTrigger({
       size="small"
       aria-label={he.systemBug}
       data-system-bug-ignore=""
-      onClick={onClick}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       sx={{
         ...systemBugLauncherSx,
         left: systemBugLauncherLeft(besideSidebar),
@@ -72,12 +77,27 @@ function SystemBugTrigger({
   );
 }
 
+function useSystemBugPortalHost() {
+  const [host, setHost] = useState<HTMLElement | null>(() =>
+    typeof document !== "undefined" ? document.body : null,
+  );
+  useEffect(() => {
+    const sync = () => setHost(pickSystemBugPortalHost(document.body));
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.body, { childList: true });
+    return () => obs.disconnect();
+  }, []);
+  return host;
+}
+
 export default function SystemBugLauncher() {
   const location = useLocation();
   const { user } = useAuth();
   const { showSuccess, showError } = useFeedback();
   const [open, setOpen] = useState(false);
   const [screenshot, setScreenshot] = useState<Blob | null>(null);
+  const host = useSystemBugPortalHost();
 
   useEffect(() => {
     pushRouteTrail(location.pathname);
@@ -104,7 +124,7 @@ export default function SystemBugLauncher() {
 
   return (
     <>
-      {typeof document !== "undefined" ? createPortal(button, document.body) : button}
+      {!open && host ? createPortal(button, host) : null}
       <SystemBugDialog
         open={open}
         screenshot={screenshot}

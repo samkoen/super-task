@@ -37,3 +37,18 @@ def parse_trail(raw: str) -> list[str]:
         if isinstance(data, list):
             return clip_route_trail([str(item) for item in data])
     return clip_route_trail(text.split(","))
+
+
+def parse_system_bug_emails(raw: str) -> list[str]:
+    emails: list[str] = []
+    seen: set[str] = set()
+    for part in (raw or "").replace(";", ",").split(","):
+        email = part.strip()
+        if not email:
+            continue
+        key = email.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        emails.append(email)
+    return emails

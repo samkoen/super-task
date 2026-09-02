@@ -1,4 +1,5 @@
 import { Box, Button, Typography } from "@mui/material";
+import CompactAudioPlayer from "../media/CompactAudioPlayer";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import { he } from "../../i18n/he";
 import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
@@ -125,9 +126,7 @@ function LegacyAttachmentList({
             {item.kind === "video" && (
               <Box component="video" src={src} controls sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }} />
             )}
-            {item.kind === "audio" && (
-              <Box component="audio" src={src} controls sx={{ width: "100%", display: "block" }} />
-            )}
+            {item.kind === "audio" && <CompactAudioPlayer src={src} />}
             {item.kind === "photo" && onRemovePhoto && (
               <Button size="small" color="inherit" disabled={disabled} onClick={onRemovePhoto} sx={{ mt: 0.5 }}>
                 {he.removeMedia}

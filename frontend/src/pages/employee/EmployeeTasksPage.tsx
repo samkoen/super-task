@@ -528,6 +528,20 @@ export default function EmployeeTasksPage() {
     }
   };
 
+  const handleAvatarDelete = async () => {
+    setAvatarUploading(true);
+    try {
+      await authService.deleteAvatar();
+      await refresh();
+      await load(true);
+      showSuccess(he.employeePhotoDeleted);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const urgentTasks = dashboard?.urgent_tasks ?? [];
   const inProgressTasks = dashboard?.in_progress_tasks ?? [];
   const awaitingResponseTasks = dashboard?.awaiting_response_tasks ?? [];
@@ -610,6 +624,7 @@ export default function EmployeeTasksPage() {
         photoUrl={photoUrl}
         photoEditable
         onEditPhoto={() => setAvatarOpen(true)}
+        onDeletePhoto={photoUrl ? () => void handleAvatarDelete() : undefined}
         slogan={dashboard?.employee?.excellence_slogan ?? user?.excellence_slogan}
         meta={[
           headerBranch ? `${he.branch}: ${headerBranch}` : "",

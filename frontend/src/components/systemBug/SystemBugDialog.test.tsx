@@ -16,13 +16,13 @@ vi.mock("../../hooks/useAudioRecorder", () => ({
     error: "",
     start: vi.fn(),
     stop: vi.fn(),
-    stopAndWait: vi.fn(),
+    stopAndWait: vi.fn().mockResolvedValue(null),
     reset: vi.fn(),
   }),
 }));
 
 describe("SystemBugDialog", () => {
-  it("requires text or audio before send", () => {
+  it("requires text or audio before send", async () => {
     const onError = vi.fn();
     render(
       <SystemBugDialog
@@ -39,7 +39,9 @@ describe("SystemBugDialog", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: he.systemBugSend }));
-    expect(onError).toHaveBeenCalledWith(he.systemBugNeedExplain);
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(he.systemBugNeedExplain);
+    });
     expect(submitSystemBug).not.toHaveBeenCalled();
   });
 

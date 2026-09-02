@@ -12,12 +12,16 @@ def _actor() -> ActorContext:
 
 
 def test_submit_sends_mail_with_screenshot(monkeypatch):
-    sent = {}
+    sent = []
 
     def fake_deliver(**kwargs):
-        sent.update(kwargs)
+        sent.append(kwargs)
         return True
 
+    monkeypatch.setattr(
+        "app.services.system_bug_service.SYSTEM_BUG_EMAIL",
+        "skoen7665210@gmail.com,Bircat9172@gmail.com",
+    )
     monkeypatch.setattr("app.services.system_bug_service.deliver_html_email", fake_deliver)
     result = SystemBugService().submit(
         _actor(),
@@ -30,9 +34,12 @@ def test_submit_sends_mail_with_screenshot(monkeypatch):
     )
     assert result["ok"] is True
     assert "/employee" in result["subject"]
-    assert sent["to_email"] == "skoen7665210@gmail.com"
-    assert sent["kind"] == "system-bug"
-    assert sent["attachments"][0][0] == "screenshot.png"
+    assert [row["to_email"] for row in sent] == [
+        "skoen7665210@gmail.com",
+        "Bircat9172@gmail.com",
+    ]
+    assert sent[0]["kind"] == "system-bug"
+    assert sent[0]["attachments"][0][0] == "screenshot.png"
 
 
 def test_submit_rejects_empty_report():

@@ -7,11 +7,13 @@ vi.mock("./api", () => ({
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
 const mockPost = api.post as ReturnType<typeof vi.fn>;
 const mockPatch = api.patch as ReturnType<typeof vi.fn>;
+const mockDelete = api.delete as ReturnType<typeof vi.fn>;
 
 describe("authService profile", () => {
   beforeEach(() => {
@@ -87,5 +89,13 @@ describe("authService profile", () => {
     expect(path).toBe("/auth/me/avatar/excellence");
     expect(body).toBeInstanceOf(FormData);
     expect(config).toEqual({ timeout: 120_000 });
+  });
+
+  it("deleteAvatar deletes /auth/me/avatar", async () => {
+    mockDelete.mockResolvedValue({
+      data: { message: "ok", user: { id: "1", avatar_url: null } },
+    });
+    await authService.deleteAvatar();
+    expect(mockDelete).toHaveBeenCalledWith("/auth/me/avatar");
   });
 });

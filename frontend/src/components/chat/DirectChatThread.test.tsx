@@ -71,4 +71,17 @@ describe("DirectChatThread", () => {
     await waitFor(() => expect(screen.getByText("ישן")).toBeTruthy());
     expect(directChatService.listMessages).toHaveBeenLastCalledWith("c1", { before: "m2" });
   });
+
+  it("shows received audio as a full-width line, not a square", async () => {
+    vi.mocked(directChatService.listMessages).mockResolvedValue({
+      messages: [{ ...msg("m-audio", ""), audio_url: "/uploads/chat/v.webm" }],
+      has_more: false,
+    });
+    render(<DirectChatThread conversationId="c1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
+    });
+    expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
+    expect(document.querySelector("audio")).toBeNull();
+  });
 });

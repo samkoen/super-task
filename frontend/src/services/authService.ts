@@ -82,6 +82,11 @@ export const authService = {
     return response.data;
   },
 
+  deleteAvatar: async () => {
+    const response = await api.delete<{ user: User; message: string }>("/auth/me/avatar");
+    return response.data;
+  },
+
   changePassword: async (current_password: string, new_password: string) => {
     const response = await api.post<{ message: string }>("/auth/change-password", {
       current_password,
