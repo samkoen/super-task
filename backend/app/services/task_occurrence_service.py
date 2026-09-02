@@ -548,8 +548,17 @@ class TaskOccurrenceService:
         completion_attachments,
     ) -> dict:
         raw_reqs = getattr(occurrence, "completion_requirements", None)
+        reqs = (
+            effective_requirements(
+                raw_reqs,
+                photo_required=getattr(occurrence, "photo_required", None),
+                min_video_seconds=getattr(occurrence, "min_video_seconds", None),
+            )
+            if raw_reqs is not None
+            else []
+        )
         attachments = resolve_completion_attachments(
-            effective_requirements(raw_reqs) if raw_reqs is not None else [],
+            reqs,
             attachments=completion_attachments,
             photo_path=photo_path,
             video_path=video_path,
@@ -557,7 +566,7 @@ class TaskOccurrenceService:
             video_duration_seconds=video_duration_seconds,
         )
         if raw_reqs is not None:
-            assert_attachments_match(effective_requirements(raw_reqs), attachments)
+            assert_attachments_match(reqs, attachments)
             return TaskOccurrenceService._pack_attachments(attachments)
         requires_visual = (
             employee_can_see_occurrence(

@@ -39,7 +39,7 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const audio = useAudioRecorder();
-  const annotateRef = useRef<PhotoAnnotationCanvasHandle | null>(null);
+  const annotateRef = useRef<PhotoAnnotationCanvasHandle>(null);
 
   useEffect(() => {
     if (props.open) return;
@@ -117,7 +117,7 @@ function SystemBugFields({
   note: string;
   setNote: (value: string) => void;
   screenshot: Blob | null;
-  annotateRef: RefObject<PhotoAnnotationCanvasHandle | null>;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
   sending: boolean;
   recording: boolean;
   hasAudio: boolean;
@@ -163,7 +163,7 @@ function SystemBugScreenshot({
   annotateRef,
 }: {
   screenshot: Blob | null;
-  annotateRef: RefObject<PhotoAnnotationCanvasHandle | null>;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
 }) {
   if (!screenshot) {
     return (

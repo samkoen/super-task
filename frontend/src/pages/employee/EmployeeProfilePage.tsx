@@ -129,7 +129,7 @@ export default function EmployeeProfilePage() {
           <EmployeeAvatar
             name={user.full_name}
             photoUrl={user.avatar_url}
-            size={88}
+            size={112}
             editable
             onEdit={() => setAvatarOpen(true)}
             onDelete={user.avatar_url ? () => void handleAvatarDelete() : undefined}

@@ -1,14 +1,16 @@
-import { Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
+import { Box, Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { he } from "../../i18n/he";
 
 export default function CompletionExampleDialog({
   src,
   title,
+  kind = "photo",
   onClose,
 }: {
   src: string | null;
   title: string;
+  kind?: "photo" | "video";
   onClose: () => void;
 }) {
   return (
@@ -20,13 +22,18 @@ export default function CompletionExampleDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {src && (
-          <img
+        {src && kind === "video" ? (
+          <Box
+            component="video"
             src={src}
-            alt={title}
-            style={{ width: "100%", borderRadius: 8, display: "block" }}
+            controls
+            autoPlay
+            playsInline
+            sx={{ width: "100%", borderRadius: 1, display: "block", bgcolor: "common.black" }}
           />
-        )}
+        ) : src ? (
+          <img src={src} alt={title} style={{ width: "100%", borderRadius: 8, display: "block" }} />
+        ) : null}
       </DialogContent>
     </Dialog>
   );

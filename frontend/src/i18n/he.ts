@@ -354,6 +354,7 @@ export const he = {
   completionTakePhoto: "צלם תמונה",
   completionTakeVideo: "צלם סרטון",
   completionRetake: "צלם שוב",
+  completionPlayVideo: "נגן סרטון",
   completionEnlargeExample: "הגדלת דוגמה",
   completionSlotDone: "הושלם",
   completionVisualSummary: (photos: number, videos: number) => {
@@ -365,6 +366,14 @@ export const he = {
   completionSlotsProgress: (done: number, total: number) => `${done}/${total}`,
   workStartTask: "שעון נוכחות — תחילת עבודה",
   workStartTaskHint: "שעת פתיחת המשימה נחשבת כהגעה, רק אם המשימה גם נסגרה",
+  punchClockIn: "כניסה למשמרת",
+  punchClockOut: "יציאה ממשמרת",
+  punchClockInHint: "לחצו על טביעת האצבע כדי להתחיל",
+  punchClockOutHint: "לחצו על טביעת האצבע כדי לסיים",
+  punchOpenEndEarly: "סיימתי מוקדם — יציאה",
+  punchBackToTasks: "חזרה למשימות",
+  punchRemainingHint: (count: number) =>
+    count === 1 ? "עדיין יש משימה פתוחה" : `עדיין יש ${count} משימות פתוחות`,
   startUrl: "קישור בפתיחת המשימה",
   startUrlHint: "למשל הזמנה ב-Agroline — נפתח בדפדפן כשהעובד מתחיל",
   startUrlInvalid: "הקישור חייב להתחיל ב-https://",

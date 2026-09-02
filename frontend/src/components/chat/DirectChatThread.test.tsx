@@ -101,7 +101,7 @@ describe("DirectChatThread", () => {
 
   it("sends a photo into the thread instead of attaching it below", async () => {
     vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
-    vi.mocked(directChatService.uploadPhoto).mockResolvedValue({ url: "/uploads/p.jpg" });
+    vi.mocked(directChatService.uploadPhoto).mockResolvedValue({ url: "/uploads/p.jpg", kind: "photo" });
     vi.mocked(directChatService.send).mockResolvedValue({});
     render(<DirectChatThread conversationId="c1" />);
     fireEvent.click(await screen.findByRole("button", { name: "add-photo" }));

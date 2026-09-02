@@ -105,7 +105,7 @@ export function PhotoCaptureDialog({
   const [capturing, setCapturing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const annotationRef = useRef<PhotoAnnotationCanvasHandle | null>(null);
+  const annotationRef = useRef<PhotoAnnotationCanvasHandle>(null);
   const shotPreviewUrl = useBlobPreviewUrl(!annotate ? previewBlob : null);
 
   useEffect(() => {
@@ -609,11 +609,11 @@ export default function MediaCaptureActions({
       </Tooltip>
       )}
       {showVideo && (
-      <Tooltip title={videoAdded ? he.videoAdded : he.addVideo}>
+      <Tooltip title={videoAdded ? videoDoneLabel ?? he.videoAdded : videoLabel ?? he.addVideo}>
         <span>
           <IconButton
             size="small"
-            aria-label={he.addVideo}
+            aria-label={videoAdded ? videoDoneLabel ?? he.videoAdded : videoLabel ?? he.addVideo}
             color={videoAdded ? "primary" : "default"}
             onClick={openVideoCapture}
             disabled={videoDisabled}

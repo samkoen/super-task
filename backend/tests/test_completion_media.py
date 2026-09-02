@@ -1,6 +1,8 @@
 from app.domain.completion_media import (
     assert_attachments_match,
     assert_completion_media,
+    drop_stale_migrated_photo,
+    effective_requirements,
     has_required_completion_visual_media,
     merge_completion_requirements,
     normalize_min_video_seconds,
@@ -192,3 +194,29 @@ def test_merge_fills_missing_example_without_dropping_occurrence_title():
     assert merged == [
         {"kind": "photo", "title": "מדף", "hint": "הסבר", "example_url": "/ex.jpg"}
     ]
+
+
+def test_merge_keeps_explicit_empty_occurrence_requirements():
+    assert merge_completion_requirements([], [{"kind": "photo"}]) == []
+
+
+def test_stale_migrated_photo_is_dropped_when_not_required():
+    assert drop_stale_migrated_photo(
+        [{"kind": "photo"}],
+        photo_required=False,
+    ) == []
+    assert effective_requirements(
+        [{"kind": "photo"}],
+        photo_required=False,
+    ) == []
+
+
+def test_stale_migrated_photo_kept_when_required_or_named():
+    assert drop_stale_migrated_photo(
+        [{"kind": "photo"}],
+        photo_required=True,
+    ) == [{"kind": "photo"}]
+    assert effective_requirements(
+        [{"kind": "photo", "title": "מדף"}],
+        photo_required=False,
+    ) == [{"kind": "photo", "title": "מדף"}]

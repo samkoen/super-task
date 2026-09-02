@@ -80,6 +80,7 @@ function ShiftIdentity({
       <EmployeeAvatar
         name={name}
         photoUrl={photoUrl}
+        size={112}
         editable={photoEditable}
         onEdit={onEditPhoto}
         onDelete={onDeletePhoto}

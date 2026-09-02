@@ -93,17 +93,34 @@ export function requirementsFromLegacy(
   return [];
 }
 
+function isBarePhotoOnly(list: CompletionRequirement[]): boolean {
+  const item = list[0];
+  return (
+    list.length === 1 &&
+    item.kind === "photo" &&
+    !item.title &&
+    !item.hint &&
+    !item.example_url
+  );
+}
+
 export function effectiveRequirements(task: {
   completion_requirements?: CompletionRequirement[] | null;
   photo_required?: boolean;
   min_video_seconds?: number | null;
 }): CompletionRequirement[] {
-  if (Array.isArray(task.completion_requirements)) {
-    return normalizeRequirements(task.completion_requirements);
+  if (!Array.isArray(task.completion_requirements)) {
+    return requirementsFromLegacy(task.photo_required, task.min_video_seconds);
   }
-  const legacy = requirementsFromLegacy(task.photo_required, task.min_video_seconds);
-  if (legacy.length) return legacy;
-  return [{ kind: "photo" }];
+  const normalized = normalizeRequirements(task.completion_requirements);
+  if (
+    isBarePhotoOnly(normalized) &&
+    task.photo_required === false &&
+    !normalizeMinVideoSeconds(task.min_video_seconds)
+  ) {
+    return [];
+  }
+  return normalized;
 }
 
 export function addRequirement(

@@ -115,6 +115,20 @@ def parse_requirements_input(
     return requirements_from_legacy(bool(photo_required), min_video_seconds)
 
 
+def drop_stale_migrated_photo(
+    requirements: list[dict],
+    *,
+    photo_required: bool | None,
+    min_video_seconds: object | None = None,
+) -> list[dict]:
+    """a034 a forcé une photo même si photo_required était faux."""
+    if photo_required or normalize_min_video_seconds(min_video_seconds):
+        return requirements
+    if not _is_bare_photo_list(requirements):
+        return requirements
+    return []
+
+
 def effective_requirements(
     raw: object | None,
     *,
@@ -123,7 +137,11 @@ def effective_requirements(
 ) -> list[dict]:
     """Liste persistée si présente, sinon legacy."""
     if raw is not None:
-        return normalize_requirements(raw)
+        return drop_stale_migrated_photo(
+            normalize_requirements(raw),
+            photo_required=photo_required,
+            min_video_seconds=min_video_seconds,
+        )
     return requirements_from_legacy(bool(photo_required), min_video_seconds)
 
 
@@ -204,6 +222,15 @@ def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
 _GUIDE_KEYS = ("title", "hint", "example_url")
 
 
+def _is_bare_photo_list(requirements: list[dict]) -> bool:
+    if len(requirements) != 1:
+        return False
+    item = requirements[0]
+    if item.get("kind") != "photo":
+        return False
+    return not any(str(item.get(key) or "").strip() for key in _GUIDE_KEYS)
+
+
 def _has_slot_guides(requirements: list | None) -> bool:
     if not isinstance(requirements, list):
         return False
@@ -233,11 +260,15 @@ def merge_completion_requirements(
     template_reqs: list | None,
 ) -> list | None:
     """Complète les guides de cases depuis le template si l'occurrence est en retard."""
+    if occurrence_reqs is None:
+        return template_reqs
     occ = occurrence_reqs if isinstance(occurrence_reqs, list) else []
     tpl = template_reqs if isinstance(template_reqs, list) else []
     if not tpl:
         return occurrence_reqs
-    if not occ or (_has_slot_guides(tpl) and not _has_slot_guides(occ)):
+    if not occ:
+        return occ
+    if _has_slot_guides(tpl) and not _has_slot_guides(occ):
         return template_reqs
     merged: list = []
     for index, item in enumerate(occ):
