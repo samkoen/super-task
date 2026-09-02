@@ -107,6 +107,15 @@ describe("nativeVideoRecorder", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ blob: async () => blob })));
     const file = await fileFromNativePath("/cache/a.mp4");
     expect(file.size).toBe(1);
+    expect(file.name.endsWith(".mp4")).toBe(true);
     expect(convertFileSrc).toHaveBeenCalledWith("file:///cache/a.mp4");
+  });
+
+  it("names a jpeg cache file as a photo", async () => {
+    const blob = new Blob(["x"], { type: "image/jpeg" });
+    vi.stubGlobal("fetch", vi.fn(async () => ({ blob: async () => blob })));
+    const file = await fileFromNativePath("/cache/a.jpg", "image/jpeg");
+    expect(file.name.endsWith(".jpg")).toBe(true);
+    expect(file.type).toBe("image/jpeg");
   });
 });

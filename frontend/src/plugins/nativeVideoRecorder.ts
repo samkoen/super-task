@@ -16,7 +16,7 @@ interface NativeVideoRecorderPlugin {
 
 const NativeVideoRecorder = registerPlugin<NativeVideoRecorderPlugin>("NativeVideoRecorder");
 
-export function canUseNativeVideoRecorder(): boolean {
+export function canUseNativeAndroidCamera(): boolean {
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   } catch {
@@ -24,14 +24,29 @@ export function canUseNativeVideoRecorder(): boolean {
   }
 }
 
-export async function fileFromNativePath(path: string, mimeType = "video/mp4"): Promise<File> {
+export function canUseNativeVideoRecorder(): boolean {
+  return canUseNativeAndroidCamera();
+}
+
+export async function fileFromNativePath(
+  path: string,
+  mimeType = "video/mp4",
+  filename?: string,
+): Promise<File> {
   const src = path.startsWith("file:") ? path : `file://${path}`;
   const url = Capacitor.convertFileSrc(src);
   const blob = await (await fetch(url)).blob();
   if (!blob.size) {
     throw new Error("empty-video");
   }
-  return blobToFile(blob, `task-video-${Date.now()}.mp4`, mimeType);
+  return blobToFile(blob, filename ?? nativeFileName(mimeType), mimeType);
+}
+
+function nativeFileName(mimeType: string): string {
+  if (mimeType.includes("jpeg") || mimeType.includes("jpg")) {
+    return `task-photo-${Date.now()}.jpg`;
+  }
+  return `task-video-${Date.now()}.mp4`;
 }
 
 export async function recordNativeVideo(options?: {

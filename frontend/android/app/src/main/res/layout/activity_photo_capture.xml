@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:layoutDirection="rtl">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/photo_preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/photo_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/photo_close"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/video_record_close" />
+
+        <Button
+            android:id="@+id/photo_flip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="8dp"
+            android:text="@string/video_record_flip" />
+
+        <Button
+            android:id="@+id/photo_shutter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/photo_capture_shutter" />
+    </LinearLayout>
+</FrameLayout>

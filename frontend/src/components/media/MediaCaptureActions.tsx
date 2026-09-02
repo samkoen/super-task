@@ -25,7 +25,9 @@ import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./Photo
 import CameraFacingPreview from "./CameraFacingPreview";
 import { he } from "../../i18n/he";
 import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
+import { canUseNativePhotoCapture } from "../../plugins/nativePhotoCapture";
 import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
+import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 
@@ -87,6 +89,7 @@ export function PhotoCaptureDialog({
   onSkip,
   title,
   annotate = true,
+  seedBlob = null,
 }: {
   open: boolean;
   uploading: boolean;
@@ -98,6 +101,8 @@ export function PhotoCaptureDialog({
   title?: string;
   /** Faux pour un avatar : aperçu brut, sans flèches / ellipses. */
   annotate?: boolean;
+  /** Photo déjà prise (CameraX Android) — saute le live WebView. */
+  seedBlob?: Blob | null;
 }) {
   const { supported, active, starting, error, facing, onVideoRef, start, flip } = camera;
   const theme = useTheme();
@@ -112,8 +117,12 @@ export function PhotoCaptureDialog({
     if (!open) {
       setPreviewBlob(null);
       setConfirming(false);
+      return;
     }
-  }, [open]);
+    if (seedBlob && seedBlob.size > 0) {
+      setPreviewBlob(seedBlob);
+    }
+  }, [open, seedBlob]);
 
   const handleCapture = async () => {
     const video = camera.videoRef.current;
@@ -172,7 +181,7 @@ export function PhotoCaptureDialog({
             flipDisabled={starting || capturing}
           />
         )}
-        {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
+        {!supported && !hasPreview && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
         {errorMessage(error) && <Alert severity="warning">{errorMessage(error)}</Alert>}
         {starting && (
           <Box display="flex" justifyContent="center" py={1}>
@@ -518,29 +527,48 @@ export default function MediaCaptureActions({
   const photoCamera = useCameraStream({ defaultFacing: "environment" });
   const videoRecorder = useVideoRecorder({ defaultFacing: "environment" });
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoSeed, setPhotoSeed] = useState<Blob | null>(null);
   const [videoOpen, setVideoOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
   const [nativeVideoError, setNativeVideoError] = useState("");
+  const [nativePhotoError, setNativePhotoError] = useState("");
   const captureSupported = isMediaCaptureSupported();
   const nativeVideo = canUseNativeVideoRecorder();
+  const nativePhoto = canUseNativePhotoCapture();
 
   const busy = disabled || uploadingKind !== null;
   const captureDisabled = busy || !captureSupported;
+  const photoDisabled = busy || (!captureSupported && !nativePhoto);
   const videoDisabled = busy || (!captureSupported && !nativeVideo);
+  const nativeError = nativePhotoError || nativeVideoError;
   const kinds = allowedKinds ?? (["photo", "video", "audio"] as MediaKind[]);
   const showPhoto = kinds.includes("photo");
   const showVideo = kinds.includes("video");
   const showAudio = kinds.includes("audio");
 
-  const openPhotoCapture = useCallback(() => {
+  const openWebPhotoCapture = useCallback(() => {
+    setPhotoSeed(null);
     setPhotoOpen(true);
     scheduleAfterDialogPaint(() => {
       void photoCamera.start();
     });
   }, [photoCamera.start]);
 
+  const openPhotoCapture = useCallback(() => {
+    setNativePhotoError("");
+    void launchPhotoCapture({
+      openWeb: openWebPhotoCapture,
+      onNative: async (file) => {
+        setPhotoSeed(await normalizePhotoOrientation(file));
+        setPhotoOpen(true);
+      },
+      onPermissionDenied: () => setNativePhotoError("permission"),
+    });
+  }, [openWebPhotoCapture]);
+
   const closePhotoCapture = useCallback(() => {
     setPhotoOpen(false);
+    setPhotoSeed(null);
     photoCamera.stop();
   }, [photoCamera.stop]);
 
@@ -596,7 +624,7 @@ export default function MediaCaptureActions({
             aria-label={he.addPhoto}
             color={photoAdded ? "primary" : "default"}
             onClick={openPhotoCapture}
-            disabled={captureDisabled}
+            disabled={photoDisabled}
             sx={{ p: 0.5 }}
           >
             {uploadingKind === "photo" ? (
@@ -638,7 +666,7 @@ export default function MediaCaptureActions({
         startIcon={<PhotoCameraIcon />}
         variant={photoAdded ? "contained" : "outlined"}
         onClick={openPhotoCapture}
-        disabled={captureDisabled}
+        disabled={photoDisabled}
       >
         {uploadingKind === "photo"
           ? he.loading
@@ -677,20 +705,21 @@ export default function MediaCaptureActions({
   return (
     <>
       {density === "icon" ? iconActions : defaultActions}
-      {!captureSupported && !nativeVideo && (
+      {!captureSupported && !nativeVideo && !nativePhoto && (
         <Typography variant="caption" color="warning.main">
           {he.mediaCaptureUnsupported}
         </Typography>
       )}
-      {nativeVideoError ? (
+      {nativeError ? (
         <Typography variant="caption" color="warning.main">
-          {errorMessage(nativeVideoError)}
+          {errorMessage(nativeError)}
         </Typography>
       ) : null}
       <PhotoCaptureDialog
         open={photoOpen}
         uploading={uploadingKind === "photo"}
         camera={photoCamera}
+        seedBlob={photoSeed}
         onClose={closePhotoCapture}
         onCapture={(file) => onCapture(file, "photo")}
       />

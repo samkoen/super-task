@@ -33,6 +33,13 @@
             android:theme="@style/AppTheme.NoActionBar"
             android:configChanges="keyboard|keyboardHidden|screenSize" />
 
+        <activity
+            android:name=".PhotoCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme.NoActionBar"
+            android:configChanges="keyboard|keyboardHidden|screenSize" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

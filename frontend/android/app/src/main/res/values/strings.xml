@@ -10,4 +10,5 @@
     <string name="video_record_close">סגור</string>
     <string name="video_record_recording">מקליט…</string>
     <string name="video_record_too_short">יש להקליט לפחות %d שניות</string>
+    <string name="photo_capture_shutter">צלם</string>
 </resources>
