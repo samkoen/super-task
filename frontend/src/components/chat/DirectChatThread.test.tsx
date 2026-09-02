@@ -24,7 +24,20 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
 }));
 
 vi.mock("../../utils/mediaUrl", () => ({ mediaUrl: (p: string | null) => p }));
-vi.mock("../media/MediaCaptureActions", () => ({ default: () => null }));
+vi.mock("../media/MediaCaptureActions", () => ({
+  default: ({
+    onCapture,
+  }: {
+    onCapture: (file: File, kind: "photo" | "video" | "audio") => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onCapture(new File(["x"], "p.jpg", { type: "image/jpeg" }), "photo")}
+    >
+      add-photo
+    </button>
+  ),
+}));
 
 function msg(id: string, body: string) {
   return {
@@ -44,6 +57,7 @@ describe("DirectChatThread", () => {
   beforeEach(() => {
     vi.mocked(directChatService.listMessages).mockReset();
     vi.mocked(directChatService.send).mockReset();
+    vi.mocked(directChatService.uploadPhoto).mockReset();
   });
 
   it("shows an empty thread then sends text", async () => {
@@ -83,5 +97,18 @@ describe("DirectChatThread", () => {
     });
     expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
     expect(document.querySelector("audio")).toBeNull();
+  });
+
+  it("sends a photo into the thread instead of attaching it below", async () => {
+    vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
+    vi.mocked(directChatService.uploadPhoto).mockResolvedValue({ url: "/uploads/p.jpg" });
+    vi.mocked(directChatService.send).mockResolvedValue({});
+    render(<DirectChatThread conversationId="c1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "add-photo" }));
+    await waitFor(() => {
+      expect(directChatService.uploadPhoto).toHaveBeenCalled();
+      expect(directChatService.send).toHaveBeenCalledWith("c1", { photo_url: "/uploads/p.jpg" });
+    });
+    expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
   });
 });
