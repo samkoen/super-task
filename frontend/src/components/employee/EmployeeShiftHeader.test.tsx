@@ -68,7 +68,8 @@ describe("EmployeeShiftHeader", () => {
         onToggleBreak={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: he.employeeDeletePhoto }));
+    fireEvent.click(screen.getByRole("button", { name: he.employeeChangePhoto }));
+    fireEvent.click(screen.getByRole("menuitem", { name: he.employeeDeletePhoto }));
     expect(onDeletePhoto).toHaveBeenCalledTimes(1);
   });
 
