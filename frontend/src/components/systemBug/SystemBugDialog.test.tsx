@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import SystemBugDialog from "./SystemBugDialog";
+import SystemBugDialog, { resolveSystemBugScreenshot } from "./SystemBugDialog";
 import { he } from "../../i18n/he";
 import { submitSystemBug } from "../../services/systemBugService";
 
@@ -16,13 +16,28 @@ vi.mock("../../hooks/useAudioRecorder", () => ({
     error: "",
     start: vi.fn(),
     stop: vi.fn(),
-    stopAndWait: vi.fn(),
+    stopAndWait: vi.fn().mockResolvedValue(null),
     reset: vi.fn(),
   }),
 }));
 
+vi.mock("../media/PhotoAnnotationCanvas", async () => {
+  const { forwardRef } = await import("react");
+  const { he: labels } = await import("../../i18n/he");
+  return {
+    default: forwardRef(function MockPhotoAnnotationCanvas(_props, _ref) {
+      return (
+        <div>
+          <button type="button" aria-label={labels.photoAnnotateEllipse} />
+          <button type="button" aria-label={labels.photoAnnotateArrow} />
+        </div>
+      );
+    }),
+  };
+});
+
 describe("SystemBugDialog", () => {
-  it("requires text or audio before send", () => {
+  it("requires text or audio before send", async () => {
     const onError = vi.fn();
     render(
       <SystemBugDialog
@@ -39,7 +54,9 @@ describe("SystemBugDialog", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: he.systemBugSend }));
-    expect(onError).toHaveBeenCalledWith(he.systemBugNeedExplain);
+    await waitFor(() => {
+      expect(onError).toHaveBeenCalledWith(he.systemBugNeedExplain);
+    });
     expect(submitSystemBug).not.toHaveBeenCalled();
   });
 
@@ -66,5 +83,43 @@ describe("SystemBugDialog", () => {
       expect(submitSystemBug).toHaveBeenCalled();
       expect(onSent).toHaveBeenCalled();
     });
+  });
+
+  it("offers ellipse and arrow tools on the screenshot", () => {
+    render(
+      <SystemBugDialog
+        open
+        screenshot={new Blob(["png"], { type: "image/png" })}
+        route="/employee"
+        trail={["/employee"]}
+        appVersion="0.1.0"
+        preview=""
+        branchName=""
+        onClose={vi.fn()}
+        onSent={vi.fn()}
+        onError={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(he.photoAnnotateEllipse)).toBeTruthy();
+    expect(screen.getByLabelText(he.photoAnnotateArrow)).toBeTruthy();
+  });
+
+  it("sends the annotated screenshot when export succeeds", async () => {
+    const original = new Blob(["raw"], { type: "image/png" });
+    const marked = new File(["marked"], "shot.jpg", { type: "image/jpeg" });
+    const result = await resolveSystemBugScreenshot(original, {
+      exportFile: async () => marked,
+    });
+    expect(result).toBe(marked);
+  });
+
+  it("keeps the original screenshot if annotation export fails", async () => {
+    const original = new Blob(["raw"], { type: "image/png" });
+    const result = await resolveSystemBugScreenshot(original, {
+      exportFile: async () => {
+        throw new Error("canvas not ready");
+      },
+    });
+    expect(result).toBe(original);
   });
 });

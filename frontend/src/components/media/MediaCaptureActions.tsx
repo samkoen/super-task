@@ -45,6 +45,7 @@ interface MediaCaptureActionsProps {
   videoLabel?: string;
   photoDoneLabel?: string;
   videoDoneLabel?: string;
+  onAudioStart?: () => void;
   onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
 }
 
@@ -104,7 +105,7 @@ export function PhotoCaptureDialog({
   const [capturing, setCapturing] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const annotationRef = useRef<PhotoAnnotationCanvasHandle | null>(null);
+  const annotationRef = useRef<PhotoAnnotationCanvasHandle>(null);
   const shotPreviewUrl = useBlobPreviewUrl(!annotate ? previewBlob : null);
 
   useEffect(() => {
@@ -511,6 +512,7 @@ export default function MediaCaptureActions({
   videoLabel,
   photoDoneLabel,
   videoDoneLabel,
+  onAudioStart,
   onCapture,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream({ defaultFacing: "environment" });
@@ -573,7 +575,7 @@ export default function MediaCaptureActions({
             size="small"
             aria-label={he.addAudio}
             color={audioAdded ? "primary" : "default"}
-            onClick={() => setAudioOpen(true)}
+            onClick={() => (onAudioStart ? onAudioStart() : setAudioOpen(true))}
             disabled={captureDisabled}
             sx={{ p: 0.5 }}
           >
@@ -607,11 +609,11 @@ export default function MediaCaptureActions({
       </Tooltip>
       )}
       {showVideo && (
-      <Tooltip title={videoAdded ? he.videoAdded : he.addVideo}>
+      <Tooltip title={videoAdded ? videoDoneLabel ?? he.videoAdded : videoLabel ?? he.addVideo}>
         <span>
           <IconButton
             size="small"
-            aria-label={he.addVideo}
+            aria-label={videoAdded ? videoDoneLabel ?? he.videoAdded : videoLabel ?? he.addVideo}
             color={videoAdded ? "primary" : "default"}
             onClick={openVideoCapture}
             disabled={videoDisabled}
@@ -663,7 +665,7 @@ export default function MediaCaptureActions({
       <Button
         startIcon={<MicIcon />}
         variant={audioAdded ? "contained" : "outlined"}
-        onClick={() => setAudioOpen(true)}
+        onClick={() => (onAudioStart ? onAudioStart() : setAudioOpen(true))}
         disabled={captureDisabled}
       >
         {uploadingKind === "audio" ? he.loading : audioAdded ? he.audioAdded : he.addAudio}
@@ -700,12 +702,14 @@ export default function MediaCaptureActions({
         onClose={closeVideoCapture}
         onCapture={(file, durationSeconds) => onCapture(file, "video", { durationSeconds })}
       />
-      <AudioCaptureDialog
-        open={audioOpen}
-        uploading={uploadingKind === "audio"}
-        onClose={() => setAudioOpen(false)}
-        onCapture={(file) => onCapture(file, "audio")}
-      />
+      {onAudioStart ? null : (
+        <AudioCaptureDialog
+          open={audioOpen}
+          uploading={uploadingKind === "audio"}
+          onClose={() => setAudioOpen(false)}
+          onCapture={(file) => onCapture(file, "audio")}
+        />
+      )}
     </>
   );
 }

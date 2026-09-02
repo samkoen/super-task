@@ -110,6 +110,33 @@ describe("TaskChatPanel", () => {
     expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
   });
 
+  it("shows received audio as a full-width line, not a square", async () => {
+    vi.mocked(taskService.listMessages).mockResolvedValue({
+      has_more: false,
+      messages: [
+        {
+          id: "m-audio",
+          occurrence_id: "occ-1",
+          sender_user_id: "mgr-1",
+          sender_role: "branch_manager",
+          sender_name: "מנהל",
+          body: "",
+          display_body: "",
+          photo_url: null,
+          video_url: null,
+          audio_url: "/uploads/chat/v.webm",
+          created_at: "2026-07-22T10:05:00.000Z",
+        },
+      ],
+    });
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
+    await waitFor(() => {
+      expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
+    });
+    expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
+    expect(document.querySelector("audio")).toBeNull();
+  });
+
   it("reloads the thread when a chat SSE event arrives", async () => {
     vi.mocked(taskService.listMessages)
       .mockResolvedValueOnce({ messages: [], has_more: false })

@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Drawer,
-  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -52,7 +51,7 @@ import ManagerBottomNav from "./ManagerBottomNav";
 import ManagerNewTaskFab from "./ManagerNewTaskFab";
 import MobileMenuTopBar from "./MobileMenuTopBar";
 import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
-import ViewAsBanner from "./ViewAsBanner";
+import EmployeeChromeMenu from "./EmployeeChromeMenu";
 import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
 import {
@@ -61,7 +60,6 @@ import {
 } from "../../utils/managerBottomNav";
 import { dialogActionsPbCss, systemTopInsetCss } from "../../utils/systemInsets";
 import { usesEmployeeChrome } from "../../utils/employeeSurface";
-import { isViewAsPreview } from "../../utils/viewAsPreview";
 
 const SIDEBAR_BG = "#0B1220";
 const SIDEBAR_ACCENT = "#1A9B86";
@@ -328,16 +326,18 @@ function Layout() {
   if (isEmployee) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-        <Box sx={{ position: "sticky", top: 0, zIndex: (t) => t.zIndex.appBar }}>
-        {isViewAsPreview(user) && <ViewAsBanner />}
         <Box
           sx={{
+            position: "sticky",
+            top: 0,
+            zIndex: (t) => t.zIndex.appBar,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            px: { xs: 2, sm: 2.5 },
-            py: 1.25,
-            pt: `calc(10px + ${systemTopInsetCss()})`,
+            px: { xs: 1.5, sm: 2 },
+            pb: 0.75,
+            pt: systemTopInsetCss(),
+            minHeight: `calc(48px + ${systemTopInsetCss()})`,
             color: "#fff",
             bgcolor: SIDEBAR_BG,
             backgroundImage: `
@@ -345,68 +345,18 @@ function Layout() {
               linear-gradient(90deg, #111827 0%, ${SIDEBAR_BG} 100%)
             `,
             borderBottom: `1px solid ${alpha("#fff", 0.06)}`,
-            boxShadow: `0 8px 24px ${alpha("#0B1220", 0.25)}`,
           }}
         >
-          <Box display="flex" alignItems="center" gap={1.25}>
-            <AppBrandMark size={34} />
-            <Box>
-              <Typography variant="subtitle1" fontWeight={800} lineHeight={1.2}>
-                {he.appName}
-              </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.55, display: { xs: "none", sm: "block" } }}>
-                {user?.full_name}
-              </Typography>
-            </Box>
+          <Box display="flex" alignItems="center" gap={1}>
+            <AppBrandMark size={28} />
+            <Typography variant="subtitle1" fontWeight={800} lineHeight={1.2}>
+              {he.appName}
+            </Typography>
           </Box>
-          <Box display="flex" alignItems="center" gap={0.5}>
+          <Box display="flex" alignItems="center" gap={0.25}>
             <NotificationBell muteIncoming={breakMuted} />
-            <IconButton
-              color="inherit"
-              aria-label={he.myAccount}
-              onClick={() => navigate("/employee/account")}
-              sx={{
-                opacity: location.pathname === "/employee/account" ? 1 : 0.85,
-                "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
-              }}
-            >
-              <AccountCircleIcon />
-            </IconButton>
-            {user?.role === "branch_manager" && (
-              <Button
-                type="button"
-                color="inherit"
-                size="small"
-                onClick={() => navigate("/manager")}
-                sx={{
-                  ...sidebarNavButtonSx,
-                  opacity: 0.85,
-                  borderRadius: 2,
-                  px: 1.5,
-                  "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
-                }}
-              >
-                {he.managerArea}
-              </Button>
-            )}
-            <Button
-              type="button"
-              color="inherit"
-              size="small"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-              sx={{
-                ...sidebarNavButtonSx,
-                opacity: 0.85,
-                borderRadius: 2,
-                px: 1.5,
-                "&:hover": { opacity: 1, bgcolor: alpha("#fff", 0.08) },
-              }}
-            >
-              {he.logout}
-            </Button>
+            <EmployeeChromeMenu onLogout={handleLogout} />
           </Box>
-        </Box>
         </Box>
         {(user?.branches?.length ?? 0) >= 2 && (
           <Box

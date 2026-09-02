@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Box,
   Button,
@@ -16,6 +16,9 @@ import { he } from "../../i18n/he";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { submitSystemBug } from "../../services/systemBugService";
 import { ApiError } from "../../services/api";
+import PhotoAnnotationCanvas, {
+  type PhotoAnnotationCanvasHandle,
+} from "../media/PhotoAnnotationCanvas";
 
 const AUDIO_MAX_MS = 30_000;
 
@@ -36,6 +39,7 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const audio = useAudioRecorder();
+  const annotateRef = useRef<PhotoAnnotationCanvasHandle>(null);
 
   useEffect(() => {
     if (props.open) return;
@@ -50,13 +54,21 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
   }, [audio.recording, audio.stop]);
 
   return (
-    <Dialog open={props.open} onClose={sending ? undefined : props.onClose} fullWidth maxWidth="sm" dir="rtl">
-      <DialogTitle>{he.systemBug}</DialogTitle>
-      <DialogContent>
+    <Dialog
+      open={props.open}
+      onClose={sending ? undefined : props.onClose}
+      fullWidth
+      maxWidth="md"
+      dir="rtl"
+      disableEnforceFocus
+    >
+      <DialogTitle data-system-bug-dialog="">{he.systemBug}</DialogTitle>
+      <DialogContent sx={{ overflowY: "auto" }}>
         <SystemBugFields
           note={note}
           setNote={setNote}
           screenshot={props.screenshot}
+          annotateRef={annotateRef}
           sending={sending}
           recording={audio.recording}
           hasAudio={Boolean(audio.blob)}
@@ -80,6 +92,7 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
               audioBlob: audio.blob,
               recording: audio.recording,
               stopAndWait: audio.stopAndWait,
+              annotate: annotateRef.current,
             })
           }
         >
@@ -94,6 +107,7 @@ function SystemBugFields({
   note,
   setNote,
   screenshot,
+  annotateRef,
   sending,
   recording,
   hasAudio,
@@ -103,39 +117,19 @@ function SystemBugFields({
   note: string;
   setNote: (value: string) => void;
   screenshot: Blob | null;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
   sending: boolean;
   recording: boolean;
   hasAudio: boolean;
   canRecord: boolean;
   onToggleRecord: () => void;
 }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!screenshot) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(screenshot);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [screenshot]);
   return (
     <>
       <Typography variant="body2" color="text.secondary" mb={1.5}>
         {he.systemBugHint}
       </Typography>
-      {previewUrl ? (
-        <Box
-          component="img"
-          src={previewUrl}
-          alt=""
-          sx={{ width: "100%", maxHeight: 180, objectFit: "contain", mb: 1.5, borderRadius: 1 }}
-        />
-      ) : (
-        <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-          {he.systemBugCaptureFailed}
-        </Typography>
-      )}
+      <SystemBugScreenshot screenshot={screenshot} annotateRef={annotateRef} />
       <TextField
         label={he.systemBugNote}
         value={note}
@@ -164,6 +158,31 @@ function SystemBugFields({
   );
 }
 
+function SystemBugScreenshot({
+  screenshot,
+  annotateRef,
+}: {
+  screenshot: Blob | null;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
+}) {
+  if (!screenshot) {
+    return (
+      <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+        {he.systemBugCaptureFailed}
+      </Typography>
+    );
+  }
+  return (
+    <Box mb={1.5}>
+      <PhotoAnnotationCanvas
+        ref={annotateRef}
+        imageBlob={screenshot}
+        hint={he.systemBugAnnotateHint}
+      />
+    </Box>
+  );
+}
+
 export async function resolveSystemBugAudio(audio: {
   recording: boolean;
   blob: Blob | null;
@@ -171,6 +190,19 @@ export async function resolveSystemBugAudio(audio: {
 }): Promise<Blob | null> {
   if (!audio.recording) return audio.blob;
   return audio.stopAndWait();
+}
+
+export async function resolveSystemBugScreenshot(
+  screenshot: Blob | null,
+  annotate: Pick<PhotoAnnotationCanvasHandle, "exportFile"> | null,
+): Promise<Blob | null> {
+  if (!screenshot) return null;
+  if (!annotate) return screenshot;
+  try {
+    return await annotate.exportFile();
+  } catch {
+    return screenshot;
+  }
 }
 
 async function sendSystemBug(
@@ -181,6 +213,7 @@ async function sendSystemBug(
     audioBlob: Blob | null;
     recording: boolean;
     stopAndWait: () => Promise<Blob | null>;
+    annotate: PhotoAnnotationCanvasHandle | null;
   },
 ) {
   if (args.sending) return;
@@ -193,8 +226,16 @@ async function sendSystemBug(
     args.onError(he.systemBugNeedExplain);
     return;
   }
+  await deliverSystemBug(args, audioBlob);
+}
+
+async function deliverSystemBug(
+  args: Parameters<typeof sendSystemBug>[0],
+  audioBlob: Blob | null,
+) {
   args.setSending(true);
   try {
+    const screenshot = await resolveSystemBugScreenshot(args.screenshot, args.annotate);
     await submitSystemBug({
       note: args.note.trim(),
       route: args.route,
@@ -202,7 +243,7 @@ async function sendSystemBug(
       appVersion: args.appVersion,
       preview: args.preview,
       branchName: args.branchName,
-      screenshot: args.screenshot,
+      screenshot,
       audio: audioBlob,
     });
     args.onSent();

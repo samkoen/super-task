@@ -129,6 +129,36 @@ def test_employee_complete_rejects_audio_only():
         )
 
 
+def test_employee_can_finish_old_task_without_forced_photo():
+    occurrence = _occurrence(completion_requirements=[{"kind": "photo"}], photo_required=False)
+    pending = _occurrence(status=task_status.PENDING_REVIEW)
+    completion = _completion(photo_path=None)
+
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    occurrence_repo.update_status.return_value = pending
+    occurrence_repo.get_branch_name.return_value = "Branch"
+    occurrence_repo.get_department_name.return_value = None
+    occurrence_repo.get_assignee_name.return_value = "Worker"
+    occurrence_repo.get_manager_name.return_value = "Manager"
+
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    completion_repo.create.return_value = completion
+
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+
+    result = asyncio.run(
+        svc.complete_occurrence(actor, "occ-1", completion_status=task_status.COMPLETION_DONE)
+    )
+    completion_repo.create.assert_called_once()
+    assert result["status"] == task_status.PENDING_REVIEW
+
+
 def test_manager_complete_skips_review():
     occurrence = _occurrence()
     completed = _occurrence(status=task_status.COMPLETED)

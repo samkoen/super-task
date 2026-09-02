@@ -51,6 +51,35 @@ describe("completionMedia", () => {
     expect(effectiveRequirements({ completion_requirements: [] })).toEqual([]);
   });
 
+  it("drops a migrated bare photo when the old task did not require one", () => {
+    expect(
+      effectiveRequirements({
+        completion_requirements: [{ kind: "photo" }],
+        photo_required: false,
+      }),
+    ).toEqual([]);
+  });
+
+  it("keeps a photo slot when the manager required it or named it", () => {
+    expect(
+      effectiveRequirements({
+        completion_requirements: [{ kind: "photo" }],
+        photo_required: true,
+      }),
+    ).toEqual([{ kind: "photo" }]);
+    expect(
+      effectiveRequirements({
+        completion_requirements: [{ kind: "photo", title: "מדף" }],
+        photo_required: false,
+      }),
+    ).toEqual([{ kind: "photo", title: "מדף" }]);
+  });
+
+  it("uses legacy flags when the API has no requirements list", () => {
+    expect(effectiveRequirements({ photo_required: false })).toEqual([]);
+    expect(effectiveRequirements({ photo_required: true })).toEqual([{ kind: "photo" }]);
+  });
+
   it("keeps title and example on visual slots only", () => {
     expect(
       normalizeRequirements([

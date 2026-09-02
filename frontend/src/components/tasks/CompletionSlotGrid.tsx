@@ -32,7 +32,7 @@ export default function CompletionSlotGrid({
   language?: EmployeeLanguage;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
 }) {
-  const [preview, setPreview] = useState<{ src: string; title: string } | null>(null);
+  const [preview, setPreview] = useState<{ src: string; title: string; kind: "photo" | "video" } | null>(null);
   const hints = useSlotHintPlayback(language);
   const visualCount = visualSlotCount(requirements);
   if (!requirements.length) return null;
@@ -49,7 +49,7 @@ export default function CompletionSlotGrid({
           interactive={interactive}
           disabled={disabled}
           onCapture={onCapture}
-          onEnlarge={(src, title) => setPreview({ src, title })}
+          onEnlarge={(src, title, kind) => setPreview({ src, title, kind: kind ?? "photo" })}
           hints={hints}
         />
       )}
@@ -69,6 +69,7 @@ export default function CompletionSlotGrid({
       <CompletionExampleDialog
         src={preview?.src ?? null}
         title={preview?.title ?? ""}
+        kind={preview?.kind}
         onClose={() => setPreview(null)}
       />
       {hints.dialog && (
@@ -118,7 +119,7 @@ function VisualSlotList({
   interactive: boolean;
   disabled?: boolean;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
-  onEnlarge: (src: string, title: string) => void;
+  onEnlarge: (src: string, title: string, kind?: "photo" | "video") => void;
   hints: ReturnType<typeof useSlotHintPlayback>;
 }) {
   const visualCount = visualSlotCount(requirements);
@@ -140,7 +141,7 @@ function VisualSlotList({
             interactive={interactive}
             disabled={disabled}
             onCapture={onCapture ? (file, duration) => onCapture(index, file, duration) : undefined}
-            onEnlarge={(src) => onEnlarge(src, slotDisplayTitle(req, index))}
+            onEnlarge={(src, kind) => onEnlarge(src, slotDisplayTitle(req, index), kind)}
             hintControls={slotHintControls(req, index, hints)}
           />
         ),

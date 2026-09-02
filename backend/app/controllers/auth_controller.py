@@ -247,6 +247,25 @@ async def upload_my_avatar(
     }
 
 
+@router.delete("/me/avatar")
+def delete_my_avatar(
+    request: Request,
+    service: AuthService = Depends(get_auth_service),
+):
+    user_id = session_acting_user_id(request)
+    if not user_id:
+        return JSONResponse({"error": "לא מחובר"}, status_code=401)
+    try:
+        user = service.set_my_avatar(
+            str(user_id),
+            None,
+            active_branch_id=request.session.get(SESSION_ACTIVE_BRANCH_KEY),
+        )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"message": "התמונה נמחקה", "user": _with_preview_meta(request, service, user)}
+
+
 @router.post("/me/avatar/excellence")
 async def stylize_my_avatar(
     request: Request,

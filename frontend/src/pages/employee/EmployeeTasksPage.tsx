@@ -52,8 +52,11 @@ import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailD
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
+import EmployeePunchDoor from "../../components/employee/EmployeePunchDoor";
 import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
+import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
+import { excludeAttendancePunch } from "../../utils/punchDoor";
 import DirectChatThread from "../../components/chat/DirectChatThread";
 import FullscreenBackAppBar, {
   fullscreenChatBodySx,
@@ -528,6 +531,20 @@ export default function EmployeeTasksPage() {
     }
   };
 
+  const handleAvatarDelete = async () => {
+    setAvatarUploading(true);
+    try {
+      await authService.deleteAvatar();
+      await refresh();
+      await load(true);
+      showSuccess(he.employeePhotoDeleted);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const urgentTasks = dashboard?.urgent_tasks ?? [];
   const inProgressTasks = dashboard?.in_progress_tasks ?? [];
   const awaitingResponseTasks = dashboard?.awaiting_response_tasks ?? [];
@@ -535,6 +552,29 @@ export default function EmployeeTasksPage() {
   const todayTasks = dashboard?.today_tasks ?? [];
   const completedTasks = dashboard?.completed_tasks ?? [];
 
+  const punchPool = useMemo(
+    () =>
+      collectUniqueTasks([
+        inProgressTasks,
+        awaitingResponseTasks,
+        urgentTasks,
+        todayTasks,
+        pendingReviewTasks,
+        completedTasks,
+      ]),
+    [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, pendingReviewTasks, completedTasks],
+  );
+  const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask));
+  const openWorkTask = useCallback(
+    (task: EmployeeTaskCard) => {
+      if (punch.start && task.id !== punch.start.id) {
+        openDetail(punch.start);
+        return;
+      }
+      openDetail(task);
+    },
+    [openDetail, punch.start],
+  );
   const workLists = useMemo(() => {
     const pool = collectUniqueTasks([
       inProgressTasks,
@@ -542,7 +582,7 @@ export default function EmployeeTasksPage() {
       urgentTasks,
       todayTasks,
     ]);
-    return splitEmployeeWorkLists(pool);
+    return splitEmployeeWorkLists(excludeAttendancePunch(pool));
   }, [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks]);
 
   const progress = dashboard?.progress_percent ?? 0;
@@ -576,7 +616,7 @@ export default function EmployeeTasksPage() {
     if (!alertTaskId || loading) return;
     const existing = cardById.get(alertTaskId);
     if (existing) {
-      openDetail(existing);
+      openWorkTask(existing);
       setSearchParams({}, { replace: true });
       return;
     }
@@ -585,7 +625,7 @@ export default function EmployeeTasksPage() {
       .getOccurrence(alertTaskId)
       .then((occ) => {
         if (cancelled) return;
-        openDetail(toEmployeeCard(occ));
+        openWorkTask(toEmployeeCard(occ));
         setSearchParams({}, { replace: true });
       })
       .catch(() => {
@@ -594,7 +634,7 @@ export default function EmployeeTasksPage() {
     return () => {
       cancelled = true;
     };
-  }, [alertTaskId, loading, cardById, setSearchParams, openDetail]);
+  }, [alertTaskId, loading, cardById, setSearchParams, openWorkTask]);
 
   const headerName = dashboard?.employee?.full_name ?? user?.full_name;
   const headerBranch = dashboard?.employee?.branch_name;
@@ -610,6 +650,7 @@ export default function EmployeeTasksPage() {
         photoUrl={photoUrl}
         photoEditable
         onEditPhoto={() => setAvatarOpen(true)}
+        onDeletePhoto={photoUrl ? () => void handleAvatarDelete() : undefined}
         slogan={dashboard?.employee?.excellence_slogan ?? user?.excellence_slogan}
         meta={[
           headerBranch ? `${he.branch}: ${headerBranch}` : "",
@@ -639,8 +680,37 @@ export default function EmployeeTasksPage() {
 
       {loading ? (
         <ListSkeleton variant="table" rows={5} />
+      ) : punch.showStart && punch.start ? (
+        <EmployeePunchDoor
+          kind="start"
+          name={headerName}
+          photoUrl={photoUrl}
+          taskTitle={punch.start.title}
+          onOpen={() => {
+            if (punch.start) openDetail(punch.start);
+          }}
+        />
+      ) : punch.showEnd && punch.end ? (
+        <EmployeePunchDoor
+          kind="end"
+          name={headerName}
+          photoUrl={photoUrl}
+          taskTitle={punch.end.title}
+          remainingCount={openCount}
+          onOpen={() => {
+            if (punch.end) openDetail(punch.end);
+          }}
+          onBack={punch.dismissEnd}
+        />
       ) : (
         <>
+          {punch.end ? (
+            <Box sx={{ mb: 1.5, display: "flex", justifyContent: "center" }}>
+              <Button variant="outlined" color="error" onClick={punch.requestEnd}>
+                {he.punchOpenEndEarly}
+              </Button>
+            </Box>
+          ) : null}
           {openCount === 0 ? (
             <EmptyState
               title={he.noTasksToday}
@@ -653,13 +723,13 @@ export default function EmployeeTasksPage() {
               <EmployeeTaskSection
                 title={he.employeeRoutineTasks}
                 tasks={workLists.routine}
-                onOpen={openDetail}
+                onOpen={openWorkTask}
                 layout="list"
               />
               <EmployeeTaskSection
                 title={he.employeeDynamicTasks}
                 tasks={workLists.dynamic}
-                onOpen={openDetail}
+                onOpen={openWorkTask}
                 layout="tile"
                 color="error.main"
               />
@@ -668,8 +738,8 @@ export default function EmployeeTasksPage() {
 
           <EmployeeTaskSection
             title={he.taskPendingReview}
-            tasks={pendingReviewTasks}
-            onOpen={openDetail}
+            tasks={excludeAttendancePunch(pendingReviewTasks)}
+            onOpen={openWorkTask}
           />
 
           {completedTasks.length > 0 && (
@@ -682,7 +752,7 @@ export default function EmployeeTasksPage() {
               <AccordionDetails sx={{ pt: 1, px: 1.5 }}>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
                   {completedTasks.map((task) => (
-                    <EmployeeTaskRow key={task.id} task={task} onOpen={openDetail} />
+                    <EmployeeTaskRow key={task.id} task={task} onOpen={openWorkTask} />
                   ))}
                 </Box>
               </AccordionDetails>

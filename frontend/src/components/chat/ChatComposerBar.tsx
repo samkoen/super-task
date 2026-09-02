@@ -10,8 +10,8 @@ import { he } from "../../i18n/he";
 import { blobToFile } from "../../utils/mediaCapture";
 import { createHoldGesture } from "../../utils/holdGesture";
 import type { MediaKind } from "../media/MediaCaptureActions";
+import ChatAudioDock from "./ChatAudioDock";
 import ChatPhotoCapture from "./ChatPhotoCapture";
-import { AudioFallbackDialog } from "./ChatAudioFallback";
 
 export default function ChatComposerBar({
   body,
@@ -32,18 +32,32 @@ export default function ChatComposerBar({
 }) {
   const media = useChatComposerMedia(onSendMedia);
   const busy = disabled || sending;
+  if (media.audioDock) {
+    return (
+      <Box display="flex" flexDirection="column" gap={1}>
+        <ChatAudioDock
+          audio={media.audio}
+          sending={busy}
+          onSend={() => void media.sendAudio()}
+          onDelete={media.deleteAudio}
+        />
+        {error ? <Alert severity="error">{error}</Alert> : null}
+      </Box>
+    );
+  }
 
   return (
     <Box display="flex" flexDirection="column" gap={1} position="relative">
       <Box display="flex" alignItems="flex-end" gap={0.75} dir="rtl">
-        <HoldIconButton
-          label={he.chatHoldToRecord}
-          recording={media.holdKind === "audio"}
+        <IconButton
+          aria-label={he.chatRecordAudio}
+          color="primary"
           disabled={busy}
-          gesture={media.audioHold}
+          onClick={media.startAudio}
+          sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
         >
           <MicIcon />
-        </HoldIconButton>
+        </IconButton>
         <Box display="flex" alignItems="flex-end" gap={0.75} flex={1} minWidth={0}>
           <TextField
             value={body}
@@ -91,12 +105,6 @@ export default function ChatComposerBar({
         onClose={() => media.setPhotoOpen(false)}
         onSend={(file) => onSendMedia(file, "photo")}
       />
-      <AudioFallbackDialog
-        open={media.audioOpen}
-        uploading={sending}
-        onClose={() => media.setAudioOpen(false)}
-        onSend={(file) => onSendMedia(file, "audio")}
-      />
     </Box>
   );
 }
@@ -107,7 +115,7 @@ function useChatComposerMedia(
   const audio = useAudioRecorder();
   const video = useVideoRecorder({ defaultFacing: "environment" });
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [audioOpen, setAudioOpen] = useState(false);
+  const [audioDock, setAudioDock] = useState(false);
   const [holdKind, setHoldKind] = useState<MediaKind | null>(null);
   const audioRef = useRef(audio);
   const videoRef = useRef(video);
@@ -115,14 +123,6 @@ function useChatComposerMedia(
   audioRef.current = audio;
   videoRef.current = video;
   sendRef.current = onSendMedia;
-  const audioHold = useMemo(() => createHoldGesture({
-    onTap: () => setAudioOpen(true),
-    onHoldStart: () => {
-      setHoldKind("audio");
-      void audioRef.current.start();
-    },
-    onHoldEnd: () => void finishHoldAudio(audioRef.current, sendRef.current, () => setHoldKind(null)),
-  }), []);
   const cameraHold = useMemo(() => createHoldGesture({
     onTap: () => setPhotoOpen(true),
     onHoldStart: () => {
@@ -131,7 +131,24 @@ function useChatComposerMedia(
     },
     onHoldEnd: () => void finishHoldVideo(videoRef.current, sendRef.current, () => setHoldKind(null)),
   }), []);
-  return { video, holdKind, photoOpen, setPhotoOpen, audioOpen, setAudioOpen, audioHold, cameraHold };
+  return {
+    audio,
+    video,
+    holdKind,
+    photoOpen,
+    setPhotoOpen,
+    audioDock,
+    cameraHold,
+    startAudio: () => {
+      setAudioDock(true);
+      void audio.start();
+    },
+    deleteAudio: () => {
+      audio.reset();
+      setAudioDock(false);
+    },
+    sendAudio: () => sendComposerAudio(audioRef.current, sendRef.current, () => setAudioDock(false)),
+  };
 }
 
 function HoldIconButton({
@@ -168,7 +185,7 @@ function HoldIconButton({
   );
 }
 
-async function finishHoldAudio(
+async function sendComposerAudio(
   audio: ReturnType<typeof useAudioRecorder>,
   onSend: (file: File, kind: MediaKind) => void | Promise<void>,
   done: () => void,

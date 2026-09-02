@@ -18,18 +18,16 @@ import {
 import { he } from "../../i18n/he";
 import { formatTime } from "../../utils/dashboardTime";
 import { systemBottomInsetCss } from "../../utils/systemInsets";
-import {
-  replacePendingMedia,
-  revokePendingMedia,
-  uploadPendingMedia,
-  type PendingMedia,
-} from "../../utils/pendingMedia";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
+import { useAudioRecorder } from "../../hooks/useAudioRecorder";
+import { blobToFile } from "../../utils/mediaCapture";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
-import CompletionMediaPreview from "../tasks/CompletionMediaPreview";
+import { chatBubbleCopySx, chatBubbleMetaSx, chatBubbleSx, isChatAudioOnly } from "../../utils/chatBubbleSx";
 import BreakAlertDialog from "./BreakAlertDialog";
+import ChatAudioDock from "./ChatAudioDock";
+import ChatMessageMedia from "./ChatMessageMedia";
 
 interface DirectChatThreadProps {
   conversationId: string | null;
@@ -44,16 +42,14 @@ export default function DirectChatThread({
 }: DirectChatThreadProps) {
   const { user } = useAuth();
   const [body, setBody] = useState("");
-  const [pendingPhoto, setPendingPhoto] = useState<PendingMedia | null>(null);
-  const [pendingVideo, setPendingVideo] = useState<PendingMedia | null>(null);
-  const [pendingAudio, setPendingAudio] = useState<PendingMedia | null>(null);
   const [sending, setSending] = useState(false);
+  const sendLock = useRef(false);
   const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
   const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
+  const audio = useAudioRecorder();
+  const [audioDock, setAudioDock] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const pendingRef = useRef({ photo: null as PendingMedia | null, video: null as PendingMedia | null, audio: null as PendingMedia | null });
-  pendingRef.current = { photo: pendingPhoto, video: pendingVideo, audio: pendingAudio };
 
   const fetchPage = useCallback(async (before?: string) => {
     if (!conversationId) return { messages: [] as DirectChatMessage[], has_more: false };
@@ -77,49 +73,45 @@ export default function DirectChatThread({
       bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
     }
   }, [messages.length, loading, stickToBottom]);
-  useEffect(() => () => {
-    revokePendingMedia(pendingRef.current.photo);
-    revokePendingMedia(pendingRef.current.video);
-    revokePendingMedia(pendingRef.current.audio);
-  }, []);
 
-  const handleCapture = (file: File, kind: MediaKind) => {
-    if (kind === "photo") setPendingPhoto((prev) => replacePendingMedia(prev, file));
-    else if (kind === "video") setPendingVideo((prev) => replacePendingMedia(prev, file));
-    else setPendingAudio((prev) => replacePendingMedia(prev, file));
-  };
+  const deliver = (payload: DirectChatPayload) =>
+    deliverDirectMessage({
+      payload,
+      conversationId,
+      broadcast,
+      loadLatest,
+      stickToBottom,
+      setBreakAlert,
+    });
 
   const handleSend = async () => {
-    if (!body.trim() && !pendingPhoto && !pendingVideo && !pendingAudio) {
+    if (!body.trim()) {
       setError(he.taskChatNeedContent);
       return;
     }
     setSending(true);
     setError("");
     try {
-      const payload = await buildPayload(pendingPhoto, pendingVideo, pendingAudio, body, setUploadingKind);
-      if (broadcast) {
-        await directChatService.broadcast(payload);
-      } else if (conversationId) {
-        const sent = await directChatService.send(conversationId, payload);
-        setBreakAlert(parseRecipientBreak(sent));
-        stickToBottom.current = true;
-        await loadLatest(true);
-      }
+      await deliver({ body: body.trim() });
       setBody("");
-      revokePendingMedia(pendingPhoto);
-      revokePendingMedia(pendingVideo);
-      revokePendingMedia(pendingAudio);
-      setPendingPhoto(null);
-      setPendingVideo(null);
-      setPendingAudio(null);
       onSent?.();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
-      setUploadingKind(null);
       setSending(false);
     }
+  };
+
+  const handleCapture = (file: File, kind: MediaKind) => {
+    void postDirectMedia({
+      file,
+      kind,
+      deliver,
+      setSending,
+      setError,
+      setUploadingKind,
+      onSent,
+    });
   };
 
   return (
@@ -140,9 +132,207 @@ export default function DirectChatThread({
           onLoadOlder={() => void loadOlder()}
         />
       )}
+      {audioDock ? (
+        <ChatAudioDock
+          audio={audio}
+          sending={sending}
+          onSend={() =>
+            void sendDockedDirectAudio({
+              audio,
+              conversationId,
+              broadcast,
+              sendLock,
+              setAudioDock,
+              setSending,
+              setError,
+              setUploadingKind,
+              loadLatest,
+              stickToBottom,
+              setBreakAlert,
+              onSent,
+            })
+          }
+          onDelete={() => {
+            audio.reset();
+            setAudioDock(false);
+          }}
+        />
+      ) : (
+        <DirectChatComposeFields
+          body={body}
+          onBodyChange={setBody}
+          sending={sending}
+          uploadingKind={uploadingKind}
+          broadcast={broadcast}
+          error={error}
+          onStartAudio={() => {
+            setAudioDock(true);
+            void audio.start();
+          }}
+          onCapture={handleCapture}
+          onSend={() => void handleSend()}
+        />
+      )}
+      <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
+    </Box>
+  );
+}
+
+async function deliverDirectMessage(args: {
+  payload: DirectChatPayload;
+  conversationId: string | null;
+  broadcast: boolean;
+  loadLatest: (force?: boolean) => Promise<unknown>;
+  stickToBottom: { current: boolean };
+  setBreakAlert: (value: BreakAlertTarget | null) => void;
+}) {
+  if (args.broadcast) {
+    await directChatService.broadcast(args.payload);
+    return;
+  }
+  if (!args.conversationId) return;
+  const sent = await directChatService.send(args.conversationId, args.payload);
+  args.setBreakAlert(parseRecipientBreak(sent));
+  args.stickToBottom.current = true;
+  await args.loadLatest(true);
+}
+
+async function uploadDirectKind(file: File, kind: MediaKind): Promise<DirectChatPayload> {
+  if (kind === "photo") return { photo_url: (await directChatService.uploadPhoto(file)).url };
+  if (kind === "video") return { video_url: (await directChatService.uploadVideo(file)).url };
+  return { audio_url: (await directChatService.uploadAudio(file)).url };
+}
+
+async function postDirectMedia(args: {
+  file: File;
+  kind: MediaKind;
+  deliver: (payload: DirectChatPayload) => Promise<void>;
+  setSending: (value: boolean) => void;
+  setError: (value: string) => void;
+  setUploadingKind: (kind: MediaKind | null) => void;
+  onSent?: () => void;
+}) {
+  args.setSending(true);
+  args.setError("");
+  try {
+    args.setUploadingKind(args.kind);
+    await args.deliver(await uploadDirectKind(args.file, args.kind));
+    args.onSent?.();
+  } catch (e) {
+    args.setError(e instanceof ApiError ? e.message : he.errorGeneric);
+  } finally {
+    args.setUploadingKind(null);
+    args.setSending(false);
+  }
+}
+
+async function postDockedAudioFile(
+  blob: Blob,
+  args: {
+    audio: ReturnType<typeof useAudioRecorder>;
+    conversationId: string | null;
+    broadcast: boolean;
+    setAudioDock: (open: boolean) => void;
+    setSending: (value: boolean) => void;
+    setError: (value: string) => void;
+    setUploadingKind: (kind: MediaKind | null) => void;
+    loadLatest: (force?: boolean) => Promise<unknown>;
+    stickToBottom: { current: boolean };
+    setBreakAlert: (value: BreakAlertTarget | null) => void;
+    onSent?: () => void;
+  },
+) {
+  const file = blobToFile(blob, `chat-audio-${Date.now()}.webm`, blob.type || "audio/webm");
+  await postDirectMedia({
+    file,
+    kind: "audio",
+    deliver: (payload) =>
+      deliverDirectMessage({
+        payload,
+        conversationId: args.conversationId,
+        broadcast: args.broadcast,
+        loadLatest: args.loadLatest,
+        stickToBottom: args.stickToBottom,
+        setBreakAlert: args.setBreakAlert,
+      }),
+    setSending: args.setSending,
+    setError: args.setError,
+    setUploadingKind: args.setUploadingKind,
+    onSent: () => {
+      args.setAudioDock(false);
+      args.audio.reset();
+      args.onSent?.();
+    },
+  });
+}
+
+function closeEmptyDockedAudio(args: {
+  audio: ReturnType<typeof useAudioRecorder>;
+  setAudioDock: (open: boolean) => void;
+  setError: (value: string) => void;
+}) {
+  args.setError(he.chatAudioEmpty);
+  args.audio.reset();
+  args.setAudioDock(false);
+}
+
+async function sendDockedDirectAudio(args: {
+  audio: ReturnType<typeof useAudioRecorder>;
+  conversationId: string | null;
+  broadcast: boolean;
+  sendLock: { current: boolean };
+  setAudioDock: (open: boolean) => void;
+  setSending: (value: boolean) => void;
+  setError: (value: string) => void;
+  setUploadingKind: (kind: MediaKind | null) => void;
+  loadLatest: (force?: boolean) => Promise<unknown>;
+  stickToBottom: { current: boolean };
+  setBreakAlert: (value: BreakAlertTarget | null) => void;
+  onSent?: () => void;
+}) {
+  if (args.sendLock.current) return;
+  args.sendLock.current = true;
+  args.setSending(true);
+  args.setError("");
+  try {
+    const blob = await args.audio.stopAndWait();
+    if (!blob) {
+      closeEmptyDockedAudio(args);
+      return;
+    }
+    await postDockedAudioFile(blob, args);
+  } finally {
+    args.sendLock.current = false;
+    args.setSending(false);
+  }
+}
+
+function DirectChatComposeFields({
+  body,
+  onBodyChange,
+  sending,
+  uploadingKind,
+  broadcast,
+  error,
+  onStartAudio,
+  onCapture,
+  onSend,
+}: {
+  body: string;
+  onBodyChange: (value: string) => void;
+  sending: boolean;
+  uploadingKind: MediaKind | null;
+  broadcast: boolean;
+  error: string;
+  onStartAudio: () => void;
+  onCapture: (file: File, kind: MediaKind) => void;
+  onSend: () => void;
+}) {
+  return (
+    <>
       <TextField
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => onBodyChange(e.target.value)}
         placeholder={he.directChatPlaceholder}
         fullWidth
         multiline
@@ -151,54 +341,25 @@ export default function DirectChatThread({
       />
       <MediaCaptureActions
         density="icon"
-        photoAdded={Boolean(pendingPhoto)}
-        videoAdded={Boolean(pendingVideo)}
-        audioAdded={Boolean(pendingAudio)}
+        photoAdded={false}
+        videoAdded={false}
+        audioAdded={false}
         uploadingKind={uploadingKind}
         disabled={sending}
-        onCapture={(file, kind) => handleCapture(file, kind)}
+        onAudioStart={onStartAudio}
+        onCapture={onCapture}
       />
-      {(pendingPhoto || pendingVideo || pendingAudio) && (
-        <CompletionMediaPreview
-          photo_path={pendingPhoto?.previewUrl}
-          video_path={pendingVideo?.previewUrl}
-          audio_path={pendingAudio?.previewUrl}
-          disabled={sending}
-          transcriptFallback={false}
-          onRemovePhoto={() => { revokePendingMedia(pendingPhoto); setPendingPhoto(null); }}
-          onRemoveVideo={() => { revokePendingMedia(pendingVideo); setPendingVideo(null); }}
-          onRemoveAudio={() => { revokePendingMedia(pendingAudio); setPendingAudio(null); }}
-        />
-      )}
-      {error && <Alert severity="error">{error}</Alert>}
+      {error ? <Alert severity="error">{error}</Alert> : null}
       <Button
         variant="contained"
         startIcon={sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
-        onClick={() => void handleSend()}
+        onClick={onSend}
         disabled={sending || Boolean(uploadingKind)}
       >
         {broadcast ? he.directChatBroadcast : he.taskChatSend}
       </Button>
-      <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
-    </Box>
+    </>
   );
-}
-
-async function buildPayload(
-  photo: PendingMedia | null,
-  video: PendingMedia | null,
-  audio: PendingMedia | null,
-  body: string,
-  setKind: (k: MediaKind | null) => void,
-): Promise<DirectChatPayload> {
-  if (photo) setKind("photo");
-  const photo_url = await uploadPendingMedia(photo, directChatService.uploadPhoto);
-  if (video) setKind("video");
-  const video_url = await uploadPendingMedia(video, directChatService.uploadVideo);
-  if (audio) setKind("audio");
-  const audio_url = await uploadPendingMedia(audio, directChatService.uploadAudio);
-  setKind(null);
-  return { body: body.trim() || undefined, photo_url, video_url, audio_url };
 }
 
 function MessageList({
@@ -229,34 +390,28 @@ function MessageList({
       {messages.map((msg) => {
         const mine = Boolean(myId && msg.sender_user_id === myId);
         const text = msg.body?.trim();
+        const audioOnly = isChatAudioOnly({
+          text,
+          photoUrl: msg.photo_url,
+          videoUrl: msg.video_url,
+          audioUrl: msg.audio_url,
+        });
         return (
           <Box
             key={msg.id}
-            sx={{
-              alignSelf: mine ? "flex-end" : "flex-start",
-              maxWidth: "90%", p: 1.25, borderRadius: 2,
-              bgcolor: mine ? "primary.main" : "background.paper",
-              color: mine ? "primary.contrastText" : "text.primary",
-              border: mine ? "none" : "1px solid",
-              borderColor: "divider",
-            }}
+            sx={chatBubbleSx({ mine, audioOnly })}
           >
-            <Typography variant="caption" sx={{ opacity: 0.85 }} display="block">
+            <Typography variant="caption" sx={chatBubbleMetaSx} display="block">
               {msg.sender_name || "—"} · {formatTime(msg.created_at)}
             </Typography>
             {text ? (
-              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{text}</Typography>
+              <Typography variant="body2" sx={chatBubbleCopySx}>{text}</Typography>
             ) : null}
-            {(msg.photo_url || msg.video_url || msg.audio_url) && (
-              <Box mt={0.75}>
-                <CompletionMediaPreview
-                  photo_path={msg.photo_url}
-                  video_path={msg.video_url}
-                  audio_path={msg.audio_url}
-                  transcriptFallback={false}
-                />
-              </Box>
-            )}
+            <ChatMessageMedia
+              photoUrl={msg.photo_url}
+              videoUrl={msg.video_url}
+              audioUrl={msg.audio_url}
+            />
           </Box>
         );
       })}

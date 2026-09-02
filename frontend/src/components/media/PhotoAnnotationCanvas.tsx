@@ -25,6 +25,7 @@ export interface PhotoAnnotationCanvasHandle {
 
 interface PhotoAnnotationCanvasProps {
   imageBlob: Blob;
+  hint?: string;
 }
 
 type DrawState =
@@ -54,7 +55,7 @@ function pointerToCanvas(
 }
 
 const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnotationCanvasProps>(
-  function PhotoAnnotationCanvas({ imageBlob }, ref) {
+  function PhotoAnnotationCanvas({ imageBlob, hint }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
@@ -319,7 +320,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
           </ToggleButton>
         </ToggleButtonGroup>
         <Typography variant="body2" color="text.secondary">
-          {he.mediaCapturePhotoAnnotateHint}
+          {hint ?? he.mediaCapturePhotoAnnotateHint}
         </Typography>
         <Box
           ref={containerRef}

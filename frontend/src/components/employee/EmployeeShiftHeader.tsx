@@ -12,6 +12,7 @@ interface EmployeeShiftHeaderProps {
   photoUrl?: string | null;
   photoEditable?: boolean;
   onEditPhoto?: () => void;
+  onDeletePhoto?: () => void;
   meta?: string;
   slogan?: string | null;
   onShift: boolean;
@@ -67,15 +68,23 @@ function ShiftIdentity({
   photoUrl,
   photoEditable,
   onEditPhoto,
+  onDeletePhoto,
   meta,
   slogan,
 }: Pick<
   EmployeeShiftHeaderProps,
-  "name" | "photoUrl" | "photoEditable" | "onEditPhoto" | "meta" | "slogan"
+  "name" | "photoUrl" | "photoEditable" | "onEditPhoto" | "onDeletePhoto" | "meta" | "slogan"
 >) {
   return (
     <Box display="flex" alignItems="flex-start" gap={1.25} flex={1} minWidth={0} width="100%">
-      <EmployeeAvatar name={name} photoUrl={photoUrl} editable={photoEditable} onEdit={onEditPhoto} />
+      <EmployeeAvatar
+        name={name}
+        photoUrl={photoUrl}
+        size={112}
+        editable={photoEditable}
+        onEdit={onEditPhoto}
+        onDelete={onDeletePhoto}
+      />
       <ShiftIdentityText name={name} meta={meta} slogan={slogan} />
     </Box>
   );
@@ -128,6 +137,7 @@ export default function EmployeeShiftHeader({
   photoUrl,
   photoEditable = false,
   onEditPhoto,
+  onDeletePhoto,
   meta,
   slogan,
   onShift,
@@ -150,6 +160,7 @@ export default function EmployeeShiftHeader({
           photoUrl={photoUrl}
           photoEditable={photoEditable}
           onEditPhoto={onEditPhoto}
+          onDeletePhoto={onDeletePhoto}
           meta={meta}
           slogan={slogan}
         />

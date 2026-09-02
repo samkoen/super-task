@@ -15,10 +15,11 @@ import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import type { MediaKind } from "../media/MediaCaptureActions";
 import type { TaskStatus } from "../../services/taskService";
-import CompletionMediaPreview from "./CompletionMediaPreview";
+import { chatBubbleCopySx, chatBubbleMetaSx, chatBubbleSx, isChatAudioOnly } from "../../utils/chatBubbleSx";
 import BreakAlertDialog from "../chat/BreakAlertDialog";
 import ChatComposerBar from "../chat/ChatComposerBar";
 import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
+import ChatMessageMedia from "../chat/ChatMessageMedia";
 import ChatTaskActions from "../chat/ChatTaskActions";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 import { isOpenChatTask } from "../../utils/chatTaskFollowUp";
@@ -180,7 +181,7 @@ export default function TaskChatPanel({
           <Typography variant="caption" fontWeight={700} display="block" mb={0.25}>
             {he.taskChatEmployeeQuestion}
           </Typography>
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", color: "text.primary" }}>
             {(lastEmployeeQuestion.display_body ?? lastEmployeeQuestion.body)?.trim() ||
               lastEmployeeQuestion.display_audio_transcript ||
               he.taskChatMediaOnly}
@@ -189,14 +190,10 @@ export default function TaskChatPanel({
             lastEmployeeQuestion.video_url ||
             lastEmployeeQuestion.audio_url) && (
             <Box mt={1}>
-              <CompletionMediaPreview
-                photo_path={lastEmployeeQuestion.photo_url}
-                video_path={lastEmployeeQuestion.video_url}
-                audio_path={lastEmployeeQuestion.audio_url}
-                audio_transcript={
-                  lastEmployeeQuestion.display_audio_transcript ??
-                  lastEmployeeQuestion.audio_transcript
-                }
+              <ChatMessageMedia
+                photoUrl={lastEmployeeQuestion.photo_url}
+                videoUrl={lastEmployeeQuestion.video_url}
+                audioUrl={lastEmployeeQuestion.audio_url}
               />
             </Box>
           )}
@@ -239,47 +236,35 @@ export default function TaskChatPanel({
             const fromEmployee = msg.sender_role === "employee" || (!mine && !msg.sender_role);
             const text = (msg.display_body ?? msg.body)?.trim();
             const transcript = msg.display_audio_transcript ?? msg.audio_transcript;
+            const audioOnly = isChatAudioOnly({
+              text,
+              photoUrl: msg.photo_url,
+              videoUrl: msg.video_url,
+              audioUrl: msg.audio_url,
+            });
             return (
               <Box
                 key={msg.id}
-                sx={{
-                  alignSelf: mine ? "flex-end" : "flex-start",
-                  maxWidth: "90%",
-                  p: 1.25,
-                  borderRadius: 2,
-                  bgcolor: mine ? "primary.main" : fromEmployee ? "#fff8e1" : "background.paper",
-                  color: mine ? "primary.contrastText" : "text.primary",
-                  border: mine ? "none" : "1px solid",
-                  borderColor: fromEmployee ? "warning.light" : "divider",
-                  boxShadow: fromEmployee ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-                }}
+                sx={chatBubbleSx({ mine, fromEmployee, audioOnly })}
               >
-                <Typography
-                  variant="caption"
-                  sx={{ opacity: 0.85, color: mine ? "inherit" : "text.secondary" }}
-                  display="block"
-                >
+                <Typography variant="caption" sx={chatBubbleMetaSx} display="block">
                   {msg.sender_name || "—"} · {formatTime(msg.created_at)}
                 </Typography>
                 {text ? (
                   <Typography
                     variant="body2"
                     fontWeight={fromEmployee && !mine ? 600 : 400}
-                    sx={{ whiteSpace: "pre-wrap", color: "inherit" }}
+                    sx={chatBubbleCopySx}
                   >
                     {text}
                   </Typography>
                 ) : null}
-                {(msg.photo_url || msg.video_url || msg.audio_url || transcript) && (
-                  <Box mt={0.75}>
-                    <CompletionMediaPreview
-                      photo_path={msg.photo_url}
-                      video_path={msg.video_url}
-                      audio_path={msg.audio_url}
-                      audio_transcript={transcript}
-                    />
-                  </Box>
-                )}
+                <ChatMessageMedia
+                  photoUrl={msg.photo_url}
+                  videoUrl={msg.video_url}
+                  audioUrl={msg.audio_url}
+                  transcript={text ? undefined : transcript}
+                />
               </Box>
             );
           })}

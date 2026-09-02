@@ -92,13 +92,6 @@ export default function EmployeeTaskDetailDialog({
       <DialogTitle>{titleNode ?? task.title}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
         <TaskStatusRow task={task} />
-        <TaskChatPanel
-          key={task.id}
-          occurrenceId={task.id}
-          compact
-          composeEnabled={canComposeTaskChat(task.status, true)}
-          onOccurrenceUpdated={() => onChatUpdated?.()}
-        />
         {task.description ? (
           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
             {task.description}
@@ -116,6 +109,13 @@ export default function EmployeeTaskDetailDialog({
           </Alert>
         ) : null}
         <TaskDetailMedia task={task} language={language} capture={liveCapture} />
+        <TaskChatPanel
+          key={task.id}
+          occurrenceId={task.id}
+          compact
+          composeEnabled={canComposeTaskChat(task.status, true)}
+          onOccurrenceUpdated={() => onChatUpdated?.()}
+        />
       </DialogContent>
       <TaskDetailActions
         task={task}

@@ -60,11 +60,24 @@ function capture(overrides: Partial<EmployeeTaskCaptureProps> = {}): EmployeeTas
 }
 
 describe("EmployeeTaskDetailDialog", () => {
-  it("places chat above the description so it stays reachable", () => {
+  it("places chat below the description so the task content stays first", () => {
     render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
     const chat = screen.getByTestId("task-chat-panel");
     const description = screen.getByText("לצלם את המדף");
-    expect(chat.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(description.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("places chat below the capture fields when the oved is doing the task", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={task()}
+        capture={capture()}
+        onClose={vi.fn()}
+      />,
+    );
+    const chat = screen.getByTestId("task-chat-panel");
+    const note = screen.getByLabelText(he.note);
+    expect(note.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("offers to reopen the start url", () => {

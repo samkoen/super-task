@@ -1,25 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ChatComposerBar from "./ChatComposerBar";
 import { he } from "../../i18n/he";
-import { HOLD_MS } from "../../utils/holdGesture";
 
-const { startAudio, stopAndWaitAudio } = vi.hoisted(() => ({
-  startAudio: vi.fn(),
-  stopAndWaitAudio: vi.fn().mockResolvedValue(null),
+const audioState = vi.hoisted(() => ({
+  supported: true,
+  recording: false,
+  paused: false,
+  blob: null as Blob | null,
+  error: "",
+  elapsedSeconds: 0,
+  start: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
+  stop: vi.fn(),
+  stopAndWait: vi.fn().mockResolvedValue(null),
+  reset: vi.fn(),
 }));
 
 vi.mock("../../hooks/useAudioRecorder", () => ({
-  useAudioRecorder: () => ({
-    supported: true,
-    recording: false,
-    blob: null,
-    error: "",
-    start: startAudio,
-    stop: vi.fn(),
-    stopAndWait: stopAndWaitAudio,
-    reset: vi.fn(),
-  }),
+  useAudioRecorder: () => audioState,
 }));
 
 vi.mock("../../hooks/useVideoRecorder", () => ({
@@ -37,8 +37,14 @@ vi.mock("./ChatPhotoCapture", () => ({
 
 describe("ChatComposerBar", () => {
   beforeEach(() => {
-    startAudio.mockClear();
-    stopAndWaitAudio.mockClear();
+    audioState.recording = false;
+    audioState.paused = false;
+    audioState.blob = null;
+    audioState.start.mockClear();
+    audioState.reset.mockClear();
+    audioState.stopAndWait.mockClear();
+    URL.createObjectURL = vi.fn(() => "blob:audio");
+    URL.revokeObjectURL = vi.fn();
   });
 
   it("shows mic, text+send, and camera", () => {
@@ -51,13 +57,13 @@ describe("ChatComposerBar", () => {
         onSendMedia={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText(he.chatHoldToRecord)).toBeTruthy();
+    expect(screen.getByLabelText(he.chatRecordAudio)).toBeTruthy();
     expect(screen.getByPlaceholderText(he.taskChatPlaceholder)).toBeTruthy();
     expect(screen.getByRole("button", { name: he.taskChatSend })).toBeTruthy();
     expect(screen.getByLabelText(he.chatCameraAction)).toBeTruthy();
   });
 
-  it("opens the button-based audio dialog on a short tap", () => {
+  it("starts recording immediately on mic tap without a dialog", () => {
     render(
       <ChatComposerBar
         body=""
@@ -67,10 +73,14 @@ describe("ChatComposerBar", () => {
         onSendMedia={vi.fn()}
       />,
     );
-    fireEvent.pointerDown(screen.getByLabelText(he.chatHoldToRecord));
-    fireEvent.pointerUp(screen.getByLabelText(he.chatHoldToRecord));
-    expect(screen.getByText(he.chatAudioButtons)).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.chatAudioStart })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(he.chatRecordAudio));
+    expect(audioState.start).toHaveBeenCalled();
+    expect(screen.getByLabelText(he.chatAudioPlay)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.chatAudioPause })).toBeTruthy();
+    expect(screen.getByLabelText(he.chatAudioSend)).toBeTruthy();
+    expect(screen.getByLabelText(he.chatAudioDiscard)).toBeTruthy();
+    expect(screen.queryByText(he.mediaCaptureAudioTitle)).toBeNull();
+    expect(screen.queryByText(he.chatAudioButtons)).toBeNull();
   });
 
   it("opens the camera on a short tap", () => {
@@ -88,9 +98,25 @@ describe("ChatComposerBar", () => {
     expect(screen.getByText(he.mediaCapturePhotoTitle)).toBeTruthy();
   });
 
-  it("starts audio on hold and sends on release", async () => {
-    vi.useFakeTimers();
+  it("deletes the recording and returns to the composer", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(he.chatRecordAudio));
+    fireEvent.click(screen.getByLabelText(he.chatAudioDiscard));
+    expect(audioState.reset).toHaveBeenCalled();
+    expect(screen.getByLabelText(he.chatRecordAudio)).toBeTruthy();
+  });
+
+  it("sends the recording from the dock", async () => {
     const onSendMedia = vi.fn();
+    audioState.stopAndWait.mockResolvedValue(new Blob(["x"], { type: "audio/webm" }));
     render(
       <ChatComposerBar
         body=""
@@ -100,16 +126,11 @@ describe("ChatComposerBar", () => {
         onSendMedia={onSendMedia}
       />,
     );
-    const mic = screen.getByLabelText(he.chatHoldToRecord);
-    fireEvent.pointerDown(mic);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(HOLD_MS);
+    fireEvent.click(screen.getByLabelText(he.chatRecordAudio));
+    fireEvent.click(screen.getByLabelText(he.chatAudioSend));
+    await waitFor(() => {
+      expect(audioState.stopAndWait).toHaveBeenCalled();
+      expect(onSendMedia).toHaveBeenCalledWith(expect.any(File), "audio");
     });
-    expect(startAudio).toHaveBeenCalled();
-    await act(async () => {
-      fireEvent.pointerUp(mic);
-    });
-    expect(stopAndWaitAudio).toHaveBeenCalled();
-    vi.useRealTimers();
   });
 });

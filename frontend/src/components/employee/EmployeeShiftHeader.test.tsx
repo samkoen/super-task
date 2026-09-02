@@ -54,6 +54,25 @@ describe("EmployeeShiftHeader", () => {
     expect(screen.getByRole("button", { name: he.employeeChangePhoto })).toBeTruthy();
   });
 
+  it("shows delete on the avatar when a photo is present", () => {
+    const onDeletePhoto = vi.fn();
+    render(
+      <EmployeeShiftHeader
+        name="מונאדל מונאדל"
+        photoUrl="/uploads/avatars/a.jpg"
+        photoEditable
+        onEditPhoto={vi.fn()}
+        onDeletePhoto={onDeletePhoto}
+        onShift
+        onBreak={false}
+        onToggleBreak={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.employeeChangePhoto }));
+    fireEvent.click(screen.getByRole("menuitem", { name: he.employeeDeletePhoto }));
+    expect(onDeletePhoto).toHaveBeenCalledTimes(1);
+  });
+
   it("stacks identity above break controls on a phone", () => {
     expect(employeeShiftHeaderPaperSx.flexDirection).toEqual({ xs: "column", sm: "row" });
     const onToggleBreak = vi.fn();
