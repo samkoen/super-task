@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   Typography,
 } from "@mui/material";
@@ -15,10 +14,10 @@ import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import type { MediaKind } from "../media/MediaCaptureActions";
 import type { TaskStatus } from "../../services/taskService";
-import { chatBubbleCopySx, chatBubbleMetaSx, chatBubbleSx, isChatAudioOnly } from "../../utils/chatBubbleSx";
 import BreakAlertDialog from "../chat/BreakAlertDialog";
 import ChatComposerBar from "../chat/ChatComposerBar";
 import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
+import ChatMessageList from "../chat/ChatMessageList";
 import ChatMessageMedia from "../chat/ChatMessageMedia";
 import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
 import ChatTaskActions from "../chat/ChatTaskActions";
@@ -222,69 +221,19 @@ export default function TaskChatPanel({
           {he.taskChatEmpty}
         </Typography>
       ) : (
-        <Box
-          sx={{
-            maxHeight: compact ? 220 : 320,
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-            p: 1.25,
-            bgcolor: "grey.100",
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "divider",
-          }}
-        >
-          {hasMore && (
-            <Button type="button" size="small" onClick={() => void loadOlder()} disabled={loadingOlder}>
-              {loadingOlder ? <CircularProgress size={16} /> : he.chatLoadOlder}
-            </Button>
-          )}
-          {messages.map((msg) => {
-            const mine = Boolean(user?.id && msg.sender_user_id === user.id);
-            const fromEmployee = msg.sender_role === "employee" || (!mine && !msg.sender_role);
-            const text = (msg.display_body ?? msg.body)?.trim();
-            const transcript = msg.display_audio_transcript ?? msg.audio_transcript;
-            const audioOnly = isChatAudioOnly({
-              text,
-              photoUrl: msg.photo_url,
-              videoUrl: msg.video_url,
-              audioUrl: msg.audio_url,
-            });
-            return (
-              <Box
-                key={msg.id}
-                sx={chatBubbleSx({ mine, fromEmployee, audioOnly })}
-              >
-                <Typography variant="caption" sx={chatBubbleMetaSx} display="block">
-                  {msg.sender_name || "—"} · {formatTime(msg.created_at)}
-                </Typography>
-                {text ? (
-                  <Typography
-                    variant="body2"
-                    fontWeight={fromEmployee && !mine ? 600 : 400}
-                    sx={chatBubbleCopySx}
-                  >
-                    {text}
-                  </Typography>
-                ) : null}
-                <ChatMessageMedia
-                  photoUrl={msg.photo_url}
-                  videoUrl={msg.video_url}
-                  audioUrl={msg.audio_url}
-                  transcript={text ? undefined : transcript}
-                  onAnnotateReply={
-                    canAnnotateChatReply(composeEnabled, mine)
-                      ? annotateReply.start
-                      : undefined
-                  }
-                />
-              </Box>
-            );
-          })}
-          <div ref={bottomRef} />
-        </Box>
+        <ChatMessageList
+          messages={messages}
+          myId={user?.id}
+          hasMore={hasMore}
+          loadingOlder={loadingOlder}
+          onLoadOlder={() => void loadOlder()}
+          bottomRef={bottomRef}
+          composeEnabled={composeEnabled}
+          onAnnotateReply={annotateReply.start}
+          layout="bounded"
+          compact={compact}
+          highlightEmployee
+        />
       )}
 
       {composeEnabled && (

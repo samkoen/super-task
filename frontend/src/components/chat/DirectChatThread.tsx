@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   Typography,
 } from "@mui/material";
@@ -14,19 +13,16 @@ import {
   type DirectChatPayload,
 } from "../../services/directChatService";
 import { he } from "../../i18n/he";
-import { formatTime } from "../../utils/dashboardTime";
 import { systemBottomInsetCss } from "../../utils/systemInsets";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
 import type { MediaKind } from "../media/MediaCaptureActions";
-import { chatBubbleCopySx, chatBubbleMetaSx, chatBubbleSx, isChatAudioOnly } from "../../utils/chatBubbleSx";
 import BreakAlertDialog from "./BreakAlertDialog";
 import ChatComposerBar from "./ChatComposerBar";
-import ChatMessageMedia from "./ChatMessageMedia";
+import ChatMessageList from "./ChatMessageList";
 import ChatPhotoAnnotateReplyDialog from "./ChatPhotoAnnotateReplyDialog";
 import { useChatPhotoAnnotateReply } from "../../hooks/useChatPhotoAnnotateReply";
-import { canAnnotateChatReply } from "../../utils/chatAnnotateReply";
 
 interface DirectChatThreadProps {
   conversationId: string | null;
@@ -111,7 +107,7 @@ export default function DirectChatThread({
       ) : messages.length === 0 ? (
         <Typography variant="body2" color="text.secondary">{he.directChatEmpty}</Typography>
       ) : (
-        <MessageList
+        <ChatMessageList
           messages={messages}
           myId={user?.id}
           bottomRef={bottomRef}
@@ -185,67 +181,4 @@ async function postDirectMedia(args: {
   } finally {
     args.setSending(false);
   }
-}
-
-function MessageList({
-  messages,
-  myId,
-  bottomRef,
-  hasMore,
-  loadingOlder,
-  onLoadOlder,
-  onAnnotateReply,
-}: {
-  messages: DirectChatMessage[];
-  myId?: string;
-  bottomRef: Ref<HTMLDivElement>;
-  hasMore: boolean;
-  loadingOlder: boolean;
-  onLoadOlder: () => void;
-  onAnnotateReply: (photoUrl: string) => void;
-}) {
-  return (
-    <Box sx={{
-      flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1,
-      p: 1.25, bgcolor: "grey.100", borderRadius: 2, minHeight: 220,
-    }}>
-      {hasMore && (
-        <Button type="button" size="small" onClick={onLoadOlder} disabled={loadingOlder}>
-          {loadingOlder ? <CircularProgress size={16} /> : he.chatLoadOlder}
-        </Button>
-      )}
-      {messages.map((msg) => {
-        const mine = Boolean(myId && msg.sender_user_id === myId);
-        const text = msg.body?.trim();
-        const audioOnly = isChatAudioOnly({
-          text,
-          photoUrl: msg.photo_url,
-          videoUrl: msg.video_url,
-          audioUrl: msg.audio_url,
-        });
-        return (
-          <Box
-            key={msg.id}
-            sx={chatBubbleSx({ mine, audioOnly })}
-          >
-            <Typography variant="caption" sx={chatBubbleMetaSx} display="block">
-              {msg.sender_name || "—"} · {formatTime(msg.created_at)}
-            </Typography>
-            {text ? (
-              <Typography variant="body2" sx={chatBubbleCopySx}>{text}</Typography>
-            ) : null}
-            <ChatMessageMedia
-              photoUrl={msg.photo_url}
-              videoUrl={msg.video_url}
-              audioUrl={msg.audio_url}
-              onAnnotateReply={
-                canAnnotateChatReply(true, mine) ? onAnnotateReply : undefined
-              }
-            />
-          </Box>
-        );
-      })}
-      <div ref={bottomRef} />
-    </Box>
-  );
 }
