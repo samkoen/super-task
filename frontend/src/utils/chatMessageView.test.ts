@@ -4,6 +4,7 @@ import {
   chatMessageText,
   chatMessageTranscript,
   isEmployeeChatMessage,
+  lastEmployeeChatMessage,
   type ChatMessageView,
 } from "./chatMessageView";
 
@@ -34,6 +35,15 @@ describe("chatMessageView", () => {
     expect(isEmployeeChatMessage(msg({ sender_role: "employee" }), true)).toBe(true);
     expect(isEmployeeChatMessage(msg({ sender_role: null }), false)).toBe(true);
     expect(isEmployeeChatMessage(msg({ sender_role: "branch_manager" }), false)).toBe(false);
+  });
+
+  it("returns the latest employee message", () => {
+    expect(lastEmployeeChatMessage([
+      msg({ id: "m1", sender_role: "employee", body: "ישן" }),
+      msg({ id: "m2", sender_role: "branch_manager", body: "תשובה" }),
+      msg({ id: "m3", sender_role: "employee", body: "חדש" }),
+    ])?.id).toBe("m3");
+    expect(lastEmployeeChatMessage([msg({ sender_role: "branch_manager" })])).toBeUndefined();
   });
 
   it("sizes the fill thread taller than the bounded task panel", () => {

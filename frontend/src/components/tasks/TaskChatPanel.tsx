@@ -1,30 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  CircularProgress,
-  Typography,
-} from "@mui/material";
-import { ApiError } from "../../services/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, Typography } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
-import { taskService, type TaskMessage } from "../../services/taskService";
+import { taskService, type TaskStatus } from "../../services/taskService";
 import { he } from "../../i18n/he";
-import { formatTime } from "../../utils/dashboardTime";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
-import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
-import type { MediaKind } from "../media/MediaCaptureActions";
-import type { TaskStatus } from "../../services/taskService";
-import BreakAlertDialog from "../chat/BreakAlertDialog";
-import ChatComposerBar from "../chat/ChatComposerBar";
-import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
-import ChatMessageList from "../chat/ChatMessageList";
-import ChatMessageMedia from "../chat/ChatMessageMedia";
-import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
-import ChatTaskActions from "../chat/ChatTaskActions";
-import { useChatPhotoAnnotateReply } from "../../hooks/useChatPhotoAnnotateReply";
-import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
-import { canAnnotateChatReply } from "../../utils/chatAnnotateReply";
+import { useChatThread } from "../../hooks/useChatThread";
+import { createTaskChatTransport } from "../../utils/taskChatTransport";
+import { lastEmployeeChatMessage, type ChatMessageView } from "../../utils/chatMessageView";
 import { isOpenChatTask } from "../../utils/chatTaskFollowUp";
+import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
+import ChatTaskActions from "../chat/ChatTaskActions";
+import ChatThread from "../chat/ChatThread";
+import TaskChatQuestionBanner from "../chat/TaskChatQuestionBanner";
 
 interface TaskChatPanelProps {
   occurrenceId: string;
@@ -42,15 +29,6 @@ interface TaskChatPanelProps {
   pollMs?: number | false;
 }
 
-function asTaskChatPage(data: unknown): { messages: TaskMessage[]; has_more: boolean } {
-  if (Array.isArray(data)) return { messages: data as TaskMessage[], has_more: false };
-  if (data && typeof data === "object" && Array.isArray((data as { messages?: unknown }).messages)) {
-    const page = data as { messages: TaskMessage[]; has_more?: boolean };
-    return { messages: page.messages, has_more: Boolean(page.has_more) };
-  }
-  return { messages: [], has_more: false };
-}
-
 export default function TaskChatPanel({
   occurrenceId,
   occurrenceStatus,
@@ -62,216 +40,156 @@ export default function TaskChatPanel({
   pollMs,
 }: TaskChatPanelProps) {
   const { user } = useAuth();
-  const [body, setBody] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
-  const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
-  const [status, setStatus] = useState(occurrenceStatus);
-  const [resolvedAt, setResolvedAt] = useState(chatResolvedAt);
-  const [followUpAt, setFollowUpAt] = useState(chatFollowUpAt);
-  const [remindOpen, setRemindOpen] = useState(false);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
-  const canManage =
-    user?.role === "branch_manager" || user?.role === "network_manager" || user?.role === "admin";
-  const showChatActions = canManage && isOpenChatTask(status, resolvedAt);
-
-  useEffect(() => {
-    setStatus(occurrenceStatus);
-    setResolvedAt(chatResolvedAt);
-    setFollowUpAt(chatFollowUpAt);
-  }, [occurrenceStatus, chatResolvedAt, chatFollowUpAt]);
-
-  const fetchPage = useCallback(async (before?: string) => {
-    try {
-      return asTaskChatPage(await taskService.listMessages(occurrenceId, { before }));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-      throw e;
-    }
-  }, [occurrenceId]);
-
-  const { messages, hasMore, loading, loadingOlder, loadLatest, loadOlder, stickToBottom } =
-    usePagedChatMessages({ enabled: true, fetchPage });
-
-  useTaskChatLiveSync(occurrenceId, () => void loadLatest(true), { pollMs });
-
-  useEffect(() => {
-    if (stickToBottom.current) {
-      bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
-    }
-  }, [messages.length, loading, stickToBottom]);
-
-  const finishPosted = async (result: Awaited<ReturnType<typeof taskService.postMessage>>) => {
-    setBreakAlert(parseRecipientBreak(result));
-    stickToBottom.current = true;
-    await loadLatest(true);
-    setBody("");
-    onOccurrenceUpdated?.(result.occurrence.status, he.taskChatSent);
-  };
-
-  const handleSend = async () => {
-    if (!body.trim()) {
-      setError(he.taskChatNeedContent);
-      return;
-    }
-    setSending(true);
-    setError("");
-    try {
-      const result = await taskService.postMessage(occurrenceId, { body: body.trim() });
-      await finishPosted(result);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const sendInstantMedia = async (file: File, kind: MediaKind) => {
-    setSending(true);
-    setError("");
-    try {
-      const uploaded = await uploadChatKind(file, kind);
-      const result = await taskService.postMessage(occurrenceId, uploaded);
-      await finishPosted(result);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const annotateReply = useChatPhotoAnnotateReply((file) => sendInstantMedia(file, "photo"));
-
-  const runChatAction = async (action: () => Promise<{ occurrence: { status: string; chat_resolved_at?: string | null; chat_follow_up_at?: string | null } }>) => {
-    setSending(true);
-    setError("");
-    try {
-      const result = await action();
-      setStatus(result.occurrence.status as TaskStatus);
-      setResolvedAt(result.occurrence.chat_resolved_at);
-      setFollowUpAt(result.occurrence.chat_follow_up_at);
-      onOccurrenceUpdated?.(
-        result.occurrence.status,
-        result.occurrence.chat_follow_up_at && !result.occurrence.chat_resolved_at
-          ? he.chatTaskReminderSet
-          : he.chatTaskCompleted,
-      );
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const lastEmployeeQuestion = [...messages]
-    .reverse()
-    .find((m) => m.sender_role === "employee");
+  const onUpdatedRef = useRef(onOccurrenceUpdated);
+  onUpdatedRef.current = onOccurrenceUpdated;
+  const transport = useMemo(
+    () => createTaskChatTransport({
+      occurrenceId,
+      onPosted: (status, notice) => onUpdatedRef.current?.(status, notice),
+    }),
+    [occurrenceId],
+  );
+  const thread = useChatThread({ transport, enabled: true });
+  useTaskChatLiveSync(occurrenceId, () => void thread.loadLatest(true), { pollMs });
+  const manager = useTaskChatManager({
+    userRole: user?.role,
+    occurrenceId,
+    occurrenceStatus,
+    chatFollowUpAt,
+    chatResolvedAt,
+    onOccurrenceUpdated,
+    runBusy: thread.runBusy,
+  });
+  const lastQuestion = user?.role === "employee"
+    ? undefined
+    : lastEmployeeChatMessage(thread.messages);
 
   return (
     <Box display="flex" flexDirection="column" gap={1.5}>
-      <Typography variant="subtitle2" fontWeight={700}>
-        {he.taskChatTitle}
-      </Typography>
-      {showChatActions && (
-        <ChatTaskActions
-          disabled={sending}
-          onComplete={() => void runChatAction(() => taskService.resolveChatTask(occurrenceId))}
-          onRemind={() => setRemindOpen(true)}
-        />
-      )}
-
-      {user?.role !== "employee" && lastEmployeeQuestion && (
-        <Alert severity="warning" sx={{ alignItems: "flex-start" }}>
-          <Typography variant="caption" fontWeight={700} display="block" mb={0.25}>
-            {he.taskChatEmployeeQuestion}
-          </Typography>
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", color: "text.primary" }}>
-            {(lastEmployeeQuestion.display_body ?? lastEmployeeQuestion.body)?.trim() ||
-              lastEmployeeQuestion.display_audio_transcript ||
-              he.taskChatMediaOnly}
-          </Typography>
-          {(lastEmployeeQuestion.photo_url ||
-            lastEmployeeQuestion.video_url ||
-            lastEmployeeQuestion.audio_url) && (
-            <Box mt={1}>
-              <ChatMessageMedia
-                photoUrl={lastEmployeeQuestion.photo_url}
-                videoUrl={lastEmployeeQuestion.video_url}
-                audioUrl={lastEmployeeQuestion.audio_url}
-                onAnnotateReply={
-                  canAnnotateChatReply(composeEnabled, false)
-                    ? annotateReply.start
-                    : undefined
-                }
-              />
-            </Box>
-          )}
-          <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-            {lastEmployeeQuestion.sender_name || "—"} · {formatTime(lastEmployeeQuestion.created_at)}
-          </Typography>
-        </Alert>
-      )}
-
-      {loading ? (
-        <Box display="flex" justifyContent="center" py={2}>
-          <CircularProgress size={24} />
-        </Box>
-      ) : messages.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {he.taskChatEmpty}
-        </Typography>
-      ) : (
-        <ChatMessageList
-          messages={messages}
-          myId={user?.id}
-          hasMore={hasMore}
-          loadingOlder={loadingOlder}
-          onLoadOlder={() => void loadOlder()}
-          bottomRef={bottomRef}
-          composeEnabled={composeEnabled}
-          onAnnotateReply={annotateReply.start}
-          layout="bounded"
-          compact={compact}
-          highlightEmployee
-        />
-      )}
-
-      {composeEnabled && (
-        <Box sx={{ position: "sticky", bottom: 0, bgcolor: "background.paper", pt: 0.5, zIndex: 1 }}>
-          <ChatComposerBar
-            body={body}
-            onBodyChange={setBody}
-            sending={sending}
-            error={error}
-            onSendText={() => void handleSend()}
-            onSendMedia={(file, kind) => void sendInstantMedia(file, kind)}
+      <ChatThread
+        thread={thread}
+        myId={user?.id}
+        emptyText={he.taskChatEmpty}
+        composeEnabled={composeEnabled}
+        layout="bounded"
+        compact={compact}
+        highlightEmployee
+        stickyComposer
+        header={(
+          <TaskChatHeader
+            showActions={manager.showActions}
+            sending={thread.sending}
+            lastQuestion={lastQuestion}
+            composeEnabled={composeEnabled}
+            onComplete={manager.complete}
+            onRemind={() => manager.setRemindOpen(true)}
+            onAnnotateReply={thread.annotateReply.start}
           />
-        </Box>
-      )}
-      {!composeEnabled && error && <Alert severity="error">{error}</Alert>}
-      <ChatPhotoAnnotateReplyDialog
-        photoUrl={annotateReply.photoUrl}
-        sending={sending}
-        onClose={annotateReply.close}
-        onSend={annotateReply.submit}
+        )}
       />
-      <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
       <ChatFollowUpDialog
-        open={remindOpen}
-        initialIso={followUpAt}
-        saving={sending}
-        onClose={() => setRemindOpen(false)}
-        onSave={(iso) => {
-          setRemindOpen(false);
-          void runChatAction(() => taskService.setChatFollowUp(occurrenceId, iso));
-        }}
+        open={manager.remindOpen}
+        initialIso={manager.followUpAt}
+        saving={thread.sending}
+        onClose={() => manager.setRemindOpen(false)}
+        onSave={manager.saveFollowUp}
       />
     </Box>
   );
 }
 
-async function uploadChatKind(file: File, kind: MediaKind) {
-  if (kind === "photo") return { photo_url: (await taskService.uploadPhoto(file)).url };
-  if (kind === "video") return { video_url: (await taskService.uploadVideo(file)).url };
-  return { audio_url: (await taskService.uploadAudio(file)).url };
+function TaskChatHeader({
+  showActions,
+  sending,
+  lastQuestion,
+  composeEnabled,
+  onComplete,
+  onRemind,
+  onAnnotateReply,
+}: {
+  showActions: boolean;
+  sending: boolean;
+  lastQuestion?: ChatMessageView;
+  composeEnabled: boolean;
+  onComplete: () => void;
+  onRemind: () => void;
+  onAnnotateReply: (photoUrl: string) => void;
+}) {
+  return (
+    <>
+      <Typography variant="subtitle2" fontWeight={700}>{he.taskChatTitle}</Typography>
+      {showActions && (
+        <ChatTaskActions disabled={sending} onComplete={onComplete} onRemind={onRemind} />
+      )}
+      {lastQuestion && (
+        <TaskChatQuestionBanner
+          message={lastQuestion}
+          composeEnabled={composeEnabled}
+          onAnnotateReply={onAnnotateReply}
+        />
+      )}
+    </>
+  );
+}
+
+type ChatOccurrencePatch = {
+  status: string;
+  chat_resolved_at?: string | null;
+  chat_follow_up_at?: string | null;
+};
+
+function chatActionNotice(occurrence: ChatOccurrencePatch): string {
+  return occurrence.chat_follow_up_at && !occurrence.chat_resolved_at
+    ? he.chatTaskReminderSet
+    : he.chatTaskCompleted;
+}
+
+function useTaskChatManager(opts: {
+  userRole?: string;
+  occurrenceId: string;
+  occurrenceStatus?: TaskStatus;
+  chatFollowUpAt?: string | null;
+  chatResolvedAt?: string | null;
+  onOccurrenceUpdated?: (status: string, notice?: string) => void;
+  runBusy: (work: () => Promise<void>) => Promise<void>;
+}) {
+  const [status, setStatus] = useState(opts.occurrenceStatus);
+  const [resolvedAt, setResolvedAt] = useState(opts.chatResolvedAt);
+  const [followUpAt, setFollowUpAt] = useState(opts.chatFollowUpAt);
+  const [remindOpen, setRemindOpen] = useState(false);
+  const canManage =
+    opts.userRole === "branch_manager" ||
+    opts.userRole === "network_manager" ||
+    opts.userRole === "admin";
+
+  useEffect(() => {
+    setStatus(opts.occurrenceStatus);
+    setResolvedAt(opts.chatResolvedAt);
+    setFollowUpAt(opts.chatFollowUpAt);
+  }, [opts.occurrenceStatus, opts.chatResolvedAt, opts.chatFollowUpAt]);
+
+  const applyOccurrence = (occurrence: ChatOccurrencePatch) => {
+    setStatus(occurrence.status as TaskStatus);
+    setResolvedAt(occurrence.chat_resolved_at);
+    setFollowUpAt(occurrence.chat_follow_up_at);
+    opts.onOccurrenceUpdated?.(occurrence.status, chatActionNotice(occurrence));
+  };
+
+  return {
+    followUpAt,
+    remindOpen,
+    setRemindOpen,
+    showActions: canManage && isOpenChatTask(status, resolvedAt),
+    complete: () => {
+      void opts.runBusy(async () => {
+        applyOccurrence((await taskService.resolveChatTask(opts.occurrenceId)).occurrence);
+      });
+    },
+    saveFollowUp: (iso: string) => {
+      setRemindOpen(false);
+      void opts.runBusy(async () => {
+        applyOccurrence((await taskService.setChatFollowUp(opts.occurrenceId, iso)).occurrence);
+      });
+    },
+  };
 }

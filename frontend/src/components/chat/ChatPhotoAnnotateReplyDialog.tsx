@@ -93,7 +93,7 @@ function ReplyImageBody({
   annotateRef,
 }: {
   image: ReturnType<typeof useReplyImageBlob>;
-  annotateRef: RefObject<PhotoAnnotationCanvasHandle | null>;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
 }) {
   if (image.loading) {
     return <CircularProgress size={28} sx={{ alignSelf: "center", my: 2 }} />;
@@ -113,7 +113,7 @@ function ReplyImageBody({
 
 async function confirmReply(opts: {
   image: ReturnType<typeof useReplyImageBlob>;
-  annotateRef: RefObject<PhotoAnnotationCanvasHandle | null>;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
   sending: boolean;
   confirming: boolean;
   setConfirming: (value: boolean) => void;

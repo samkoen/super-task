@@ -26,16 +26,38 @@ export function isEmployeeChatMessage(msg: ChatMessageView, mine: boolean): bool
   return msg.sender_role === "employee" || (!mine && !msg.sender_role);
 }
 
-export function chatMessageListSx(layout: "fill" | "bounded", compact: boolean) {
+export function lastEmployeeChatMessage(messages: ChatMessageView[]): ChatMessageView | undefined {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].sender_role === "employee") return messages[i];
+  }
+  return undefined;
+}
+
+export type ChatMessageListSx = {
+  overflowY: "auto";
+  display: "flex";
+  flexDirection: "column";
+  gap: number;
+  p: number;
+  bgcolor: string;
+  borderRadius: number;
+  flex?: number;
+  minHeight?: number;
+  maxHeight?: number;
+  border?: string;
+  borderColor?: string;
+};
+
+export function chatMessageListSx(layout: "fill" | "bounded", compact: boolean): ChatMessageListSx {
   const base = {
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
+    overflowY: "auto" as const,
+    display: "flex" as const,
+    flexDirection: "column" as const,
     gap: 1,
     p: 1.25,
     bgcolor: "grey.100",
     borderRadius: 2,
-  } as const;
+  };
   if (layout === "fill") {
     return { ...base, flex: 1, minHeight: 220 };
   }
