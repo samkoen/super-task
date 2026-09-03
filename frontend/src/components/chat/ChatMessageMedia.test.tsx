@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import ChatMessageMedia from "./ChatMessageMedia";
 import { he } from "../../i18n/he";
 
@@ -20,5 +20,13 @@ describe("ChatMessageMedia", () => {
     render(<ChatMessageMedia photoUrl="/uploads/p.jpg" />);
     expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
     expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
+    expect(screen.queryByRole("button", { name: he.chatAnnotateReply })).toBeNull();
+  });
+
+  it("offers annotate-and-send on a received photo", () => {
+    const onAnnotateReply = vi.fn();
+    render(<ChatMessageMedia photoUrl="/uploads/p.jpg" onAnnotateReply={onAnnotateReply} />);
+    fireEvent.click(screen.getByRole("button", { name: he.chatAnnotateReply }));
+    expect(onAnnotateReply).toHaveBeenCalledWith("/uploads/p.jpg");
   });
 });

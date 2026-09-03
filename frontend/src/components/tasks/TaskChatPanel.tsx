@@ -20,8 +20,11 @@ import BreakAlertDialog from "../chat/BreakAlertDialog";
 import ChatComposerBar from "../chat/ChatComposerBar";
 import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
 import ChatMessageMedia from "../chat/ChatMessageMedia";
+import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
 import ChatTaskActions from "../chat/ChatTaskActions";
+import { useChatPhotoAnnotateReply } from "../../hooks/useChatPhotoAnnotateReply";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
+import { canAnnotateChatReply } from "../../utils/chatAnnotateReply";
 import { isOpenChatTask } from "../../utils/chatTaskFollowUp";
 
 interface TaskChatPanelProps {
@@ -138,6 +141,8 @@ export default function TaskChatPanel({
     }
   };
 
+  const annotateReply = useChatPhotoAnnotateReply((file) => sendInstantMedia(file, "photo"));
+
   const runChatAction = async (action: () => Promise<{ occurrence: { status: string; chat_resolved_at?: string | null; chat_follow_up_at?: string | null } }>) => {
     setSending(true);
     setError("");
@@ -194,6 +199,11 @@ export default function TaskChatPanel({
                 photoUrl={lastEmployeeQuestion.photo_url}
                 videoUrl={lastEmployeeQuestion.video_url}
                 audioUrl={lastEmployeeQuestion.audio_url}
+                onAnnotateReply={
+                  canAnnotateChatReply(composeEnabled, false)
+                    ? annotateReply.start
+                    : undefined
+                }
               />
             </Box>
           )}
@@ -264,6 +274,11 @@ export default function TaskChatPanel({
                   videoUrl={msg.video_url}
                   audioUrl={msg.audio_url}
                   transcript={text ? undefined : transcript}
+                  onAnnotateReply={
+                    canAnnotateChatReply(composeEnabled, mine)
+                      ? annotateReply.start
+                      : undefined
+                  }
                 />
               </Box>
             );
@@ -285,6 +300,12 @@ export default function TaskChatPanel({
         </Box>
       )}
       {!composeEnabled && error && <Alert severity="error">{error}</Alert>}
+      <ChatPhotoAnnotateReplyDialog
+        photoUrl={annotateReply.photoUrl}
+        sending={sending}
+        onClose={annotateReply.close}
+        onSend={annotateReply.submit}
+      />
       <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
       <ChatFollowUpDialog
         open={remindOpen}

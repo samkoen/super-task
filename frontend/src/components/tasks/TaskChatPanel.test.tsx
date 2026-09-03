@@ -273,6 +273,45 @@ describe("TaskChatPanel", () => {
     expect(taskService.resolveChatTask).not.toHaveBeenCalled();
   });
 
+  it("lets the employee annotate a received photo and send it back", async () => {
+    vi.mocked(taskService.listMessages).mockResolvedValue({
+      has_more: false,
+      messages: [
+        {
+          id: "m-photo",
+          occurrence_id: "occ-1",
+          sender_user_id: "mgr-1",
+          sender_role: "branch_manager",
+          sender_name: "מנהל",
+          body: "",
+          display_body: "",
+          photo_url: "/uploads/chat/from-mgr.jpg",
+          video_url: null,
+          audio_url: null,
+          created_at: "2026-07-22T10:05:00.000Z",
+        },
+        {
+          id: "m-mine",
+          occurrence_id: "occ-1",
+          sender_user_id: "emp-1",
+          sender_role: "employee",
+          sender_name: "עובד",
+          body: "",
+          display_body: "",
+          photo_url: "/uploads/chat/mine.jpg",
+          video_url: null,
+          audio_url: null,
+          created_at: "2026-07-22T10:06:00.000Z",
+        },
+      ],
+    });
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
+    await waitFor(() => {
+      expect(screen.getAllByAltText(he.taskReferencePhoto)).toHaveLength(2);
+    });
+    expect(screen.getAllByRole("button", { name: he.chatAnnotateReply })).toHaveLength(1);
+  });
+
   it("uploads a photo and posts it immediately", async () => {
     vi.mocked(taskService.listMessages).mockResolvedValue({ messages: [], has_more: false });
     vi.mocked(taskService.uploadPhoto).mockResolvedValue({ url: "/uploads/p.jpg" } as never);

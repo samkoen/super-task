@@ -4,10 +4,8 @@ import {
   Box,
   Button,
   CircularProgress,
-  TextField,
   Typography,
 } from "@mui/material";
-import SendIcon from "@mui/icons-material/Send";
 import { ApiError } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -21,13 +19,14 @@ import { systemBottomInsetCss } from "../../utils/systemInsets";
 import { parseRecipientBreak, type BreakAlertTarget } from "../../utils/breakAlert";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { usePagedChatMessages } from "../../hooks/usePagedChatMessages";
-import { useAudioRecorder } from "../../hooks/useAudioRecorder";
-import { blobToFile } from "../../utils/mediaCapture";
-import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
+import type { MediaKind } from "../media/MediaCaptureActions";
 import { chatBubbleCopySx, chatBubbleMetaSx, chatBubbleSx, isChatAudioOnly } from "../../utils/chatBubbleSx";
 import BreakAlertDialog from "./BreakAlertDialog";
-import ChatAudioDock from "./ChatAudioDock";
+import ChatComposerBar from "./ChatComposerBar";
 import ChatMessageMedia from "./ChatMessageMedia";
+import ChatPhotoAnnotateReplyDialog from "./ChatPhotoAnnotateReplyDialog";
+import { useChatPhotoAnnotateReply } from "../../hooks/useChatPhotoAnnotateReply";
+import { canAnnotateChatReply } from "../../utils/chatAnnotateReply";
 
 interface DirectChatThreadProps {
   conversationId: string | null;
@@ -43,12 +42,8 @@ export default function DirectChatThread({
   const { user } = useAuth();
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
-  const sendLock = useRef(false);
-  const [uploadingKind, setUploadingKind] = useState<MediaKind | null>(null);
   const [error, setError] = useState("");
   const [breakAlert, setBreakAlert] = useState<BreakAlertTarget | null>(null);
-  const audio = useAudioRecorder();
-  const [audioDock, setAudioDock] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const fetchPage = useCallback(async (before?: string) => {
@@ -102,17 +97,10 @@ export default function DirectChatThread({
     }
   };
 
-  const handleCapture = (file: File, kind: MediaKind) => {
-    void postDirectMedia({
-      file,
-      kind,
-      deliver,
-      setSending,
-      setError,
-      setUploadingKind,
-      onSent,
-    });
+  const sendMedia = (file: File, kind: MediaKind) => {
+    void postDirectMedia({ file, kind, deliver, setSending, setError, onSent });
   };
+  const annotateReply = useChatPhotoAnnotateReply((file) => sendMedia(file, "photo"));
 
   return (
     <Box display="flex" flexDirection="column" gap={1.5} sx={{ minHeight: 0, flex: 1, pb: systemBottomInsetCss() }}>
@@ -130,49 +118,25 @@ export default function DirectChatThread({
           hasMore={hasMore}
           loadingOlder={loadingOlder}
           onLoadOlder={() => void loadOlder()}
+          onAnnotateReply={annotateReply.start}
         />
       )}
-      {audioDock ? (
-        <ChatAudioDock
-          audio={audio}
-          sending={sending}
-          onSend={() =>
-            void sendDockedDirectAudio({
-              audio,
-              conversationId,
-              broadcast,
-              sendLock,
-              setAudioDock,
-              setSending,
-              setError,
-              setUploadingKind,
-              loadLatest,
-              stickToBottom,
-              setBreakAlert,
-              onSent,
-            })
-          }
-          onDelete={() => {
-            audio.reset();
-            setAudioDock(false);
-          }}
-        />
-      ) : (
-        <DirectChatComposeFields
-          body={body}
-          onBodyChange={setBody}
-          sending={sending}
-          uploadingKind={uploadingKind}
-          broadcast={broadcast}
-          error={error}
-          onStartAudio={() => {
-            setAudioDock(true);
-            void audio.start();
-          }}
-          onCapture={handleCapture}
-          onSend={() => void handleSend()}
-        />
-      )}
+      <ChatComposerBar
+        body={body}
+        onBodyChange={setBody}
+        sending={sending}
+        error={error}
+        placeholder={he.directChatPlaceholder}
+        sendLabel={broadcast ? he.directChatBroadcast : he.taskChatSend}
+        onSendText={() => void handleSend()}
+        onSendMedia={sendMedia}
+      />
+      <ChatPhotoAnnotateReplyDialog
+        photoUrl={annotateReply.photoUrl}
+        sending={sending}
+        onClose={annotateReply.close}
+        onSend={annotateReply.submit}
+      />
       <BreakAlertDialog target={breakAlert} onClose={() => setBreakAlert(null)} />
     </Box>
   );
@@ -209,157 +173,18 @@ async function postDirectMedia(args: {
   deliver: (payload: DirectChatPayload) => Promise<void>;
   setSending: (value: boolean) => void;
   setError: (value: string) => void;
-  setUploadingKind: (kind: MediaKind | null) => void;
   onSent?: () => void;
 }) {
   args.setSending(true);
   args.setError("");
   try {
-    args.setUploadingKind(args.kind);
     await args.deliver(await uploadDirectKind(args.file, args.kind));
     args.onSent?.();
   } catch (e) {
     args.setError(e instanceof ApiError ? e.message : he.errorGeneric);
   } finally {
-    args.setUploadingKind(null);
     args.setSending(false);
   }
-}
-
-async function postDockedAudioFile(
-  blob: Blob,
-  args: {
-    audio: ReturnType<typeof useAudioRecorder>;
-    conversationId: string | null;
-    broadcast: boolean;
-    setAudioDock: (open: boolean) => void;
-    setSending: (value: boolean) => void;
-    setError: (value: string) => void;
-    setUploadingKind: (kind: MediaKind | null) => void;
-    loadLatest: (force?: boolean) => Promise<unknown>;
-    stickToBottom: { current: boolean };
-    setBreakAlert: (value: BreakAlertTarget | null) => void;
-    onSent?: () => void;
-  },
-) {
-  const file = blobToFile(blob, `chat-audio-${Date.now()}.webm`, blob.type || "audio/webm");
-  await postDirectMedia({
-    file,
-    kind: "audio",
-    deliver: (payload) =>
-      deliverDirectMessage({
-        payload,
-        conversationId: args.conversationId,
-        broadcast: args.broadcast,
-        loadLatest: args.loadLatest,
-        stickToBottom: args.stickToBottom,
-        setBreakAlert: args.setBreakAlert,
-      }),
-    setSending: args.setSending,
-    setError: args.setError,
-    setUploadingKind: args.setUploadingKind,
-    onSent: () => {
-      args.setAudioDock(false);
-      args.audio.reset();
-      args.onSent?.();
-    },
-  });
-}
-
-function closeEmptyDockedAudio(args: {
-  audio: ReturnType<typeof useAudioRecorder>;
-  setAudioDock: (open: boolean) => void;
-  setError: (value: string) => void;
-}) {
-  args.setError(he.chatAudioEmpty);
-  args.audio.reset();
-  args.setAudioDock(false);
-}
-
-async function sendDockedDirectAudio(args: {
-  audio: ReturnType<typeof useAudioRecorder>;
-  conversationId: string | null;
-  broadcast: boolean;
-  sendLock: { current: boolean };
-  setAudioDock: (open: boolean) => void;
-  setSending: (value: boolean) => void;
-  setError: (value: string) => void;
-  setUploadingKind: (kind: MediaKind | null) => void;
-  loadLatest: (force?: boolean) => Promise<unknown>;
-  stickToBottom: { current: boolean };
-  setBreakAlert: (value: BreakAlertTarget | null) => void;
-  onSent?: () => void;
-}) {
-  if (args.sendLock.current) return;
-  args.sendLock.current = true;
-  args.setSending(true);
-  args.setError("");
-  try {
-    const blob = await args.audio.stopAndWait();
-    if (!blob) {
-      closeEmptyDockedAudio(args);
-      return;
-    }
-    await postDockedAudioFile(blob, args);
-  } finally {
-    args.sendLock.current = false;
-    args.setSending(false);
-  }
-}
-
-function DirectChatComposeFields({
-  body,
-  onBodyChange,
-  sending,
-  uploadingKind,
-  broadcast,
-  error,
-  onStartAudio,
-  onCapture,
-  onSend,
-}: {
-  body: string;
-  onBodyChange: (value: string) => void;
-  sending: boolean;
-  uploadingKind: MediaKind | null;
-  broadcast: boolean;
-  error: string;
-  onStartAudio: () => void;
-  onCapture: (file: File, kind: MediaKind) => void;
-  onSend: () => void;
-}) {
-  return (
-    <>
-      <TextField
-        value={body}
-        onChange={(e) => onBodyChange(e.target.value)}
-        placeholder={he.directChatPlaceholder}
-        fullWidth
-        multiline
-        minRows={2}
-        disabled={sending}
-      />
-      <MediaCaptureActions
-        density="icon"
-        photoAdded={false}
-        videoAdded={false}
-        audioAdded={false}
-        uploadingKind={uploadingKind}
-        disabled={sending}
-        onAudioStart={onStartAudio}
-        onCapture={onCapture}
-      />
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      <Button
-        variant="contained"
-        startIcon={sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
-        onClick={onSend}
-        disabled={sending || Boolean(uploadingKind)}
-      >
-        {broadcast ? he.directChatBroadcast : he.taskChatSend}
-      </Button>
-    </>
-  );
 }
 
 function MessageList({
@@ -369,6 +194,7 @@ function MessageList({
   hasMore,
   loadingOlder,
   onLoadOlder,
+  onAnnotateReply,
 }: {
   messages: DirectChatMessage[];
   myId?: string;
@@ -376,6 +202,7 @@ function MessageList({
   hasMore: boolean;
   loadingOlder: boolean;
   onLoadOlder: () => void;
+  onAnnotateReply: (photoUrl: string) => void;
 }) {
   return (
     <Box sx={{
@@ -411,6 +238,9 @@ function MessageList({
               photoUrl={msg.photo_url}
               videoUrl={msg.video_url}
               audioUrl={msg.audio_url}
+              onAnnotateReply={
+                canAnnotateChatReply(true, mine) ? onAnnotateReply : undefined
+              }
             />
           </Box>
         );
