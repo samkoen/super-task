@@ -24,50 +24,39 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
 }));
 
 vi.mock("../../utils/mediaUrl", () => ({ mediaUrl: (p: string | null) => p }));
-const audioMocks = vi.hoisted(() => ({
-  stopAndWait: vi.fn(),
-  reset: vi.fn(),
-  start: vi.fn(),
-}));
 
-vi.mock("../../hooks/useAudioRecorder", () => ({
-  useAudioRecorder: () => ({
-    supported: true,
-    recording: true,
-    paused: false,
-    blob: null,
-    error: "",
-    elapsedSeconds: 2,
-    start: audioMocks.start,
-    pause: vi.fn(),
-    resume: vi.fn(),
-    stop: vi.fn(),
-    stopAndWait: audioMocks.stopAndWait,
-    reset: audioMocks.reset,
-  }),
-}));
-
-vi.mock("../media/MediaCaptureActions", () => ({
-  default: ({
-    onCapture,
-    onAudioStart,
-  }: {
-    onCapture: (file: File, kind: "photo" | "video" | "audio") => void;
-    onAudioStart?: () => void;
-  }) => (
-    <>
-      <button
-        type="button"
-        onClick={() => onCapture(new File(["x"], "p.jpg", { type: "image/jpeg" }), "photo")}
-      >
-        add-photo
-      </button>
-      <button type="button" onClick={() => onAudioStart?.()}>
-        add-audio
-      </button>
-    </>
-  ),
-}));
+vi.mock("./ChatComposerBar", async () => {
+  const { he: labels } = await import("../../i18n/he");
+  return {
+    default: (props: {
+      body: string;
+      placeholder?: string;
+      sendLabel?: string;
+      onBodyChange: (value: string) => void;
+      onSendText: () => void;
+      onSendMedia: (file: File, kind: "photo" | "video" | "audio") => void;
+    }) => (
+      <>
+        <input
+          placeholder={props.placeholder ?? labels.taskChatPlaceholder}
+          value={props.body}
+          onChange={(e) => props.onBodyChange(e.target.value)}
+        />
+        <button type="button" onClick={props.onSendText}>
+          {props.sendLabel ?? labels.taskChatSend}
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onSendMedia(new File(["x"], "p.jpg", { type: "image/jpeg" }), "photo")
+          }
+        >
+          send-photo
+        </button>
+      </>
+    ),
+  };
+});
 
 function msg(id: string, body: string) {
   return {
@@ -88,10 +77,6 @@ describe("DirectChatThread", () => {
     vi.mocked(directChatService.listMessages).mockReset();
     vi.mocked(directChatService.send).mockReset();
     vi.mocked(directChatService.uploadPhoto).mockReset();
-    vi.mocked(directChatService.uploadAudio).mockReset();
-    audioMocks.stopAndWait.mockReset();
-    audioMocks.reset.mockReset();
-    audioMocks.start.mockReset();
   });
 
   it("shows an empty thread then sends text", async () => {
@@ -133,12 +118,27 @@ describe("DirectChatThread", () => {
     expect(document.querySelector("audio")).toBeNull();
   });
 
+  it("lets the employee annotate a received photo and send it back", async () => {
+    vi.mocked(directChatService.listMessages).mockResolvedValue({
+      messages: [
+        { ...msg("m-in", ""), sender_user_id: "mgr-1", sender_name: "מנהל", photo_url: "/uploads/from-mgr.jpg" },
+        { ...msg("m-mine", ""), photo_url: "/uploads/mine.jpg" },
+      ],
+      has_more: false,
+    });
+    render(<DirectChatThread conversationId="c1" />);
+    await waitFor(() => {
+      expect(screen.getAllByAltText(he.taskReferencePhoto)).toHaveLength(2);
+    });
+    expect(screen.getAllByRole("button", { name: he.chatAnnotateReply })).toHaveLength(1);
+  });
+
   it("sends a photo into the thread instead of attaching it below", async () => {
     vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
     vi.mocked(directChatService.uploadPhoto).mockResolvedValue({ url: "/uploads/p.jpg", kind: "photo" });
     vi.mocked(directChatService.send).mockResolvedValue({});
     render(<DirectChatThread conversationId="c1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "add-photo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "send-photo" }));
     await waitFor(() => {
       expect(directChatService.uploadPhoto).toHaveBeenCalled();
       expect(directChatService.send).toHaveBeenCalledWith("c1", { photo_url: "/uploads/p.jpg" });
@@ -146,37 +146,9 @@ describe("DirectChatThread", () => {
     expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
   });
 
-  it("closes the dock and shows an error when the recording is empty", async () => {
-    vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
-    audioMocks.stopAndWait.mockResolvedValue(null);
-    render(<DirectChatThread conversationId="c1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "add-audio" }));
-    fireEvent.click(screen.getByRole("button", { name: he.chatAudioSend }));
-    await waitFor(() => expect(screen.getByText(he.chatAudioEmpty)).toBeTruthy());
-    expect(audioMocks.reset).toHaveBeenCalled();
-    expect(directChatService.uploadAudio).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: he.chatAudioSend })).toBeNull();
-  });
-
-  it("sends docked audio only once if the send button is tapped twice", async () => {
-    vi.mocked(directChatService.listMessages).mockResolvedValue({ messages: [], has_more: false });
-    let release: (blob: Blob) => void = () => undefined;
-    audioMocks.stopAndWait.mockReturnValue(
-      new Promise<Blob | null>((resolve) => {
-        release = (blob) => resolve(blob);
-      }),
-    );
-    vi.mocked(directChatService.uploadAudio).mockResolvedValue({ url: "/uploads/a.webm", kind: "audio" });
-    vi.mocked(directChatService.send).mockResolvedValue({});
-    render(<DirectChatThread conversationId="c1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "add-audio" }));
-    const send = screen.getByRole("button", { name: he.chatAudioSend });
-    fireEvent.click(send);
-    fireEvent.click(send);
-    expect(audioMocks.stopAndWait).toHaveBeenCalledTimes(1);
-    release(new Blob(["x"], { type: "audio/webm" }));
-    await waitFor(() => {
-      expect(directChatService.uploadAudio).toHaveBeenCalledTimes(1);
-    });
+  it("uses the broadcast send label", () => {
+    render(<DirectChatThread conversationId={null} broadcast />);
+    expect(screen.getByText(he.directChatBroadcastHint)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.directChatBroadcast })).toBeTruthy();
   });
 });

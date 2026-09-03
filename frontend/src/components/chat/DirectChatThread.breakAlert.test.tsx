@@ -25,7 +25,29 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
 }));
 
 vi.mock("../../utils/mediaUrl", () => ({ mediaUrl: (p: string | null) => p }));
-vi.mock("../media/MediaCaptureActions", () => ({ default: () => null }));
+vi.mock("./ChatComposerBar", async () => {
+  const { he: labels } = await import("../../i18n/he");
+  return {
+    default: (props: {
+      body: string;
+      placeholder?: string;
+      sendLabel?: string;
+      onBodyChange: (value: string) => void;
+      onSendText: () => void;
+    }) => (
+      <>
+        <input
+          placeholder={props.placeholder ?? labels.taskChatPlaceholder}
+          value={props.body}
+          onChange={(e) => props.onBodyChange(e.target.value)}
+        />
+        <button type="button" onClick={props.onSendText}>
+          {props.sendLabel ?? labels.taskChatSend}
+        </button>
+      </>
+    ),
+  };
+});
 
 describe("DirectChatThread break alert", () => {
   beforeEach(() => {

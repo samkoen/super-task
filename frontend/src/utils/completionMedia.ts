@@ -123,6 +123,64 @@ export function effectiveRequirements(task: {
   return normalized;
 }
 
+export function parseRequirementWords(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of text.split(/[\n,،]+/)) {
+    const word = raw.trim().slice(0, MAX_SLOT_TITLE);
+    if (!word || seen.has(word)) continue;
+    seen.add(word);
+    out.push(word);
+    if (out.length >= MAX_COMPLETION_REQUIREMENTS) break;
+  }
+  return out;
+}
+
+export function wordsToPhotoRequirements(words: string[]): CompletionRequirement[] {
+  return parseRequirementWords(words.join("\n")).map((title) => ({ kind: "photo", title }));
+}
+
+export function photoWordsFromRequirements(list: CompletionRequirement[]): string[] {
+  return list
+    .filter((item) => item.kind === "photo")
+    .map((item) => (item.title || "").trim())
+    .filter(Boolean);
+}
+
+function photoSlotForWord(
+  title: string,
+  previous: CompletionRequirement[],
+): CompletionRequirement {
+  const prev = previous.find((item) => (item.title || "").trim() === title);
+  return prev ? { ...prev, title } : { kind: "photo", title };
+}
+
+export function isWordPhotoSlot(req: CompletionRequirement): boolean {
+  return req.kind === "photo" && Boolean((req.title || "").trim());
+}
+
+export function editorDetailRequirements(
+  list: CompletionRequirement[],
+): Array<{ req: CompletionRequirement; index: number }> {
+  return list
+    .map((req, index) => ({ req, index }))
+    .filter(({ req }) => !isWordPhotoSlot(req));
+}
+
+export function applyWordPhotoSlots(
+  list: CompletionRequirement[],
+  words: string[],
+): CompletionRequirement[] {
+  const others = list.filter((item) => item.kind !== "photo");
+  const previous = list.filter((item) => item.kind === "photo");
+  const limited = words.slice(0, Math.max(0, MAX_COMPLETION_REQUIREMENTS - others.length));
+  if (limited.length === 0) {
+    const untitled = previous.filter((item) => !(item.title || "").trim());
+    return [...untitled, ...others].slice(0, MAX_COMPLETION_REQUIREMENTS);
+  }
+  return [...limited.map((title) => photoSlotForWord(title, previous)), ...others];
+}
+
 export function addRequirement(
   list: CompletionRequirement[],
   kind: CompletionKind,

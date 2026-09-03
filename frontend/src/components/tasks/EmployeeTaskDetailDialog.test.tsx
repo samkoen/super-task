@@ -211,6 +211,28 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByText("ניקיון")).toBeTruthy();
   });
 
+  it("blocks finish while a word photo is still missing", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task(),
+          completion_requirements: [
+            { kind: "photo", title: "חלב" },
+            { kind: "photo", title: "לחם" },
+            { kind: "photo", title: "ביצים" },
+          ],
+        }}
+        capture={capture({ canSubmit: false, slots: [null, null, null] })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("חלב")).toBeTruthy();
+    expect(screen.getByText("לחם")).toBeTruthy();
+    expect(screen.getByText("ביצים")).toBeTruthy();
+    expect(screen.getByText(he.completionFillSlotsHint)).toBeTruthy();
+    expect((screen.getByRole("button", { name: he.doTask }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("does not show do-task when waiting for manager review", () => {
     render(
       <EmployeeTaskDetailDialog

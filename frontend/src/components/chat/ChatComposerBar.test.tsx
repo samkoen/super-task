@@ -42,7 +42,8 @@ describe("ChatComposerBar", () => {
     audioState.blob = null;
     audioState.start.mockClear();
     audioState.reset.mockClear();
-    audioState.stopAndWait.mockClear();
+    audioState.stopAndWait.mockReset();
+    audioState.stopAndWait.mockResolvedValue(null);
     URL.createObjectURL = vi.fn(() => "blob:audio");
     URL.revokeObjectURL = vi.fn();
   });
@@ -112,6 +113,68 @@ describe("ChatComposerBar", () => {
     fireEvent.click(screen.getByLabelText(he.chatAudioDiscard));
     expect(audioState.reset).toHaveBeenCalled();
     expect(screen.getByLabelText(he.chatRecordAudio)).toBeTruthy();
+  });
+
+  it("uses a custom placeholder and send label", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        placeholder={he.directChatPlaceholder}
+        sendLabel={he.directChatBroadcast}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    expect(screen.getByPlaceholderText(he.directChatPlaceholder)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.directChatBroadcast })).toBeTruthy();
+  });
+
+  it("shows an error and closes the dock when the recording is empty", async () => {
+    audioState.stopAndWait.mockResolvedValue(null);
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(he.chatRecordAudio));
+    fireEvent.click(screen.getByLabelText(he.chatAudioSend));
+    await waitFor(() => expect(screen.getByText(he.chatAudioEmpty)).toBeTruthy());
+    expect(audioState.reset).toHaveBeenCalled();
+    expect(screen.queryByLabelText(he.chatAudioSend)).toBeNull();
+  });
+
+  it("sends docked audio only once if the send button is tapped twice", async () => {
+    const onSendMedia = vi.fn();
+    let release: (blob: Blob) => void = () => undefined;
+    audioState.stopAndWait.mockReturnValue(
+      new Promise<Blob | null>((resolve) => {
+        release = (blob) => resolve(blob);
+      }),
+    );
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={onSendMedia}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(he.chatRecordAudio));
+    const send = screen.getByLabelText(he.chatAudioSend);
+    fireEvent.click(send);
+    fireEvent.click(send);
+    expect(audioState.stopAndWait).toHaveBeenCalledTimes(1);
+    release(new Blob(["x"], { type: "audio/webm" }));
+    await waitFor(() => {
+      expect(onSendMedia).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("sends the recording from the dock", async () => {
