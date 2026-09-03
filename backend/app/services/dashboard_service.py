@@ -116,6 +116,7 @@ class DashboardService:
         translation_service: TaskTranslationService | None = None,
         template_repo: TaskTemplateRepository | None = None,
         scheduler: TaskSchedulerService | None = None,
+        network_repo=None,
     ):
         self._occurrences = occurrence_repo
         self._branches = branch_repo
@@ -125,6 +126,7 @@ class DashboardService:
         self._translations = translation_service
         self._templates = template_repo
         self._scheduler = scheduler
+        self._networks = network_repo
 
     def manager_dashboard(
         self,
@@ -366,6 +368,7 @@ class DashboardService:
             "unfinished_tasks": unfinished,
             "recent_alerts": alerts[:10],
             "branches": None,
+            "manages_all_workers": False,
         }
 
     def _network_overview_dashboard(self, actor: ActorContext, day: date, now: datetime) -> dict:
@@ -374,72 +377,158 @@ class DashboardService:
             branch_ids = [b.id for b in self._branches.list_branches()]
         elif not branch_ids:
             branch_ids = []
-        branches_summary = []
+        collected = self._collect_network_branches(branch_ids, day, now)
+        payload = self._network_overview_payload(actor, day, collected)
+        if self._manages_all_workers(actor):
+            self._fill_all_workers_overview(payload, actor, branch_ids, collected, day, now)
+        return payload
+
+    def _manages_all_workers(self, actor: ActorContext) -> bool:
+        if not self._networks or not actor.network_id:
+            return False
+        net = self._networks.find_by_id(actor.network_id)
+        return bool(net and net.manages_all_workers)
+
+    def _collect_network_branches(self, branch_ids: list[str], day: date, now: datetime) -> dict:
+        summaries: list[dict] = []
+        all_tasks: list[TaskOccurrence] = []
+        all_overdue: list[TaskOccurrence] = []
         all_alerts: list[dict] = []
         total_counts = _count_by_status([])
-
         for bid in branch_ids:
-            branch = self._branches.find_by_id(bid)
-            if not branch:
+            row = self._network_branch_row(bid, day, now)
+            if not row:
                 continue
-            tasks_today = self._tasks_for_dashboard_day(branch_id=bid, day=day, now=now)
-            overdue = self._occurrences.list_occurrences(branch_id=bid, status=task_status.OVERDUE)
-            counts = _count_by_status(tasks_today)
-            urgent_pending = sum(
-                1
-                for t in tasks_today
-                if t.status in {task_status.PENDING, task_status.IN_PROGRESS}
-                and _parse_due_at(t.due_at) <= now + timedelta(hours=2)
-            )
-            health = branch_health_from_counts(
-                overdue=len(overdue),
-                completion_rate=counts["completion_rate"],
-                urgent_pending=urgent_pending,
-            )
-            branches_summary.append({
-                "branch_id": bid,
-                "name": branch.name,
-                "health": health,
-                "overdue": len(overdue),
-                "pending": counts["tasks_pending"] + counts["tasks_in_progress"],
-                "completion_rate": counts["completion_rate"],
-            })
+            summaries.append(row["summary"])
+            all_tasks.extend(row["tasks"])
+            all_overdue.extend(row["overdue"])
+            all_alerts.extend(row["alerts"])
             for key in total_counts:
                 if key != "completion_rate":
-                    total_counts[key] += counts.get(key, 0)
-            all_alerts.extend(self._build_alerts(overdue, tasks_today, now))
-
+                    total_counts[key] += row["counts"].get(key, 0)
         actionable = total_counts["tasks_total"] - total_counts["tasks_cancelled"]
         total_counts["completion_rate"] = (
             round(total_counts["tasks_completed"] / actionable, 2) if actionable else 1.0
         )
-        health = branch_health_from_counts(
-            overdue=total_counts["tasks_overdue"],
-            completion_rate=total_counts["completion_rate"],
-            urgent_pending=0,
-        )
+        return {
+            "summaries": summaries,
+            "tasks": all_tasks,
+            "overdue": all_overdue,
+            "alerts": all_alerts,
+            "counts": total_counts,
+        }
 
+    def _network_branch_row(self, bid: str, day: date, now: datetime) -> dict | None:
+        branch = self._branches.find_by_id(bid)
+        if not branch:
+            return None
+        tasks_today = self._tasks_for_dashboard_day(branch_id=bid, day=day, now=now)
+        overdue = self._occurrences.list_occurrences(branch_id=bid, status=task_status.OVERDUE)
+        counts = _count_by_status(tasks_today)
+        urgent_pending = sum(
+            1
+            for t in tasks_today
+            if t.status in {task_status.PENDING, task_status.IN_PROGRESS}
+            and _parse_due_at(t.due_at) <= now + timedelta(hours=2)
+        )
+        return {
+            "summary": {
+                "branch_id": bid,
+                "name": branch.name,
+                "health": branch_health_from_counts(
+                    overdue=len(overdue),
+                    completion_rate=counts["completion_rate"],
+                    urgent_pending=urgent_pending,
+                ),
+                "overdue": len(overdue),
+                "pending": counts["tasks_pending"] + counts["tasks_in_progress"],
+                "completion_rate": counts["completion_rate"],
+            },
+            "tasks": tasks_today,
+            "overdue": overdue,
+            "counts": counts,
+            "alerts": self._build_alerts(overdue, tasks_today, now),
+        }
+
+    def _network_overview_payload(self, actor: ActorContext, day: date, collected: dict) -> dict:
+        counts = collected["counts"]
         return {
             "due_on": day.isoformat(),
             "branch": None,
             "network_name": (
                 self._branches.get_network_name(actor.network_id) if actor.network_id else None
             ),
-            "health": health,
+            "health": branch_health_from_counts(
+                overdue=counts["tasks_overdue"],
+                completion_rate=counts["completion_rate"],
+                urgent_pending=0,
+            ),
             "counts": {
-                **total_counts,
+                **counts,
                 "employees_total": 0,
                 "employees_active": 0,
-                "overdue_open": total_counts["tasks_overdue"],
+                "overdue_open": counts["tasks_overdue"],
             },
             "store_kpis": None,
             "by_department": None,
             "team": None,
             "task_queues": None,
             "unfinished_tasks": None,
-            "recent_alerts": sorted(all_alerts, key=lambda a: a["due_at"])[:15],
-            "branches": branches_summary,
+            "recent_alerts": sorted(collected["alerts"], key=lambda a: a["due_at"])[:15],
+            "branches": collected["summaries"],
+            "manages_all_workers": False,
         }
+
+    def _fill_all_workers_overview(
+        self,
+        payload: dict,
+        actor: ActorContext,
+        branch_ids: list[str],
+        collected: dict,
+        day: date,
+        now: datetime,
+    ) -> None:
+        if not branch_ids:
+            payload["manages_all_workers"] = True
+            return
+        employees = self._users.list_users(
+            roles_in=worker_roles_for_roster(actor.role),
+            branch_ids=branch_ids,
+        )
+        done_ids = [
+            t.id
+            for t in collected["tasks"]
+            if t.status in {task_status.COMPLETED, task_status.PENDING_REVIEW}
+        ]
+        completion_map = self._completions.find_by_occurrence_ids(done_ids)
+        team = self._annotate_team_branches(
+            self._team_timelines(
+                employees, collected["tasks"], collected["overdue"], completion_map, day, now
+            ),
+            employees,
+        )
+        payload["manages_all_workers"] = True
+        payload["store_kpis"] = build_store_kpis(collected["tasks"])
+        payload["team"] = team
+        payload["task_queues"] = self._task_queues(collected["tasks"], completion_map, now)
+        payload["unfinished_tasks"] = self._unfinished_tasks(collected["overdue"], day, now)
+        payload["counts"] = {
+            **payload["counts"],
+            "employees_total": len(employees),
+            "employees_active": sum(1 for m in team if m["is_active"]),
+        }
+
+    def _annotate_team_branches(self, team: list[dict], employees: list[User]) -> list[dict]:
+        by_id = {emp.id: emp for emp in employees}
+        names: dict[str, str | None] = {}
+        for member in team:
+            emp = by_id.get(member["user_id"])
+            bid = emp.branch_id if emp else None
+            if bid and bid not in names:
+                branch = self._branches.find_by_id(bid)
+                names[bid] = branch.name if branch else None
+            member["branch_name"] = names.get(bid) if bid else None
+        return team
 
     def _department_breakdown(
         self,

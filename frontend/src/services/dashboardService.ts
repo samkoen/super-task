@@ -76,6 +76,7 @@ export interface TimelineTask {
 export interface TeamMember {
   user_id: string;
   full_name: string;
+  branch_name?: string | null;
   job_function: string | null;
   is_active: boolean;
   status: "in_progress" | "active" | "idle";
@@ -154,6 +155,7 @@ export interface ManagerDashboard {
   unfinished_tasks: UnfinishedTask[] | null;
   recent_alerts: DashboardAlert[];
   branches: BranchSummary[] | null;
+  manages_all_workers?: boolean;
 }
 
 export interface EmployeeTaskCard {

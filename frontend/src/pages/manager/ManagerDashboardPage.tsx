@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   Grid,
   MenuItem,
@@ -11,8 +10,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import { ApiError } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import {
@@ -25,11 +22,7 @@ import {
 } from "../../services/promotionStageService";
 import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
 import HealthBadge from "../../components/dashboard/HealthBadge";
-import StoreStatusKpiRow from "../../components/dashboard/StoreStatusKpiRow";
-import ActionRequiredCarousel from "../../components/dashboard/ActionRequiredCarousel";
-import PendingTasksCarousel from "../../components/dashboard/PendingTasksCarousel";
-import StaffProgressOverview from "../../components/dashboard/StaffProgressOverview";
-import StoreStatusAnalysisTable from "../../components/dashboard/StoreStatusAnalysisTable";
+import ManagerTodayBoard from "../../components/dashboard/ManagerTodayBoard";
 import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
@@ -49,13 +42,12 @@ import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
 import { managerNewTaskNavigation } from "../../utils/managerBottomNav";
 import {
   parseBranchFromSearch,
-  readManagerScopeBranchId,
   writeManagerScopeBranchId,
 } from "../../utils/managerScopeBranch";
 import { managerWelcomeSubtitle } from "../../utils/managerWelcomeSubtitle";
+import { homeBranchAfterOverview, showAllWorkersDashboard } from "../../utils/networkDashboard";
 
 /** Masqué temporairement — remettre à true pour réafficher. */
-const SHOW_STAFF_PROGRESS = true;
 const SHOW_DEPARTMENT_PROGRESS = false;
 
 function dashboardTitle(branchName: string | undefined): string {
@@ -70,9 +62,7 @@ export default function ManagerDashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<ManagerDashboard | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState(() => {
-    return parseBranchFromSearch(searchParams) || readManagerScopeBranchId();
-  });
+  const [selectedBranch, setSelectedBranch] = useState(() => parseBranchFromSearch(searchParams) || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
@@ -145,24 +135,26 @@ export default function ManagerDashboardPage() {
   }, [data?.task_queues]);
 
   useEffect(() => {
-    if (!canPickBranch) {
-      load();
-      return;
+    if (canPickBranch) {
+      branchService.list().then(setBranches).catch(() => setBranches([]));
     }
-    branchService.list().then(setBranches).catch(() => setBranches([]));
   }, [canPickBranch]);
 
   useEffect(() => {
-    if (canPickBranch && !selectedBranch && user?.branch_id) {
-      setSelectedBranch(user.branch_id);
-      return;
-    }
-    if (canPickBranch && branches.length === 1 && !selectedBranch) {
-      setSelectedBranch(branches[0].id);
-      return;
-    }
     load();
-  }, [load, canPickBranch, selectedBranch, branches, user?.branch_id]);
+  }, [load]);
+
+  useEffect(() => {
+    const next = homeBranchAfterOverview({
+      canPickBranch,
+      selectedBranch,
+      overviewLoaded: Boolean(data) && !data?.branch,
+      managesAllWorkers: data?.manages_all_workers,
+      homeBranchId: user?.branch_id,
+      onlyBranchId: branches.length === 1 ? branches[0].id : undefined,
+    });
+    if (next) setSelectedBranch(next);
+  }, [canPickBranch, selectedBranch, data, user?.branch_id, branches]);
 
   const handleReviewTask = useCallback(async (taskId: string) => {
     setReviewLoading(true);
@@ -256,74 +248,43 @@ export default function ManagerDashboardPage() {
         </Paper>
       )}
 
+      {data && showAllWorkersDashboard(data) && (
+        <Box mb={3}>
+          <ManagerTodayBoard
+            data={data}
+            title={he.dashboardAllWorkers}
+            hint={he.dashboardAllWorkersHint}
+            showAnalysis={showAnalysis}
+            onToggleAnalysis={() => setShowAnalysis((v) => !v)}
+            onReviewTask={(id) => void handleReviewTask(id)}
+            onOpenTask={(id) => setEditOccurrenceId(id)}
+            onChanged={() => void load(true)}
+            onNewTask={() => goTasks({ openNewTask: true })}
+            onGalleryTask={() => goTasks({ openGalleryTask: true })}
+            onViewTasks={() => goTasks()}
+          />
+        </Box>
+      )}
+
       {data?.branch && (
         <>
-          <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
-            {he.dashboardToday}
-          </Typography>
-          <StoreStatusKpiRow storeKpis={data.store_kpis} />
-
-          {/* שורה 1 — שאלות עובדים */}
-          <ActionRequiredCarousel
-            queues={data.task_queues}
-            mode="questions"
-            onReviewTask={handleReviewTask}
+          <ManagerTodayBoard
+            data={data}
+            showAnalysis={showAnalysis}
+            analysisExtra={<PromotionStagesAnalysisTable stages={stages} />}
+            onToggleAnalysis={() => setShowAnalysis((v) => !v)}
+            onReviewTask={(id) => void handleReviewTask(id)}
+            onOpenTask={(id) => setEditOccurrenceId(id)}
+            onChanged={() => void load(true)}
+            onNewTask={() => goTasks({ openNewTask: true })}
+            onGalleryTask={() => goTasks({ openGalleryTask: true })}
+            onViewTasks={() => goTasks()}
           />
-
-          {/* שורה 2 — משימות ממתינות + ניתוח מצב */}
-          <PendingTasksCarousel
-            queues={data.task_queues}
-            onOpenTask={(task) => setEditOccurrenceId(task.id)}
-            onOpenStatusAnalysis={() => setShowAnalysis((v) => !v)}
-          />
-
-          {showAnalysis && (
-            <>
-              <StoreStatusAnalysisTable
-                team={data.team}
-                onOpenTask={(task) => setEditOccurrenceId(task.id)}
-                onClose={() => setShowAnalysis(false)}
-              />
-              <PromotionStagesAnalysisTable stages={stages} />
-            </>
-          )}
-
-          {/* שורה 3 — ממתינות לאישור */}
-          <ActionRequiredCarousel
-            queues={data.task_queues}
-            mode="reviews"
-            onReviewTask={handleReviewTask}
-          />
-
-          {SHOW_STAFF_PROGRESS && (
-            <StaffProgressOverview team={data.team ?? []} onChanged={() => void load(true)} />
-          )}
-
           {SHOW_DEPARTMENT_PROGRESS &&
             data.by_department &&
             data.by_department.length > 0 && (
               <DepartmentProgressGrid departments={data.by_department} />
             )}
-
-          <Box display="flex" gap={2} flexWrap="wrap">
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => goTasks({ openNewTask: true })}
-            >
-              {he.newTask}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={() => goTasks({ openGalleryTask: true })}
-            >
-              {he.newTaskFromGallery}
-            </Button>
-            <Button variant="outlined" startIcon={<TaskAltIcon />} onClick={() => goTasks()}>
-              {he.dashboardViewTasks}
-            </Button>
-          </Box>
         </>
       )}
 
