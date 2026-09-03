@@ -169,6 +169,12 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
           <Box minWidth={0}>
             <Typography fontWeight={800} noWrap>
               {member.full_name}
+              {member.branch_name && (
+                <Typography component="span" color="text.secondary" fontWeight={600}>
+                  {" · "}
+                  {member.branch_name}
+                </Typography>
+              )}
               {role && (
                 <Typography component="span" color="text.secondary" fontWeight={600}>
                   {" · "}
