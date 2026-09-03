@@ -1,14 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   addRequirement,
+  applyWordPhotoSlots,
+  editorDetailRequirements,
+  isWordPhotoSlot,
   effectiveRequirements,
   meetsCompletionMedia,
   meetsCompletionRequirements,
   normalizeMinVideoSeconds,
   normalizeRequirements,
+  parseRequirementWords,
   resolveRequirementExamples,
   setRequirementHint,
   setRequirementTitle,
+  wordsToPhotoRequirements,
 } from "./completionMedia";
 
 describe("completionMedia", () => {
@@ -96,6 +101,53 @@ describe("completionMedia", () => {
     const withSpace = setRequirementTitle([{ kind: "photo" }], 0, "מדף ");
     expect(withSpace[0].title).toBe("מדף ");
     expect(setRequirementHint(withSpace, 0, "לצלם את ")[0].hint).toBe("לצלם את ");
+  });
+
+  it("parses words, trims, dedupes, and caps title and count", () => {
+    const long = "א".repeat(90);
+    expect(parseRequirementWords(`  חלב \n\nלחם,חלב,${long}`)).toEqual([
+      "חלב",
+      "לחם",
+      "א".repeat(80),
+    ]);
+    expect(parseRequirementWords("a\n".repeat(12))).toHaveLength(1);
+    expect(parseRequirementWords(Array.from({ length: 12 }, (_, i) => `w${i}`).join("\n"))).toHaveLength(10);
+  });
+
+  it("turns a word list into named photo slots", () => {
+    expect(wordsToPhotoRequirements([" חלב ", "לחם", "חלב"])).toEqual([
+      { kind: "photo", title: "חלב" },
+      { kind: "photo", title: "לחם" },
+    ]);
+  });
+
+  it("keeps video and slot extras when the word list changes", () => {
+    const current = [
+      { kind: "photo" as const, title: "חלב", hint: "קר" },
+      { kind: "video" as const, min_seconds: 10 },
+    ];
+    expect(applyWordPhotoSlots(current, ["חלב", "לחם"])).toEqual([
+      { kind: "photo", title: "חלב", hint: "קר" },
+      { kind: "photo", title: "לחם" },
+      { kind: "video", min_seconds: 10 },
+    ]);
+    expect(applyWordPhotoSlots(current, [])).toEqual([{ kind: "video", min_seconds: 10 }]);
+    expect(isWordPhotoSlot({ kind: "photo", title: "חלב" })).toBe(true);
+    expect(isWordPhotoSlot({ kind: "photo" })).toBe(false);
+    expect(
+      editorDetailRequirements([
+        { kind: "photo", title: "חלב" },
+        { kind: "video", min_seconds: 10 },
+      ]),
+    ).toEqual([{ req: { kind: "video", min_seconds: 10 }, index: 1 }]);
+  });
+
+  it("blocks finish until every word has a photo", () => {
+    const reqs = wordsToPhotoRequirements(["חלב", "לחם", "ביצים"]);
+    expect(meetsCompletionRequirements(reqs, [{ kind: "photo" }, { kind: "photo" }])).toBe(false);
+    expect(
+      meetsCompletionRequirements(reqs, [{ kind: "photo" }, { kind: "photo" }, { kind: "photo" }]),
+    ).toBe(true);
   });
 
   it("uploads pending example photos at resolve time", async () => {

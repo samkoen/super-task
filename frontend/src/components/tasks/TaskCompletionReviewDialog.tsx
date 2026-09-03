@@ -115,7 +115,9 @@ export default function TaskCompletionReviewDialog({
             compact
             composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
             onOccurrenceUpdated={(_status, notice) => {
-              onDone(notice ?? he.taskChatSent);
+              if (notice !== he.taskChatSent) {
+                onDone(notice ?? he.taskChatSent);
+              }
             }}
           />
         )}

@@ -19,6 +19,8 @@ export default function ChatComposerBar({
   sending,
   error,
   disabled = false,
+  placeholder = he.taskChatPlaceholder,
+  sendLabel = he.taskChatSend,
   onSendText,
   onSendMedia,
 }: {
@@ -27,11 +29,14 @@ export default function ChatComposerBar({
   sending: boolean;
   error?: string;
   disabled?: boolean;
+  placeholder?: string;
+  sendLabel?: string;
   onSendText: () => void;
   onSendMedia: (file: File, kind: MediaKind) => void | Promise<void>;
 }) {
   const media = useChatComposerMedia(onSendMedia);
   const busy = disabled || sending;
+  const shownError = error || media.mediaError;
   if (media.audioDock) {
     return (
       <Box display="flex" flexDirection="column" gap={1}>
@@ -41,7 +46,7 @@ export default function ChatComposerBar({
           onSend={() => void media.sendAudio()}
           onDelete={media.deleteAudio}
         />
-        {error ? <Alert severity="error">{error}</Alert> : null}
+        {shownError ? <Alert severity="error">{shownError}</Alert> : null}
       </Box>
     );
   }
@@ -62,7 +67,7 @@ export default function ChatComposerBar({
           <TextField
             value={body}
             onChange={(e) => onBodyChange(e.target.value)}
-            placeholder={he.taskChatPlaceholder}
+            placeholder={placeholder}
             fullWidth
             multiline
             minRows={1}
@@ -76,7 +81,7 @@ export default function ChatComposerBar({
             onClick={onSendText}
             disabled={busy}
           >
-            {he.taskChatSend}
+            {sendLabel}
           </Button>
         </Box>
         <HoldIconButton
@@ -91,7 +96,7 @@ export default function ChatComposerBar({
       {media.holdKind ? (
         <Typography variant="caption" color="error.main">{he.chatRecordingHold}</Typography>
       ) : null}
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {shownError ? <Alert severity="error">{shownError}</Alert> : null}
       <Box
         component="video"
         ref={media.video.onVideoRef}
@@ -117,6 +122,8 @@ function useChatComposerMedia(
   const [photoOpen, setPhotoOpen] = useState(false);
   const [audioDock, setAudioDock] = useState(false);
   const [holdKind, setHoldKind] = useState<MediaKind | null>(null);
+  const [mediaError, setMediaError] = useState("");
+  const sendLock = useRef(false);
   const audioRef = useRef(audio);
   const videoRef = useRef(video);
   const sendRef = useRef(onSendMedia);
@@ -139,7 +146,9 @@ function useChatComposerMedia(
     setPhotoOpen,
     audioDock,
     cameraHold,
+    mediaError,
     startAudio: () => {
+      setMediaError("");
       setAudioDock(true);
       void audio.start();
     },
@@ -147,7 +156,16 @@ function useChatComposerMedia(
       audio.reset();
       setAudioDock(false);
     },
-    sendAudio: () => sendComposerAudio(audioRef.current, sendRef.current, () => setAudioDock(false)),
+    sendAudio: () => sendComposerAudio({
+      audio: audioRef.current,
+      onSend: sendRef.current,
+      sendLock,
+      onEmpty: () => {
+        setMediaError(he.chatAudioEmpty);
+        audioRef.current.reset();
+      },
+      done: () => setAudioDock(false),
+    }),
   };
 }
 
@@ -185,16 +203,25 @@ function HoldIconButton({
   );
 }
 
-async function sendComposerAudio(
-  audio: ReturnType<typeof useAudioRecorder>,
-  onSend: (file: File, kind: MediaKind) => void | Promise<void>,
-  done: () => void,
-) {
+async function sendComposerAudio(opts: {
+  audio: ReturnType<typeof useAudioRecorder>;
+  onSend: (file: File, kind: MediaKind) => void | Promise<void>;
+  sendLock: { current: boolean };
+  onEmpty: () => void;
+  done: () => void;
+}) {
+  if (opts.sendLock.current) return;
+  opts.sendLock.current = true;
   try {
-    const blob = await audio.stopAndWait();
-    if (blob) await onSend(blobToFile(blob, `chat-audio-${Date.now()}.webm`, blob.type || "audio/webm"), "audio");
+    const blob = await opts.audio.stopAndWait();
+    if (!blob) {
+      opts.onEmpty();
+      return;
+    }
+    await opts.onSend(blobToFile(blob, `chat-audio-${Date.now()}.webm`, blob.type || "audio/webm"), "audio");
   } finally {
-    done();
+    opts.sendLock.current = false;
+    opts.done();
   }
 }
 

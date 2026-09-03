@@ -892,7 +892,6 @@ export default function EmployeeTasksPage() {
         }
         onChatUpdated={() => {
           void load();
-          closeDetail();
           showSuccess(he.taskChatSent);
         }}
       />

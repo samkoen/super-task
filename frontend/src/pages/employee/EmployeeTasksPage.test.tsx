@@ -37,8 +37,19 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
 }));
 
 vi.mock("../../components/tasks/EmployeeTaskDetailDialog", () => ({
-  default: ({ task }: { task: { title?: string } | null }) =>
-    task ? <div>detail:{task.title}</div> : null,
+  default: ({
+    task,
+    onChatUpdated,
+  }: {
+    task: { title?: string } | null;
+    onChatUpdated?: () => void;
+  }) =>
+    task ? (
+      <div>
+        <div>detail:{task.title}</div>
+        <button type="button" onClick={() => onChatUpdated?.()}>send-chat</button>
+      </div>
+    ) : null,
 }));
 
 function card(over: Partial<EmployeeTaskCard> & Pick<EmployeeTaskCard, "id" | "title">): EmployeeTaskCard {
@@ -112,6 +123,8 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(screen.queryByText("מדף חלב")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: he.punchClockIn }));
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
+    await waitFor(() => expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy());
   });
 
   it("keeps the list and lets the oved open the end door early", async () => {
