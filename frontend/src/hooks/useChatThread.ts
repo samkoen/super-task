@@ -99,7 +99,7 @@ function useChatSend(args: {
   }, [afterSend, body, runBusy, setError, transportRef]);
 
   const sendMedia = useCallback((file: File, kind: MediaKind) => {
-    void runBusy(async () => {
+    return runBusy(async () => {
       await afterSend(await transportRef.current.send(
         await transportRef.current.upload(file, kind),
       ));

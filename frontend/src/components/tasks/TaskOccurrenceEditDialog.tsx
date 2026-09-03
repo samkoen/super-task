@@ -151,7 +151,9 @@ export default function TaskOccurrenceEditDialog({
               composeEnabled={canComposeTaskChat(target.status, false)}
               onOccurrenceUpdated={(_status, notice) => {
                 showSuccess(notice ?? he.taskChatSent);
-                onSaved?.(notice ?? he.taskChatSent);
+                if (notice !== he.taskChatSent) {
+                  onSaved?.(notice ?? he.taskChatSent);
+                }
               }}
             />
             <CoreEditFields form={form} setForm={setForm} />

@@ -46,11 +46,9 @@ describe("useChatThread", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     const file = new File(["x"], "p.jpg", { type: "image/jpeg" });
     await act(async () => {
-      result.current.sendMedia(file, "photo");
+      await result.current.sendMedia(file, "photo");
     });
-    await waitFor(() => {
-      expect(transport.upload).toHaveBeenCalledWith(file, "photo");
-      expect(transport.send).toHaveBeenCalledWith({ photo_url: "/p.jpg" });
-    });
+    expect(transport.upload).toHaveBeenCalledWith(file, "photo");
+    expect(transport.send).toHaveBeenCalledWith({ photo_url: "/p.jpg" });
   });
 });

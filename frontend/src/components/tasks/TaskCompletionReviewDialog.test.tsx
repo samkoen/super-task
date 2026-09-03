@@ -12,7 +12,21 @@ vi.mock("../../services/taskService", () => ({
 }));
 
 vi.mock("./TaskChatPanel", () => ({
-  default: () => <div data-testid="task-chat-panel">{he.taskChatTitle}</div>,
+  default: ({
+    onOccurrenceUpdated,
+  }: {
+    onOccurrenceUpdated?: (status: string, notice?: string) => void;
+  }) => (
+    <div data-testid="task-chat-panel">
+      {he.taskChatTitle}
+      <button
+        type="button"
+        onClick={() => onOccurrenceUpdated?.("awaiting_response", he.taskChatSent)}
+      >
+        send-chat
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("./TaskReferenceMediaDisplay", () => ({
@@ -63,6 +77,22 @@ beforeEach(() => {
 });
 
 describe("TaskCompletionReviewDialog", () => {
+  it("keeps the window open after sending a chat message", () => {
+    const onDone = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <TaskCompletionReviewDialog
+        task={reviewTask({ status: "awaiting_response" })}
+        onClose={onClose}
+        onDone={onDone}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
+    expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("places chat above completion media", () => {
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
