@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from app.domain import roles
 from app.domain.break_notify import break_alert_payload
+from app.domain.chat_file import stored_file_name
 from app.domain.chat_page import clamp_chat_page_size
 from app.domain.direct_chat import (
     SCOPE_BRANCH,
@@ -104,9 +105,13 @@ class DirectChatService:
         photo_url: str | None = None,
         video_url: str | None = None,
         audio_url: str | None = None,
+        file_url: str | None = None,
+        file_name: str | None = None,
     ) -> dict:
         conv = self._require_conv(actor, conversation_id)
-        message = self._write_message(actor, conv, body, photo_url, video_url, audio_url)
+        message = self._write_message(
+            actor, conv, body, photo_url, video_url, audio_url, file_url, file_name
+        )
         result = {"message": self._message_api(message), "conversation": conv.to_dict()}
         result.update(self._recipient_break_fields(actor, conv.counterpart_user_id))
         return result
@@ -119,6 +124,8 @@ class DirectChatService:
         photo_url: str | None = None,
         video_url: str | None = None,
         audio_url: str | None = None,
+        file_url: str | None = None,
+        file_name: str | None = None,
     ) -> dict:
         scope = downward_scope(actor)
         if not scope:
@@ -126,18 +133,30 @@ class DirectChatService:
         posted = 0
         for peer in self._peers(*scope):
             conv = self._convs.get_or_create(*scope, peer.id)
-            self._write_message(actor, conv, body, photo_url, video_url, audio_url)
+            self._write_message(
+                actor, conv, body, photo_url, video_url, audio_url, file_url, file_name
+            )
             posted += 1
         return {"ok": True, "count": posted}
 
-    def _write_message(self, actor, conv, body, photo_url, video_url, audio_url):
+    def _write_message(
+        self, actor, conv, body, photo_url, video_url, audio_url, file_url=None, file_name=None
+    ):
         text = clip_body(body)
-        if not has_message_content(text, photo_url, video_url, audio_url):
+        if not has_message_content(text, photo_url, video_url, audio_url, file_url):
             raise ValueError("נדרש טקסט או מדיה להודעה")
+        has_file = bool((file_url or "").strip())
         message = self._messages.create(
-            conv.id, actor.user_id, body=text, photo_url=photo_url, video_url=video_url, audio_url=audio_url
+            conv.id,
+            actor.user_id,
+            body=text,
+            photo_url=photo_url,
+            video_url=video_url,
+            audio_url=audio_url,
+            file_url=(file_url or "").strip() or None,
+            file_name=stored_file_name(file_name, has_file=has_file),
         )
-        preview = message_preview(text, photo_url, video_url, audio_url)
+        preview = message_preview(text, photo_url, video_url, audio_url, file_url)
         at = datetime.now(timezone.utc)
         self._convs.touch_last(conv.id, preview=preview, sender_user_id=actor.user_id, at=at)
         self._reads.mark_read(conv.id, actor.user_id)

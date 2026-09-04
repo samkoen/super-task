@@ -10,6 +10,8 @@ export interface DirectChatMessage {
   photo_url: string | null;
   video_url: string | null;
   audio_url: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
   created_at: string;
 }
 
@@ -46,12 +48,17 @@ export interface DirectChatPayload {
   photo_url?: string;
   video_url?: string;
   audio_url?: string;
+  file_url?: string;
+  file_name?: string;
 }
 
-async function uploadChatFile(file: File, kind: "photo" | "video" | "audio") {
+async function uploadChatFile(file: File, kind: "photo" | "video" | "audio" | "file") {
   const form = new FormData();
   form.append("file", file);
-  const { data } = await api.post<{ url: string; kind: string }>(`/direct-chats/upload-${kind}`, form);
+  const { data } = await api.post<{ url: string; kind: string; filename?: string | null }>(
+    `/direct-chats/upload-${kind}`,
+    form,
+  );
   return data;
 }
 
@@ -88,4 +95,5 @@ export const directChatService = {
   uploadPhoto: (file: File) => uploadChatFile(file, "photo"),
   uploadVideo: (file: File) => uploadChatFile(file, "video"),
   uploadAudio: (file: File) => uploadChatFile(file, "audio"),
+  uploadFile: (file: File) => uploadChatFile(file, "file"),
 };

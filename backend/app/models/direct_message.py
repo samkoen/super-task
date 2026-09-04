@@ -11,6 +11,8 @@ class DirectMessage:
     video_url: str | None
     audio_url: str | None
     created_at: str
+    file_url: str | None = None
+    file_name: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -21,5 +23,7 @@ class DirectMessage:
             "photo_url": self.photo_url,
             "video_url": self.video_url,
             "audio_url": self.audio_url,
+            "file_url": self.file_url,
+            "file_name": self.file_name,
             "created_at": self.created_at,
         }

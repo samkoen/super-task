@@ -34,6 +34,7 @@ _TASK_FOLDERS = {
     "photo": "task_photos",
     "video": "task_videos",
     "audio": "task_audio",
+    "file": "task_files",
 }
 
 
@@ -615,6 +616,8 @@ async def post_task_message(
         photo_url=payload.get("photo_url"),
         video_url=payload.get("video_url"),
         audio_url=payload.get("audio_url"),
+        file_url=payload.get("file_url"),
+        file_name=payload.get("file_name"),
     )
     _emit_task_event(db, result["event_type"], result["occurrence"])
     return {
@@ -733,6 +736,16 @@ async def upload_task_audio(
 ):
     load_actor(request, UserRepository(db))
     return await upload_attachment(kind="audio", folder=_TASK_FOLDERS["audio"], file=file)
+
+
+@router.post("/upload-file")
+async def upload_task_file(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    load_actor(request, UserRepository(db))
+    return await upload_attachment(kind="file", folder=_TASK_FOLDERS["file"], file=file)
 
 
 @router.post("/run-scheduler")

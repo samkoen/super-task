@@ -23,12 +23,15 @@ describe("QualityRatingStars", () => {
     expect(onChange).toHaveBeenCalledWith(4);
   });
 
-  it("lights stars from the left in LTR even inside an RTL parent", () => {
+  it("fills from the right so one star is the Hebrew start", () => {
     render(
       <div dir="rtl">
         <QualityRatingStars value={null} onChange={vi.fn()} />
       </div>,
     );
+    const group = screen.getByRole("radiogroup", { name: he.qualityRating });
+    expect(group.getAttribute("dir")).toBe("rtl");
+
     fireEvent.mouseEnter(star(1));
     expect(star(1).getAttribute("data-filled")).toBe("true");
     expect(star(5).getAttribute("data-filled")).toBe("false");

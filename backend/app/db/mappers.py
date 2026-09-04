@@ -402,6 +402,8 @@ def task_message_orm_to_domain(row: orm.TaskMessage | None) -> TaskMessage | Non
         audio_url=row.audio_url,
         audio_transcript=getattr(row, "audio_transcript", None),
         audio_transcript_sender=getattr(row, "audio_transcript_sender", None),
+        file_url=getattr(row, "file_url", None),
+        file_name=getattr(row, "file_name", None),
         created_at=parse_datetime_iso(row.created_at),
     )
 
@@ -438,6 +440,8 @@ def direct_message_orm_to_domain(row: orm.DirectMessage | None) -> DirectMessage
         photo_url=row.photo_url,
         video_url=row.video_url,
         audio_url=row.audio_url,
+        file_url=getattr(row, "file_url", None),
+        file_name=getattr(row, "file_name", None),
         created_at=parse_datetime_iso(row.created_at),
     )
 

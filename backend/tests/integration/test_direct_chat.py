@@ -110,6 +110,28 @@ def test_photo_message(client_emp, client_mgr, jpeg_bytes):
     assert _last(client_mgr, conv_id)["photo_url"] == url
 
 
+def test_file_message(client_emp, client_mgr):
+    conv_id = _open_mine(client_emp)
+    upload = client_emp.post(
+        "/api/direct-chats/upload-file",
+        files={"file": ("report.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    url = upload.json()["url"]
+    posted = client_emp.post(
+        f"/api/direct-chats/{conv_id}/messages",
+        json={"file_url": url, "file_name": "report.pdf"},
+    )
+    assert posted.status_code == 200, posted.text
+    last = _last(client_mgr, conv_id)
+    assert last["file_url"] == url
+    assert last["file_name"] == "report.pdf"
+    for client in (client_emp, client_mgr):
+        proxied = client.get("/api/media/proxy", params={"src": url})
+        assert proxied.status_code == 200, proxied.text
+        assert proxied.content.startswith(b"%PDF")
+
+
 def test_broadcast_reaches_oved(client_emp, client_mgr):
     sent = client_mgr.post("/api/direct-chats/broadcast", json={"body": "מחר פתיחה ב-7"})
     assert sent.status_code == 200, sent.text

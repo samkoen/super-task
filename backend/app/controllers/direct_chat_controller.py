@@ -22,6 +22,7 @@ _CHAT_FOLDERS = {
     "photo": "direct_chat_photos",
     "video": "direct_chat_videos",
     "audio": "direct_chat_audio",
+    "file": "direct_chat_files",
 }
 
 
@@ -90,6 +91,8 @@ def broadcast_direct_chat(
         photo_url=body.get("photo_url"),
         video_url=body.get("video_url"),
         audio_url=body.get("audio_url"),
+        file_url=body.get("file_url"),
+        file_name=body.get("file_name"),
     )
     pending = service.take_pending_notifications()
     db.commit()
@@ -130,6 +133,8 @@ def post_direct_message(
         photo_url=body.get("photo_url"),
         video_url=body.get("video_url"),
         audio_url=body.get("audio_url"),
+        file_url=body.get("file_url"),
+        file_name=body.get("file_name"),
     )
     pending = service.take_pending_notifications()
     db.commit()
@@ -165,3 +170,13 @@ async def upload_direct_audio(
 ):
     load_actor(request, UserRepository(db))
     return await upload_attachment(kind="audio", folder=_CHAT_FOLDERS["audio"], file=file)
+
+
+@router.post("/upload-file")
+async def upload_direct_file(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    load_actor(request, UserRepository(db))
+    return await upload_attachment(kind="file", folder=_CHAT_FOLDERS["file"], file=file)

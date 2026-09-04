@@ -15,7 +15,9 @@ export default function TaskChatQuestionBanner({
   onAnnotateReply: (photoUrl: string) => void;
 }) {
   const text = chatMessageText(message) || message.display_audio_transcript || he.taskChatMediaOnly;
-  const hasMedia = Boolean(message.photo_url || message.video_url || message.audio_url);
+  const hasMedia = Boolean(
+    message.photo_url || message.video_url || message.audio_url || message.file_url,
+  );
   return (
     <Alert severity="warning" sx={{ alignItems: "flex-start" }}>
       <Typography variant="caption" fontWeight={700} display="block" mb={0.25}>
@@ -30,6 +32,8 @@ export default function TaskChatQuestionBanner({
             photoUrl={message.photo_url}
             videoUrl={message.video_url}
             audioUrl={message.audio_url}
+            fileUrl={message.file_url}
+            fileName={message.file_name}
             onAnnotateReply={
               canAnnotateChatReply(composeEnabled, false) ? onAnnotateReply : undefined
             }

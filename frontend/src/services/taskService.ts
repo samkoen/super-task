@@ -34,6 +34,8 @@ export interface TaskMessage {
   photo_url: string | null;
   video_url: string | null;
   audio_url: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
   audio_transcript?: string | null;
   audio_transcript_sender?: string | null;
   display_audio_transcript?: string | null;
@@ -215,10 +217,13 @@ export interface CompleteTaskPayload {
   completion_attachments?: CompletionAttachment[];
 }
 
-async function uploadTaskFile(file: File, kind: "photo" | "video" | "audio") {
+async function uploadTaskFile(file: File, kind: "photo" | "video" | "audio" | "file") {
   const form = new FormData();
   form.append("file", file);
-  const response = await api.post<{ url: string; kind: string }>(`/tasks/upload-${kind}`, form);
+  const response = await api.post<{ url: string; kind: string; filename?: string | null }>(
+    `/tasks/upload-${kind}`,
+    form,
+  );
   return response.data;
 }
 
@@ -387,6 +392,8 @@ export const taskService = {
       photo_url?: string;
       video_url?: string;
       audio_url?: string;
+      file_url?: string;
+      file_name?: string;
     },
   ) => {
     const response = await api.post<{
@@ -447,4 +454,6 @@ export const taskService = {
   uploadVideo: async (file: File) => uploadTaskFile(file, "video"),
 
   uploadAudio: async (file: File) => uploadTaskFile(file, "audio"),
+
+  uploadFile: async (file: File) => uploadTaskFile(file, "file"),
 };

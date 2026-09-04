@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { he } from "../i18n/he";
-import type { MediaKind } from "../components/media/MediaCaptureActions";
+import type { ChatMediaKind } from "../utils/chatTransport";
 import { parseRecipientBreak, type BreakAlertTarget } from "../utils/breakAlert";
 import { chatErrorMessage, type ChatSendResult, type ChatTransport } from "../utils/chatTransport";
 import { usePagedChatMessages } from "./usePagedChatMessages";
@@ -98,7 +98,7 @@ function useChatSend(args: {
     });
   }, [afterSend, body, runBusy, setError, transportRef]);
 
-  const sendMedia = useCallback((file: File, kind: MediaKind) => {
+  const sendMedia = useCallback((file: File, kind: ChatMediaKind) => {
     return runBusy(async () => {
       await afterSend(await transportRef.current.send(
         await transportRef.current.upload(file, kind),

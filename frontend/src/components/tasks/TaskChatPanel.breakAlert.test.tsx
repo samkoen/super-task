@@ -16,6 +16,7 @@ vi.mock("../../services/taskService", () => ({
     uploadPhoto: vi.fn(),
     uploadVideo: vi.fn(),
     uploadAudio: vi.fn(),
+    uploadFile: vi.fn(),
   },
 }));
 

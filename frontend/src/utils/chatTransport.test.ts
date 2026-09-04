@@ -14,10 +14,15 @@ describe("chatTransport helpers", () => {
       uploadPhoto: vi.fn().mockResolvedValue({ url: "/p.jpg" }),
       uploadVideo: vi.fn().mockResolvedValue({ url: "/v.webm" }),
       uploadAudio: vi.fn().mockResolvedValue({ url: "/a.webm" }),
+      uploadFile: vi.fn().mockResolvedValue({ url: "/f.pdf", filename: "m.bin" }),
     };
     const file = new File(["x"], "m.bin");
     expect(await uploadChatMedia(uploader, file, "photo")).toEqual({ photo_url: "/p.jpg" });
     expect(await uploadChatMedia(uploader, file, "video")).toEqual({ video_url: "/v.webm" });
     expect(await uploadChatMedia(uploader, file, "audio")).toEqual({ audio_url: "/a.webm" });
+    expect(await uploadChatMedia(uploader, file, "file")).toEqual({
+      file_url: "/f.pdf",
+      file_name: "m.bin",
+    });
   });
 });

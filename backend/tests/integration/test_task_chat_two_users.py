@@ -117,6 +117,29 @@ def test_employee_audio_message_transcripts(
     assert as_mgr["display_audio_transcript"] == "transcript-he"
 
 
+def test_employee_file_message(client_emp, client_mgr, occurrence_id, mock_i18n):
+    upload = client_emp.post(
+        "/api/tasks/upload-file",
+        files={"file": ("report.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    body = upload.json()
+    url = body["url"]
+    assert url.startswith("/uploads/")
+    assert body["filename"] == "report.pdf"
+
+    posted = client_emp.post(
+        _messages_url(occurrence_id),
+        json={"file_url": url, "file_name": body["filename"]},
+    )
+    assert posted.status_code == 201, posted.text
+    assert posted.json()["chat_message"]["file_url"] == url
+    assert posted.json()["chat_message"]["file_name"] == "report.pdf"
+    as_mgr = _last(client_mgr, occurrence_id)
+    assert as_mgr["file_url"] == url
+    assert as_mgr["file_name"] == "report.pdf"
+
+
 def test_empty_message_rejected(client_emp, occurrence_id, mock_i18n):
     response = client_emp.post(_messages_url(occurrence_id), json={"body": "   "})
     assert response.status_code == 400

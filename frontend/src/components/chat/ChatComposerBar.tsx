@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Alert, Box, Button, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import SendIcon from "@mui/icons-material/Send";
@@ -10,6 +11,8 @@ import { he } from "../../i18n/he";
 import { blobToFile } from "../../utils/mediaCapture";
 import { createHoldGesture } from "../../utils/holdGesture";
 import type { MediaKind } from "../media/MediaCaptureActions";
+import type { ChatMediaKind } from "../../utils/chatTransport";
+import { CHAT_FILE_ACCEPT } from "../../utils/chatFile";
 import ChatAudioDock from "./ChatAudioDock";
 import ChatPhotoCapture from "./ChatPhotoCapture";
 
@@ -32,7 +35,7 @@ export default function ChatComposerBar({
   placeholder?: string;
   sendLabel?: string;
   onSendText: () => void;
-  onSendMedia: (file: File, kind: MediaKind) => void | Promise<void>;
+  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
 }) {
   const media = useChatComposerMedia(onSendMedia);
   const busy = disabled || sending;
@@ -92,6 +95,7 @@ export default function ChatComposerBar({
         >
           {media.holdKind === "video" ? <VideocamIcon /> : <PhotoCameraIcon />}
         </HoldIconButton>
+        <ChatFileAttach disabled={busy} onPick={(file) => void onSendMedia(file, "file")} />
       </Box>
       {media.holdKind ? (
         <Typography variant="caption" color="error.main">{he.chatRecordingHold}</Typography>
@@ -115,7 +119,7 @@ export default function ChatComposerBar({
 }
 
 function useChatComposerMedia(
-  onSendMedia: (file: File, kind: MediaKind) => void | Promise<void>,
+  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>,
 ) {
   const audio = useAudioRecorder();
   const video = useVideoRecorder({ defaultFacing: "environment" });
@@ -167,6 +171,40 @@ function useChatComposerMedia(
       done: () => setAudioDock(false),
     }),
   };
+}
+
+function ChatFileAttach({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean;
+  onPick: (file: File) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        hidden
+        accept={CHAT_FILE_ACCEPT}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) onPick(file);
+        }}
+      />
+      <IconButton
+        aria-label={he.chatAttachFile}
+        color="primary"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
+      >
+        <AttachFileIcon />
+      </IconButton>
+    </>
+  );
 }
 
 function HoldIconButton({

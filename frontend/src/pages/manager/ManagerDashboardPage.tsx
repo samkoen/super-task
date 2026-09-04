@@ -26,10 +26,13 @@ import ManagerTodayBoard from "../../components/dashboard/ManagerTodayBoard";
 import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
-import PageHeader from "../../components/ui/PageHeader";
+import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
+import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
+import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../context/FeedbackContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
 import { formatHebrewDay, todayIso } from "../../utils/dateView";
@@ -44,20 +47,15 @@ import {
   parseBranchFromSearch,
   writeManagerScopeBranchId,
 } from "../../utils/managerScopeBranch";
-import { managerWelcomeSubtitle } from "../../utils/managerWelcomeSubtitle";
+import { managerDashboardMeta } from "../../utils/managerWelcomeSubtitle";
 import { homeBranchAfterOverview, showAllWorkersDashboard } from "../../utils/networkDashboard";
 
 /** Masqué temporairement — remettre à true pour réafficher. */
 const SHOW_DEPARTMENT_PROGRESS = false;
 
-function dashboardTitle(branchName: string | undefined): string {
-  const day = formatHebrewDay(todayIso());
-  if (branchName) return `${he.branch}: ${branchName} · ${day}`;
-  return `${he.dashboardNetworkOverview} · ${day}`;
-}
-
 export default function ManagerDashboardPage() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
+  const { showSuccess, showError } = useFeedback();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<ManagerDashboard | null>(null);
@@ -71,6 +69,8 @@ export default function ManagerDashboardPage() {
   const [success, setSuccess] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [stages, setStages] = useState<PromotionStage[]>([]);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const prevQuestionCountRef = useRef<number | null>(null);
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
@@ -169,6 +169,33 @@ export default function ManagerDashboardPage() {
     }
   }, []);
 
+  const handleAvatarCapture = async (file: File) => {
+    setAvatarUploading(true);
+    try {
+      await authService.stylizeAvatar(file);
+      await refresh();
+      showSuccess(he.employeePhotoStylized);
+      setAvatarOpen(false);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setAvatarUploading(true);
+    try {
+      await authService.deleteAvatar();
+      await refresh();
+      showSuccess(he.employeePhotoDeleted);
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const goTasks = (opts?: { openNewTask?: boolean; openGalleryTask?: boolean }) => {
     const branchId = scopeBranchId || undefined;
     if (opts?.openNewTask) {
@@ -182,38 +209,42 @@ export default function ManagerDashboardPage() {
     );
   };
 
-  if (loading && !data) {
-    return <ListSkeleton variant="dashboard" />;
-  }
+  const photoUrl = user?.avatar_url;
 
   return (
     <Box>
-      <PageHeader
-        title={dashboardTitle(data?.branch?.name)}
-        subtitle={managerWelcomeSubtitle(
-          user?.full_name,
-          data?.network_name || user?.network_name || branches[0]?.network_name
-        )}
-        action={
+      <EmployeeShiftHeader
+        dateLabel={formatHebrewDay(todayIso())}
+        name={user?.full_name}
+        photoUrl={photoUrl}
+        photoEditable
+        onEditPhoto={() => setAvatarOpen(true)}
+        onDeletePhoto={photoUrl ? () => void handleAvatarDelete() : undefined}
+        slogan={user?.excellence_slogan}
+        meta={managerDashboardMeta({
+          branchName: data?.branch?.name || user?.branch_name,
+          networkName: data?.network_name || user?.network_name || branches[0]?.network_name,
+          role: user?.role,
+        })}
+        extra={
           canPickBranch ? (
-            <TextField
-              select
-              size="small"
-              label={he.dashboardSelectBranch}
+            <ManagerBranchPicker
               value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              sx={{ minWidth: 180 }}
-            >
-              <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
-              {branches.map((b) => (
-                <MenuItem key={b.id} value={b.id}>
-                  {b.name}
-                </MenuItem>
-              ))}
-            </TextField>
+              branches={branches}
+              onChange={setSelectedBranch}
+            />
           ) : undefined
         }
       />
+      <EmployeeAvatarCapture
+        open={avatarOpen}
+        uploading={avatarUploading}
+        uploadingLabel={he.avatarStylizing}
+        onClose={() => setAvatarOpen(false)}
+        onCapture={handleAvatarCapture}
+      />
+
+      {loading && !data ? <ListSkeleton variant="dashboard" /> : null}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
@@ -305,5 +336,33 @@ export default function ManagerDashboardPage() {
         }}
       />
     </Box>
+  );
+}
+
+function ManagerBranchPicker({
+  value,
+  branches,
+  onChange,
+}: {
+  value: string;
+  branches: Branch[];
+  onChange: (id: string) => void;
+}) {
+  return (
+    <TextField
+      select
+      size="small"
+      label={he.dashboardSelectBranch}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      sx={{ minWidth: 180 }}
+    >
+      <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
+      {branches.map((b) => (
+        <MenuItem key={b.id} value={b.id}>
+          {b.name}
+        </MenuItem>
+      ))}
+    </TextField>
   );
 }

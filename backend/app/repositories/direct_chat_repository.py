@@ -131,6 +131,8 @@ class DirectMessageRepository:
         photo_url: str | None,
         video_url: str | None,
         audio_url: str | None,
+        file_url: str | None = None,
+        file_name: str | None = None,
     ) -> DirectMessage:
         import uuid
 
@@ -143,6 +145,8 @@ class DirectMessageRepository:
             photo_url=photo_url,
             video_url=video_url,
             audio_url=audio_url,
+            file_url=(file_url or "").strip() or None,
+            file_name=(file_name or "").strip() or None,
             created_at=now,
         )
         self._db.add(row)
