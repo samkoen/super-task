@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Box, Button, Chip, Paper, Typography } from "@mui/material";
 import FreeBreakfastIcon from "@mui/icons-material/FreeBreakfast";
 import { he } from "../../i18n/he";
@@ -15,11 +16,12 @@ interface EmployeeShiftHeaderProps {
   onDeletePhoto?: () => void;
   meta?: string;
   slogan?: string | null;
-  onShift: boolean;
-  onBreak: boolean;
+  onShift?: boolean;
+  onBreak?: boolean;
   breakBusy?: boolean;
   progress?: number | null;
-  onToggleBreak: () => void;
+  onToggleBreak?: () => void;
+  extra?: ReactNode;
   qualityRating?: QualityRatingSummary | null;
 }
 
@@ -145,6 +147,7 @@ export default function EmployeeShiftHeader({
   breakBusy = false,
   progress = null,
   onToggleBreak,
+  extra,
   qualityRating,
 }: EmployeeShiftHeaderProps) {
   return (
@@ -164,12 +167,14 @@ export default function EmployeeShiftHeader({
           meta={meta}
           slogan={slogan}
         />
-        <ShiftPresence
-          onShift={onShift}
-          onBreak={onBreak}
-          breakBusy={breakBusy}
-          onToggleBreak={onToggleBreak}
-        />
+        {onToggleBreak ? (
+          <ShiftPresence
+            onShift={Boolean(onShift)}
+            onBreak={Boolean(onBreak)}
+            breakBusy={breakBusy}
+            onToggleBreak={onToggleBreak}
+          />
+        ) : extra}
       </Paper>
       <ShiftFooter qualityRating={qualityRating} progress={progress} />
     </Box>

@@ -30,7 +30,7 @@ export default function QualityRatingStars({
 
   return (
     <Box
-      dir="ltr"
+      dir="rtl"
       display="inline-flex"
       alignItems="center"
       role={readOnly ? "img" : "radiogroup"}
@@ -50,7 +50,7 @@ export default function QualityRatingStars({
         />
       ))}
       {readOnly && value != null ? (
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }} dir="rtl">
+        <Typography variant="caption" color="text.secondary" sx={{ ms: 0.5 }} dir="rtl">
           {value.toFixed(1)}
         </Typography>
       ) : null}

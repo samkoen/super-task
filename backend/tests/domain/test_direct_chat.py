@@ -85,6 +85,7 @@ def test_preview_and_clip():
     assert message_preview(" ", "/p.jpg", None, None) == "📷"
     assert message_preview(None, None, "/v.mp4", None) == "🎥"
     assert message_preview(None, None, None, "/a.m4a") == "🎤"
+    assert message_preview(None, None, None, None, "/f.pdf") == "📎"
     assert clip_body("  x  ") == "x"
     assert clip_body("   ") is None
     with pytest.raises(ValueError):

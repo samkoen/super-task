@@ -29,4 +29,11 @@ describe("ChatMessageMedia", () => {
     fireEvent.click(screen.getByRole("button", { name: he.chatAnnotateReply }));
     expect(onAnnotateReply).toHaveBeenCalledWith("/uploads/p.jpg");
   });
+
+  it("renders a downloadable file card", () => {
+    render(<ChatMessageMedia fileUrl="/uploads/d.pdf" fileName="דוח.pdf" />);
+    const link = screen.getByRole("link", { name: /דוח\.pdf/ });
+    expect(link.getAttribute("href")).toBe("/uploads/d.pdf");
+    expect(screen.getByText(he.chatFileOpen)).toBeTruthy();
+  });
 });

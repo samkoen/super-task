@@ -8,6 +8,8 @@ export type ChatMessageView = {
   photo_url?: string | null;
   video_url?: string | null;
   audio_url?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
   audio_transcript?: string | null;
   display_audio_transcript?: string | null;
   created_at: string;

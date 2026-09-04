@@ -402,6 +402,8 @@ class TaskMessage(Base):
     audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     audio_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_transcript_sender: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -502,6 +504,8 @@ class DirectMessage(Base):
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    file_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -10,6 +10,7 @@ vi.mock("../services/directChatService", () => ({
     uploadPhoto: vi.fn(),
     uploadVideo: vi.fn(),
     uploadAudio: vi.fn(),
+    uploadFile: vi.fn(),
   },
 }));
 

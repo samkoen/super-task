@@ -51,4 +51,18 @@ describe("useChatThread", () => {
     expect(transport.upload).toHaveBeenCalledWith(file, "photo");
     expect(transport.send).toHaveBeenCalledWith({ photo_url: "/p.jpg" });
   });
+
+  it("uploads a file then posts url and name", async () => {
+    const transport = fakeTransport({
+      upload: vi.fn().mockResolvedValue({ file_url: "/f.pdf", file_name: "a.pdf" }),
+    });
+    const { result } = renderHook(() => useChatThread({ transport, enabled: true }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const file = new File(["x"], "a.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await result.current.sendMedia(file, "file");
+    });
+    expect(transport.upload).toHaveBeenCalledWith(file, "file");
+    expect(transport.send).toHaveBeenCalledWith({ file_url: "/f.pdf", file_name: "a.pdf" });
+  });
 });

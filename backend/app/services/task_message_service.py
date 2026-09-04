@@ -15,6 +15,7 @@ from app.domain.audio_transcription_fallback import (
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
 from app.domain.break_notify import break_alert_payload
+from app.domain.chat_file import stored_file_name
 from app.domain.chat_page import clamp_chat_page_size
 from app.domain.task_scope import can_manage_tasks
 from app.domain.task_chat import (
@@ -112,8 +113,10 @@ class TaskMessageService:
         photo_url: str | None = None,
         video_url: str | None = None,
         audio_url: str | None = None,
+        file_url: str | None = None,
+        file_name: str | None = None,
     ) -> dict:
-        if not has_message_content(body, photo_url, video_url, audio_url):
+        if not has_message_content(body, photo_url, video_url, audio_url, file_url):
             raise ValueError("נדרש טקסט או מדיה להודעה")
 
         occurrence = self._require_occurrence(occurrence_id)
@@ -139,6 +142,8 @@ class TaskMessageService:
             photo_url=photo_url,
             video_url=video_url,
             audio_url=audio_url,
+            file_url=file_url,
+            file_name=stored_file_name(file_name, has_file=bool((file_url or "").strip())),
         )
 
         message = await self._enrich_i18n(message, actor=actor, occurrence=occurrence)

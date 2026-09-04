@@ -3,6 +3,7 @@ import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import { he } from "../../i18n/he";
 import { formatTime } from "../../utils/dashboardTime";
 import { canAnnotateChatReply } from "../../utils/chatAnnotateReply";
+import { chatThreadItems } from "../../utils/chatDay";
 import {
   chatMessageListSx,
   chatMessageText,
@@ -45,17 +46,40 @@ export default function ChatMessageList({
           {loadingOlder ? <CircularProgress size={16} /> : he.chatLoadOlder}
         </Button>
       )}
-      {messages.map((msg) => (
-        <ChatMessageBubble
-          key={msg.id}
-          msg={msg}
-          myId={myId}
-          composeEnabled={composeEnabled}
-          onAnnotateReply={onAnnotateReply}
-          highlightEmployee={highlightEmployee}
-        />
-      ))}
+      {chatThreadItems(messages).map((item) =>
+        item.kind === "day" ? (
+          <ChatDayChip key={`day-${item.day}`} label={item.label} />
+        ) : (
+          <ChatMessageBubble
+            key={item.message.id}
+            msg={item.message}
+            myId={myId}
+            composeEnabled={composeEnabled}
+            onAnnotateReply={onAnnotateReply}
+            highlightEmployee={highlightEmployee}
+          />
+        ),
+      )}
       <div ref={bottomRef} />
+    </Box>
+  );
+}
+
+function ChatDayChip({ label }: { label: string }) {
+  return (
+    <Box
+      role="separator"
+      aria-label={label}
+      alignSelf="center"
+      px={1.25}
+      py={0.25}
+      borderRadius={2}
+      bgcolor="background.paper"
+      boxShadow="0 1px 1px rgba(0,0,0,0.08)"
+    >
+      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+        {label}
+      </Typography>
     </Box>
   );
 }
@@ -99,6 +123,8 @@ function ChatMessageBubble({
         photoUrl={msg.photo_url}
         videoUrl={msg.video_url}
         audioUrl={msg.audio_url}
+        fileUrl={msg.file_url}
+        fileName={msg.file_name}
         transcript={chatMessageTranscript(msg)}
         onAnnotateReply={
           canAnnotateChatReply(composeEnabled, mine) ? onAnnotateReply : undefined

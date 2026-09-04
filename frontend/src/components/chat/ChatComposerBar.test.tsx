@@ -62,6 +62,7 @@ describe("ChatComposerBar", () => {
     expect(screen.getByPlaceholderText(he.taskChatPlaceholder)).toBeTruthy();
     expect(screen.getByRole("button", { name: he.taskChatSend })).toBeTruthy();
     expect(screen.getByLabelText(he.chatCameraAction)).toBeTruthy();
+    expect(screen.getByLabelText(he.chatAttachFile)).toBeTruthy();
   });
 
   it("starts recording immediately on mic tap without a dialog", () => {
@@ -195,5 +196,22 @@ describe("ChatComposerBar", () => {
       expect(audioState.stopAndWait).toHaveBeenCalled();
       expect(onSendMedia).toHaveBeenCalledWith(expect.any(File), "audio");
     });
+  });
+
+  it("sends a picked document as a file", () => {
+    const onSendMedia = vi.fn();
+    const { container } = render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={onSendMedia}
+      />,
+    );
+    const input = container.querySelector("input[type='file']") as HTMLInputElement;
+    const file = new File(["x"], "דוח.pdf", { type: "application/pdf" });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(onSendMedia).toHaveBeenCalledWith(file, "file");
   });
 });

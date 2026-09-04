@@ -14,6 +14,8 @@ class TaskMessage:
     body_translated: str | None = None
     audio_transcript: str | None = None
     audio_transcript_sender: str | None = None
+    file_url: str | None = None
+    file_name: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -27,5 +29,7 @@ class TaskMessage:
             "audio_url": self.audio_url,
             "audio_transcript": self.audio_transcript,
             "audio_transcript_sender": self.audio_transcript_sender,
+            "file_url": self.file_url,
+            "file_name": self.file_name,
             "created_at": self.created_at,
         }

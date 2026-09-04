@@ -23,12 +23,14 @@ def has_message_content(
     photo_url: str | None,
     video_url: str | None,
     audio_url: str | None,
+    file_url: str | None = None,
 ) -> bool:
     return bool(
         (body or "").strip()
         or (photo_url or "").strip()
         or (video_url or "").strip()
         or (audio_url or "").strip()
+        or (file_url or "").strip()
     )
 
 

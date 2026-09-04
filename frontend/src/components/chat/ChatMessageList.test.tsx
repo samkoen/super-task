@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import ChatMessageList from "./ChatMessageList";
 import { he } from "../../i18n/he";
+import { chatDayLabel, messageDayKey } from "../../utils/chatDay";
 import type { ChatMessageView } from "../../utils/chatMessageView";
 
 vi.mock("../../utils/mediaUrl", () => ({
@@ -92,5 +93,27 @@ describe("ChatMessageList", () => {
     );
     expect(screen.getByText("שלום")).toBeTruthy();
     expect(screen.queryByText("hello")).toBeNull();
+  });
+
+  it("shows one WhatsApp-style date chip per day", () => {
+    const older = "2026-07-23T10:00:00+03:00";
+    const later = "2026-07-24T09:00:00+03:00";
+    render(
+      <ChatMessageList
+        messages={[
+          msg({ id: "a", body: "ישן", created_at: older }),
+          msg({ id: "b", body: "עוד", created_at: older }),
+          msg({ id: "c", body: "חדש", created_at: later }),
+        ]}
+        hasMore={false}
+        loadingOlder={false}
+        onLoadOlder={vi.fn()}
+        bottomRef={{ current: null }}
+      />,
+    );
+    const first = chatDayLabel(messageDayKey(older));
+    const second = chatDayLabel(messageDayKey(later));
+    expect(screen.getAllByRole("separator", { name: first })).toHaveLength(1);
+    expect(screen.getAllByRole("separator", { name: second })).toHaveLength(1);
   });
 });

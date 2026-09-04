@@ -27,6 +27,7 @@ TZ = ZoneInfo("Asia/Jerusalem")
 def test_chat_rules_content_and_status():
     assert has_message_content("שלום", None, None, None)
     assert has_message_content(None, "/p.jpg", None, None)
+    assert has_message_content(None, None, None, None, "/f.pdf")
     assert not has_message_content("  ", None, None, None)
     assert can_employee_post(task_status.PENDING)
     assert can_employee_post(task_status.IN_PROGRESS)

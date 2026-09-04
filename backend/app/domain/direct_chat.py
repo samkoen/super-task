@@ -100,6 +100,7 @@ def message_preview(
     photo_url: str | None,
     video_url: str | None,
     audio_url: str | None,
+    file_url: str | None = None,
 ) -> str:
     text = (body or "").strip()
     if text:
@@ -110,6 +111,8 @@ def message_preview(
         return "🎥"
     if (audio_url or "").strip():
         return "🎤"
+    if (file_url or "").strip():
+        return "📎"
     return ""
 
 

@@ -5,16 +5,33 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
+from app.domain.chat_file import clip_file_name
 from app.domain.media_compression import compress_photo_bytes
 from app.services import blob_storage
 
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
 VIDEO_MAX_BYTES = 50 * 1024 * 1024
 AUDIO_MAX_BYTES = 20 * 1024 * 1024
+FILE_MAX_BYTES = 25 * 1024 * 1024
 
 PHOTO_ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 VIDEO_ALLOWED_EXT = {".mp4", ".webm", ".mov", ".mpeg", ".mpg"}
 AUDIO_ALLOWED_EXT = {".mp3", ".wav", ".ogg", ".webm", ".m4a", ".aac"}
+FILE_ALLOWED_EXT = {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".txt",
+    ".csv",
+    ".zip",
+    ".rtf",
+    ".odt",
+    ".ods",
+}
 
 _CONTENT_TYPES = {
     ".jpg": "image/jpeg",
@@ -32,12 +49,26 @@ _CONTENT_TYPES = {
     ".ogg": "audio/ogg",
     ".m4a": "audio/mp4",
     ".aac": "audio/aac",
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".zip": "application/zip",
+    ".rtf": "application/rtf",
+    ".odt": "application/vnd.oasis.opendocument.text",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
 }
 
 _KIND_CONFIG = {
     "photo": (PHOTO_ALLOWED_EXT, PHOTO_MAX_BYTES),
     "video": (VIDEO_ALLOWED_EXT, VIDEO_MAX_BYTES),
     "audio": (AUDIO_ALLOWED_EXT, AUDIO_MAX_BYTES),
+    "file": (FILE_ALLOWED_EXT, FILE_MAX_BYTES),
 }
 
 
@@ -57,7 +88,7 @@ async def upload_attachment(*, kind: str, folder: str, file: UploadFile) -> dict
         ext=ext,
         content_type=content_type,
     )
-    return {"url": url, "kind": kind}
+    return {"url": url, "kind": kind, "filename": clip_file_name(file.filename)}
 
 
 def save_photo_bytes(*, folder: str, data: bytes) -> str:

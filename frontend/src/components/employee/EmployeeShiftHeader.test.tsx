@@ -92,6 +92,20 @@ describe("EmployeeShiftHeader", () => {
     expect(meta.compareDocumentPosition(breakBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("hides break controls when the header is identity-only", () => {
+    render(
+      <EmployeeShiftHeader
+        dateLabel="יום חמישי"
+        name="דנה מנהלת"
+        meta={`${he.branch}: שפע · ${he.roleBranchManager}`}
+        extra={<span>branch-picker</span>}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "דנה מנהלת" })).toBeTruthy();
+    expect(screen.getByText("branch-picker")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.employeeBreakStart })).toBeNull();
+  });
+
   it("shows the excellence slogan under the name", () => {
     render(
       <EmployeeShiftHeader
