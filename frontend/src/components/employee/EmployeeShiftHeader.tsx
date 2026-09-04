@@ -111,7 +111,7 @@ function ShiftPresence({
       <Chip
         size="small"
         color={onBreak ? "warning" : onShift ? "success" : "default"}
-        label={shiftStatusLabel(onBreak, onShift)}
+        label={shiftStatusLabel(Boolean(onBreak), Boolean(onShift))}
       />
       <Button
         variant={onBreak ? "contained" : "outlined"}
