@@ -44,3 +44,27 @@ def test_media_proxy_allows_participants_rejects_other_branch_and_evil_url(
         params={"src": "https://evil.example/secret.jpg"},
     )
     assert evil.status_code == 400
+
+
+def test_media_proxy_allows_chat_file_for_participants(
+    client_emp,
+    client_mgr,
+    occurrence_id,
+    mock_i18n,
+):
+    upload = client_emp.post(
+        "/api/tasks/upload-file",
+        files={"file": ("report.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    url = upload.json()["url"]
+    posted = client_emp.post(
+        f"/api/tasks/occurrences/{occurrence_id}/messages",
+        json={"file_url": url, "file_name": "report.pdf"},
+    )
+    assert posted.status_code == 201, posted.text
+
+    for client in (client_emp, client_mgr):
+        proxied = client.get("/api/media/proxy", params={"src": url})
+        assert proxied.status_code == 200, proxied.text
+        assert proxied.content.startswith(b"%PDF")

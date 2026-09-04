@@ -126,6 +126,10 @@ def test_file_message(client_emp, client_mgr):
     last = _last(client_mgr, conv_id)
     assert last["file_url"] == url
     assert last["file_name"] == "report.pdf"
+    for client in (client_emp, client_mgr):
+        proxied = client.get("/api/media/proxy", params={"src": url})
+        assert proxied.status_code == 200, proxied.text
+        assert proxied.content.startswith(b"%PDF")
 
 
 def test_broadcast_reaches_oved(client_emp, client_mgr):

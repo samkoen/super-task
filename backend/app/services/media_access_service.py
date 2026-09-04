@@ -222,6 +222,7 @@ def _message_media_match(url: str):
         orm.TaskMessage.photo_url == url,
         orm.TaskMessage.video_url == url,
         orm.TaskMessage.audio_url == url,
+        orm.TaskMessage.file_url == url,
     )
 
 
@@ -230,6 +231,7 @@ def _direct_message_media_match(url: str):
         orm.DirectMessage.photo_url == url,
         orm.DirectMessage.video_url == url,
         orm.DirectMessage.audio_url == url,
+        orm.DirectMessage.file_url == url,
     )
 
 

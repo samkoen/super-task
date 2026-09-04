@@ -42,4 +42,15 @@ describe("TaskChatQuestionBanner", () => {
     expect(screen.getByText(he.taskChatMediaOnly)).toBeTruthy();
     expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
   });
+
+  it("shows a file card when the question is a document", () => {
+    render(
+      <TaskChatQuestionBanner
+        message={question({ body: "", file_url: "/uploads/d.pdf", file_name: "דוח.pdf" })}
+        composeEnabled
+        onAnnotateReply={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /דוח\.pdf/ })).toBeTruthy();
+  });
 });
