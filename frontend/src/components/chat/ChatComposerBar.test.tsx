@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import ChatComposerBar from "./ChatComposerBar";
+import ChatComposerBar, { isComposerExpanded } from "./ChatComposerBar";
 import { he } from "../../i18n/he";
 
 const audioState = vi.hoisted(() => ({
@@ -35,6 +35,16 @@ vi.mock("./ChatPhotoCapture", () => ({
   default: ({ open }: { open: boolean }) => (open ? <div>{he.mediaCapturePhotoTitle}</div> : null),
 }));
 
+describe("isComposerExpanded", () => {
+  it("expands when the field is focused", () => {
+    expect(isComposerExpanded(true, "")).toBe(true);
+  });
+
+  it("stays collapsed when empty and not focused", () => {
+    expect(isComposerExpanded(false, "   ")).toBe(false);
+  });
+});
+
 describe("ChatComposerBar", () => {
   beforeEach(() => {
     audioState.recording = false;
@@ -46,6 +56,70 @@ describe("ChatComposerBar", () => {
     audioState.stopAndWait.mockResolvedValue(null);
     URL.createObjectURL = vi.fn(() => "blob:audio");
     URL.revokeObjectURL = vi.fn();
+  });
+
+  it("expands to almost full width on focus like WhatsApp", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    fireEvent.focus(screen.getByPlaceholderText(he.taskChatPlaceholder));
+    expect(screen.queryByLabelText(he.chatRecordAudio)).toBeNull();
+    expect(screen.queryByLabelText(he.chatCameraAction)).toBeNull();
+    expect(screen.queryByLabelText(he.chatAttachFile)).toBeNull();
+    expect(screen.getByRole("button", { name: he.taskChatSend })).toBeTruthy();
+  });
+
+  it("keeps the text field expanded while there is a draft", () => {
+    render(
+      <ChatComposerBar
+        body="שלום"
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    fireEvent.blur(screen.getByPlaceholderText(he.taskChatPlaceholder));
+    expect(screen.queryByLabelText(he.chatRecordAudio)).toBeNull();
+    expect(screen.getByRole("button", { name: he.taskChatSend })).toBeTruthy();
+  });
+
+  it("restores media buttons after blur when the field is empty", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    const input = screen.getByPlaceholderText(he.taskChatPlaceholder);
+    fireEvent.focus(input);
+    fireEvent.blur(input);
+    expect(screen.getByLabelText(he.chatRecordAudio)).toBeTruthy();
+    expect(screen.getByLabelText(he.chatCameraAction)).toBeTruthy();
+    expect(screen.getByLabelText(he.chatAttachFile)).toBeTruthy();
+  });
+
+  it("renders send as an arrow icon without the send word", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    const send = screen.getByRole("button", { name: he.taskChatSend });
+    expect(send.textContent).not.toContain(he.taskChatSend);
   });
 
   it("shows mic, text+send, and camera", () => {
