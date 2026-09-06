@@ -6,7 +6,7 @@ import base64
 import json
 import logging
 from typing import Any
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from app.integrations.brevo.config import (
@@ -26,7 +26,7 @@ class BrevoApiError(Exception):
 
 def send_transactional_html_email(
     *,
-    to_email: str,
+    to_email: str | list[str],
     subject: str,
     html_content: str,
     attachments: list[tuple[str, bytes]] | None = None,
@@ -36,21 +36,19 @@ def send_transactional_html_email(
     if not key or not sender:
         raise BrevoApiError("Brevo : BREVO_API_KEY et BREVO_SENDER_EMAIL requis")
 
-    to_addr = (to_email or "").strip()
-    if not to_addr:
+    to_addrs = _normalize_to(to_email)
+    if not to_addrs:
         raise BrevoApiError("Destinataire vide")
 
     payload: dict[str, Any] = {
         "sender": {"name": brevo_sender_name(), "email": sender},
-        "to": [{"email": to_addr}],
+        "to": [{"email": addr} for addr in to_addrs],
         "subject": (subject or "").strip() or "(sans objet)",
         "htmlContent": html_content or "<p></p>",
     }
     if attachments:
         payload["attachment"] = [
-            {"name": name, "content": base64.b64encode(data).decode("ascii")}
-            for name, data in attachments
-            if data
+            _brevo_attachment(name, data) for name, data in attachments if data
         ]
 
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -75,8 +73,31 @@ def send_transactional_html_email(
             pass
         logger.warning("Brevo HTTP %s: %s", e.code, msg)
         raise BrevoApiError(f"Brevo HTTP {e.code}: {msg}") from e
+    except URLError as e:
+        raise BrevoApiError(f"Brevo réseau: {e.reason}") from e
 
     try:
         return json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
         return {"raw": raw}
+
+
+def _brevo_attachment(name: str, data: bytes) -> dict[str, str]:
+    row = {"name": name, "content": base64.b64encode(data).decode("ascii")}
+    if name.startswith("screenshot."):
+        row["contentId"] = "bug-screenshot"
+    return row
+
+
+def _normalize_to(to_email: str | list[str]) -> list[str]:
+    items = [to_email] if isinstance(to_email, str) else list(to_email or [])
+    emails: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        email = (item or "").strip()
+        key = email.lower()
+        if not email or key in seen:
+            continue
+        seen.add(key)
+        emails.append(email)
+    return emails

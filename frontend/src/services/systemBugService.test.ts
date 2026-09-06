@@ -25,5 +25,7 @@ describe("submitSystemBug", () => {
     const form = vi.mocked(api.post).mock.calls[0][1] as FormData;
     expect(form.get("note")).toBe("bug");
     expect(form.get("route")).toBe("/employee");
+    const shotFile = form.get("screenshot") as File;
+    expect(shotFile.name).toBe("screenshot.jpg");
   });
 });

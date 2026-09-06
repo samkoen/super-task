@@ -48,6 +48,12 @@ def parse_trail(raw: str) -> list[str]:
     return clip_route_trail(text.split(","))
 
 
+REQUIRED_SYSTEM_BUG_EMAILS = (
+    "skoen7665210@gmail.com",
+    "Bircat9172@gmail.com",
+)
+
+
 def parse_system_bug_emails(raw: str) -> list[str]:
     emails: list[str] = []
     seen: set[str] = set()
@@ -60,6 +66,15 @@ def parse_system_bug_emails(raw: str) -> list[str]:
             continue
         seen.add(key)
         emails.append(email)
+    return emails
+
+
+def system_bug_recipients(raw: str) -> list[str]:
+    emails = parse_system_bug_emails(raw)
+    have = {email.lower() for email in emails}
+    for required in REQUIRED_SYSTEM_BUG_EMAILS:
+        if required.lower() not in have:
+            emails.append(required)
     return emails
 
 
@@ -113,7 +128,7 @@ def system_bug_issue_body(
     )
     notes = []
     if has_audio:
-        notes.append("_הקלטה מצורפת למייל בלבד._")
+        notes.append("_הקלטה התקבלה._")
     if has_screenshot:
         notes.append("_צילום מסך מצורף למייל._")
     extra_notes = ("\n\n" + "\n".join(notes)) if notes else ""

@@ -18,7 +18,7 @@ export async function submitSystemBug(payload: {
   form.append("preview", payload.preview ?? "");
   form.append("branch_name", payload.branchName ?? "");
   if (payload.screenshot && payload.screenshot.size > 0) {
-    form.append("screenshot", payload.screenshot, "screenshot.png");
+    form.append("screenshot", payload.screenshot, "screenshot.jpg");
   }
   if (payload.audio && payload.audio.size > 0) {
     form.append("audio", payload.audio, "explanation.webm");

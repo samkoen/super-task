@@ -1,13 +1,21 @@
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
 
 from app.domain.scope import ActorContext
 from app.domain import roles
 from app.domain.system_bug import SystemBugIdentity
 from app.integrations.github.client import GitHubApiError
 from app.services.system_bug_service import SystemBugService, resolve_system_bug_identity
+
+
+def _png_shot() -> bytes:
+    buf = BytesIO()
+    Image.new("RGB", (120, 80), (10, 20, 30)).save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def _actor() -> ActorContext:
@@ -42,25 +50,75 @@ def test_submit_sends_mail_with_names_not_ids(monkeypatch):
         route="/employee",
         trail_raw='["/manager","/employee"]',
         app_version="0.1.0",
-        screenshot=b"png",
-        audio=None,
+        screenshot=_png_shot(),
+        audio=b"webm-bytes",
         identity=_identity(),
     )
     html = sent[0]["html_content"]
+    names = [name for name, _ in sent[0]["attachments"]]
     assert result["ok"] is True
     assert "/employee" in result["subject"]
-    assert [row["to_email"] for row in sent] == [
+    assert sent[0]["to_email"] == [
         "skoen7665210@gmail.com",
         "Bircat9172@gmail.com",
     ]
+    assert sent[0]["allow_simulation"] is False
     assert sent[0]["kind"] == "system-bug"
-    assert sent[0]["attachments"][0][0] == "screenshot.png"
+    assert names == ["screenshot.jpg"]
+    assert "cid:bug-screenshot" in html
+    assert "הקלטה התקבלה" in html
     assert "דני כהן" in html
     assert "שפע" in html
     assert "רמי לוי" in html
     assert "e1" not in html
     assert "n1" not in html
     assert "b1" not in html
+
+
+def test_submit_adds_second_required_address(monkeypatch):
+    sent = _patch_mail(monkeypatch)
+    monkeypatch.setattr(
+        "app.services.system_bug_service.SYSTEM_BUG_EMAIL",
+        "skoen7665210@gmail.com",
+    )
+    SystemBugService().submit(
+        _actor(),
+        note="נפל",
+        route="/employee",
+        trail_raw="",
+        app_version="0.1.0",
+        screenshot=b"png",
+        audio=None,
+        identity=_identity(),
+    )
+    assert sent[0]["to_email"] == [
+        "skoen7665210@gmail.com",
+        "Bircat9172@gmail.com",
+    ]
+    assert sent[0]["allow_simulation"] is False
+
+
+def test_submit_fails_if_real_email_not_sent(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.system_bug_service.SYSTEM_BUG_EMAIL",
+        "skoen7665210@gmail.com,Bircat9172@gmail.com",
+    )
+    monkeypatch.setattr(
+        "app.services.system_bug_service.deliver_html_email",
+        lambda **_k: False,
+    )
+    monkeypatch.setattr("app.services.system_bug_service.github_issues_enabled", lambda: True)
+    with pytest.raises(RuntimeError, match="שליחת הדיווח נכשלה"):
+        SystemBugService().submit(
+            _actor(),
+            note="נפל",
+            route="/employee",
+            trail_raw="",
+            app_version="0.1.0",
+            screenshot=b"png",
+            audio=None,
+            identity=_identity(),
+        )
 
 
 def test_submit_rejects_empty_report():
@@ -101,7 +159,7 @@ def test_submit_opens_github_issue_without_audio(monkeypatch):
     assert result["github_issue_url"].endswith("/issues/12")
     assert calls[0]["screenshot"] == b"png"
     assert "webm-bytes" not in calls[0]["body"]
-    assert "הקלטה מצורפת למייל" in calls[0]["body"]
+    assert "הקלטה התקבלה" in calls[0]["body"]
     assert "דני כהן" in calls[0]["body"]
     assert "e1" not in calls[0]["body"]
 
@@ -126,7 +184,11 @@ def test_submit_keeps_email_if_github_fails(monkeypatch):
     )
     assert result["ok"] is True
     assert "github_issue_url" not in result
-    assert len(sent) == 2
+    assert len(sent) == 1
+    assert sent[0]["to_email"] == [
+        "skoen7665210@gmail.com",
+        "Bircat9172@gmail.com",
+    ]
 
 
 def test_resolve_identity_uses_names_not_ids():
