@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { Alert, Box, Button, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
+import { Alert, Box, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
@@ -15,6 +15,10 @@ import type { ChatMediaKind } from "../../utils/chatTransport";
 import { CHAT_FILE_ACCEPT } from "../../utils/chatFile";
 import ChatAudioDock from "./ChatAudioDock";
 import ChatPhotoCapture from "./ChatPhotoCapture";
+
+export function isComposerExpanded(focused: boolean, body: string): boolean {
+  return focused || Boolean(body.trim());
+}
 
 export default function ChatComposerBar({
   body,
@@ -38,65 +42,106 @@ export default function ChatComposerBar({
   onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
 }) {
   const media = useChatComposerMedia(onSendMedia);
+  const [focused, setFocused] = useState(false);
   const busy = disabled || sending;
   const shownError = error || media.mediaError;
+  const expanded = isComposerExpanded(focused, body);
   if (media.audioDock) {
     return (
-      <Box display="flex" flexDirection="column" gap={1}>
-        <ChatAudioDock
-          audio={media.audio}
-          sending={busy}
-          onSend={() => void media.sendAudio()}
-          onDelete={media.deleteAudio}
-        />
-        {shownError ? <Alert severity="error">{shownError}</Alert> : null}
-      </Box>
+      <DockedAudioBar
+        audio={media.audio}
+        busy={busy}
+        error={shownError}
+        onSend={() => void media.sendAudio()}
+        onDelete={media.deleteAudio}
+      />
     );
   }
+  return (
+    <IdleComposer
+      body={body}
+      expanded={expanded}
+      busy={busy}
+      sending={sending}
+      shownError={shownError}
+      placeholder={placeholder}
+      sendLabel={sendLabel}
+      media={media}
+      onBodyChange={onBodyChange}
+      onSendText={onSendText}
+      onSendMedia={onSendMedia}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    />
+  );
+}
 
+function DockedAudioBar({
+  audio,
+  busy,
+  error,
+  onSend,
+  onDelete,
+}: {
+  audio: ReturnType<typeof useAudioRecorder>;
+  busy: boolean;
+  error?: string;
+  onSend: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Box display="flex" flexDirection="column" gap={1}>
+      <ChatAudioDock audio={audio} sending={busy} onSend={onSend} onDelete={onDelete} />
+      {error ? <Alert severity="error">{error}</Alert> : null}
+    </Box>
+  );
+}
+
+function IdleComposer({
+  body,
+  expanded,
+  busy,
+  sending,
+  shownError,
+  placeholder,
+  sendLabel,
+  media,
+  onBodyChange,
+  onSendText,
+  onSendMedia,
+  onFocus,
+  onBlur,
+}: {
+  body: string;
+  expanded: boolean;
+  busy: boolean;
+  sending: boolean;
+  shownError?: string;
+  placeholder: string;
+  sendLabel: string;
+  media: ReturnType<typeof useChatComposerMedia>;
+  onBodyChange: (value: string) => void;
+  onSendText: () => void;
+  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
   return (
     <Box display="flex" flexDirection="column" gap={1} position="relative">
-      <Box display="flex" alignItems="flex-end" gap={0.75} dir="rtl">
-        <IconButton
-          aria-label={he.chatRecordAudio}
-          color="primary"
-          disabled={busy}
-          onClick={media.startAudio}
-          sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
-        >
-          <MicIcon />
-        </IconButton>
-        <Box display="flex" alignItems="flex-end" gap={0.75} flex={1} minWidth={0}>
-          <TextField
-            value={body}
-            onChange={(e) => onBodyChange(e.target.value)}
-            placeholder={placeholder}
-            fullWidth
-            multiline
-            minRows={1}
-            maxRows={4}
-            disabled={busy}
-          />
-          <Button
-            variant="contained"
-            sx={{ minHeight: 48, minWidth: 72, fontWeight: 800, flexShrink: 0 }}
-            startIcon={sending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
-            onClick={onSendText}
-            disabled={busy}
-          >
-            {sendLabel}
-          </Button>
-        </Box>
-        <HoldIconButton
-          label={he.chatCameraAction}
-          recording={media.holdKind === "video"}
-          disabled={busy}
-          gesture={media.cameraHold}
-        >
-          {media.holdKind === "video" ? <VideocamIcon /> : <PhotoCameraIcon />}
-        </HoldIconButton>
-        <ChatFileAttach disabled={busy} onPick={(file) => void onSendMedia(file, "file")} />
-      </Box>
+      <ComposerRow
+        body={body}
+        expanded={expanded}
+        busy={busy}
+        sending={sending}
+        placeholder={placeholder}
+        sendLabel={sendLabel}
+        media={media}
+        onBodyChange={onBodyChange}
+        onSendText={onSendText}
+        onSendMedia={onSendMedia}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
       {media.holdKind ? (
         <Typography variant="caption" color="error.main">{he.chatRecordingHold}</Typography>
       ) : null}
@@ -115,6 +160,128 @@ export default function ChatComposerBar({
         onSend={(file) => onSendMedia(file, "photo")}
       />
     </Box>
+  );
+}
+
+function ComposerRow({
+  body,
+  expanded,
+  busy,
+  sending,
+  placeholder,
+  sendLabel,
+  media,
+  onBodyChange,
+  onSendText,
+  onSendMedia,
+  onFocus,
+  onBlur,
+}: {
+  body: string;
+  expanded: boolean;
+  busy: boolean;
+  sending: boolean;
+  placeholder: string;
+  sendLabel: string;
+  media: ReturnType<typeof useChatComposerMedia>;
+  onBodyChange: (value: string) => void;
+  onSendText: () => void;
+  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
+  return (
+    <Box display="flex" alignItems="flex-end" gap={0.75} dir="rtl">
+      {expanded ? null : <MicStartButton busy={busy} onStart={media.startAudio} />}
+      <Box display="flex" alignItems="flex-end" gap={0.75} flex={1} minWidth={0}>
+        <TextField
+          value={body}
+          onChange={(e) => onBodyChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          fullWidth
+          multiline
+          minRows={1}
+          maxRows={4}
+          disabled={busy}
+        />
+        <SendTextButton sendLabel={sendLabel} sending={sending} disabled={busy} onSend={onSendText} />
+      </Box>
+      {expanded ? null : <IdleMediaEnd busy={busy} media={media} onSendMedia={onSendMedia} />}
+    </Box>
+  );
+}
+
+function MicStartButton({ busy, onStart }: { busy: boolean; onStart: () => void }) {
+  return (
+    <IconButton
+      aria-label={he.chatRecordAudio}
+      color="primary"
+      disabled={busy}
+      onClick={onStart}
+      sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
+    >
+      <MicIcon />
+    </IconButton>
+  );
+}
+
+function IdleMediaEnd({
+  busy,
+  media,
+  onSendMedia,
+}: {
+  busy: boolean;
+  media: ReturnType<typeof useChatComposerMedia>;
+  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
+}) {
+  return (
+    <>
+      <HoldIconButton
+        label={he.chatCameraAction}
+        recording={media.holdKind === "video"}
+        disabled={busy}
+        gesture={media.cameraHold}
+      >
+        {media.holdKind === "video" ? <VideocamIcon /> : <PhotoCameraIcon />}
+      </HoldIconButton>
+      <ChatFileAttach disabled={busy} onPick={(file) => void onSendMedia(file, "file")} />
+    </>
+  );
+}
+
+function SendTextButton({
+  sendLabel,
+  sending,
+  disabled,
+  onSend,
+}: {
+  sendLabel: string;
+  sending: boolean;
+  disabled: boolean;
+  onSend: () => void;
+}) {
+  return (
+    <IconButton
+      type="button"
+      aria-label={sendLabel}
+      color="primary"
+      disabled={disabled}
+      onClick={onSend}
+      sx={{
+        minWidth: 48,
+        minHeight: 48,
+        flexShrink: 0,
+        borderRadius: "50%",
+        bgcolor: "primary.main",
+        color: "primary.contrastText",
+        "&:hover": { bgcolor: "primary.dark" },
+        "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "action.disabled" },
+      }}
+    >
+      {sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon sx={{ transform: "scaleX(-1)" }} />}
+    </IconButton>
   );
 }
 
