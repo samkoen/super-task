@@ -5,17 +5,16 @@ import logging
 from html import escape
 
 from app.core.config import APP_NAME, SYSTEM_BUG_EMAIL
+from app.domain.media_compression import compress_photo_bytes
 from app.domain.scope import ActorContext
 from app.domain.system_bug import (
-    MAX_AUDIO_BYTES,
     MAX_NOTE_LEN,
-    MAX_SCREENSHOT_BYTES,
     SystemBugIdentity,
     has_system_bug_explanation,
-    parse_system_bug_emails,
     parse_trail,
     system_bug_issue_body,
     system_bug_meta_rows,
+    system_bug_recipients,
     system_bug_subject,
 )
 from app.integrations.github import create_system_bug_issue, github_issues_enabled
@@ -42,20 +41,24 @@ class SystemBugService:
         extra: dict[str, str] | None = None,
     ) -> dict:
         note = (note or "").strip()[:MAX_NOTE_LEN]
-        audio_bytes = _capped(audio, MAX_AUDIO_BYTES)
-        shot = _capped(screenshot, MAX_SCREENSHOT_BYTES)
-        if not has_system_bug_explanation(note, has_audio=bool(audio_bytes)):
+        has_audio = bool(audio)
+        shot, shot_name = _prepare_screenshot(screenshot)
+        if not has_system_bug_explanation(note, has_audio=has_audio):
             raise ValueError("הוסיפו טקסט או הקלטה")
-        recipients = parse_system_bug_emails(SYSTEM_BUG_EMAIL)
+        recipients = system_bug_recipients(SYSTEM_BUG_EMAIL)
         if not recipients:
             raise ValueError("יעד הדיווח אינו מוגדר")
         subject = system_bug_subject(route=route, role=actor.role, version=app_version)
         trail = parse_trail(trail_raw)
         extra = extra or {}
-        html = _html_body(identity, actor.role, note, route, trail, app_version, extra)
-        if not _deliver_to_all(recipients, subject, html, _attachments(shot, audio_bytes)):
+        html = _html_body(
+            identity, actor.role, note, route, trail, app_version, extra, bool(shot), has_audio
+        )
+        if not _deliver_to_all(recipients, subject, html, _mail_attachments(shot, shot_name)):
             raise RuntimeError("שליחת הדיווח נכשלה")
-        return _submit_ok(actor, identity, subject, note, route, trail, app_version, extra, shot, audio_bytes)
+        return _submit_ok(
+            actor, identity, subject, note, route, trail, app_version, extra, shot, has_audio
+        )
 
 
 def resolve_system_bug_identity(
@@ -105,7 +108,7 @@ def _submit_ok(
     version: str,
     extra: dict[str, str],
     screenshot: bytes | None,
-    audio_bytes: bytes | None,
+    has_audio: bool,
 ) -> dict:
     result: dict = {"ok": True, "subject": subject}
     github_url = _try_github_issue(
@@ -118,7 +121,7 @@ def _submit_ok(
         version=version,
         extra=extra,
         screenshot=screenshot,
-        has_audio=bool(audio_bytes),
+        has_audio=has_audio,
     )
     if github_url:
         result["github_issue_url"] = github_url
@@ -164,32 +167,33 @@ def _deliver_to_all(
     html: str,
     attachments: list[Attachment],
 ) -> bool:
-    sent = True
-    for to_email in recipients:
-        ok = deliver_html_email(
-            to_email=to_email,
-            subject=subject,
-            html_content=html,
-            kind="system-bug",
-            attachments=attachments,
-        )
-        sent = sent and ok
-    return sent
+    return deliver_html_email(
+        to_email=recipients,
+        subject=subject,
+        html_content=html,
+        kind="system-bug",
+        attachments=attachments,
+        allow_simulation=False,
+    )
 
 
-def _capped(data: bytes | None, limit: int) -> bytes | None:
+def _prepare_screenshot(data: bytes | None) -> tuple[bytes | None, str]:
     if not data:
-        return None
-    return data if len(data) <= limit else data[:limit]
+        return None, "screenshot.jpg"
+    try:
+        jpeg, ext, _ = compress_photo_bytes(data)
+        return jpeg, f"screenshot{ext}"
+    except Exception:
+        logger.warning("[system-bug] screenshot JPEG compress failed")
+        if len(data) <= 800_000:
+            return data, "screenshot.png"
+        return None, "screenshot.jpg"
 
 
-def _attachments(screenshot: bytes | None, audio: bytes | None) -> list[Attachment]:
-    items: list[Attachment] = []
-    if screenshot:
-        items.append(("screenshot.png", screenshot))
-    if audio:
-        items.append(("explanation.webm", audio))
-    return items
+def _mail_attachments(screenshot: bytes | None, name: str) -> list[Attachment]:
+    if not screenshot:
+        return []
+    return [(name, screenshot)]
 
 
 def _html_body(
@@ -200,6 +204,8 @@ def _html_body(
     trail: list[str],
     version: str,
     extra: dict[str, str],
+    has_screenshot: bool = False,
+    has_audio: bool = False,
 ) -> str:
     meta = "".join(
         f"<tr><th align='right'>{escape(k)}</th><td>{escape(v)}</td></tr>"
@@ -208,7 +214,18 @@ def _html_body(
         )
     )
     body = escape(note) if note else "—"
+    shot = _screenshot_html(has_screenshot)
+    audio_note = "<p>הקלטה התקבלה (ללא קובץ קול במייל).</p>" if has_audio else ""
     return (
         f"<html><body dir='rtl'><h2>{escape(APP_NAME)} — תקלה במערכת</h2>"
-        f"<p>{body}</p><table>{meta}</table></body></html>"
+        f"<p>{body}</p>{shot}{audio_note}<table>{meta}</table></body></html>"
+    )
+
+
+def _screenshot_html(has_screenshot: bool) -> str:
+    if not has_screenshot:
+        return ""
+    return (
+        "<p><img src='cid:bug-screenshot' alt='screenshot' "
+        "style='max-width:100%;height:auto'/></p>"
     )

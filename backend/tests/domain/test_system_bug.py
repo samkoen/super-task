@@ -3,6 +3,7 @@ from app.domain.system_bug import (
     clip_route_trail,
     has_system_bug_explanation,
     parse_system_bug_emails,
+    system_bug_recipients,
     parse_trail,
     system_bug_issue_body,
     system_bug_meta_rows,
@@ -34,6 +35,17 @@ def test_parse_system_bug_emails_splits_and_dedupes():
         "skoen7665210@gmail.com, Bircat9172@gmail.com,skoen7665210@gmail.com"
     ) == ["skoen7665210@gmail.com", "Bircat9172@gmail.com"]
     assert parse_system_bug_emails("  ") == []
+
+
+def test_system_bug_recipients_always_include_both_addresses():
+    assert system_bug_recipients("skoen7665210@gmail.com") == [
+        "skoen7665210@gmail.com",
+        "Bircat9172@gmail.com",
+    ]
+    assert system_bug_recipients("  ") == [
+        "skoen7665210@gmail.com",
+        "Bircat9172@gmail.com",
+    ]
 
 
 def _identity() -> SystemBugIdentity:
@@ -70,6 +82,6 @@ def test_issue_body_mentions_audio_mail_only_without_blob():
     )
     assert "דני כהן" in body
     assert "e1" not in body
-    assert "הקלטה מצורפת למייל בלבד" in body
+    assert "הקלטה התקבלה" in body
     assert "webm" not in body
     assert "צילום מסך מצורף למייל" in body

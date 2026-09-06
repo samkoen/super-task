@@ -55,7 +55,10 @@ COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true" if IS_VERCEL else "false"
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "")
 BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", APP_NAME)
-BREVO_USE_SIMULATION = os.environ.get("BREVO_USE_SIMULATION", "true").lower() in (
+BREVO_USE_SIMULATION = os.environ.get(
+    "BREVO_USE_SIMULATION",
+    "false" if IS_PRODUCTION else "true",
+).lower() in (
     "1",
     "true",
     "yes",
