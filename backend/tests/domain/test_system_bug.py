@@ -1,10 +1,15 @@
+import pytest
+
 from app.domain.system_bug import (
+    SYSTEM_BUG_STATUS_CLOSED,
+    SYSTEM_BUG_STATUS_OPEN,
     SystemBugIdentity,
     clip_route_trail,
     has_system_bug_explanation,
     mail_safe_audio_attachment,
     mail_safe_audio_filename,
     parse_system_bug_emails,
+    parse_system_bug_status,
     system_bug_recipients,
     parse_trail,
     system_bug_issue_body,
@@ -115,3 +120,11 @@ def test_inbox_allows_yitzhak_name_variants():
     assert can_view_system_bug_inbox(full_name="דני כהן") is False
     assert can_view_system_bug_inbox(full_name="דני", user_id="u1", extra_user_ids=("u1",)) is True
     assert can_view_system_bug_inbox(full_name="דני", user_id="u2", extra_user_ids=("u1",)) is False
+
+
+def test_parse_system_bug_status_open_or_closed():
+    assert parse_system_bug_status(None) == SYSTEM_BUG_STATUS_OPEN
+    assert parse_system_bug_status("OPEN") == SYSTEM_BUG_STATUS_OPEN
+    assert parse_system_bug_status("closed") == SYSTEM_BUG_STATUS_CLOSED
+    with pytest.raises(ValueError, match="סטטוס"):
+        parse_system_bug_status("done")

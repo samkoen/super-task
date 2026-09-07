@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canViewSystemBugInbox, normalizePersonName } from "./systemBugInbox";
+import { canViewSystemBugInbox, isSystemBugOpen, normalizePersonName } from "./systemBugInbox";
 
 describe("canViewSystemBugInbox", () => {
   it("allows יצחק with or without geresh", () => {
@@ -14,5 +14,13 @@ describe("canViewSystemBugInbox", () => {
     expect(canViewSystemBugInbox({ full_name: "דני", can_view_system_bug_inbox: true })).toBe(
       true,
     );
+  });
+});
+
+describe("isSystemBugOpen", () => {
+  it("treats missing status as open", () => {
+    expect(isSystemBugOpen()).toBe(true);
+    expect(isSystemBugOpen("open")).toBe(true);
+    expect(isSystemBugOpen("closed")).toBe(false);
   });
 });

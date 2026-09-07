@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -12,6 +13,7 @@ import {
 import { ApiError } from "../../services/api";
 import { getSystemBug, type SystemBugInboxItem } from "../../services/systemBugService";
 import { mediaUrl } from "../../utils/mediaUrl";
+import { isSystemBugOpen } from "../../utils/systemBugInbox";
 import { he } from "../../i18n/he";
 
 export default function SystemBugInboxDetailDialog({
@@ -77,8 +79,15 @@ function InboxDetailBody({
   shotSrc: string | null;
   audioSrc: string | null;
 }) {
+  const open = isSystemBugOpen(report.status);
   return (
     <>
+      <Chip
+        size="small"
+        label={open ? he.systemBugInboxOpen : he.systemBugInboxClosed}
+        color={open ? "success" : "default"}
+        sx={{ alignSelf: "flex-start" }}
+      />
       <Typography variant="body2" color="text.secondary">
         {he.systemBugInboxFrom}: <strong>{report.reporter_name || "—"}</strong>
         {report.branch_name ? ` · ${report.branch_name}` : ""}

@@ -15,6 +15,7 @@ from app.domain.system_bug import (
     has_system_bug_explanation,
     mail_safe_audio_attachment,
     parse_inbox_user_ids,
+    parse_system_bug_status,
     parse_trail,
     system_bug_issue_body,
     system_bug_meta_rows,
@@ -112,6 +113,14 @@ class SystemBugService:
         blob_storage.delete_media_url(row.audio_url)
         if not self._repo.delete(report_id):
             raise ValueError("דיווח לא נמצא")
+
+    def set_inbox_status(self, actor: ActorContext, report_id: str, status: str) -> dict:
+        self._assert_inbox(actor)
+        cleaned = parse_system_bug_status(status)
+        row = self._repo.set_status(report_id, cleaned) if self._repo else None
+        if not row:
+            raise ValueError("דיווח לא נמצא")
+        return row.to_dict()
 
     def _assert_inbox(self, actor: ActorContext) -> None:
         name = ""

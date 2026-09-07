@@ -194,3 +194,15 @@ def audio_blob_meta(data: bytes | None) -> tuple[str, str] | None:
     if name == "explanation.m4a":
         return ".m4a", "audio/mp4"
     return ".webm", "audio/webm"
+
+
+SYSTEM_BUG_STATUS_OPEN = "open"
+SYSTEM_BUG_STATUS_CLOSED = "closed"
+SYSTEM_BUG_STATUSES = frozenset({SYSTEM_BUG_STATUS_OPEN, SYSTEM_BUG_STATUS_CLOSED})
+
+
+def parse_system_bug_status(raw: str | None) -> str:
+    value = (raw or SYSTEM_BUG_STATUS_OPEN).strip().lower()
+    if value not in SYSTEM_BUG_STATUSES:
+        raise ValueError("סטטוס לא תקין")
+    return value

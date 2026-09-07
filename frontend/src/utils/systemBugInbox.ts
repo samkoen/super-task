@@ -1,5 +1,7 @@
 const GERESH = /['׳'`’]/g;
 export const SYSTEM_BUG_INBOX_PATH = "/system-bugs";
+export const SYSTEM_BUG_OPEN = "open";
+export const SYSTEM_BUG_CLOSED = "closed";
 const INBOX_NAME = "יצחק ריצרד";
 
 export function normalizePersonName(name: string): string {
@@ -21,4 +23,8 @@ export function canViewSystemBugInbox(
   if (user.can_view_system_bug_inbox) return true;
   const raw = user.full_name?.trim() || `${user.first_name ?? ""} ${user.last_name ?? ""}`;
   return normalizePersonName(raw) === INBOX_NAME;
+}
+
+export function isSystemBugOpen(status?: string | null): boolean {
+  return (status || SYSTEM_BUG_OPEN) !== SYSTEM_BUG_CLOSED;
 }

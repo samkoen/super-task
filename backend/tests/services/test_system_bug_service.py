@@ -292,3 +292,20 @@ def test_delete_inbox_denies_other_user():
     users.find_by_id.return_value = SimpleNamespace(full_name="דני כהן")
     with pytest.raises(PermissionError, match="אין הרשאה"):
         SystemBugService(MagicMock(), users).delete_inbox_item(_actor(), "bug-1")
+
+
+def test_set_inbox_status_open_and_closed():
+    repo = MagicMock()
+    repo.set_status.return_value = SimpleNamespace(to_dict=lambda: {"id": "bug-1", "status": "closed"})
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    result = SystemBugService(repo, users).set_inbox_status(_actor(), "bug-1", "closed")
+    assert result["status"] == "closed"
+    repo.set_status.assert_called_once_with("bug-1", "closed")
+
+
+def test_set_inbox_status_denies_other_user():
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="דני כהן")
+    with pytest.raises(PermissionError, match="אין הרשאה"):
+        SystemBugService(MagicMock(), users).set_inbox_status(_actor(), "bug-1", "closed")

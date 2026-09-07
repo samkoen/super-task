@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { getSystemBug, listSystemBugs, deleteSystemBug, submitSystemBug } from "./systemBugService";
+import { getSystemBug, listSystemBugs, deleteSystemBug, setSystemBugStatus, submitSystemBug } from "./systemBugService";
 import api from "./api";
 
 vi.mock("./api", () => ({
-  default: { post: vi.fn(), get: vi.fn(), delete: vi.fn() },
+  default: { post: vi.fn(), get: vi.fn(), delete: vi.fn(), patch: vi.fn() },
 }));
 
 describe("submitSystemBug", () => {
@@ -59,5 +59,12 @@ describe("submitSystemBug", () => {
     vi.mocked(api.delete).mockResolvedValueOnce({ data: { ok: true } });
     await deleteSystemBug("1");
     expect(api.delete).toHaveBeenCalledWith("/system-bugs/1");
+  });
+
+  it("patches inbox status", async () => {
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: { report: { id: "1", status: "closed" } } });
+    const report = await setSystemBugStatus("1", "closed");
+    expect(api.patch).toHaveBeenCalledWith("/system-bugs/1", { status: "closed" });
+    expect(report.status).toBe("closed");
   });
 });
