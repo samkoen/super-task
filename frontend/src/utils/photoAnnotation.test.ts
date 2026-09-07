@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   appendDescriptionBlock,
   computePhotoDisplaySize,
+  dataUrlToBlob,
   dataUrlToFile,
   hitTestAnnotation,
+  loadImageElement,
   moveAnnotation,
   scaleAnnotations,
 } from "./photoAnnotation";
@@ -61,6 +63,33 @@ describe("dataUrlToFile", () => {
     const file = dataUrlToFile("data:image/jpeg;base64,/9j/4AAQ", "test.jpg");
     expect(file.name).toBe("test.jpg");
     expect(file.type).toBe("image/jpeg");
+  });
+});
+
+describe("dataUrlToBlob", () => {
+  it("keeps the jpeg mime without fetch", () => {
+    const blob = dataUrlToBlob("data:image/jpeg;base64,/9j/4AAQ");
+    expect(blob.type).toBe("image/jpeg");
+    expect(blob.size).toBeGreaterThan(0);
+  });
+});
+
+describe("loadImageElement", () => {
+  it("does not set cors on blob urls", async () => {
+    const seen: string[] = [];
+    class FakeImage {
+      crossOrigin = "";
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        seen.push(this.crossOrigin);
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+    vi.stubGlobal("Image", FakeImage);
+    await loadImageElement("blob:http://localhost/shot");
+    expect(seen[0]).toBe("");
+    vi.unstubAllGlobals();
   });
 });
 

@@ -85,6 +85,25 @@ describe("SystemBugDialog", () => {
     });
   });
 
+  it("hides annotate tools when capture failed", () => {
+    render(
+      <SystemBugDialog
+        open
+        screenshot={null}
+        route="/employee"
+        trail={["/employee"]}
+        appVersion="0.1.0"
+        preview=""
+        branchName=""
+        onClose={vi.fn()}
+        onSent={vi.fn()}
+        onError={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.systemBugCaptureFailed)).toBeTruthy();
+    expect(screen.queryByLabelText(he.photoAnnotateEllipse)).toBeNull();
+  });
+
   it("offers ellipse and arrow tools on the screenshot", () => {
     render(
       <SystemBugDialog

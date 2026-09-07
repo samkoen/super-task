@@ -16,6 +16,7 @@ import { he } from "../../i18n/he";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { submitSystemBug } from "../../services/systemBugService";
 import { ApiError } from "../../services/api";
+import { toMailSafeAudio } from "../../utils/audioToMailSafe";
 import PhotoAnnotationCanvas, {
   type PhotoAnnotationCanvasHandle,
 } from "../media/PhotoAnnotationCanvas";
@@ -127,9 +128,11 @@ function SystemBugFields({
   return (
     <>
       <Typography variant="body2" color="text.secondary" mb={1.5}>
-        {he.systemBugHint}
+        {screenshot ? he.systemBugHint : he.systemBugCaptureFailed}
       </Typography>
-      <SystemBugScreenshot screenshot={screenshot} annotateRef={annotateRef} />
+      {screenshot ? (
+        <SystemBugScreenshot screenshot={screenshot} annotateRef={annotateRef} />
+      ) : null}
       <TextField
         label={he.systemBugNote}
         value={note}
@@ -162,16 +165,9 @@ function SystemBugScreenshot({
   screenshot,
   annotateRef,
 }: {
-  screenshot: Blob | null;
+  screenshot: Blob;
   annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
 }) {
-  if (!screenshot) {
-    return (
-      <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-        {he.systemBugCaptureFailed}
-      </Typography>
-    );
-  }
   return (
     <Box mb={1.5}>
       <PhotoAnnotationCanvas
@@ -236,6 +232,7 @@ async function deliverSystemBug(
   args.setSending(true);
   try {
     const screenshot = await resolveSystemBugScreenshot(args.screenshot, args.annotate);
+    const audio = await toMailSafeAudio(audioBlob);
     await submitSystemBug({
       note: args.note.trim(),
       route: args.route,
@@ -244,7 +241,7 @@ async function deliverSystemBug(
       preview: args.preview,
       branchName: args.branchName,
       screenshot,
-      audio: audioBlob,
+      audio,
     });
     args.onSent();
     args.onClose();

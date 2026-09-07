@@ -69,6 +69,25 @@ def parse_system_bug_emails(raw: str) -> list[str]:
     return emails
 
 
+def mail_safe_audio_filename(data: bytes | None) -> str | None:
+    if not data:
+        return None
+    if data.startswith(b"RIFF") and b"WAVE" in data[8:16]:
+        return "explanation.wav"
+    if data.startswith(b"ID3") or data[:2] in {b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"}:
+        return "explanation.mp3"
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        return "explanation.m4a"
+    return None
+
+
+def mail_safe_audio_attachment(data: bytes | None) -> tuple[str, bytes] | None:
+    name = mail_safe_audio_filename(data)
+    if not name or not data:
+        return None
+    return name, data
+
+
 def system_bug_recipients(raw: str) -> list[str]:
     emails = parse_system_bug_emails(raw)
     have = {email.lower() for email in emails}
@@ -128,7 +147,7 @@ def system_bug_issue_body(
     )
     notes = []
     if has_audio:
-        notes.append("_הקלטה התקבלה._")
+        notes.append("_הקלטה מצורפת למייל._")
     if has_screenshot:
         notes.append("_צילום מסך מצורף למייל._")
     extra_notes = ("\n\n" + "\n".join(notes)) if notes else ""

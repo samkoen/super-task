@@ -40,6 +40,28 @@ function readDisplayBounds(container: HTMLElement | null): { maxWidth: number; m
   return { maxWidth, maxHeight };
 }
 
+function sameDisplayBounds(
+  a: { maxWidth: number; maxHeight: number },
+  b: { maxWidth: number; maxHeight: number },
+): boolean {
+  return a.maxWidth === b.maxWidth && a.maxHeight === b.maxHeight;
+}
+
+function sizeCanvas(
+  image: HTMLImageElement,
+  canvas: HTMLCanvasElement,
+  bounds: { maxWidth: number; maxHeight: number },
+): void {
+  const { width, height } = computePhotoDisplaySize(
+    image.naturalWidth,
+    image.naturalHeight,
+    bounds,
+  );
+  if (width <= 0 || height <= 0) return;
+  canvas.width = width;
+  canvas.height = height;
+}
+
 function pointerToCanvas(
   canvas: HTMLCanvasElement,
   clientX: number,
@@ -76,7 +98,10 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
-      const updateBounds = () => setDisplayBounds(readDisplayBounds(container));
+      const updateBounds = () => {
+        const next = readDisplayBounds(container);
+        setDisplayBounds((prev) => (sameDisplayBounds(prev, next) ? prev : next));
+      };
       updateBounds();
       const observer = new ResizeObserver(updateBounds);
       observer.observe(container);
@@ -138,20 +163,17 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
       draftRef.current = null;
       setHasSelection(false);
 
-      void loadImageElement(url).then((image) => {
-        if (cancelled || !canvasRef.current) return;
-        const { width, height } = computePhotoDisplaySize(
-          image.naturalWidth,
-          image.naturalHeight,
-          displayBounds
-        );
-        if (width <= 0 || height <= 0) return;
-        imageRef.current = image;
-        canvasRef.current.width = width;
-        canvasRef.current.height = height;
-        paint();
-        setReady(true);
-      });
+      void loadImageElement(url)
+        .then((image) => {
+          if (cancelled || !canvasRef.current) return;
+          imageRef.current = image;
+          sizeCanvas(image, canvasRef.current, displayBounds);
+          paint();
+          setReady(true);
+        })
+        .catch(() => {
+          if (!cancelled) setReady(false);
+        });
 
       return () => {
         cancelled = true;
@@ -160,9 +182,18 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
         drawStateRef.current = null;
         draftRef.current = null;
       };
-      // paint reads refs; re-run when image/bounds change
+      // Reload only when the blob changes — bounds are applied in the next effect.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [imageBlob, displayBounds]);
+    }, [imageBlob]);
+
+    useEffect(() => {
+      const image = imageRef.current;
+      const canvas = canvasRef.current;
+      if (!image || !canvas || !ready) return;
+      sizeCanvas(image, canvas, displayBounds);
+      paint();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [displayBounds, ready]);
 
     useEffect(() => {
       const onKeyDown = (event: KeyboardEvent) => {
@@ -343,6 +374,8 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
             onPointerCancel={onPointerUp}
             style={{
               maxWidth: "100%",
+              height: "auto",
+              minHeight: ready ? undefined : 180,
               cursor: tool === "select" ? "default" : "crosshair",
               touchAction: "none",
             }}

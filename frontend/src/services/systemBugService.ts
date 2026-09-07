@@ -1,4 +1,5 @@
 import api from "./api";
+import { mailAudioFileName } from "../utils/audioToMailSafe";
 
 export async function submitSystemBug(payload: {
   note: string;
@@ -21,7 +22,7 @@ export async function submitSystemBug(payload: {
     form.append("screenshot", payload.screenshot, "screenshot.jpg");
   }
   if (payload.audio && payload.audio.size > 0) {
-    form.append("audio", payload.audio, "explanation.webm");
+    form.append("audio", payload.audio, mailAudioFileName(payload.audio));
   }
   await api.post("/system-bugs", form, { timeout: 60_000 });
 }

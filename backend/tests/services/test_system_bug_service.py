@@ -12,6 +12,10 @@ from app.integrations.github.client import GitHubApiError
 from app.services.system_bug_service import SystemBugService, resolve_system_bug_identity
 
 
+def _wav_bytes() -> bytes:
+    return b"RIFF\x00\x00\x00\x00WAVEfmt "
+
+
 def _png_shot() -> bytes:
     buf = BytesIO()
     Image.new("RGB", (120, 80), (10, 20, 30)).save(buf, format="PNG")
@@ -51,7 +55,7 @@ def test_submit_sends_mail_with_names_not_ids(monkeypatch):
         trail_raw='["/manager","/employee"]',
         app_version="0.1.0",
         screenshot=_png_shot(),
-        audio=b"webm-bytes",
+        audio=_wav_bytes(),
         identity=_identity(),
     )
     html = sent[0]["html_content"]
@@ -64,9 +68,10 @@ def test_submit_sends_mail_with_names_not_ids(monkeypatch):
     ]
     assert sent[0]["allow_simulation"] is False
     assert sent[0]["kind"] == "system-bug"
-    assert names == ["screenshot.jpg"]
+    assert names == ["screenshot.jpg", "explanation.wav"]
     assert "cid:bug-screenshot" in html
-    assert "הקלטה התקבלה" in html
+    assert "הקלטה מצורפת" in html
+    assert "לא מצורפה למייל" not in html
     assert "דני כהן" in html
     assert "שפע" in html
     assert "רמי לוי" in html
@@ -159,7 +164,7 @@ def test_submit_opens_github_issue_without_audio(monkeypatch):
     assert result["github_issue_url"].endswith("/issues/12")
     assert calls[0]["screenshot"] == b"png"
     assert "webm-bytes" not in calls[0]["body"]
-    assert "הקלטה התקבלה" in calls[0]["body"]
+    assert "הקלטה מצורפת למייל" in calls[0]["body"]
     assert "דני כהן" in calls[0]["body"]
     assert "e1" not in calls[0]["body"]
 
