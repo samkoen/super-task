@@ -17,6 +17,7 @@ class SystemBugReport:
     screenshot_url: str | None
     audio_url: str | None
     github_issue_url: str | None
+    status: str
     created_at: str
 
     def to_dict(self) -> dict:
@@ -34,6 +35,7 @@ class SystemBugReport:
             "screenshot_url": self.screenshot_url,
             "audio_url": self.audio_url,
             "github_issue_url": self.github_issue_url,
+            "status": self.status,
             "created_at": self.created_at,
         }
 

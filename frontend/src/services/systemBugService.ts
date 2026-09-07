@@ -15,6 +15,7 @@ export interface SystemBugInboxItem {
   screenshot_url: string | null;
   audio_url: string | null;
   github_issue_url: string | null;
+  status: "open" | "closed";
   created_at: string;
 }
 
@@ -56,4 +57,14 @@ export async function getSystemBug(reportId: string): Promise<SystemBugInboxItem
 
 export async function deleteSystemBug(reportId: string): Promise<void> {
   await api.delete(`/system-bugs/${reportId}`);
+}
+
+export async function setSystemBugStatus(
+  reportId: string,
+  status: "open" | "closed",
+): Promise<SystemBugInboxItem> {
+  const response = await api.patch<{ report: SystemBugInboxItem }>(`/system-bugs/${reportId}`, {
+    status,
+  });
+  return response.data.report;
 }

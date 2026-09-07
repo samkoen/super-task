@@ -152,3 +152,24 @@ def test_inbox_delete_only_for_yitzhak(client_emp, app, world_seed, monkeypatch)
     assert removed.status_code == 200, removed.text
     assert inbox.get("/api/system-bugs").json()["items"] == []
     assert inbox.get(f"/api/system-bugs/{report_id}").status_code == 400
+
+
+def test_inbox_can_close_and_reopen(client_emp, app, world_seed, monkeypatch):
+    _patch_bug_delivery(monkeypatch)
+    created = client_emp.post(
+        "/api/system-bugs",
+        data={"note": "נפל", "route": "/employee", "app_version": "0.1.0"},
+    )
+    assert created.status_code == 200, created.text
+    inbox = login_client(app, _create_yitzhak(world_seed))
+    report_id = inbox.get("/api/system-bugs").json()["items"][0]["id"]
+    assert inbox.get("/api/system-bugs").json()["items"][0]["status"] == "open"
+    assert client_emp.patch(
+        f"/api/system-bugs/{report_id}", json={"status": "closed"}
+    ).status_code == 403
+    closed = inbox.patch(f"/api/system-bugs/{report_id}", json={"status": "closed"})
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["report"]["status"] == "closed"
+    opened = inbox.patch(f"/api/system-bugs/{report_id}", json={"status": "open"})
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["report"]["status"] == "open"

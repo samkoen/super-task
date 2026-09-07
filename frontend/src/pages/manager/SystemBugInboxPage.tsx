@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import {
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,11 +14,14 @@ import {
   Typography,
 } from "@mui/material";
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import { ApiError } from "../../services/api";
 import {
   deleteSystemBug,
   listSystemBugs,
+  setSystemBugStatus,
   type SystemBugInboxItem,
 } from "../../services/systemBugService";
 import SystemBugInboxDetailDialog from "../../components/systemBug/SystemBugInboxDetailDialog";
@@ -28,7 +32,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { formatDueAt } from "../../utils/dateView";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { canViewSystemBugInbox } from "../../utils/systemBugInbox";
+import { canViewSystemBugInbox, isSystemBugOpen } from "../../utils/systemBugInbox";
 import { he } from "../../i18n/he";
 
 export default function SystemBugInboxPage() {
@@ -72,6 +76,15 @@ export default function SystemBugInboxPage() {
     }
   };
 
+  const handleSetStatus = async (item: SystemBugInboxItem, status: "open" | "closed") => {
+    try {
+      await setSystemBugStatus(item.id, status);
+      setItems(await listSystemBugs());
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
   if (!canViewSystemBugInbox(user)) return <Navigate to="/" replace />;
 
   return (
@@ -85,7 +98,12 @@ export default function SystemBugInboxPage() {
           icon={<BugReportOutlinedIcon fontSize="inherit" />}
         />
       ) : (
-        <InboxList items={items} onSelect={setSelectedId} onAskDelete={setDeleteTarget} />
+        <InboxList
+          items={items}
+          onSelect={setSelectedId}
+          onAskDelete={setDeleteTarget}
+          onSetStatus={handleSetStatus}
+        />
       )}
       <SystemBugInboxDetailDialog
         reportId={selectedId}
@@ -106,15 +124,23 @@ function InboxList({
   items,
   onSelect,
   onAskDelete,
+  onSetStatus,
 }: {
   items: SystemBugInboxItem[];
   onSelect: (id: string) => void;
   onAskDelete: (item: SystemBugInboxItem) => void;
+  onSetStatus: (item: SystemBugInboxItem, status: "open" | "closed") => void;
 }) {
   return (
     <Box display="flex" flexDirection="column" gap={1.5}>
       {items.map((item) => (
-        <InboxRow key={item.id} item={item} onSelect={onSelect} onAskDelete={onAskDelete} />
+        <InboxRow
+          key={item.id}
+          item={item}
+          onSelect={onSelect}
+          onAskDelete={onAskDelete}
+          onSetStatus={onSetStatus}
+        />
       ))}
     </Box>
   );
@@ -124,24 +150,41 @@ function InboxRow({
   item,
   onSelect,
   onAskDelete,
+  onSetStatus,
 }: {
   item: SystemBugInboxItem;
   onSelect: (id: string) => void;
   onAskDelete: (item: SystemBugInboxItem) => void;
+  onSetStatus: (item: SystemBugInboxItem, status: "open" | "closed") => void;
 }) {
   const shotSrc = mediaUrl(item.screenshot_url);
+  const open = isSystemBugOpen(item.status);
   return (
     <Paper
       variant="outlined"
       onClick={() => onSelect(item.id)}
-      sx={{ p: 1.5, display: "flex", gap: 1.5, cursor: "pointer", borderRadius: 2 }}
+      sx={{
+        p: 1.5,
+        display: "flex",
+        gap: 1.5,
+        cursor: "pointer",
+        borderRadius: 2,
+        opacity: open ? 1 : 0.72,
+      }}
     >
       <InboxThumb shotSrc={shotSrc} />
       <Box minWidth={0} flex={1}>
-        <Typography variant="subtitle2" fontWeight={700} noWrap>
-          {item.reporter_name || "—"}
-          {item.branch_name ? ` · ${item.branch_name}` : ""}
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1} mb={0.25}>
+          <Typography variant="subtitle2" fontWeight={700} noWrap>
+            {item.reporter_name || "—"}
+            {item.branch_name ? ` · ${item.branch_name}` : ""}
+          </Typography>
+          <Chip
+            size="small"
+            label={open ? he.systemBugInboxOpen : he.systemBugInboxClosed}
+            color={open ? "success" : "default"}
+          />
+        </Box>
         <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
           {item.note || he.issueReportMediaOnly}
         </Typography>
@@ -150,19 +193,54 @@ function InboxRow({
           {item.audio_url ? ` · ${he.systemBugInboxAudio}` : ""}
         </Typography>
       </Box>
+      <InboxStatusActions item={item} open={open} onAskDelete={onAskDelete} onSetStatus={onSetStatus} />
+    </Paper>
+  );
+}
+
+function InboxStatusActions({
+  item,
+  open,
+  onAskDelete,
+  onSetStatus,
+}: {
+  item: SystemBugInboxItem;
+  open: boolean;
+  onAskDelete: (item: SystemBugInboxItem) => void;
+  onSetStatus: (item: SystemBugInboxItem, status: "open" | "closed") => void;
+}) {
+  return (
+    <Box display="flex" alignItems="center" onClick={(e) => e.stopPropagation()}>
+      <Tooltip title={he.systemBugInboxClose}>
+        <span>
+          <IconButton
+            size="small"
+            color="success"
+            disabled={!open}
+            onClick={() => onSetStatus(item, "closed")}
+          >
+            <CheckCircleOutlineIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title={he.systemBugInboxReopen}>
+        <span>
+          <IconButton
+            size="small"
+            color="primary"
+            disabled={open}
+            onClick={() => onSetStatus(item, "open")}
+          >
+            <ReplayOutlinedIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
       <Tooltip title={he.systemBugInboxDelete}>
-        <IconButton
-          size="small"
-          color="error"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAskDelete(item);
-          }}
-        >
+        <IconButton size="small" color="error" onClick={() => onAskDelete(item)}>
           <DeleteOutlineIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-    </Paper>
+    </Box>
   );
 }
 

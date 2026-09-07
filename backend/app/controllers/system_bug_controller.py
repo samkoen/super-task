@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth.actor import load_actor
@@ -96,3 +96,17 @@ def delete_system_bug(
     actor = load_actor(request, UserRepository(db))
     service.delete_inbox_item(actor, report_id)
     return {"ok": True, "message": "הדיווח נמחק"}
+
+
+@router.patch("/{report_id}")
+@handle_controller_errors
+def patch_system_bug(
+    report_id: str,
+    request: Request,
+    body: dict = Body(...),
+    db: Session = Depends(get_db),
+    service: SystemBugService = Depends(get_system_bug_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    report = service.set_inbox_status(actor, report_id, str(body.get("status") or ""))
+    return {"report": report}

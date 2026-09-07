@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 import app.db.models as orm
 from app.db import mappers as mp
+from app.domain.system_bug import SYSTEM_BUG_STATUS_OPEN, parse_system_bug_status
 from app.models.system_bug_report import (
     SystemBugReport,
     trail_from_json,
@@ -46,6 +47,7 @@ class SystemBugReportRepository:
             screenshot_url=screenshot_url,
             audio_url=audio_url,
             github_issue_url=github_issue_url,
+            status=SYSTEM_BUG_STATUS_OPEN,
         )
         self._db.add(row)
         self._db.flush()
@@ -63,7 +65,21 @@ class SystemBugReportRepository:
     def list_recent(self) -> list[SystemBugReport]:
         q = select(orm.SystemBugReport).order_by(orm.SystemBugReport.created_at.desc())
         rows = self._db.execute(q).scalars().all()
-        return [r for row in rows if (r := self._to_domain(row))]
+        items = [r for row in rows if (r := self._to_domain(row))]
+        open_items = [item for item in items if item.status == SYSTEM_BUG_STATUS_OPEN]
+        closed_items = [item for item in items if item.status != SYSTEM_BUG_STATUS_OPEN]
+        return open_items + closed_items
+
+    def set_status(self, report_id: str, status: str) -> SystemBugReport | None:
+        try:
+            row = self._db.get(orm.SystemBugReport, mp.parse_uuid(report_id))
+        except ValueError:
+            return None
+        if row is None:
+            return None
+        row.status = status
+        self._db.flush()
+        return self._to_domain(row)
 
     def delete(self, report_id: str) -> bool:
         try:
@@ -95,5 +111,6 @@ class SystemBugReportRepository:
             screenshot_url=row.screenshot_url,
             audio_url=row.audio_url,
             github_issue_url=row.github_issue_url,
+            status=parse_system_bug_status(getattr(row, "status", None)),
             created_at=mp.parse_datetime_iso(row.created_at),
         )
