@@ -6,11 +6,13 @@ import { mediaUrl } from "../utils/mediaUrl";
 export function useResolvedMediaSrc(path: string | null | undefined) {
   const preview = peekChatMediaPreview(path);
   const [retrySrc, setRetrySrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const retryRef = useRef({ src: null as string | null, busy: false });
 
   useEffect(() => {
     retryRef.current = { src: null, busy: false };
     setRetrySrc(null);
+    setFailed(false);
   }, [path]);
 
   useEffect(() => () => revokeIfBlob(retrySrc), [retrySrc]);
@@ -18,7 +20,8 @@ export function useResolvedMediaSrc(path: string | null | undefined) {
   return {
     src: preview || retrySrc || mediaUrl(path),
     loading: retryRef.current.busy && !retrySrc && !preview,
-    onError: () => startProxyRetry(path, preview, retryRef, setRetrySrc),
+    failed,
+    onError: () => startProxyRetry(path, preview, retryRef, setRetrySrc, setFailed),
   };
 }
 
@@ -36,11 +39,15 @@ function startProxyRetry(
   preview: string | null,
   retryRef: { current: { src: string | null; busy: boolean } },
   setRetrySrc: (src: string | null) => void,
+  setFailed: (value: boolean) => void,
 ) {
-  if (!path || preview || retryRef.current.src || retryRef.current.busy || path.startsWith("blob:")) {
+  if (retryRef.current.busy) return;
+  if (!path || preview || retryRef.current.src || path.startsWith("blob:")) {
+    setFailed(true);
     return;
   }
   retryRef.current.busy = true;
+  setFailed(false);
   void fetchMediaBlobWithRetry(path)
     .then((blob) => {
       const objectUrl = URL.createObjectURL(blob);
@@ -49,6 +56,7 @@ function startProxyRetry(
     })
     .catch(() => {
       retryRef.current.src = null;
+      setFailed(true);
     })
     .finally(() => {
       retryRef.current.busy = false;

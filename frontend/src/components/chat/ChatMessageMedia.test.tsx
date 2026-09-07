@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ChatMessageMedia from "./ChatMessageMedia";
 import { he } from "../../i18n/he";
 
 vi.mock("../../utils/mediaUrl", () => ({
   mediaUrl: (path: string | null | undefined) => path ?? null,
+}));
+
+vi.mock("../../utils/fetchMediaBlob", () => ({
+  fetchMediaBlobWithRetry: vi.fn().mockRejectedValue(new Error("media fetch failed: 404")),
 }));
 
 describe("ChatMessageMedia", () => {
@@ -27,6 +31,15 @@ describe("ChatMessageMedia", () => {
   it("hides the loading placeholder once the photo paints", () => {
     render(<ChatMessageMedia photoUrl="/uploads/p.jpg" />);
     fireEvent.load(screen.getByAltText(he.taskReferencePhoto));
+    expect(screen.queryByLabelText(he.loading)).toBeNull();
+  });
+
+  it("replaces the spinner with an error when the photo never loads", async () => {
+    render(<ChatMessageMedia photoUrl="/uploads/p.jpg" />);
+    fireEvent.error(screen.getByAltText(he.taskReferencePhoto));
+    await waitFor(() => {
+      expect(screen.getByText(he.chatMediaLoadError)).toBeTruthy();
+    });
     expect(screen.queryByLabelText(he.loading)).toBeNull();
   });
 

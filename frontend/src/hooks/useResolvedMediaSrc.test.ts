@@ -62,5 +62,16 @@ describe("useResolvedMediaSrc", () => {
       result.current.onError();
     });
     expect(fetchMediaBlobWithRetry).toHaveBeenCalledTimes(1);
+    expect(result.current.failed).toBe(true);
+  });
+
+  it("marks the media as failed when every retry is exhausted", async () => {
+    vi.mocked(fetchMediaBlobWithRetry).mockRejectedValue(new Error("media fetch failed: 404"));
+    const { result } = renderHook(() => useResolvedMediaSrc("/uploads/p.jpg"));
+    await act(async () => {
+      result.current.onError();
+    });
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    expect(result.current.src).toBe("/proxy?src=/uploads/p.jpg");
   });
 });

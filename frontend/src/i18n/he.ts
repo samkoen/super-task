@@ -556,6 +556,7 @@ export const he = {
   chatAnnotateReplyHint: "הוסיפו אליפסות או חצים על התמונה שהתקבלה, ואז שלחו",
   chatAnnotateReplyCaption: "הוסיפו כיתוב…",
   chatAnnotateReplyLoadError: "לא ניתן לטעון את התמונה",
+  chatMediaLoadError: "לא ניתן לטעון את המדיה",
   chatTaskComplete: "סיום מטלה",
   chatTaskCompleted: "המטלה הועברה לארכיון",
   chatTaskReminder: "הגדרת תזכורת",

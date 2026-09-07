@@ -86,7 +86,7 @@ function ChatVideo({ sourceUrl }: { sourceUrl?: string | null }) {
   const media = useResolvedMediaSrc(sourceUrl);
   if (!sourceUrl || !media.src) return null;
   return (
-    <PaintedMedia src={media.src} onError={media.onError} kind="video" />
+    <PaintedMedia src={media.src} failed={media.failed} onError={media.onError} kind="video" />
   );
 }
 
@@ -102,8 +102,10 @@ function ChatPhoto({
   const reply = onAnnotateReply ? () => onAnnotateReply(sourceUrl) : undefined;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: "100%" }}>
-      {media.src ? (
-        <PaintedMedia src={media.src} onError={media.onError} kind="photo" onClick={reply} />
+      {media.failed ? (
+        <ChatMediaFailed />
+      ) : media.src ? (
+        <PaintedMedia src={media.src} failed={media.failed} onError={media.onError} kind="photo" onClick={reply} />
       ) : (
         <ChatMediaPending />
       )}
@@ -118,11 +120,13 @@ function ChatPhoto({
 
 function PaintedMedia({
   src,
+  failed,
   onError,
   kind,
   onClick,
 }: {
   src: string;
+  failed: boolean;
   onError: () => void;
   kind: "photo" | "video";
   onClick?: () => void;
@@ -131,6 +135,7 @@ function PaintedMedia({
   useEffect(() => {
     setPainted(false);
   }, [src]);
+  if (failed) return <ChatMediaFailed />;
   return (
     <>
       {painted ? null : <ChatMediaPending />}
@@ -169,6 +174,25 @@ function ChatMediaPending() {
       }}
     >
       <CircularProgress size={22} />
+    </Box>
+  );
+}
+
+function ChatMediaFailed() {
+  return (
+    <Box
+      aria-label={he.chatMediaLoadError}
+      sx={{
+        minHeight: 72,
+        borderRadius: 1,
+        bgcolor: "action.hover",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        px: 1,
+      }}
+    >
+      <Typography variant="caption">{he.chatMediaLoadError}</Typography>
     </Box>
   );
 }
