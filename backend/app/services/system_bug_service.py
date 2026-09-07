@@ -11,6 +11,7 @@ from app.domain.system_bug import (
     MAX_NOTE_LEN,
     SystemBugIdentity,
     has_system_bug_explanation,
+    mail_safe_audio_attachment,
     parse_trail,
     system_bug_issue_body,
     system_bug_meta_rows,
@@ -51,10 +52,22 @@ class SystemBugService:
         subject = system_bug_subject(route=route, role=actor.role, version=app_version)
         trail = parse_trail(trail_raw)
         extra = extra or {}
+        audio_file = mail_safe_audio_attachment(audio)
         html = _html_body(
-            identity, actor.role, note, route, trail, app_version, extra, bool(shot), has_audio
+            identity,
+            actor.role,
+            note,
+            route,
+            trail,
+            app_version,
+            extra,
+            bool(shot),
+            audio_file[0] if audio_file else None,
+            has_audio,
         )
-        if not _deliver_to_all(recipients, subject, html, _mail_attachments(shot, shot_name)):
+        if not _deliver_to_all(
+            recipients, subject, html, _mail_attachments(shot, shot_name, audio_file)
+        ):
             raise RuntimeError("שליחת הדיווח נכשלה")
         return _submit_ok(
             actor, identity, subject, note, route, trail, app_version, extra, shot, has_audio
@@ -190,10 +203,17 @@ def _prepare_screenshot(data: bytes | None) -> tuple[bytes | None, str]:
         return None, "screenshot.jpg"
 
 
-def _mail_attachments(screenshot: bytes | None, name: str) -> list[Attachment]:
-    if not screenshot:
-        return []
-    return [(name, screenshot)]
+def _mail_attachments(
+    screenshot: bytes | None,
+    name: str,
+    audio_file: Attachment | None,
+) -> list[Attachment]:
+    items: list[Attachment] = []
+    if screenshot:
+        items.append((name, screenshot))
+    if audio_file:
+        items.append(audio_file)
+    return items
 
 
 def _html_body(
@@ -205,6 +225,7 @@ def _html_body(
     version: str,
     extra: dict[str, str],
     has_screenshot: bool = False,
+    audio_name: str | None = None,
     has_audio: bool = False,
 ) -> str:
     meta = "".join(
@@ -215,11 +236,19 @@ def _html_body(
     )
     body = escape(note) if note else "—"
     shot = _screenshot_html(has_screenshot)
-    audio_note = "<p>הקלטה התקבלה (ללא קובץ קול במייל).</p>" if has_audio else ""
+    audio_note = _audio_html(audio_name, has_audio)
     return (
         f"<html><body dir='rtl'><h2>{escape(APP_NAME)} — תקלה במערכת</h2>"
         f"<p>{body}</p>{shot}{audio_note}<table>{meta}</table></body></html>"
     )
+
+
+def _audio_html(audio_name: str | None, has_audio: bool) -> str:
+    if audio_name:
+        return f"<p>הקלטה מצורפת ({escape(audio_name)}).</p>"
+    if has_audio:
+        return "<p>הקלטה התקבלה (לא מצורפה למייל).</p>"
+    return ""
 
 
 def _screenshot_html(has_screenshot: bool) -> str:

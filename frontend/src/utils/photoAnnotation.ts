@@ -189,7 +189,9 @@ export function renderAnnotatedImage(
 export function loadImageElement(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    if (src.startsWith("http://") || src.startsWith("https://")) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("image load failed"));
     img.src = src;
@@ -218,15 +220,19 @@ export function appendDescriptionBlock(existing: string, addition: string): stri
   return `${base}\n\n${extra}`;
 }
 
-export function dataUrlToFile(dataUrl: string, filename: string): File {
+export function dataUrlToBlob(dataUrl: string): Blob {
   const [header, base64] = dataUrl.split(",");
   const mime = header.match(/data:(.*?);/)?.[1] ?? "image/jpeg";
-  const binary = atob(base64);
+  const binary = atob(base64 ?? "");
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return new File([bytes], filename, { type: mime });
+  return new Blob([bytes], { type: mime });
+}
+
+export function dataUrlToFile(dataUrl: string, filename: string): File {
+  return blobToFile(dataUrlToBlob(dataUrl), filename);
 }
 
 export function blobToFile(blob: Blob, filename: string): File {

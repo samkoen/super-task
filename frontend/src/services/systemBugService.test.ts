@@ -28,4 +28,19 @@ describe("submitSystemBug", () => {
     const shotFile = form.get("screenshot") as File;
     expect(shotFile.name).toBe("screenshot.jpg");
   });
+
+  it("names a wav recording for gmail", async () => {
+    vi.mocked(api.post).mockClear();
+    vi.mocked(api.post).mockResolvedValue({ data: { ok: true } });
+    const audio = new Blob(["RIFF"], { type: "audio/wav" });
+    await submitSystemBug({
+      note: "bug",
+      route: "/employee",
+      trail: ["/employee"],
+      appVersion: "0.1.0",
+      audio,
+    });
+    const form = vi.mocked(api.post).mock.calls[0][1] as FormData;
+    expect((form.get("audio") as File).name).toBe("explanation.wav");
+  });
 });
