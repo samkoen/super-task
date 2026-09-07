@@ -9,6 +9,7 @@ import {
   hasExternalStartUrl,
   needsTaskStart,
   revertStartedOnDashboard,
+  shouldAutoCompleteEmployeeTask,
   shouldOpenStartUrlOnBegin,
   waitForInFlightLinkedStart,
 } from "./employeeDoTask";
@@ -37,6 +38,17 @@ describe("employeeDoTask", () => {
     expect(canSubmitEmployeeTask("in_progress", url, true)).toBe(true);
     expect(canSubmitEmployeeTask("in_progress", url, true, false)).toBe(false);
     expect(canSubmitEmployeeTask("in_progress", url, false, false)).toBe(false);
+  });
+
+  it("auto-completes only after every required slot is filled", () => {
+    expect(shouldAutoCompleteEmployeeTask(0, true, "in_progress", null)).toBe(false);
+    expect(shouldAutoCompleteEmployeeTask(2, false, "in_progress", null)).toBe(false);
+    expect(shouldAutoCompleteEmployeeTask(2, true, "in_progress", null)).toBe(true);
+    expect(shouldAutoCompleteEmployeeTask(1, true, "pending", "https://example.com")).toBe(false);
+    expect(shouldAutoCompleteEmployeeTask(1, true, "in_progress", "https://example.com", false)).toBe(
+      false,
+    );
+    expect(shouldAutoCompleteEmployeeTask(1, true, "pending", null)).toBe(true);
   });
 
   it("waits for the in-flight linked start before complete", async () => {

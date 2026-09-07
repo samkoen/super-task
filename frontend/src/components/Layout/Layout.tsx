@@ -171,6 +171,7 @@ function Layout() {
     }
     return withSystemBugInbox(user, [
       { text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" },
+      { text: he.directChatTitle, icon: <ChatOutlinedIcon />, path: "/employee/chats" },
       { text: he.myAccount, icon: <AccountCircleIcon />, path: "/employee/account" },
     ]);
   }, [user]);

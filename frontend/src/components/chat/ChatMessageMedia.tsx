@@ -1,6 +1,8 @@
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
 import { he } from "../../i18n/he";
+import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { chatBubbleCopySx } from "../../utils/chatBubbleSx";
 import { chatFileLabel } from "../../utils/chatFile";
 import { mediaUrl } from "../../utils/mediaUrl";
@@ -31,19 +33,8 @@ export default function ChatMessageMedia({
   if (!photo && !video && !audio && !file && !note) return null;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, width: "100%" }}>
-      <ChatPhoto
-        src={photo}
-        sourceUrl={photoUrl}
-        onAnnotateReply={onAnnotateReply}
-      />
-      {video ? (
-        <Box
-          component="video"
-          src={video}
-          controls
-          sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
-        />
-      ) : null}
+      <ChatPhoto sourceUrl={photoUrl} onAnnotateReply={onAnnotateReply} />
+      <ChatVideo sourceUrl={videoUrl} />
       {audio ? <CompactAudioPlayer src={audio} /> : null}
       <ChatFileCard href={file} name={fileName} />
       {note ? (
@@ -91,37 +82,117 @@ function ChatFileCard({ href, name }: { href: string | null; name?: string | nul
   );
 }
 
+function ChatVideo({ sourceUrl }: { sourceUrl?: string | null }) {
+  const media = useResolvedMediaSrc(sourceUrl);
+  if (!sourceUrl || !media.src) return null;
+  return (
+    <PaintedMedia src={media.src} failed={media.failed} onError={media.onError} kind="video" />
+  );
+}
+
 function ChatPhoto({
-  src,
   sourceUrl,
   onAnnotateReply,
 }: {
-  src: string | null;
   sourceUrl?: string | null;
   onAnnotateReply?: (photoUrl: string) => void;
 }) {
-  if (!src || !sourceUrl) return null;
+  const media = useResolvedMediaSrc(sourceUrl);
+  if (!sourceUrl) return null;
   const reply = onAnnotateReply ? () => onAnnotateReply(sourceUrl) : undefined;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: "100%" }}>
-      <Box
-        component="img"
-        src={src}
-        alt={he.taskReferencePhoto}
-        onClick={reply}
-        sx={{
-          maxWidth: "100%",
-          maxHeight: 180,
-          borderRadius: 1,
-          display: "block",
-          cursor: reply ? "pointer" : "default",
-        }}
-      />
+      {media.failed ? (
+        <ChatMediaFailed />
+      ) : media.src ? (
+        <PaintedMedia src={media.src} failed={media.failed} onError={media.onError} kind="photo" onClick={reply} />
+      ) : (
+        <ChatMediaPending />
+      )}
       {reply ? (
         <Button size="small" onClick={reply} sx={{ alignSelf: "flex-start", minHeight: 36 }}>
           {he.chatAnnotateReply}
         </Button>
       ) : null}
+    </Box>
+  );
+}
+
+function PaintedMedia({
+  src,
+  failed,
+  onError,
+  kind,
+  onClick,
+}: {
+  src: string;
+  failed: boolean;
+  onError: () => void;
+  kind: "photo" | "video";
+  onClick?: () => void;
+}) {
+  const [painted, setPainted] = useState(false);
+  useEffect(() => {
+    setPainted(false);
+  }, [src]);
+  if (failed) return <ChatMediaFailed />;
+  return (
+    <>
+      {painted ? null : <ChatMediaPending />}
+      <Box
+        component={kind === "photo" ? "img" : "video"}
+        src={src}
+        alt={kind === "photo" ? he.taskReferencePhoto : undefined}
+        controls={kind === "video" ? true : undefined}
+        onLoad={kind === "photo" ? () => setPainted(true) : undefined}
+        onLoadedData={kind === "video" ? () => setPainted(true) : undefined}
+        onError={onError}
+        onClick={onClick}
+        sx={{
+          maxWidth: "100%",
+          maxHeight: kind === "photo" ? 180 : 200,
+          borderRadius: 1,
+          display: painted ? "block" : "none",
+          cursor: onClick ? "pointer" : "default",
+        }}
+      />
+    </>
+  );
+}
+
+function ChatMediaPending() {
+  return (
+    <Box
+      aria-label={he.loading}
+      sx={{
+        minHeight: 120,
+        borderRadius: 1,
+        bgcolor: "action.hover",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <CircularProgress size={22} />
+    </Box>
+  );
+}
+
+function ChatMediaFailed() {
+  return (
+    <Box
+      aria-label={he.chatMediaLoadError}
+      sx={{
+        minHeight: 72,
+        borderRadius: 1,
+        bgcolor: "action.hover",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        px: 1,
+      }}
+    >
+      <Typography variant="caption">{he.chatMediaLoadError}</Typography>
     </Box>
   );
 }

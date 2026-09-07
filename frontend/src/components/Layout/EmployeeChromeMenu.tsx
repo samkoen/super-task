@@ -19,6 +19,7 @@ function ChromeMenuItems({
   onExit,
   onViewAs,
   onManager,
+  onChats,
   onAccount,
   onLogout,
 }: {
@@ -27,6 +28,7 @@ function ChromeMenuItems({
   onExit: () => void;
   onViewAs: () => void;
   onManager: () => void;
+  onChats: () => void;
   onAccount: () => void;
   onLogout: () => void;
 }) {
@@ -43,6 +45,7 @@ function ChromeMenuItems({
       {flags.showManagerArea ? (
         <MenuItem onClick={onManager}>{he.managerArea}</MenuItem>
       ) : null}
+      <MenuItem onClick={onChats}>{he.directChatTitle}</MenuItem>
       <MenuItem onClick={onAccount}>{he.myAccount}</MenuItem>
       <MenuItem onClick={onLogout}>{he.logout}</MenuItem>
     </>
@@ -116,6 +119,10 @@ export default function EmployeeChromeMenu({ onLogout }: EmployeeChromeMenuProps
           onManager={() => {
             menu.close();
             menu.navigate("/manager");
+          }}
+          onChats={() => {
+            menu.close();
+            menu.navigate("/employee/chats");
           }}
           onAccount={() => {
             menu.close();

@@ -35,6 +35,7 @@ from app.domain.task_scope import (
     visible_branch_ids_for_tasks,
 )
 from app.domain.team_roster import worker_roles_for_roster
+from app.domain.work_start import arrival_at_from_visual
 from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
@@ -590,6 +591,14 @@ class TaskOccurrenceService:
             "audio_path": audio_path,
         }
 
+    def _stamp_work_start_arrival(self, occurrence, attachments) -> None:
+        if not getattr(occurrence, "is_work_start", False):
+            return
+        when = arrival_at_from_visual(attachments, now=datetime.now(TZ))
+        if when is None:
+            return
+        self._occurrences.set_started_at(occurrence.id, started_at=when)
+
     async def complete_occurrence(
         self,
         actor: ActorContext,
@@ -642,6 +651,8 @@ class TaskOccurrenceService:
         needs_review = (
             employee_submission and completion_status == task_status.COMPLETION_DONE
         )
+        if employee_submission:
+            self._stamp_work_start_arrival(occurrence, media["attachments"])
 
         if existing and occurrence.status == task_status.IN_PROGRESS:
             completion = self._completions.update_submission(

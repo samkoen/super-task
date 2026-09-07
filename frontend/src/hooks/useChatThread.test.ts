@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { he } from "../i18n/he";
+import { rememberChatMediaPreview } from "../utils/chatMediaPreview";
 import type { ChatTransport } from "../utils/chatTransport";
 import { useChatThread } from "./useChatThread";
+
+vi.mock("../utils/chatMediaPreview", async () => {
+  const actual = await vi.importActual<typeof import("../utils/chatMediaPreview")>(
+    "../utils/chatMediaPreview",
+  );
+  return { ...actual, rememberChatMediaPreview: vi.fn() };
+});
 
 function fakeTransport(overrides: Partial<ChatTransport> = {}): ChatTransport {
   return {
@@ -50,6 +58,18 @@ describe("useChatThread", () => {
     });
     expect(transport.upload).toHaveBeenCalledWith(file, "photo");
     expect(transport.send).toHaveBeenCalledWith({ photo_url: "/p.jpg" });
+    expect(rememberChatMediaPreview).toHaveBeenCalledWith({ photo_url: "/p.jpg" }, file);
+  });
+
+  it("posts a photo caption as the message body", async () => {
+    const transport = fakeTransport();
+    const { result } = renderHook(() => useChatThread({ transport, enabled: true }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const file = new File(["x"], "p.jpg", { type: "image/jpeg" });
+    await act(async () => {
+      await result.current.sendMedia(file, "photo", "  זה המדף  ");
+    });
+    expect(transport.send).toHaveBeenCalledWith({ photo_url: "/p.jpg", body: "זה המדף" });
   });
 
   it("uploads a file then posts url and name", async () => {

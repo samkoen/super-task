@@ -584,6 +584,17 @@ async def reopen_occurrence(
     }
 
 
+@router.get("/employee-chats")
+@handle_controller_errors
+def list_employee_chats(
+    request: Request,
+    service: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    return service.list_employee_chats(actor)
+
+
 @router.get("/occurrences/{occurrence_id}/messages")
 @handle_controller_errors
 def list_task_messages(

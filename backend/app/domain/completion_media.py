@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 VALID_KINDS = ("photo", "video", "audio")
+VISUAL_KINDS = frozenset({"photo", "video"})
 MAX_MIN_VIDEO_SECONDS = 600
 MAX_REQUIREMENTS = 10
 MAX_SLOT_TITLE = 80
@@ -193,6 +196,20 @@ def resolve_completion_attachments(
     )
 
 
+def normalize_captured_at(value: object | None) -> str | None:
+    """ISO avec fuseau uniquement. Vide ou invalide → None."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return None
+    return dt.isoformat()
+
+
 def first_path_of_kind(attachments: list[dict], kind: str) -> str | None:
     for item in attachments:
         if item.get("kind") == kind and (item.get("url") or "").strip():
@@ -352,6 +369,9 @@ def _normalize_attachment(item: object) -> dict:
         entry["duration_seconds"] = parse_video_duration_seconds(
             item.get("duration_seconds") or item.get("video_duration_seconds")
         )
+    captured = normalize_captured_at(item.get("captured_at"))
+    if captured:
+        entry["captured_at"] = captured
     return entry
 
 

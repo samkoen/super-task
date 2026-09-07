@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -147,7 +148,26 @@ def _delete_blob(url: str) -> None:
     _client().delete(url)
 
 
+_REMOTE_RETRY_PAUSES = (0.2, 0.6)
+
+
 def _fetch_remote(url: str) -> MediaPayload | None:
+    payload = _fetch_remote_once(url)
+    if payload or not _can_retry_remote(url):
+        return payload
+    for pause in _REMOTE_RETRY_PAUSES:
+        time.sleep(pause)
+        payload = _fetch_remote_once(url)
+        if payload:
+            return payload
+    return None
+
+
+def _can_retry_remote(url: str) -> bool:
+    return is_vercel_blob_url(url) and config.blob_storage_enabled()
+
+
+def _fetch_remote_once(url: str) -> MediaPayload | None:
     """Lit uniquement les URLs Vercel Blob — pas de HTTP générique (anti-SSRF)."""
     if not is_vercel_blob_url(url):
         logger.warning("Rejected remote media fetch (not vercel blob): %s", url[:120])

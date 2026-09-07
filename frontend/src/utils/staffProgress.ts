@@ -78,7 +78,7 @@ export function computeStaffSegments(tasks: TimelineTask[]): StaffSegments {
   return segments;
 }
 
-/** Arrivée = tâche שעון נוכחות fermée (started_at), sinon plus tôt started_at. */
+/** Arrivée = tâche שעון נוכחות fermée (started_at = 1er média visuel), sinon plus tôt started_at. */
 export function computeArrivedAt(tasks: TimelineTask[]): string | null {
   const flagged = tasks.filter((t) => t.is_work_start);
   const pool = flagged.length ? flagged.filter(isClosedPunch) : tasks;

@@ -47,8 +47,11 @@ describe("EmployeeChromeMenu", () => {
     mocks.user.is_preview = false;
     render(<EmployeeChromeMenu onLogout={() => {}} />);
     openMenu();
+    expect(screen.getByRole("menuitem", { name: he.directChatTitle })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: he.myAccount })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: he.logout })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: he.directChatTitle }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/employee/chats");
     expect(screen.queryByRole("menuitem", { name: he.viewAsEmployee })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: he.managerArea })).toBeNull();
   });

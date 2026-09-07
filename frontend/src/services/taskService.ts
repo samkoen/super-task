@@ -42,6 +42,14 @@ export interface TaskMessage {
   created_at: string;
 }
 
+export interface EmployeeTaskChat {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  last_preview: string | null;
+  last_at: string | null;
+}
+
 export interface TaskTemplate {
   id: string;
   branch_id: string;
@@ -375,6 +383,11 @@ export const taskService = {
       chat_message?: TaskMessage;
     }>(`/tasks/occurrences/${occurrenceId}/reopen`, payload ?? {});
     return response.data;
+  },
+
+  listEmployeeChats: async () => {
+    const { data } = await api.get<{ items: EmployeeTaskChat[] }>("/tasks/employee-chats");
+    return data;
   },
 
   listMessages: async (occurrenceId: string, opts?: { before?: string; limit?: number }) => {

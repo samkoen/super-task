@@ -5,6 +5,8 @@ from app.domain.completion_media import (
     effective_requirements,
     has_required_completion_visual_media,
     merge_completion_requirements,
+    normalize_attachments,
+    normalize_captured_at,
     normalize_min_video_seconds,
     normalize_requirements,
     parse_requirements_input,
@@ -220,3 +222,14 @@ def test_stale_migrated_photo_kept_when_required_or_named():
         [{"kind": "photo", "title": "מדף"}],
         photo_required=False,
     ) == [{"kind": "photo", "title": "מדף"}]
+
+
+def test_normalize_keeps_valid_captured_at():
+    assert normalize_captured_at("2026-08-18T08:12:00+03:00") == "2026-08-18T08:12:00+03:00"
+    assert normalize_captured_at("2026-08-18T05:12:00.000Z") == "2026-08-18T05:12:00+00:00"
+    assert normalize_captured_at("not-a-date") is None
+    assert normalize_captured_at("2026-08-18T08:12:00") is None
+    items = normalize_attachments(
+        [{"kind": "photo", "url": "/p.jpg", "captured_at": "2026-08-18T08:12:00+03:00"}]
+    )
+    assert items[0]["captured_at"] == "2026-08-18T08:12:00+03:00"

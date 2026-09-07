@@ -32,6 +32,7 @@ describe("employee account route", () => {
   it("is registered for the oved", () => {
     const src = readFileSync(resolve(__dirname, "../../App.tsx"), "utf8");
     expect(src).toContain('path="/employee/account"');
+    expect(src).toContain('path="/employee/chats"');
     expect(src).toContain("EmployeeProfilePage");
   });
 
@@ -40,6 +41,7 @@ describe("employee account route", () => {
     expect(layout).toContain('path: "/employee/account"');
     const chrome = readFileSync(resolve(__dirname, "../../components/Layout/EmployeeChromeMenu.tsx"), "utf8");
     expect(chrome).toContain('navigate("/employee/account")');
+    expect(chrome).toContain('navigate("/employee/chats")');
   });
 
   it("imports language from src/domain, not pages/domain", () => {

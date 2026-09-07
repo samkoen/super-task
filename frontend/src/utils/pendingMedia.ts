@@ -4,13 +4,37 @@ export type PendingMedia = {
   file: File;
   previewUrl: string;
   durationSeconds?: number | null;
+  capturedAt: string;
 };
 
 export function createPendingMedia(
   file: File,
   durationSeconds?: number | null,
 ): PendingMedia {
-  return { file, previewUrl: URL.createObjectURL(file), durationSeconds };
+  return {
+    file,
+    previewUrl: URL.createObjectURL(file),
+    durationSeconds,
+    capturedAt: new Date().toISOString(),
+  };
+}
+
+export function completionAttachmentFromPending(
+  kind: "photo" | "video" | "audio",
+  url: string,
+  media: PendingMedia | null | undefined,
+): {
+  kind: "photo" | "video" | "audio";
+  url: string;
+  duration_seconds?: number;
+  captured_at?: string;
+} {
+  return {
+    kind,
+    url,
+    duration_seconds: media?.durationSeconds ?? undefined,
+    captured_at: media?.capturedAt,
+  };
 }
 
 export function revokePendingMedia(media: PendingMedia | null | undefined): void {

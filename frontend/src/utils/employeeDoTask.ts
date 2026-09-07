@@ -32,6 +32,20 @@ export function canSubmitEmployeeTask(
   return slotsFilled;
 }
 
+/** Clôture auto dès que toutes les cases obligatoires sont remplies. */
+export function shouldAutoCompleteEmployeeTask(
+  requirementCount: number,
+  slotsFilled: boolean,
+  status: TaskStatus | string,
+  startUrl: string | null | undefined,
+  startConfirmed = true,
+): boolean {
+  if (requirementCount < 1 || !slotsFilled) return false;
+  if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return false;
+  if (hasExternalStartUrl(startUrl) && !startConfirmed) return false;
+  return true;
+}
+
 export function canDoTask(status: TaskStatus | string): boolean {
   return DOABLE.has(status);
 }
