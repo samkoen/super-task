@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { getSystemBug, listSystemBugs, submitSystemBug } from "./systemBugService";
+import { getSystemBug, listSystemBugs, deleteSystemBug, submitSystemBug } from "./systemBugService";
 import api from "./api";
 
 vi.mock("./api", () => ({
-  default: { post: vi.fn(), get: vi.fn() },
+  default: { post: vi.fn(), get: vi.fn(), delete: vi.fn() },
 }));
 
 describe("submitSystemBug", () => {
@@ -53,5 +53,11 @@ describe("submitSystemBug", () => {
     const report = await getSystemBug("1");
     expect(api.get).toHaveBeenCalledWith("/system-bugs/1");
     expect(report.note).toBe("נפל");
+  });
+
+  it("deletes an inbox item", async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: { ok: true } });
+    await deleteSystemBug("1");
+    expect(api.delete).toHaveBeenCalledWith("/system-bugs/1");
   });
 });

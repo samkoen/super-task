@@ -134,3 +134,45 @@ def test_admin_allowed_when_url_only_on_task_message():
             )
             is True
         )
+
+
+def test_system_bug_media_allowed_for_yitzhak_only():
+    import uuid
+    from types import SimpleNamespace
+
+    db = MagicMock()
+    url = "https://x.private.blob.vercel-storage.com/system_bug_screenshots/a.jpg"
+    hit = MagicMock()
+    hit.first.return_value = ("bug-1",)
+    db.execute.return_value = hit
+
+    db.get.return_value = SimpleNamespace(first_name="יצחק", last_name="ריצ'רד")
+    assert actor_can_access_media_url(
+        db,
+        ActorContext(
+            user_id=str(uuid.uuid4()),
+            role=roles.NETWORK_MANAGER,
+            network_id="n1",
+            branch_id=None,
+        ),
+        url,
+    )
+
+    db.get.return_value = SimpleNamespace(first_name="דני", last_name="כהן")
+    miss = MagicMock()
+    miss.first.return_value = None
+    db.execute.return_value = miss
+    with patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=[],
+    ):
+        assert not actor_can_access_media_url(
+            db,
+            ActorContext(
+                user_id=str(uuid.uuid4()),
+                role=roles.NETWORK_MANAGER,
+                network_id="n1",
+                branch_id=None,
+            ),
+            url,
+        )

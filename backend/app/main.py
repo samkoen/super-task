@@ -112,6 +112,8 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "direct_chat_photos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "direct_chat_videos").mkdir(exist_ok=True)
     (UPLOADS_DIR / "direct_chat_audio").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "system_bug_screenshots").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "system_bug_audio").mkdir(exist_ok=True)
     # Prod/Vercel : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
     if not IS_PRODUCTION:
         app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")

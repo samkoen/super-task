@@ -75,7 +75,21 @@ def test_inbox_is_only_for_yitzhak(client_emp, app, world_seed, monkeypatch):
     )
     assert created.status_code == 200, created.text
     assert client_emp.get("/api/system-bugs").status_code == 403
+    inbox = login_client(app, _create_yitzhak(world_seed))
+    listed = inbox.get("/api/system-bugs")
+    assert listed.status_code == 200, listed.text
+    items = listed.json()["items"]
+    assert len(items) == 1
+    assert items[0]["note"] == "הכפתור לא עובד"
+    detail = inbox.get(f"/api/system-bugs/{items[0]['id']}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["report"]["note"] == "הכפתור לא עובד"
+    me = inbox.get("/api/auth/me").json()["user"]
+    assert me["can_view_system_bug_inbox"] is True
+    assert client_emp.get("/api/auth/me").json()["user"]["can_view_system_bug_inbox"] is False
 
+
+def _create_yitzhak(world_seed):
     assert db_session.SessionLocal is not None
     db = db_session.SessionLocal()
     try:
@@ -91,16 +105,50 @@ def test_inbox_is_only_for_yitzhak(client_emp, app, world_seed, monkeypatch):
         db.commit()
     finally:
         db.close()
+    return "yitzhak@test.local"
 
-    inbox = login_client(app, "yitzhak@test.local")
-    listed = inbox.get("/api/system-bugs")
-    assert listed.status_code == 200, listed.text
-    items = listed.json()["items"]
-    assert len(items) == 1
-    assert items[0]["note"] == "הכפתור לא עובד"
-    detail = inbox.get(f"/api/system-bugs/{items[0]['id']}")
-    assert detail.status_code == 200, detail.text
-    assert detail.json()["report"]["note"] == "הכפתור לא עובד"
-    me = inbox.get("/api/auth/me").json()["user"]
-    assert me["can_view_system_bug_inbox"] is True
-    assert client_emp.get("/api/auth/me").json()["user"]["can_view_system_bug_inbox"] is False
+
+def test_inbox_proxy_serves_screenshot_and_audio(
+    client_emp, app, world_seed, monkeypatch, jpeg_bytes
+):
+    _patch_bug_delivery(monkeypatch)
+    wav = b"RIFF\x00\x00\x00\x00WAVEfmt "
+    created = client_emp.post(
+        "/api/system-bugs",
+        data={"note": "נפל", "route": "/employee", "app_version": "0.1.0"},
+        files={
+            "screenshot": ("shot.jpg", jpeg_bytes, "image/jpeg"),
+            "audio": ("explanation.wav", wav, "audio/wav"),
+        },
+    )
+    assert created.status_code == 200, created.text
+    email = _create_yitzhak(world_seed)
+    inbox = login_client(app, email)
+    items = inbox.get("/api/system-bugs").json()["items"]
+    report = items[0]
+    assert report["screenshot_url"]
+    assert report["audio_url"]
+    shot = inbox.get("/api/media/proxy", params={"src": report["screenshot_url"]})
+    audio = inbox.get("/api/media/proxy", params={"src": report["audio_url"]})
+    assert shot.status_code == 200, shot.text
+    assert shot.headers["content-type"].startswith("image/")
+    assert audio.status_code == 200, audio.text
+    assert client_emp.get(
+        "/api/media/proxy", params={"src": report["screenshot_url"]}
+    ).status_code == 403
+
+
+def test_inbox_delete_only_for_yitzhak(client_emp, app, world_seed, monkeypatch):
+    _patch_bug_delivery(monkeypatch)
+    created = client_emp.post(
+        "/api/system-bugs",
+        data={"note": "נפל", "route": "/employee", "app_version": "0.1.0"},
+    )
+    assert created.status_code == 200, created.text
+    inbox = login_client(app, _create_yitzhak(world_seed))
+    report_id = inbox.get("/api/system-bugs").json()["items"][0]["id"]
+    assert client_emp.delete(f"/api/system-bugs/{report_id}").status_code == 403
+    removed = inbox.delete(f"/api/system-bugs/{report_id}")
+    assert removed.status_code == 200, removed.text
+    assert inbox.get("/api/system-bugs").json()["items"] == []
+    assert inbox.get(f"/api/system-bugs/{report_id}").status_code == 400

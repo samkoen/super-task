@@ -53,3 +53,7 @@ export async function getSystemBug(reportId: string): Promise<SystemBugInboxItem
   const response = await api.get<{ report: SystemBugInboxItem }>(`/system-bugs/${reportId}`);
   return response.data.report;
 }
+
+export async function deleteSystemBug(reportId: string): Promise<void> {
+  await api.delete(`/system-bugs/${reportId}`);
+}
