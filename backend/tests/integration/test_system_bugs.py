@@ -1,6 +1,11 @@
 """Intégration POST /api/system-bugs : e-mail + issue GitHub optionnelle."""
 from __future__ import annotations
 
+from app.db import session as db_session
+from app.domain import roles
+from app.repositories.user_repository import UserRepository
+from tests.integration.conftest import PASSWORD, login_client
+
 
 def _patch_bug_delivery(monkeypatch):
     sent = []
@@ -60,3 +65,42 @@ def test_system_bug_rejects_empty_and_opens_github(client_emp, monkeypatch):
     assert created.json()["github_issue_url"].endswith("/issues/99")
     assert sent
     assert issues and issues[0]["screenshot"] is None
+
+
+def test_inbox_is_only_for_yitzhak(client_emp, app, world_seed, monkeypatch):
+    _patch_bug_delivery(monkeypatch)
+    created = client_emp.post(
+        "/api/system-bugs",
+        data={"note": "הכפתור לא עובד", "route": "/employee", "app_version": "0.1.0"},
+    )
+    assert created.status_code == 200, created.text
+    assert client_emp.get("/api/system-bugs").status_code == 403
+
+    assert db_session.SessionLocal is not None
+    db = db_session.SessionLocal()
+    try:
+        UserRepository(db).create_user(
+            email="yitzhak@test.local",
+            password=PASSWORD,
+            first_name="יצחק",
+            last_name="ריצ'רד",
+            role=roles.NETWORK_MANAGER,
+            email_verified=True,
+            network_id=world_seed["network_id"],
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    inbox = login_client(app, "yitzhak@test.local")
+    listed = inbox.get("/api/system-bugs")
+    assert listed.status_code == 200, listed.text
+    items = listed.json()["items"]
+    assert len(items) == 1
+    assert items[0]["note"] == "הכפתור לא עובד"
+    detail = inbox.get(f"/api/system-bugs/{items[0]['id']}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["report"]["note"] == "הכפתור לא עובד"
+    me = inbox.get("/api/auth/me").json()["user"]
+    assert me["can_view_system_bug_inbox"] is True
+    assert client_emp.get("/api/auth/me").json()["user"]["can_view_system_bug_inbox"] is False

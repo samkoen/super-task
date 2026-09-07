@@ -74,6 +74,7 @@ SYSTEM_BUG_EMAIL = os.environ.get(
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "samkoen/super-task").strip()
 GITHUB_ISSUE_LABELS = os.environ.get("GITHUB_ISSUE_LABELS", "system-bug").strip()
+SYSTEM_BUG_INBOX_USER_IDS = os.environ.get("SYSTEM_BUG_INBOX_USER_IDS", "").strip()
 
 
 def prepare_database_url(raw: str) -> str:

@@ -74,7 +74,7 @@ def user_orm_to_domain(row: orm.User | None) -> User | None:
 
 
 def user_domain_to_api(user: User) -> dict:
-    return {
+    data = {
         "id": user.id,
         "email": user.email,
         "first_name": user.first_name,
@@ -91,6 +91,19 @@ def user_domain_to_api(user: User) -> dict:
         "avatar_url": user.avatar_url,
         "excellence_slogan": user.excellence_slogan,
     }
+    data["can_view_system_bug_inbox"] = _system_bug_inbox_flag(user)
+    return data
+
+
+def _system_bug_inbox_flag(user: User) -> bool:
+    from app.core.config import SYSTEM_BUG_INBOX_USER_IDS
+    from app.domain.system_bug import can_view_system_bug_inbox, parse_inbox_user_ids
+
+    return can_view_system_bug_inbox(
+        full_name=user.full_name,
+        user_id=user.id,
+        extra_user_ids=parse_inbox_user_ids(SYSTEM_BUG_INBOX_USER_IDS),
+    )
 
 
 def invitation_orm_to_domain(row: orm.UserInvitation | None) -> UserInvitation | None:

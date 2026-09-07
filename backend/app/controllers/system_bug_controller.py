@@ -6,13 +6,14 @@ from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.system_bug_report_repository import SystemBugReportRepository
 from app.services.system_bug_service import SystemBugService, resolve_system_bug_identity
 
 router = APIRouter()
 
 
-def get_system_bug_service() -> SystemBugService:
-    return SystemBugService()
+def get_system_bug_service(db: Session = Depends(get_db)) -> SystemBugService:
+    return SystemBugService(SystemBugReportRepository(db), UserRepository(db))
 
 
 async def _read_upload(file: UploadFile | None) -> bytes | None:
@@ -59,3 +60,26 @@ async def create_system_bug(
         identity=identity,
         extra=extra,
     )
+
+
+@router.get("")
+@handle_controller_errors
+def list_system_bugs(
+    request: Request,
+    db: Session = Depends(get_db),
+    service: SystemBugService = Depends(get_system_bug_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    return {"items": service.list_inbox(actor)}
+
+
+@router.get("/{report_id}")
+@handle_controller_errors
+def get_system_bug(
+    report_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    service: SystemBugService = Depends(get_system_bug_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    return {"report": service.get_inbox_item(actor, report_id)}

@@ -548,6 +548,34 @@ class IssueReport(Base):
     )
 
 
+class SystemBugReport(Base):
+    __tablename__ = "system_bug_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    reporter_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    reporter_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    reporter_role: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    branch_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    network_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    note: Mapped[str] = mapped_column(String(4000), nullable=False, default="")
+    route: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    trail: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    app_version: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    screenshot_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    github_issue_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class UserNotification(Base):
     __tablename__ = "user_notifications"
 

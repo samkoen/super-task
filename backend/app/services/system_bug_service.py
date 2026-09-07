@@ -4,14 +4,17 @@ from __future__ import annotations
 import logging
 from html import escape
 
-from app.core.config import APP_NAME, SYSTEM_BUG_EMAIL
+from app.core.config import APP_NAME, SYSTEM_BUG_EMAIL, SYSTEM_BUG_INBOX_USER_IDS
 from app.domain.media_compression import compress_photo_bytes
 from app.domain.scope import ActorContext
 from app.domain.system_bug import (
     MAX_NOTE_LEN,
     SystemBugIdentity,
+    audio_blob_meta,
+    can_view_system_bug_inbox,
     has_system_bug_explanation,
     mail_safe_audio_attachment,
+    parse_inbox_user_ids,
     parse_trail,
     system_bug_issue_body,
     system_bug_meta_rows,
@@ -19,8 +22,11 @@ from app.domain.system_bug import (
     system_bug_subject,
 )
 from app.integrations.github import create_system_bug_issue, github_issues_enabled
+from app.models.system_bug_report import SystemBugReport
 from app.repositories.branch_repository import BranchRepository
+from app.repositories.system_bug_report_repository import SystemBugReportRepository
 from app.repositories.user_repository import UserRepository
+from app.services import blob_storage
 from app.services.email_delivery import deliver_html_email
 
 Attachment = tuple[str, bytes]
@@ -28,6 +34,14 @@ logger = logging.getLogger(__name__)
 
 
 class SystemBugService:
+    def __init__(
+        self,
+        repo: SystemBugReportRepository | None = None,
+        user_repo: UserRepository | None = None,
+    ):
+        self._repo = repo
+        self._users = user_repo
+
     def submit(
         self,
         actor: ActorContext,
@@ -41,37 +55,99 @@ class SystemBugService:
         identity: SystemBugIdentity,
         extra: dict[str, str] | None = None,
     ) -> dict:
-        note = (note or "").strip()[:MAX_NOTE_LEN]
-        has_audio = bool(audio)
-        shot, shot_name = _prepare_screenshot(screenshot)
-        if not has_system_bug_explanation(note, has_audio=has_audio):
-            raise ValueError("הוסיפו טקסט או הקלטה")
-        recipients = system_bug_recipients(SYSTEM_BUG_EMAIL)
-        if not recipients:
-            raise ValueError("יעד הדיווח אינו מוגדר")
-        subject = system_bug_subject(route=route, role=actor.role, version=app_version)
+        note, has_audio, shot, shot_name = _prepare_submit(note, screenshot, audio)
         trail = parse_trail(trail_raw)
         extra = extra or {}
-        audio_file = mail_safe_audio_attachment(audio)
-        html = _html_body(
+        subject = _send_bug_mail(
+            actor,
             identity,
-            actor.role,
             note,
             route,
             trail,
             app_version,
             extra,
-            bool(shot),
-            audio_file[0] if audio_file else None,
+            shot,
+            shot_name,
+            audio,
             has_audio,
         )
-        if not _deliver_to_all(
-            recipients, subject, html, _mail_attachments(shot, shot_name, audio_file)
-        ):
-            raise RuntimeError("שליחת הדיווח נכשלה")
-        return _submit_ok(
+        result = _submit_ok(
             actor, identity, subject, note, route, trail, app_version, extra, shot, has_audio
         )
+        saved = self._persist(
+            actor,
+            identity,
+            note,
+            route,
+            trail,
+            app_version,
+            shot,
+            shot_name,
+            audio,
+            result.get("github_issue_url"),
+        )
+        if saved:
+            result["id"] = saved.id
+        return result
+
+    def list_inbox(self, actor: ActorContext) -> list[dict]:
+        self._assert_inbox(actor)
+        if self._repo is None:
+            return []
+        return [row.to_dict() for row in self._repo.list_recent()]
+
+    def get_inbox_item(self, actor: ActorContext, report_id: str) -> dict:
+        self._assert_inbox(actor)
+        row = self._repo.find_by_id(report_id) if self._repo else None
+        if not row:
+            raise ValueError("דיווח לא נמצא")
+        return row.to_dict()
+
+    def _assert_inbox(self, actor: ActorContext) -> None:
+        name = ""
+        if self._users:
+            user = self._users.find_by_id(actor.user_id)
+            name = user.full_name if user else ""
+        extra = parse_inbox_user_ids(SYSTEM_BUG_INBOX_USER_IDS)
+        allowed = can_view_system_bug_inbox(
+            full_name=name, user_id=actor.user_id, extra_user_ids=extra
+        )
+        if not allowed:
+            raise PermissionError("אין הרשאה לצפות בדיווחי תקלות מערכת")
+
+    def _persist(
+        self,
+        actor: ActorContext,
+        identity: SystemBugIdentity,
+        note: str,
+        route: str,
+        trail: list[str],
+        version: str,
+        shot: bytes | None,
+        shot_name: str,
+        audio: bytes | None,
+        github_url: str | None,
+    ) -> SystemBugReport | None:
+        if self._repo is None:
+            return None
+        try:
+            return self._repo.create(
+                reporter_user_id=actor.user_id,
+                reporter_name=identity.user_name,
+                reporter_role=actor.role,
+                branch_name=identity.branch_name,
+                network_name=identity.network_name,
+                note=note,
+                route=route,
+                trail=trail,
+                app_version=version,
+                screenshot_url=_store_screenshot(shot, shot_name),
+                audio_url=_store_audio(audio),
+                github_issue_url=github_url,
+            )
+        except Exception:
+            logger.exception("[system-bug] persist failed")
+            return None
 
 
 def resolve_system_bug_identity(
@@ -188,6 +264,79 @@ def _deliver_to_all(
         attachments=attachments,
         allow_simulation=False,
     )
+
+
+def _send_bug_mail(
+    actor: ActorContext,
+    identity: SystemBugIdentity,
+    note: str,
+    route: str,
+    trail: list[str],
+    app_version: str,
+    extra: dict[str, str],
+    shot: bytes | None,
+    shot_name: str,
+    audio: bytes | None,
+    has_audio: bool,
+) -> str:
+    recipients = system_bug_recipients(SYSTEM_BUG_EMAIL)
+    if not recipients:
+        raise ValueError("יעד הדיווח אינו מוגדר")
+    subject = system_bug_subject(route=route, role=actor.role, version=app_version)
+    audio_file = mail_safe_audio_attachment(audio)
+    html = _html_body(
+        identity,
+        actor.role,
+        note,
+        route,
+        trail,
+        app_version,
+        extra,
+        bool(shot),
+        audio_file[0] if audio_file else None,
+        has_audio,
+    )
+    attachments = _mail_attachments(shot, shot_name, audio_file)
+    if not _deliver_to_all(recipients, subject, html, attachments):
+        raise RuntimeError("שליחת הדיווח נכשלה")
+    return subject
+
+
+def _prepare_submit(
+    note: str, screenshot: bytes | None, audio: bytes | None
+) -> tuple[str, bool, bytes | None, str]:
+    cleaned = (note or "").strip()[:MAX_NOTE_LEN]
+    has_audio = bool(audio)
+    shot, shot_name = _prepare_screenshot(screenshot)
+    if not has_system_bug_explanation(cleaned, has_audio=has_audio):
+        raise ValueError("הוסיפו טקסט או הקלטה")
+    return cleaned, has_audio, shot, shot_name
+
+
+def _store_screenshot(data: bytes | None, name: str) -> str | None:
+    if not data:
+        return None
+    ext = ".jpg" if name.endswith(".jpg") else ".png"
+    ctype = "image/jpeg" if ext == ".jpg" else "image/png"
+    return _store_blob("system_bug_screenshots", data, ext, ctype)
+
+
+def _store_audio(data: bytes | None) -> str | None:
+    meta = audio_blob_meta(data)
+    if not data or not meta:
+        return None
+    ext, ctype = meta
+    return _store_blob("system_bug_audio", data, ext, ctype)
+
+
+def _store_blob(folder: str, data: bytes, ext: str, content_type: str) -> str | None:
+    try:
+        return blob_storage.put_bytes(
+            folder=folder, data=data, ext=ext, content_type=content_type
+        )
+    except Exception:
+        logger.exception("[system-bug] blob upload failed")
+        return None
 
 
 def _prepare_screenshot(data: bytes | None) -> tuple[bytes | None, str]:

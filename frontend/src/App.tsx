@@ -28,6 +28,7 @@ const ManagerReportsPage = lazy(() => import("./pages/manager/ManagerReportsPage
 const ManagerProfilePage = lazy(() => import("./pages/manager/ManagerProfilePage"));
 const EmployeeTasksPage = lazy(() => import("./pages/employee/EmployeeTasksPage"));
 const EmployeeProfilePage = lazy(() => import("./pages/employee/EmployeeProfilePage"));
+const SystemBugInboxPage = lazy(() => import("./pages/manager/SystemBugInboxPage"));
 
 function PageLoader() {
   return (
@@ -88,6 +89,14 @@ export default function App() {
         }
       >
         <Route path="/" element={<HomeRedirect />} />
+        <Route
+          path="/system-bugs"
+          element={
+            <LazyPage>
+              <SystemBugInboxPage />
+            </LazyPage>
+          }
+        />
         <Route element={<ProtectedRoute roles={["admin"]} />}>
           <Route
             path="/admin"
