@@ -1,6 +1,23 @@
 import api from "./api";
 import { mailAudioFileName } from "../utils/audioToMailSafe";
 
+export interface SystemBugInboxItem {
+  id: string;
+  reporter_user_id: string | null;
+  reporter_name: string;
+  reporter_role: string;
+  branch_name: string;
+  network_name: string;
+  note: string;
+  route: string;
+  trail: string[];
+  app_version: string;
+  screenshot_url: string | null;
+  audio_url: string | null;
+  github_issue_url: string | null;
+  created_at: string;
+}
+
 export async function submitSystemBug(payload: {
   note: string;
   route: string;
@@ -25,4 +42,14 @@ export async function submitSystemBug(payload: {
     form.append("audio", payload.audio, mailAudioFileName(payload.audio));
   }
   await api.post("/system-bugs", form, { timeout: 60_000 });
+}
+
+export async function listSystemBugs(): Promise<SystemBugInboxItem[]> {
+  const response = await api.get<{ items: SystemBugInboxItem[] }>("/system-bugs");
+  return response.data.items;
+}
+
+export async function getSystemBug(reportId: string): Promise<SystemBugInboxItem> {
+  const response = await api.get<{ report: SystemBugInboxItem }>(`/system-bugs/${reportId}`);
+  return response.data.report;
 }

@@ -35,6 +35,14 @@ class User:
     def to_dict(self) -> dict:
         data = asdict(self)
         data["full_name"] = self.full_name
+        from app.core.config import SYSTEM_BUG_INBOX_USER_IDS
+        from app.domain.system_bug import can_view_system_bug_inbox, parse_inbox_user_ids
+
+        data["can_view_system_bug_inbox"] = can_view_system_bug_inbox(
+            full_name=self.full_name,
+            user_id=self.id,
+            extra_user_ids=parse_inbox_user_ids(SYSTEM_BUG_INBOX_USER_IDS),
+        )
         return data
 
     @classmethod

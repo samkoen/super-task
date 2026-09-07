@@ -157,3 +157,40 @@ def system_bug_issue_body(
 
 def system_bug_screenshot_markdown(image_url: str) -> str:
     return f"\n\n## צילום מסך\n\n![screenshot]({image_url})\n"
+
+
+_GERESH_CHARS = "'׳'`’"
+SYSTEM_BUG_INBOX_NAMES = frozenset({"יצחק ריצרד"})
+
+
+def normalize_person_name(name: str) -> str:
+    cleaned = (name or "").translate({ord(ch): None for ch in _GERESH_CHARS})
+    return " ".join(cleaned.split())
+
+
+def parse_inbox_user_ids(raw: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
+
+
+def can_view_system_bug_inbox(
+    *,
+    full_name: str,
+    user_id: str = "",
+    extra_user_ids: tuple[str, ...] = (),
+) -> bool:
+    if user_id and user_id in extra_user_ids:
+        return True
+    return normalize_person_name(full_name) in SYSTEM_BUG_INBOX_NAMES
+
+
+def audio_blob_meta(data: bytes | None) -> tuple[str, str] | None:
+    if not data:
+        return None
+    name = mail_safe_audio_filename(data)
+    if name == "explanation.wav":
+        return ".wav", "audio/wav"
+    if name == "explanation.mp3":
+        return ".mp3", "audio/mpeg"
+    if name == "explanation.m4a":
+        return ".m4a", "audio/mp4"
+    return ".webm", "audio/webm"

@@ -24,6 +24,7 @@ import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import RepeatIcon from "@mui/icons-material/Repeat";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AppBrandMark from "../ui/AppBrandMark";
@@ -54,6 +55,7 @@ import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
 import EmployeeChromeMenu from "./EmployeeChromeMenu";
 import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
+import { canViewSystemBugInbox, SYSTEM_BUG_INBOX_PATH } from "../../utils/systemBugInbox";
 import {
   managerBottomContentPadCss,
   shouldShowManagerChrome,
@@ -96,6 +98,16 @@ function OutletSuspense({ children }: { children?: ReactNode }) {
   );
 }
 
+type NavItem = { text: string; icon: ReactNode; path: string };
+
+function withSystemBugInbox(user: Parameters<typeof canViewSystemBugInbox>[0], items: NavItem[]): NavItem[] {
+  if (!canViewSystemBugInbox(user)) return items;
+  return [
+    ...items,
+    { text: he.systemBugInbox, icon: <BugReportOutlinedIcon />, path: SYSTEM_BUG_INBOX_PATH },
+  ];
+}
+
 function Layout() {
   const { user, loading, logout } = useAuth();
   useTaskEventSource(Boolean(user) && !loading);
@@ -120,7 +132,7 @@ function Layout() {
   const menuItems = useMemo(() => {
     if (!user) return [];
     if (user.role === "admin") {
-      return [
+      return withSystemBugInbox(user, [
         { text: he.adminArea, icon: <DashboardIcon />, path: "/admin" },
         { text: he.adminNetworks, icon: <BusinessIcon />, path: "/admin/networks" },
         { text: he.adminBranches, icon: <StoreIcon />, path: "/admin/branches" },
@@ -131,10 +143,10 @@ function Layout() {
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/admin/gallery" },
         { text: he.adminUsers, icon: <PeopleIcon />, path: "/admin/users" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/admin/invitations" },
-      ];
+      ]);
     }
     if (user.role === "network_manager" || user.role === "branch_manager") {
-      const items = [
+      const items: NavItem[] = [
         { text: he.managerArea, icon: <DashboardIcon />, path: "/manager" },
       ];
       if (user.role === "branch_manager") {
@@ -155,12 +167,12 @@ function Layout() {
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
         { text: he.myAccount, icon: <AccountCircleIcon />, path: "/manager/account" },
       );
-      return items;
+      return withSystemBugInbox(user, items);
     }
-    return [
+    return withSystemBugInbox(user, [
       { text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" },
       { text: he.myAccount, icon: <AccountCircleIcon />, path: "/employee/account" },
-    ];
+    ]);
   }, [user]);
 
   const handleLogout = () => {

@@ -95,3 +95,23 @@ def test_issue_body_mentions_audio_mail_only_without_blob():
     assert "הקלטה מצורפת למייל" in body
     assert "webm" not in body
     assert "צילום מסך מצורף למייל" in body
+
+
+def test_audio_blob_meta_keeps_wav_and_falls_back_webm():
+    from app.domain.system_bug import audio_blob_meta
+
+    wav = b"RIFF\x00\x00\x00\x00WAVEfmt "
+    assert audio_blob_meta(wav) == (".wav", "audio/wav")
+    assert audio_blob_meta(b"not-mail-safe") == (".webm", "audio/webm")
+    assert audio_blob_meta(None) is None
+
+
+def test_inbox_allows_yitzhak_name_variants():
+    from app.domain.system_bug import can_view_system_bug_inbox, normalize_person_name
+
+    assert normalize_person_name("יצחק ריצ'רד") == "יצחק ריצרד"
+    assert can_view_system_bug_inbox(full_name="יצחק ריצרד") is True
+    assert can_view_system_bug_inbox(full_name="יצחק ריצ'רד") is True
+    assert can_view_system_bug_inbox(full_name="דני כהן") is False
+    assert can_view_system_bug_inbox(full_name="דני", user_id="u1", extra_user_ids=("u1",)) is True
+    assert can_view_system_bug_inbox(full_name="דני", user_id="u2", extra_user_ids=("u1",)) is False

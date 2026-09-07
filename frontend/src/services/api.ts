@@ -50,6 +50,8 @@ export interface User {
   excellence_slogan?: string | null;
   /** Memberships multi-snif (oved). */
   branches?: UserBranchMembership[];
+  /** Rubrique דיווח תקלות מערכת (יצחק ריצרד). */
+  can_view_system_bug_inbox?: boolean;
   /** Snif actif à l'écran (oved). */
   active_branch_id?: string | null;
   /** Mode test menahel : session réelle inchangée, UI oved. */

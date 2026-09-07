@@ -216,3 +216,49 @@ def test_resolve_identity_falls_back_to_hint_not_guid():
     assert ident.user_name == ""
     assert ident.branch_name == "שפע"
     assert ident.network_name == ""
+
+
+def test_submit_persists_screenshot_and_audio(monkeypatch):
+    _patch_mail(monkeypatch)
+    stored: list[dict] = []
+    repo = MagicMock()
+    repo.create.return_value = SimpleNamespace(id="bug-1")
+
+    def fake_put(**kwargs):
+        stored.append(kwargs)
+        return f"/uploads/{kwargs['folder']}/x{kwargs['ext']}"
+
+    monkeypatch.setattr("app.services.system_bug_service.blob_storage.put_bytes", fake_put)
+    result = SystemBugService(repo).submit(
+        _actor(),
+        note="הכפתור לא עובד",
+        route="/employee",
+        trail_raw='["/employee"]',
+        app_version="0.1.0",
+        screenshot=_png_shot(),
+        audio=_wav_bytes(),
+        identity=_identity(),
+    )
+    assert result["id"] == "bug-1"
+    folders = {item["folder"] for item in stored}
+    assert folders == {"system_bug_screenshots", "system_bug_audio"}
+    kwargs = repo.create.call_args.kwargs
+    assert kwargs["note"] == "הכפתור לא עובד"
+    assert kwargs["screenshot_url"].startswith("/uploads/system_bug_screenshots/")
+    assert kwargs["audio_url"].startswith("/uploads/system_bug_audio/")
+
+
+def test_list_inbox_only_for_yitzhak():
+    repo = MagicMock()
+    repo.list_recent.return_value = [SimpleNamespace(to_dict=lambda: {"id": "1", "note": "נפל"})]
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    items = SystemBugService(repo, users).list_inbox(_actor())
+    assert items == [{"id": "1", "note": "נפל"}]
+
+
+def test_list_inbox_denies_other_user():
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="דני כהן")
+    with pytest.raises(PermissionError, match="אין הרשאה"):
+        SystemBugService(MagicMock(), users).list_inbox(_actor())
