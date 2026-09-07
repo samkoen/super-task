@@ -25,7 +25,17 @@ export interface ArrowAnnotation {
 
 export type PhotoAnnotation = CircleAnnotation | EllipseAnnotation | ArrowAnnotation;
 
-export const ANNOTATION_STROKE = "#e53935";
+export const ANNOTATION_STROKE_MANAGER = "#e53935";
+export const ANNOTATION_STROKE_EMPLOYEE = "#1e88e5";
+export const ANNOTATION_STROKE = ANNOTATION_STROKE_MANAGER;
+
+export function annotationStrokeForRole(
+  role: string | null | undefined,
+  isPreview = false,
+): string {
+  if (isPreview || role === "employee") return ANNOTATION_STROKE_EMPLOYEE;
+  return ANNOTATION_STROKE_MANAGER;
+}
 
 function drawArrowHead(
   ctx: CanvasRenderingContext2D,
@@ -48,9 +58,13 @@ export function strokeWidthForCanvas(width: number, height: number): number {
   return Math.max(2, Math.min(width, height) * 0.004);
 }
 
-export function drawAnnotation(ctx: CanvasRenderingContext2D, shape: PhotoAnnotation) {
-  ctx.strokeStyle = ANNOTATION_STROKE;
-  ctx.fillStyle = ANNOTATION_STROKE;
+export function drawAnnotation(
+  ctx: CanvasRenderingContext2D,
+  shape: PhotoAnnotation,
+  stroke = ANNOTATION_STROKE,
+) {
+  ctx.strokeStyle = stroke;
+  ctx.fillStyle = stroke;
   ctx.lineWidth = strokeWidthForCanvas(ctx.canvas.width, ctx.canvas.height);
 
   if (shape.type === "circle") {
@@ -156,7 +170,8 @@ export function scaleAnnotations(
 export function renderAnnotatedImage(
   image: HTMLImageElement,
   shapes: PhotoAnnotation[],
-  displaySize?: { width: number; height: number }
+  displaySize?: { width: number; height: number },
+  stroke = ANNOTATION_STROKE,
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
@@ -175,7 +190,7 @@ export function renderAnnotatedImage(
         )
       : shapes;
   for (const shape of exportShapes) {
-    drawAnnotation(ctx, shape);
+    drawAnnotation(ctx, shape, stroke);
   }
   return new Promise((resolve, reject) => {
     canvas.toBlob(

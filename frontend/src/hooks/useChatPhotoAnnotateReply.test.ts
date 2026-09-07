@@ -12,7 +12,17 @@ describe("useChatPhotoAnnotateReply", () => {
     await act(async () => {
       await result.current.submit(file);
     });
-    expect(sendPhoto).toHaveBeenCalledWith(file);
+    expect(sendPhoto).toHaveBeenCalledWith(file, undefined);
     expect(result.current.photoUrl).toBeNull();
+  });
+
+  it("forwards a caption with the annotated photo", async () => {
+    const sendPhoto = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useChatPhotoAnnotateReply(sendPhoto));
+    const file = new File(["x"], "a.jpg", { type: "image/jpeg" });
+    await act(async () => {
+      await result.current.submit(file, "זה המדף");
+    });
+    expect(sendPhoto).toHaveBeenCalledWith(file, "זה המדף");
   });
 });

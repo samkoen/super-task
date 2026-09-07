@@ -17,7 +17,13 @@ from app.domain.employee_language import normalize_employee_language
 from app.domain.break_notify import break_alert_payload
 from app.domain.chat_file import stored_file_name
 from app.domain.chat_page import clamp_chat_page_size
-from app.domain.task_scope import can_manage_tasks
+from app.domain.employee_task_chats import (
+    employee_task_chat_card,
+    is_open_employee_chat_task,
+    sort_employee_task_chats,
+)
+from app.domain.scope import ActorContext
+from app.domain.task_scope import can_manage_tasks, can_use_employee_work_surface
 from app.domain.task_chat import (
     can_employee_post,
     can_manager_post,
@@ -85,6 +91,19 @@ class TaskMessageService:
         self._users = user_repo
         self._branches = branch_repo
         self._completions = completion_repo
+
+    def list_employee_chats(self, actor: ActorContext) -> dict:
+        if not can_use_employee_work_surface(actor):
+            raise PermissionError("אין הרשאה לרשימת שיחות")
+        pairs = self._messages.list_open_chats_for_assignee(
+            actor.user_id, exclude_statuses=task_status.TERMINAL
+        )
+        items = [
+            employee_task_chat_card(occ, msg)
+            for occ, msg in pairs
+            if is_open_employee_chat_task(occ.status)
+        ]
+        return {"items": sort_employee_task_chats(items)}
 
     def list_messages(
         self,

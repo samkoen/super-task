@@ -4,7 +4,9 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import NearMeIcon from "@mui/icons-material/NearMe";
 import AdjustIcon from "@mui/icons-material/Adjust";
 import PanToolIcon from "@mui/icons-material/PanTool";
+import { useAuth } from "../../context/AuthContext";
 import {
+  annotationStrokeForRole,
   blobToFile,
   drawAnnotation,
   hitTestAnnotation,
@@ -78,6 +80,10 @@ function pointerToCanvas(
 
 const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnotationCanvasProps>(
   function PhotoAnnotationCanvas({ imageBlob, hint }, ref) {
+    const { user } = useAuth();
+    const stroke = annotationStrokeForRole(user?.role, Boolean(user?.is_preview));
+    const strokeRef = useRef(stroke);
+    strokeRef.current = stroke;
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
@@ -120,7 +126,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       for (let i = 0; i < shapesRef.current.length; i += 1) {
-        drawAnnotation(ctx, shapesRef.current[i]);
+        drawAnnotation(ctx, shapesRef.current[i], strokeRef.current);
         if (selectedRef.current === i) {
           ctx.save();
           ctx.strokeStyle = "#1976d2";
@@ -150,7 +156,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
         }
       }
       if (draftRef.current) {
-        drawAnnotation(ctx, draftRef.current);
+        drawAnnotation(ctx, draftRef.current, strokeRef.current);
       }
     };
 
@@ -319,10 +325,12 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
         if (!image || !canvas) {
           throw new Error("canvas not ready");
         }
-        const blob = await renderAnnotatedImage(image, shapesRef.current, {
-          width: canvas.width,
-          height: canvas.height,
-        });
+        const blob = await renderAnnotatedImage(
+          image,
+          shapesRef.current,
+          { width: canvas.width, height: canvas.height },
+          strokeRef.current,
+        );
         return blobToFile(blob, `task-photo-${Date.now()}.jpg`);
       },
     }));

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  completionAttachmentFromPending,
   createPendingMedia,
   replacePendingMedia,
   revokePendingMedia,
@@ -23,7 +24,22 @@ describe("pendingMedia", () => {
     const pending = createPendingMedia(file);
     expect(pending.file).toBe(file);
     expect(pending.previewUrl.startsWith("blob:")).toBe(true);
+    expect(pending.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     revokePendingMedia(pending);
+  });
+
+  it("forwards capturedAt on the completion attachment", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-18T08:12:00+03:00"));
+    const pending = createPendingMedia(new File(["x"], "x.jpg", { type: "image/jpeg" }));
+    expect(completionAttachmentFromPending("photo", "/p.jpg", pending)).toEqual({
+      kind: "photo",
+      url: "/p.jpg",
+      duration_seconds: undefined,
+      captured_at: new Date("2026-08-18T08:12:00+03:00").toISOString(),
+    });
+    revokePendingMedia(pending);
+    vi.useRealTimers();
   });
 
   it("replacePendingMedia revokes the previous URL", () => {

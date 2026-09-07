@@ -12,9 +12,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  List,
-  ListItemButton,
-  ListItemText,
   Paper,
   TextField,
   Typography,
@@ -39,7 +36,7 @@ import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { playTaskEndSound } from "../../utils/notificationSounds";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { taskIdFromSearch } from "../../utils/notificationNavigation";
 import {
   collectUniqueTasks,
@@ -57,23 +54,14 @@ import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
 import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
-import DirectChatThread from "../../components/chat/DirectChatThread";
-import FullscreenBackAppBar, {
-  fullscreenChatBodySx,
-  fullscreenChatDialogPaperSx,
-} from "../../components/chat/FullscreenBackAppBar";
-import { directChatService, type DirectChatCard } from "../../services/directChatService";
+import { directChatService } from "../../services/directChatService";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
-import {
-  employeeManagerLabel,
-  employeeOpenMineScope,
-  employeeSurfaceChatState,
-  needsEmployeeManagerPicker,
-} from "../../utils/employeeDirectChat";
+import { employeeSurfaceChatState } from "../../utils/employeeDirectChat";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import {
   type PendingMedia,
+  completionAttachmentFromPending,
   revokePendingMedia,
   uploadPendingMedia,
 } from "../../utils/pendingMedia";
@@ -88,6 +76,7 @@ import {
   cardAfterStart,
   needsTaskStart,
   revertStartedOnDashboard,
+  shouldAutoCompleteEmployeeTask,
   shouldOpenStartUrlOnBegin,
   waitForInFlightLinkedStart,
 } from "../../utils/employeeDoTask";
@@ -116,11 +105,7 @@ async function uploadRequirementSlots(
           : taskService.uploadAudio;
     const url = await uploadPendingMedia(media, upload);
     if (!url) continue;
-    attachments.push({
-      kind: req.kind,
-      url,
-      duration_seconds: media?.durationSeconds ?? undefined,
-    });
+    attachments.push(completionAttachmentFromPending(req.kind, url, media));
   }
   return attachments;
 }
@@ -208,6 +193,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
 
 export default function EmployeeTasksPage() {
   const { user, refresh } = useAuth();
+  const navigate = useNavigate();
   const employeeLanguage = ((user?.preferred_language || "he") as EmployeeLanguage);
   const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useFeedback();
@@ -220,12 +206,7 @@ export default function EmployeeTasksPage() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatId, setChatId] = useState<string | null>(null);
   const [chatUnread, setChatUnread] = useState(0);
-  const [chatManagers, setChatManagers] = useState<DirectChatCard[]>([]);
-  const [chatPickerOpen, setChatPickerOpen] = useState(false);
-  const [chatTitle, setChatTitle] = useState(he.directChatManagerTitle);
   const [reportText, setReportText] = useState("");
   const [reportPhotoUrl, setReportPhotoUrl] = useState("");
   const [reportVideoUrl, setReportVideoUrl] = useState("");
@@ -301,7 +282,6 @@ export default function EmployeeTasksPage() {
       const data = await directChatService.inbox();
       const surface = employeeSurfaceChatState(data, user?.role);
       setChatUnread(surface.unread);
-      setChatManagers(surface.managers);
     } catch {
       /* ignore */
     }
@@ -311,38 +291,6 @@ export default function EmployeeTasksPage() {
     void loadChatUnread();
   }, [loadChatUnread]);
   useDirectChatLiveSync(null, () => void loadChatUnread());
-
-  const openThread = async (scope?: "branch" | "network", title = he.directChatManagerTitle) => {
-    const opened = await directChatService.openMine(scope);
-    setChatId(opened.conversation.id);
-    setChatTitle(title);
-    setChatOpen(true);
-    setChatPickerOpen(false);
-    setChatUnread(0);
-  };
-
-  const openChat = async () => {
-    try {
-      const data = await directChatService.inbox();
-      const surface = employeeSurfaceChatState(data, user?.role);
-      const managers = surface.managers;
-      setChatManagers(managers);
-      setChatUnread(surface.unread);
-      if (needsEmployeeManagerPicker(managers)) {
-        setChatPickerOpen(true);
-        return;
-      }
-      const only = managers[0];
-      await openThread(employeeOpenMineScope(managers), only ? employeeManagerLabel(only) : he.directChatManagerTitle);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    }
-  };
-
-  const closeChat = () => {
-    setChatOpen(false);
-    void loadChatUnread();
-  };
 
   const clearCompletionMedia = useCallback(() => {
     setSlotMedia((prev) => {
@@ -454,8 +402,8 @@ export default function EmployeeTasksPage() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!detailTask) return;
+  const handleSubmit = async (slots = slotMedia) => {
+    if (!detailTask || saving) return;
     const openLink = shouldOpenStartUrlOnBegin(detailTask.status, detailTask.start_url);
     if (openLink) {
       openExternalUrl(detailTask.start_url);
@@ -482,7 +430,7 @@ export default function EmployeeTasksPage() {
         if (!started) return;
         task = started;
       }
-      const attachments = await uploadRequirementSlots(effectiveRequirements(task), slotMedia);
+      const attachments = await uploadRequirementSlots(effectiveRequirements(task), slots);
       await taskService.complete(task.id, {
         status: "completed",
         note: note || undefined,
@@ -497,6 +445,28 @@ export default function EmployeeTasksPage() {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSlotsChange = (next: Array<PendingMedia | null>) => {
+    setSlotMedia(next);
+    if (!detailTask || saving) return;
+    const filled = meetsCompletionRequirements(
+      requirements,
+      next.map((item, i) =>
+        item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
+      ),
+    );
+    if (
+      shouldAutoCompleteEmployeeTask(
+        requirements.length,
+        filled,
+        detailTask.status,
+        detailTask.start_url,
+        linkedStartReady,
+      )
+    ) {
+      void handleSubmit(next);
     }
   };
 
@@ -782,47 +752,13 @@ export default function EmployeeTasksPage() {
             fullWidth
             variant="contained"
             startIcon={<ChatOutlinedIcon />}
-            onClick={() => void openChat()}
+            onClick={() => navigate("/employee/chats")}
             sx={{ borderRadius: 2.5, py: 1.1 }}
           >
             {he.directChatOpen}
           </Button>
         </Badge>
       </Paper>
-
-      <Dialog
-        fullScreen
-        open={chatOpen}
-        onClose={closeChat}
-        dir="rtl"
-        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-      >
-        <FullscreenBackAppBar title={chatTitle} onBack={closeChat} />
-        <Box sx={fullscreenChatBodySx}>
-          {chatId && <DirectChatThread conversationId={chatId} onSent={() => void loadChatUnread()} />}
-        </Box>
-      </Dialog>
-
-      <Dialog open={chatPickerOpen} onClose={() => setChatPickerOpen(false)} fullWidth maxWidth="xs" dir="rtl">
-        <DialogTitle>{he.directChatPickManager}</DialogTitle>
-        <List>
-          {chatManagers.map((card) => (
-            <ListItemButton
-              key={`${card.scope}-${card.counterpart_user_id}`}
-              onClick={() =>
-                void openThread(card.scope === "network" ? "network" : "branch", employeeManagerLabel(card)).catch((e) =>
-                  showError(e instanceof ApiError ? e.message : he.errorGeneric),
-                )
-              }
-            >
-              <ListItemText
-                primary={employeeManagerLabel(card)}
-                secondary={card.unread_count ? String(card.unread_count) : undefined}
-              />
-            </ListItemButton>
-          ))}
-        </List>
-      </Dialog>
 
       <EmployeeClaimTaskDialog
         open={claimOpen}
@@ -876,7 +812,7 @@ export default function EmployeeTasksPage() {
           detailTask && canDoTask(detailTask.status)
             ? {
                 slots: slotMedia,
-                onSlotsChange: setSlotMedia,
+                onSlotsChange: handleSlotsChange,
                 note,
                 onNoteChange: setNote,
                 onSubmit: () => void handleSubmit(),

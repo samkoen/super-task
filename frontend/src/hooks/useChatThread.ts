@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from "react";
 import { he } from "../i18n/he";
 import type { ChatMediaKind } from "../utils/chatTransport";
 import { parseRecipientBreak, type BreakAlertTarget } from "../utils/breakAlert";
+import { clipChatCaption } from "../utils/chatAnnotateReply";
+import { rememberChatMediaPreview } from "../utils/chatMediaPreview";
 import { chatErrorMessage, type ChatSendResult, type ChatTransport } from "../utils/chatTransport";
 import { usePagedChatMessages } from "./usePagedChatMessages";
 import { useChatPhotoAnnotateReply } from "./useChatPhotoAnnotateReply";
@@ -98,18 +100,19 @@ function useChatSend(args: {
     });
   }, [afterSend, body, runBusy, setError, transportRef]);
 
-  const sendMedia = useCallback((file: File, kind: ChatMediaKind) => {
+  const sendMedia = useCallback((file: File, kind: ChatMediaKind, caption?: string) => {
     return runBusy(async () => {
-      await afterSend(await transportRef.current.send(
-        await transportRef.current.upload(file, kind),
-      ));
+      const payload = await transportRef.current.upload(file, kind);
+      rememberChatMediaPreview(payload, file);
+      const body = clipChatCaption(caption);
+      await afterSend(await transportRef.current.send(body ? { ...payload, body } : payload));
     });
   }, [afterSend, runBusy, transportRef]);
 
   return {
     sendText,
     sendMedia,
-    annotateReply: useChatPhotoAnnotateReply((file) => sendMedia(file, "photo")),
+    annotateReply: useChatPhotoAnnotateReply((file, caption) => sendMedia(file, "photo", caption)),
   };
 }
 

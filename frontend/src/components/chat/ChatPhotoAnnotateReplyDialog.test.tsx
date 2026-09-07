@@ -59,7 +59,29 @@ describe("ChatPhotoAnnotateReplyDialog", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: he.taskChatSend }));
     await waitFor(() => {
-      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }));
+      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }), undefined);
+    });
+  });
+
+  it("sends a caption typed under the photo", async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ChatPhotoAnnotateReplyDialog
+        photoUrl="/uploads/p.jpg"
+        sending={false}
+        onClose={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(he.chatAnnotateReplyCaption)).toBeTruthy();
+    });
+    fireEvent.change(screen.getByLabelText(he.chatAnnotateReplyCaption), {
+      target: { value: "  זה המדף  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSend }));
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }), "זה המדף");
     });
   });
 });

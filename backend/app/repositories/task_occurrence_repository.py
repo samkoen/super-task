@@ -319,6 +319,14 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
+    def set_started_at(self, id_: str, *, started_at: datetime) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.started_at = started_at
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
     def clear_manager_next_for_assignee(self, assignee_user_id: str) -> None:
         uid = mp.parse_uuid(assignee_user_id)
         rows = (

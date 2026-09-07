@@ -19,8 +19,15 @@ describe("ChatMessageMedia", () => {
   it("renders a received photo in the bubble without the attachment tray", () => {
     render(<ChatMessageMedia photoUrl="/uploads/p.jpg" />);
     expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
+    expect(screen.getByLabelText(he.loading)).toBeTruthy();
     expect(screen.queryByText(he.completionMediaAdded)).toBeNull();
     expect(screen.queryByRole("button", { name: he.chatAnnotateReply })).toBeNull();
+  });
+
+  it("hides the loading placeholder once the photo paints", () => {
+    render(<ChatMessageMedia photoUrl="/uploads/p.jpg" />);
+    fireEvent.load(screen.getByAltText(he.taskReferencePhoto));
+    expect(screen.queryByLabelText(he.loading)).toBeNull();
   });
 
   it("offers annotate-and-send on a received photo", () => {

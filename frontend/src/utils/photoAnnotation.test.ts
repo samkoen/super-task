@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ANNOTATION_STROKE_EMPLOYEE,
+  ANNOTATION_STROKE_MANAGER,
+  annotationStrokeForRole,
   appendDescriptionBlock,
+  drawAnnotation,
   computePhotoDisplaySize,
   dataUrlToBlob,
   dataUrlToFile,
@@ -9,6 +13,38 @@ import {
   moveAnnotation,
   scaleAnnotations,
 } from "./photoAnnotation";
+
+describe("annotationStrokeForRole", () => {
+  it("uses red for menahel and blue for oved", () => {
+    expect(annotationStrokeForRole("branch_manager")).toBe(ANNOTATION_STROKE_MANAGER);
+    expect(annotationStrokeForRole("network_manager")).toBe(ANNOTATION_STROKE_MANAGER);
+    expect(annotationStrokeForRole("admin")).toBe(ANNOTATION_STROKE_MANAGER);
+    expect(annotationStrokeForRole("employee")).toBe(ANNOTATION_STROKE_EMPLOYEE);
+  });
+
+  it("uses blue when a menahel previews the oved surface", () => {
+    expect(annotationStrokeForRole("branch_manager", true)).toBe(ANNOTATION_STROKE_EMPLOYEE);
+  });
+
+  it("paints a circle with the given stroke", () => {
+    const colors: string[] = [];
+    const ctx = {
+      canvas: { width: 100, height: 100 },
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      stroke: vi.fn(),
+      set strokeStyle(value: string) {
+        colors.push(value);
+      },
+      set fillStyle(value: string) {
+        colors.push(value);
+      },
+      lineWidth: 0,
+    } as unknown as CanvasRenderingContext2D;
+    drawAnnotation(ctx, { type: "circle", cx: 10, cy: 10, radius: 4 }, ANNOTATION_STROKE_EMPLOYEE);
+    expect(colors).toContain(ANNOTATION_STROKE_EMPLOYEE);
+  });
+});
 
 describe("appendDescriptionBlock", () => {
   it("returns addition when base empty", () => {
