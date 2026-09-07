@@ -262,3 +262,33 @@ def test_list_inbox_denies_other_user():
     users.find_by_id.return_value = SimpleNamespace(full_name="דני כהן")
     with pytest.raises(PermissionError, match="אין הרשאה"):
         SystemBugService(MagicMock(), users).list_inbox(_actor())
+
+
+def test_delete_inbox_item_removes_media(monkeypatch):
+    repo = MagicMock()
+    repo.find_by_id.return_value = SimpleNamespace(
+        id="bug-1",
+        screenshot_url="/uploads/system_bug_screenshots/a.jpg",
+        audio_url="/uploads/system_bug_audio/a.wav",
+    )
+    repo.delete.return_value = True
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "app.services.system_bug_service.blob_storage.delete_media_url",
+        lambda url: deleted.append(url) if url else None,
+    )
+    SystemBugService(repo, users).delete_inbox_item(_actor(), "bug-1")
+    assert deleted == [
+        "/uploads/system_bug_screenshots/a.jpg",
+        "/uploads/system_bug_audio/a.wav",
+    ]
+    repo.delete.assert_called_once_with("bug-1")
+
+
+def test_delete_inbox_denies_other_user():
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="דני כהן")
+    with pytest.raises(PermissionError, match="אין הרשאה"):
+        SystemBugService(MagicMock(), users).delete_inbox_item(_actor(), "bug-1")

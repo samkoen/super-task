@@ -5,8 +5,10 @@ from sqlalchemy import String, and_ as sa_and, cast, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
+from app.core.config import SYSTEM_BUG_INBOX_USER_IDS
 from app.db import mappers as mp
 from app.domain.scope import ActorContext
+from app.domain.system_bug import can_view_system_bug_inbox, parse_inbox_user_ids
 from app.domain.task_scope import visible_branch_ids_for_tasks
 from app.repositories.branch_repository import BranchRepository
 
@@ -17,6 +19,8 @@ def actor_can_access_media_url(db: Session, actor: ActorContext, media_url: str)
         return False
 
     if _is_own_avatar(db, actor.user_id, url):
+        return True
+    if _system_bug_media_allowed(db, actor, url):
         return True
 
     branch_ids = visible_branch_ids_for_tasks(actor, BranchRepository(db))
@@ -115,6 +119,44 @@ def _url_exists_in_branches(
     ):
         return True
     return False
+
+
+def _system_bug_media_allowed(db: Session, actor: ActorContext, url: str) -> bool:
+    if not _actor_can_view_system_bug_inbox(db, actor):
+        return False
+    return bool(
+        db.execute(
+            select(orm.SystemBugReport.id).where(_system_bug_media_match(url)).limit(1)
+        ).first()
+    )
+
+
+def _actor_can_view_system_bug_inbox(db: Session, actor: ActorContext) -> bool:
+    extra = parse_inbox_user_ids(SYSTEM_BUG_INBOX_USER_IDS)
+    name = _actor_full_name(db, actor.user_id)
+    return can_view_system_bug_inbox(
+        full_name=name, user_id=actor.user_id, extra_user_ids=extra
+    )
+
+
+def _actor_full_name(db: Session, user_id: str | None) -> str:
+    if not user_id:
+        return ""
+    try:
+        uid = mp.parse_uuid(user_id)
+    except ValueError:
+        return ""
+    row = db.get(orm.User, uid)
+    if row is None:
+        return ""
+    return f"{row.first_name} {row.last_name}".strip()
+
+
+def _system_bug_media_match(url: str):
+    return or_(
+        orm.SystemBugReport.screenshot_url == url,
+        orm.SystemBugReport.audio_url == url,
+    )
 
 
 def _is_own_avatar(db: Session, user_id: str | None, url: str) -> bool:

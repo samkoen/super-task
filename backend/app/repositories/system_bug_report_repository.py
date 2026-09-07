@@ -65,6 +65,17 @@ class SystemBugReportRepository:
         rows = self._db.execute(q).scalars().all()
         return [r for row in rows if (r := self._to_domain(row))]
 
+    def delete(self, report_id: str) -> bool:
+        try:
+            row = self._db.get(orm.SystemBugReport, mp.parse_uuid(report_id))
+        except ValueError:
+            return False
+        if row is None:
+            return False
+        self._db.delete(row)
+        self._db.flush()
+        return True
+
     @staticmethod
     def _to_domain(row: orm.SystemBugReport | None) -> SystemBugReport | None:
         if row is None:

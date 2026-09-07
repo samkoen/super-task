@@ -83,3 +83,16 @@ def get_system_bug(
 ):
     actor = load_actor(request, UserRepository(db))
     return {"report": service.get_inbox_item(actor, report_id)}
+
+
+@router.delete("/{report_id}")
+@handle_controller_errors
+def delete_system_bug(
+    report_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    service: SystemBugService = Depends(get_system_bug_service),
+):
+    actor = load_actor(request, UserRepository(db))
+    service.delete_inbox_item(actor, report_id)
+    return {"ok": True, "message": "הדיווח נמחק"}

@@ -1,9 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Box, Paper, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Paper,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { ApiError } from "../../services/api";
-import { listSystemBugs, type SystemBugInboxItem } from "../../services/systemBugService";
+import {
+  deleteSystemBug,
+  listSystemBugs,
+  type SystemBugInboxItem,
+} from "../../services/systemBugService";
 import SystemBugInboxDetailDialog from "../../components/systemBug/SystemBugInboxDetailDialog";
 import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
@@ -17,10 +33,12 @@ import { he } from "../../i18n/he";
 
 export default function SystemBugInboxPage() {
   const { user } = useAuth();
-  const { showError } = useFeedback();
+  const { showError, showSuccess } = useFeedback();
   const [items, setItems] = useState<SystemBugInboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SystemBugInboxItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     if (!canViewSystemBugInbox(user)) return;
@@ -38,6 +56,22 @@ export default function SystemBugInboxPage() {
     void load();
   }, [load]);
 
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteSystemBug(deleteTarget.id);
+      showSuccess(he.systemBugInboxDeleted);
+      setSelectedId((id) => (id === deleteTarget.id ? null : id));
+      setDeleteTarget(null);
+      await load();
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!canViewSystemBugInbox(user)) return <Navigate to="/" replace />;
 
   return (
@@ -51,9 +85,19 @@ export default function SystemBugInboxPage() {
           icon={<BugReportOutlinedIcon fontSize="inherit" />}
         />
       ) : (
-        <InboxList items={items} onSelect={setSelectedId} />
+        <InboxList items={items} onSelect={setSelectedId} onAskDelete={setDeleteTarget} />
       )}
-      <SystemBugInboxDetailDialog reportId={selectedId} onClose={() => setSelectedId(null)} />
+      <SystemBugInboxDetailDialog
+        reportId={selectedId}
+        onClose={() => setSelectedId(null)}
+        onAskDelete={setDeleteTarget}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(deleteTarget)}
+        deleting={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleConfirmDelete()}
+      />
     </Box>
   );
 }
@@ -61,14 +105,16 @@ export default function SystemBugInboxPage() {
 function InboxList({
   items,
   onSelect,
+  onAskDelete,
 }: {
   items: SystemBugInboxItem[];
   onSelect: (id: string) => void;
+  onAskDelete: (item: SystemBugInboxItem) => void;
 }) {
   return (
     <Box display="flex" flexDirection="column" gap={1.5}>
       {items.map((item) => (
-        <InboxRow key={item.id} item={item} onSelect={onSelect} />
+        <InboxRow key={item.id} item={item} onSelect={onSelect} onAskDelete={onAskDelete} />
       ))}
     </Box>
   );
@@ -77,9 +123,11 @@ function InboxList({
 function InboxRow({
   item,
   onSelect,
+  onAskDelete,
 }: {
   item: SystemBugInboxItem;
   onSelect: (id: string) => void;
+  onAskDelete: (item: SystemBugInboxItem) => void;
 }) {
   const shotSrc = mediaUrl(item.screenshot_url);
   return (
@@ -88,24 +136,7 @@ function InboxRow({
       onClick={() => onSelect(item.id)}
       sx={{ p: 1.5, display: "flex", gap: 1.5, cursor: "pointer", borderRadius: 2 }}
     >
-      <Box
-        sx={{
-          width: 64,
-          height: 64,
-          borderRadius: 1.5,
-          overflow: "hidden",
-          bgcolor: "action.hover",
-          flexShrink: 0,
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
-        {shotSrc ? (
-          <Box component="img" src={shotSrc} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <BugReportOutlinedIcon color="disabled" />
-        )}
-      </Box>
+      <InboxThumb shotSrc={shotSrc} />
       <Box minWidth={0} flex={1}>
         <Typography variant="subtitle2" fontWeight={700} noWrap>
           {item.reporter_name || "—"}
@@ -119,6 +150,70 @@ function InboxRow({
           {item.audio_url ? ` · ${he.systemBugInboxAudio}` : ""}
         </Typography>
       </Box>
+      <Tooltip title={he.systemBugInboxDelete}>
+        <IconButton
+          size="small"
+          color="error"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAskDelete(item);
+          }}
+        >
+          <DeleteOutlineIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
     </Paper>
+  );
+}
+
+function InboxThumb({ shotSrc }: { shotSrc: string | null }) {
+  return (
+    <Box
+      sx={{
+        width: 64,
+        height: 64,
+        borderRadius: 1.5,
+        overflow: "hidden",
+        bgcolor: "action.hover",
+        flexShrink: 0,
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      {shotSrc ? (
+        <Box component="img" src={shotSrc} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      ) : (
+        <BugReportOutlinedIcon color="disabled" />
+      )}
+    </Box>
+  );
+}
+
+function DeleteConfirmDialog({
+  open,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onClose={() => !deleting && onCancel()} dir="rtl">
+      <DialogTitle>{he.systemBugInboxDelete}</DialogTitle>
+      <DialogContent>
+        <Typography>{he.systemBugInboxDeleteConfirm}</Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3 }}>
+        <Button onClick={onCancel} disabled={deleting}>
+          {he.cancel}
+        </Button>
+        <Button color="error" variant="contained" onClick={onConfirm} disabled={deleting}>
+          {he.systemBugInboxDelete}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

@@ -103,6 +103,16 @@ class SystemBugService:
             raise ValueError("דיווח לא נמצא")
         return row.to_dict()
 
+    def delete_inbox_item(self, actor: ActorContext, report_id: str) -> None:
+        self._assert_inbox(actor)
+        row = self._repo.find_by_id(report_id) if self._repo else None
+        if not row:
+            raise ValueError("דיווח לא נמצא")
+        blob_storage.delete_media_url(row.screenshot_url)
+        blob_storage.delete_media_url(row.audio_url)
+        if not self._repo.delete(report_id):
+            raise ValueError("דיווח לא נמצא")
+
     def _assert_inbox(self, actor: ActorContext) -> None:
         name = ""
         if self._users:

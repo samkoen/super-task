@@ -17,9 +17,11 @@ import { he } from "../../i18n/he";
 export default function SystemBugInboxDetailDialog({
   reportId,
   onClose,
+  onAskDelete,
 }: {
   reportId: string | null;
   onClose: () => void;
+  onAskDelete?: (report: SystemBugInboxItem) => void;
 }) {
   const [report, setReport] = useState<SystemBugInboxItem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,6 +57,11 @@ export default function SystemBugInboxDetailDialog({
         {report && !loading && <InboxDetailBody report={report} shotSrc={shotSrc} audioSrc={audioSrc} />}
       </DialogContent>
       <DialogActions sx={{ px: 3 }}>
+        {report && onAskDelete && (
+          <Button color="error" onClick={() => onAskDelete(report)} sx={{ marginInlineEnd: "auto" }}>
+            {he.systemBugInboxDelete}
+          </Button>
+        )}
         <Button onClick={onClose}>{he.close}</Button>
       </DialogActions>
     </Dialog>
