@@ -60,6 +60,7 @@ export type EmployeeTaskCaptureProps = {
   onSubmit: () => void;
   canSubmit: boolean;
   saving: boolean;
+  onAnnotatingChange?: (busy: boolean) => void;
 };
 
 export interface EmployeeTaskDetailDialogProps {
@@ -224,6 +225,7 @@ function TaskLiveCapture({
         onChange={capture.onSlotsChange}
         disabled={capture.saving}
         language={language}
+        onAnnotatingChange={capture.onAnnotatingChange}
       />
       <TextField
         label={he.note}

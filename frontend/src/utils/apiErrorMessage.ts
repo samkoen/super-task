@@ -1,4 +1,10 @@
+import { he } from "../i18n/he";
+
 /** Texte affichable — CapacitorHttp / FastAPI envoient parfois un objet, pas une string. */
+
+export function isRequestEntityTooLarge(text: string): boolean {
+  return /request entity too large|payload too large/i.test(text);
+}
 
 const OBJECT_STRING = "[object Object]";
 
@@ -14,7 +20,7 @@ export function humanizeApiError(payload: unknown, depth = 0): string {
         return text;
       }
     }
-    return text;
+    return isRequestEntityTooLarge(text) ? he.errorRequestTooLarge : text;
   }
   if (typeof payload === "number" || typeof payload === "boolean") return String(payload);
   if (Array.isArray(payload)) {

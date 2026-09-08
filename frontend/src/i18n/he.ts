@@ -17,6 +17,7 @@ export const he = {
   loading: "טוען…",
   errorGeneric: "אירעה שגיאה",
   errorServerUnreachable: "לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+  errorRequestTooLarge: "הקובץ גדול מדי לשליחה. הקליטו סרטון קצר יותר ונסו שוב.",
   loginFailed: "מזהה או סיסמה שגויים",
   emailNotVerified: "יש לאמת את האימייל לפני ההתחברות",
   registerSuccessAwaitVerification:
@@ -503,6 +504,7 @@ export const he = {
   mediaCaptureRecording: "מקליט…",
   mediaCaptureUseRecording: "אשר והוסף",
   mediaCapturePreviewHint: "בדקו את ההקלטה לפני השליחה",
+  mediaCapturePreparingPhoto: "מכינים את התמונה…",
   mediaCapturePhotoAnnotateHint: "הוסיפו אליפסות או חצים, עברו לבחירה לעריכה, ואז לחצו אשר והוסף",
   mediaCapturePermission: "אין גישה למצלמה או למיקרופון — אשרו בהגדרות האפליקציה",
   mediaCaptureDevice: "לא נמצאה מצלמה או מיקרופון זמינים",

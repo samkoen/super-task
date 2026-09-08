@@ -31,6 +31,7 @@ export default function CompletionSlotTile({
   interactive,
   disabled,
   onCapture,
+  onAnnotatingChange,
   onEnlarge,
   hintControls,
 }: {
@@ -40,6 +41,7 @@ export default function CompletionSlotTile({
   interactive: boolean;
   disabled?: boolean;
   onCapture?: (file: File, durationSeconds?: number) => void;
+  onAnnotatingChange?: (busy: boolean) => void;
   onEnlarge?: (src: string, kind?: "photo" | "video") => void;
   hintControls?: HintControls;
 }) {
@@ -73,7 +75,13 @@ export default function CompletionSlotTile({
       ) : null}
       <SlotOverlay req={req} title={title} filled={filled} />
       {interactive && onCapture && (
-        <SlotCaptureBar req={req} filled={filled} disabled={disabled} onCapture={onCapture} />
+        <SlotCaptureBar
+          req={req}
+          filled={filled}
+          disabled={disabled}
+          onCapture={onCapture}
+          onAnnotatingChange={onAnnotatingChange}
+        />
       )}
     </Box>
   );
@@ -97,11 +105,13 @@ function SlotCaptureBar({
   filled,
   disabled,
   onCapture,
+  onAnnotatingChange,
 }: {
   req: CompletionRequirement;
   filled: boolean;
   disabled?: boolean;
   onCapture: (file: File, durationSeconds?: number) => void;
+  onAnnotatingChange?: (busy: boolean) => void;
 }) {
   return (
     <Box sx={captureBarSx(filled)}>
@@ -120,6 +130,7 @@ function SlotCaptureBar({
         onCapture={(file, kind, meta) =>
           onCapture(file, kind === "video" ? meta?.durationSeconds : undefined)
         }
+        onAnnotatingChange={onAnnotatingChange}
       />
     </Box>
   );

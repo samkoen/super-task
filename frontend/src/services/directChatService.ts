@@ -1,4 +1,6 @@
 import api, { EMPTY_JSON_BODY } from "./api";
+import { compressPhotoForUpload } from "../utils/mediaCapture";
+import { uploadVideoFile } from "../utils/videoUpload";
 
 export interface DirectChatMessage {
   id: string;
@@ -53,8 +55,9 @@ export interface DirectChatPayload {
 }
 
 async function uploadChatFile(file: File, kind: "photo" | "video" | "audio" | "file") {
+  const payload = kind === "photo" ? await compressPhotoForUpload(file) : file;
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", payload);
   const { data } = await api.post<{ url: string; kind: string; filename?: string | null }>(
     `/direct-chats/upload-${kind}`,
     form,
@@ -93,7 +96,7 @@ export const directChatService = {
     return data;
   },
   uploadPhoto: (file: File) => uploadChatFile(file, "photo"),
-  uploadVideo: (file: File) => uploadChatFile(file, "video"),
+  uploadVideo: (file: File) => uploadVideoFile(file, "chat", (payload) => uploadChatFile(payload, "video")),
   uploadAudio: (file: File) => uploadChatFile(file, "audio"),
   uploadFile: (file: File) => uploadChatFile(file, "file"),
 };

@@ -10,6 +10,7 @@ import {
   needsTaskStart,
   revertStartedOnDashboard,
   completeAfterEnsuringStart,
+  employeeSubmitLocked,
   isAlreadyStartedError,
   isCompleteBlockedUntilStart,
   requireLinkedStart,
@@ -128,6 +129,13 @@ describe("employeeDoTask", () => {
       false,
     );
     expect(shouldAutoCompleteEmployeeTask(1, true, "pending", null)).toBe(true);
+    expect(shouldAutoCompleteEmployeeTask(1, false, "in_progress", null)).toBe(false);
+  });
+
+  it("locks submit while the annotation window is preparing or open", () => {
+    expect(employeeSubmitLocked(false, true)).toBe(true);
+    expect(employeeSubmitLocked(true, false)).toBe(true);
+    expect(employeeSubmitLocked(false, false)).toBe(false);
   });
 
   it("waits for the in-flight linked start before complete", async () => {

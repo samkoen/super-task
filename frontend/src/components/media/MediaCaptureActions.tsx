@@ -50,6 +50,7 @@ interface MediaCaptureActionsProps {
   videoDoneLabel?: string;
   onAudioStart?: () => void;
   onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
+  onAnnotatingChange?: (busy: boolean) => void;
 }
 
 function errorMessage(error: string): string {
@@ -91,6 +92,7 @@ export function PhotoCaptureDialog({
   title,
   annotate = true,
   seedBlob = null,
+  preparing = false,
 }: {
   open: boolean;
   uploading: boolean;
@@ -104,6 +106,7 @@ export function PhotoCaptureDialog({
   annotate?: boolean;
   /** Photo déjà prise (CameraX Android) — saute le live WebView. */
   seedBlob?: Blob | null;
+  preparing?: boolean;
 }) {
   const { supported, active, starting, error, facing, onVideoRef, start, flip } = camera;
   const theme = useTheme();
@@ -174,6 +177,13 @@ export function PhotoCaptureDialog({
               sx={{ width: "100%", borderRadius: 1, maxHeight: "45vh", objectFit: "contain", bgcolor: "black" }}
             />
           )
+        ) : preparing ? (
+          <Box display="flex" flexDirection="column" alignItems="center" gap={1.5} py={4}>
+            <CircularProgress size={32} />
+            <Typography variant="body2" color="text.secondary">
+              {he.mediaCapturePreparingPhoto}
+            </Typography>
+          </Box>
         ) : (
           <CameraFacingPreview
             onVideoRef={onVideoRef}
@@ -201,7 +211,7 @@ export function PhotoCaptureDialog({
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
-        <Button onClick={onClose} disabled={capturing || uploading || confirming}>
+        <Button onClick={onClose} disabled={capturing || uploading || confirming || preparing}>
           {he.cancel}
         </Button>
         {onSkip && !hasPreview && (
@@ -524,11 +534,13 @@ export default function MediaCaptureActions({
   videoDoneLabel,
   onAudioStart,
   onCapture,
+  onAnnotatingChange,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream({ defaultFacing: "environment" });
   const videoRecorder = useVideoRecorder({ defaultFacing: "environment" });
   const [photoOpen, setPhotoOpen] = useState(false);
   const [photoSeed, setPhotoSeed] = useState<Blob | null>(null);
+  const [photoPreparing, setPhotoPreparing] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
   const [nativeVideoError, setNativeVideoError] = useState("");
@@ -549,29 +561,46 @@ export default function MediaCaptureActions({
 
   const openWebPhotoCapture = useCallback(() => {
     setPhotoSeed(null);
+    setPhotoPreparing(false);
     setPhotoOpen(true);
+    onAnnotatingChange?.(true);
     scheduleAfterDialogPaint(() => {
       void photoCamera.start();
     });
-  }, [photoCamera.start]);
+  }, [onAnnotatingChange, photoCamera.start]);
 
   const openPhotoCapture = useCallback(() => {
     setNativePhotoError("");
+    onAnnotatingChange?.(true);
+    let opened = false;
     void launchPhotoCapture({
-      openWeb: openWebPhotoCapture,
+      openWeb: () => {
+        opened = true;
+        openWebPhotoCapture();
+      },
       onNative: async (file) => {
-        setPhotoSeed(await normalizePhotoOrientation(file));
+        opened = true;
+        setPhotoPreparing(true);
         setPhotoOpen(true);
+        try {
+          setPhotoSeed(await normalizePhotoOrientation(file));
+        } finally {
+          setPhotoPreparing(false);
+        }
       },
       onPermissionDenied: () => setNativePhotoError("permission"),
+    }).finally(() => {
+      if (!opened) onAnnotatingChange?.(false);
     });
-  }, [openWebPhotoCapture]);
+  }, [onAnnotatingChange, openWebPhotoCapture]);
 
   const closePhotoCapture = useCallback(() => {
     setPhotoOpen(false);
     setPhotoSeed(null);
+    setPhotoPreparing(false);
+    onAnnotatingChange?.(false);
     photoCamera.stop();
-  }, [photoCamera.stop]);
+  }, [onAnnotatingChange, photoCamera.stop]);
 
   const openWebVideoCapture = useCallback(() => {
     setVideoOpen(true);
@@ -721,6 +750,7 @@ export default function MediaCaptureActions({
         uploading={uploadingKind === "photo"}
         camera={photoCamera}
         seedBlob={photoSeed}
+        preparing={photoPreparing}
         onClose={closePhotoCapture}
         onCapture={(file) => onCapture(file, "photo")}
       />

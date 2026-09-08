@@ -9,7 +9,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-import java.util.ArrayList;
 
 @CapacitorPlugin(
     name = "MediaPermissions",
@@ -31,22 +30,17 @@ public class MediaPermissionsPlugin extends Plugin {
         boolean needCamera = Boolean.TRUE.equals(call.getBoolean("camera", true));
         boolean needMic = Boolean.TRUE.equals(call.getBoolean("microphone", true));
 
-        ArrayList<String> aliases = new ArrayList<>();
-        if (needCamera && getPermissionState("camera") != PermissionState.GRANTED) {
-            aliases.add("camera");
-        }
-        if (needMic && getPermissionState("microphone") != PermissionState.GRANTED) {
-            aliases.add("microphone");
-        }
-        if (aliases.isEmpty()) {
+        String[] aliases = MediaPermissionRequest.aliasesToRequest(
+            needCamera,
+            getPermissionState("camera") == PermissionState.GRANTED,
+            needMic,
+            getPermissionState("microphone") == PermissionState.GRANTED
+        );
+        if (aliases.length == 0) {
             resolveStates(call);
             return;
         }
-        requestPermissionForAliases(
-            aliases.toArray(new String[0]),
-            call,
-            "permissionsCallback"
-        );
+        requestPermissionForAliases(aliases, call, "permissionsCallback");
     }
 
     @PluginMethod

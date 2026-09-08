@@ -10,7 +10,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "test:android": "powershell -ExecutionPolicy Bypass -File ./test-android.ps1",
+    "test:android:device": "powershell -ExecutionPolicy Bypass -File ./test-android.ps1 -Device"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

@@ -75,6 +75,7 @@ import {
   canSubmitEmployeeTask,
   cardAfterStart,
   completeAfterEnsuringStart,
+  employeeSubmitLocked,
   resolveTaskForComplete,
   revertStartedOnDashboard,
   shouldAutoCompleteEmployeeTask,
@@ -203,6 +204,7 @@ export default function EmployeeTasksPage() {
   const [note, setNote] = useState("");
   const [slotMedia, setSlotMedia] = useState<Array<PendingMedia | null>>([]);
   const [saving, setSaving] = useState(false);
+  const [photoAnnotating, setPhotoAnnotating] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
@@ -346,6 +348,7 @@ export default function EmployeeTasksPage() {
 
   const closeDetail = useCallback(() => {
     clearCompletionMedia();
+    setPhotoAnnotating(false);
     setDetailTask(null);
   }, [clearCompletionMedia]);
 
@@ -817,14 +820,19 @@ export default function EmployeeTasksPage() {
                 onSlotsChange: handleSlotsChange,
                 note,
                 onNoteChange: setNote,
-                onSubmit: () => void handleSubmit(),
-                canSubmit: canSubmitEmployeeTask(
-                  detailTask.status,
-                  detailTask.start_url,
-                  canSubmitDone,
-                  linkedStartReady,
-                ),
-                saving,
+                onSubmit: () => {
+                  if (employeeSubmitLocked(saving, photoAnnotating)) return;
+                  void handleSubmit();
+                },
+                canSubmit:
+                  canSubmitEmployeeTask(
+                    detailTask.status,
+                    detailTask.start_url,
+                    canSubmitDone,
+                    linkedStartReady,
+                  ) && !photoAnnotating,
+                saving: employeeSubmitLocked(saving, photoAnnotating),
+                onAnnotatingChange: setPhotoAnnotating,
               }
             : undefined
         }

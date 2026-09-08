@@ -22,6 +22,12 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    testOptions {
+        animationsDisabled = true
+        unitTests {
+            includeAndroidResources = false
+        }
+    }
     signingConfigs {
         release {
             if (keystorePropertiesFile.exists()) {
@@ -66,7 +72,11 @@ dependencies {
     implementation "androidx.camera:camera-view:1.4.2"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test:core:$androidxTestCoreVersion"
+    androidTestImplementation "androidx.test:runner:$androidxTestRunnerVersion"
+    androidTestImplementation "androidx.test:rules:$androidxTestRulesVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation "com.squareup.okhttp3:mockwebserver:4.12.0"
     implementation project(':capacitor-cordova-android-plugins')
 }
 

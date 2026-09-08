@@ -1,5 +1,7 @@
 import api, { EMPTY_JSON_BODY } from "./api";
 import type { CompletionAttachment, CompletionRequirement } from "../utils/completionMedia";
+import { compressPhotoForUpload } from "../utils/mediaCapture";
+import { uploadVideoFile } from "../utils/videoUpload";
 
 export type TaskRecurrence = "daily" | "weekly" | "biweekly" | "monthly";
 export type TaskKind = "fixed" | "ad_hoc";
@@ -226,8 +228,9 @@ export interface CompleteTaskPayload {
 }
 
 async function uploadTaskFile(file: File, kind: "photo" | "video" | "audio" | "file") {
+  const payload = kind === "photo" ? await compressPhotoForUpload(file) : file;
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", payload);
   const response = await api.post<{ url: string; kind: string; filename?: string | null }>(
     `/tasks/upload-${kind}`,
     form,
@@ -433,7 +436,7 @@ export const taskService = {
       occurrence: TaskOccurrence;
       deleted?: boolean;
       deleted_count?: number;
-    }>(`/tasks/occurrences/${occurrenceId}/cancel`, undefined, { params });
+    }>(`/tasks/occurrences/${occurrenceId}/cancel`, EMPTY_JSON_BODY, { params });
     return response.data;
   },
 
@@ -467,7 +470,8 @@ export const taskService = {
 
   uploadPhoto: async (file: File) => uploadTaskFile(file, "photo"),
 
-  uploadVideo: async (file: File) => uploadTaskFile(file, "video"),
+  uploadVideo: async (file: File) =>
+    uploadVideoFile(file, "task", (payload) => uploadTaskFile(payload, "video")),
 
   uploadAudio: async (file: File) => uploadTaskFile(file, "audio"),
 

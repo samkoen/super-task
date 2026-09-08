@@ -9,5 +9,7 @@ describe("api", () => {
 
   it("sends an empty JSON object for POST without payload (Android CapacitorHttp)", () => {
     expect(EMPTY_JSON_BODY).toEqual({});
+    expect(EMPTY_JSON_BODY).toBeDefined();
+    expect(JSON.stringify(EMPTY_JSON_BODY)).toBe("{}");
   });
 });

@@ -11,8 +11,10 @@ import {
   hitTestAnnotation,
   loadImageElement,
   moveAnnotation,
+  renderAnnotatedImage,
   scaleAnnotations,
 } from "./photoAnnotation";
+import { PHOTO_UPLOAD_MAX_EDGE } from "./mediaCapture";
 
 describe("annotationStrokeForRole", () => {
   it("uses red for menahel and blue for oved", () => {
@@ -126,6 +128,31 @@ describe("loadImageElement", () => {
     await loadImageElement("blob:http://localhost/shot");
     expect(seen[0]).toBe("");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("renderAnnotatedImage", () => {
+  it("exports jpeg at the upload max edge, not the full camera size", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fill: vi.fn(),
+      closePath: vi.fn(),
+      canvas: { width: 0, height: 0 },
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      this: HTMLCanvasElement,
+      cb,
+    ) {
+      expect(Math.max(this.width, this.height)).toBeLessThanOrEqual(PHOTO_UPLOAD_MAX_EDGE);
+      cb(new Blob(["x"], { type: "image/jpeg" }));
+    });
+    const image = { naturalWidth: 4000, naturalHeight: 3000 } as HTMLImageElement;
+    const blob = await renderAnnotatedImage(image, [], { width: 400, height: 300 });
+    expect(blob.type).toBe("image/jpeg");
   });
 });
 

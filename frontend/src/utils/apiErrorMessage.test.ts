@@ -25,6 +25,13 @@ describe("apiErrorMessage", () => {
     ).toBe("status: Field required");
   });
 
+  it("maps request entity too large to the Hebrew video-size message", () => {
+    expect(humanizeApiError("Request Entity Too Large")).toBe(he.errorRequestTooLarge);
+    expect(apiErrorMessage(new Error("request entity too large"), he.errorGeneric)).toBe(
+      he.errorRequestTooLarge,
+    );
+  });
+
   it("falls back when the payload is not readable", () => {
     expect(apiErrorMessage({ foo: 1 }, he.errorGeneric)).toBe(he.errorGeneric);
     expect(apiErrorMessage(new Error("יש להתחיל את המשימה לפני הסיום"), he.errorGeneric)).toBe(

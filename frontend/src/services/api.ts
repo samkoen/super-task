@@ -86,10 +86,14 @@ api.interceptors.response.use(
         window.location.href = "/login";
       }
     }
+    const status = error.response?.status ?? 500;
+    if (status === 413) {
+      return Promise.reject(new ApiError(he.errorRequestTooLarge, 413));
+    }
     const msg =
       humanizeApiError(error.response?.data) ||
       apiErrorMessage(error, error.response ? he.errorGeneric : he.errorServerUnreachable);
-    return Promise.reject(new ApiError(msg, error.response?.status ?? 500));
+    return Promise.reject(new ApiError(msg, status));
   }
 );
 

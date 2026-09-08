@@ -1,4 +1,5 @@
 import api, { type EmployeeLanguage, type User, type UserRole } from "./api";
+import { compressPhotoForUpload } from "../utils/mediaCapture";
 
 export interface CreateUserPayload {
   email: string;
@@ -81,7 +82,7 @@ export const userService = {
 
   uploadTeamAvatar: async (id: string, file: File) => {
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", await compressPhotoForUpload(file));
     const response = await api.post<{ user: User; message: string; url: string }>(
       `/users/team/${id}/avatar`,
       form,

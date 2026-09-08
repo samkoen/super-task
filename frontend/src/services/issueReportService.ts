@@ -1,4 +1,6 @@
 import api from "./api";
+import { compressPhotoForUpload } from "../utils/mediaCapture";
+import { uploadVideoFile } from "../utils/videoUpload";
 
 export interface IssueReport {
   id: string;
@@ -21,8 +23,9 @@ export interface CreateIssueReportPayload {
 }
 
 async function uploadIssueFile(file: File, kind: "photo" | "video" | "audio") {
+  const payload = kind === "photo" ? await compressPhotoForUpload(file) : file;
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", payload);
   const response = await api.post<{ url: string; kind: string }>(
     `/issue-reports/upload-${kind}`,
     form,
@@ -54,7 +57,8 @@ export const issueReportService = {
 
   uploadPhoto: async (file: File) => uploadIssueFile(file, "photo"),
 
-  uploadVideo: async (file: File) => uploadIssueFile(file, "video"),
+  uploadVideo: async (file: File) =>
+    uploadVideoFile(file, "issue", (payload) => uploadIssueFile(payload, "video")),
 
   uploadAudio: async (file: File) => uploadIssueFile(file, "audio"),
 };

@@ -99,7 +99,7 @@ export async function completeAfterEnsuringStart(
   }
 }
 
-/** Clôture auto dès que toutes les cases obligatoires sont remplies. */
+/** Clôture auto après confirmation des cases (flèches), pas au déclencheur photo. */
 export function shouldAutoCompleteEmployeeTask(
   requirementCount: number,
   slotsFilled: boolean,
@@ -111,6 +111,10 @@ export function shouldAutoCompleteEmployeeTask(
   if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return false;
   if (hasExternalStartUrl(startUrl) && !startConfirmed) return false;
   return true;
+}
+
+export function employeeSubmitLocked(saving: boolean, annotating: boolean): boolean {
+  return saving || annotating;
 }
 
 export function canDoTask(status: TaskStatus | string): boolean {

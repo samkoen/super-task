@@ -7,6 +7,7 @@ import {
   isMediaCaptureSupported,
   oppositeCameraFacing,
   pickVideoRecorderMimeType,
+  videoRecorderOptions,
   type CameraFacing,
 } from "../utils/mediaCapture";
 
@@ -126,9 +127,7 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
     const currentStream = streamRef.current;
     if (!currentStream || recording) return;
     const mimeType = pickVideoRecorderMimeType();
-    const recorder = mimeType
-      ? new MediaRecorder(currentStream, { mimeType })
-      : new MediaRecorder(currentStream);
+    const recorder = new MediaRecorder(currentStream, videoRecorderOptions(mimeType));
     chunksRef.current = [];
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);

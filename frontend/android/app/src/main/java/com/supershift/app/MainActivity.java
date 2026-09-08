@@ -40,20 +40,9 @@ public class MainActivity extends BridgeActivity {
             float density = v.getResources().getDisplayMetrics().density;
             int bottomPx = Math.round(nav.bottom / Math.max(density, 1f));
             int topPx = Math.round(status.top / Math.max(density, 1f));
-            // 0px écrase le fallback JS et laisse les contrôles sous les barres Samsung.
-            StringBuilder js = new StringBuilder();
-            if (bottomPx > 0) {
-                js.append("document.documentElement.style.setProperty('--app-nav-bottom','")
-                    .append(bottomPx)
-                    .append("px');");
-            }
-            if (topPx > 0) {
-                js.append("document.documentElement.style.setProperty('--app-nav-top','")
-                    .append(topPx)
-                    .append("px');");
-            }
-            if (js.length() > 0) {
-                webView.evaluateJavascript(js.toString(), null);
+            String js = WebViewInsetScript.buildCssVarScript(bottomPx, topPx);
+            if (!js.isEmpty()) {
+                webView.evaluateJavascript(js, null);
             }
             return windowInsets;
         });

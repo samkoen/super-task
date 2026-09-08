@@ -24,21 +24,15 @@ public class NativePhotoCapturePlugin extends Plugin {
         if (call == null) {
             return;
         }
+        boolean ok = result.getResultCode() == Activity.RESULT_OK && result.getData() != null;
+        String path = ok ? result.getData().getStringExtra(PhotoCaptureActivity.EXTRA_PATH) : null;
+        NativeCaptureOutcome outcome = NativeCaptureOutcome.fromActivity(ok, path, 0);
         JSObject body = new JSObject();
-        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
-            body.put("cancelled", true);
-            call.resolve(body);
-            return;
+        body.put("cancelled", outcome.cancelled);
+        if (!outcome.cancelled) {
+            body.put("path", outcome.path);
+            body.put("mimeType", "image/jpeg");
         }
-        String path = result.getData().getStringExtra(PhotoCaptureActivity.EXTRA_PATH);
-        if (path == null || path.isEmpty()) {
-            body.put("cancelled", true);
-            call.resolve(body);
-            return;
-        }
-        body.put("cancelled", false);
-        body.put("path", path);
-        body.put("mimeType", "image/jpeg");
         call.resolve(body);
     }
 }

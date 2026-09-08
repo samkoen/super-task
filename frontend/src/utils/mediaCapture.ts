@@ -97,41 +97,124 @@ export function capturePhotoFromVideo(video: HTMLVideoElement): Promise<Blob | n
   if (!ctx) return Promise.resolve(null);
   ctx.drawImage(video, 0, 0);
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg", PHOTO_JPEG_QUALITY);
   });
 }
 
-/** Applique l'orientation EXIF (Samsung / iOS) pour éviter un aperçu recadré. */
-export async function normalizePhotoOrientation(blob: Blob): Promise<Blob> {
-  if (typeof createImageBitmap !== "function") return blob;
-  try {
-    const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" });
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      bitmap.close();
-      return blob;
+/** Aligné sur le back (1280) — Vercel refuse un body > ~4,5 Mo. */
+export const PHOTO_UPLOAD_MAX_EDGE = 1280;
+export const PHOTO_PREVIEW_MAX_EDGE = PHOTO_UPLOAD_MAX_EDGE;
+export const PHOTO_JPEG_QUALITY = 0.72;
+
+export function photoPreviewSize(
+  width: number,
+  height: number,
+  maxEdge = PHOTO_UPLOAD_MAX_EDGE,
+): { width: number; height: number } {
+  const edge = Math.max(width, height);
+  if (edge <= maxEdge) return { width, height };
+  const scale = maxEdge / edge;
+  return { width: Math.round(width * scale), height: Math.round(height * scale) };
+}
+
+export function photoUploadFilename(name: string): string {
+  const base = name.replace(/\.[^.]+$/, "").trim() || "photo";
+  return `${base}.jpg`;
+}
+
+function photoSourceSize(source: ImageBitmap | HTMLImageElement): { width: number; height: number } {
+  if ("naturalWidth" in source && source.naturalWidth > 0) {
+    return { width: source.naturalWidth, height: source.naturalHeight };
+  }
+  return { width: source.width, height: source.height };
+}
+
+function closePhotoSource(source: ImageBitmap | HTMLImageElement): void {
+  if ("close" in source && typeof source.close === "function") source.close();
+}
+
+function loadBlobImage(blob: Blob): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("image"));
+    };
+    image.src = url;
+  });
+}
+
+async function decodePhotoSource(blob: Blob): Promise<ImageBitmap | HTMLImageElement | null> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(blob, { imageOrientation: "from-image" });
+    } catch {
+      /* WebView Android : retomber sur Image */
     }
-    ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
-    return await new Promise<Blob>((resolve) => {
-      canvas.toBlob(
-        (normalized) => resolve(normalized ?? blob),
-        "image/jpeg",
-        0.92
-      );
-    });
+  }
+  try {
+    return await loadBlobImage(blob);
   } catch {
-    return blob;
+    return null;
   }
 }
+
+export async function encodePhotoJpeg(
+  blob: Blob,
+  maxEdge = PHOTO_UPLOAD_MAX_EDGE,
+): Promise<Blob | null> {
+  const source = await decodePhotoSource(blob);
+  if (!source) return null;
+  const { width, height } = photoSourceSize(source);
+  if (width < 1 || height < 1) {
+    closePhotoSource(source);
+    return null;
+  }
+  const size = photoPreviewSize(width, height, maxEdge);
+  const canvas = document.createElement("canvas");
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    closePhotoSource(source);
+    return null;
+  }
+  ctx.drawImage(source, 0, 0, size.width, size.height);
+  closePhotoSource(source);
+  return new Promise((resolve) => {
+    canvas.toBlob((out) => resolve(out), "image/jpeg", PHOTO_JPEG_QUALITY);
+  });
+}
+
+/** Orientation EXIF + downscale pour l'aperçu et l'upload. */
+export async function normalizePhotoOrientation(blob: Blob): Promise<Blob> {
+  return (await encodePhotoJpeg(blob)) ?? blob;
+}
+
+/** JPEG ≤ 1280 px — évite le 413 Vercel / CapacitorHttp. */
+export async function compressPhotoForUpload(file: File): Promise<File> {
+  const encoded = await encodePhotoJpeg(file);
+  if (!encoded) return file;
+  return blobToFile(encoded, photoUploadFilename(file.name), "image/jpeg");
+}
+
+export const VIDEO_RECORD_BITRATE = 1_000_000;
 
 export function pickVideoRecorderMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
   return candidates.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
+export function videoRecorderOptions(mimeType?: string): MediaRecorderOptions {
+  const options: MediaRecorderOptions = { videoBitsPerSecond: VIDEO_RECORD_BITRATE };
+  if (mimeType) options.mimeType = mimeType;
+  return options;
 }
 
 export function isMediaCaptureSupported(): boolean {

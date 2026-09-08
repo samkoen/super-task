@@ -1,3 +1,5 @@
+import { PHOTO_JPEG_QUALITY, photoPreviewSize } from "./mediaCapture";
+
 export type AnnotationTool = "ellipse" | "arrow" | "select";
 
 export interface CircleAnnotation {
@@ -174,19 +176,20 @@ export function renderAnnotatedImage(
   stroke = ANNOTATION_STROKE,
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
+  const size = photoPreviewSize(image.naturalWidth, image.naturalHeight);
+  canvas.width = size.width;
+  canvas.height = size.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     return Promise.reject(new Error("canvas unsupported"));
   }
-  ctx.drawImage(image, 0, 0);
+  ctx.drawImage(image, 0, 0, size.width, size.height);
   const exportShapes =
     displaySize && displaySize.width > 0 && displaySize.height > 0
       ? scaleAnnotations(
           shapes,
-          image.naturalWidth / displaySize.width,
-          image.naturalHeight / displaySize.height
+          size.width / displaySize.width,
+          size.height / displaySize.height
         )
       : shapes;
   for (const shape of exportShapes) {
@@ -196,7 +199,7 @@ export function renderAnnotatedImage(
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("export failed"))),
       "image/jpeg",
-      0.92
+      PHOTO_JPEG_QUALITY
     );
   });
 }

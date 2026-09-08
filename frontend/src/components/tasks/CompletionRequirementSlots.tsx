@@ -12,12 +12,14 @@ export default function CompletionRequirementSlots({
   onChange,
   disabled = false,
   language = "he",
+  onAnnotatingChange,
 }: {
   requirements: CompletionRequirement[];
   slots: Array<PendingMedia | null>;
   onChange: (next: Array<PendingMedia | null>) => void;
   disabled?: boolean;
   language?: EmployeeLanguage;
+  onAnnotatingChange?: (busy: boolean) => void;
 }) {
   if (!requirements.length) return null;
 
@@ -38,6 +40,7 @@ export default function CompletionRequirementSlots({
       disabled={disabled}
       language={language}
       onCapture={setSlot}
+      onAnnotatingChange={onAnnotatingChange}
     />
   );
 }
