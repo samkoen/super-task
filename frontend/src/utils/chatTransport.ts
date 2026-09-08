@@ -1,5 +1,5 @@
-import { ApiError } from "../services/api";
 import { he } from "../i18n/he";
+import { apiErrorMessage } from "./apiErrorMessage";
 import type { MediaKind } from "../components/media/MediaCaptureActions";
 import type { ChatMessageView } from "./chatMessageView";
 
@@ -32,7 +32,7 @@ type MediaUploader = {
 };
 
 export function chatErrorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : he.errorGeneric;
+  return apiErrorMessage(error, he.errorGeneric);
 }
 
 export async function uploadChatMedia(

@@ -1,0 +1,8 @@
+{
+  "name": "super",
+  "private": true,
+  "scripts": {
+    "test:android": "npm --prefix frontend run test:android",
+    "test:android:device": "npm --prefix frontend run test:android:device"
+  }
+}

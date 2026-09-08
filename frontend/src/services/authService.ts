@@ -1,4 +1,5 @@
 import api, { type EmployeeLanguage, type User } from "./api";
+import { compressPhotoForUpload } from "../utils/mediaCapture";
 
 export const authService = {
   login: async (email: string, password: string) => {
@@ -62,7 +63,7 @@ export const authService = {
 
   uploadAvatar: async (file: File) => {
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", await compressPhotoForUpload(file));
     const response = await api.post<{ user: User; message: string; url: string }>(
       "/auth/me/avatar",
       form,
@@ -72,7 +73,7 @@ export const authService = {
 
   stylizeAvatar: async (file: File) => {
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", await compressPhotoForUpload(file));
     const response = await api.post<{
       user: User;
       message: string;

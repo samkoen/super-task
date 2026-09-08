@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { EMPTY_JSON_BODY } from "./api";
 
 export interface AppNotification {
   id: string;
@@ -30,7 +30,7 @@ export const notificationService = {
   },
 
   markAllRead: async () => {
-    const response = await api.post<{ marked: number }>("/notifications/read-all");
+    const response = await api.post<{ marked: number }>("/notifications/read-all", EMPTY_JSON_BODY);
     return response.data.marked;
   },
 };

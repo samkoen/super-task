@@ -24,6 +24,7 @@ export default function CompletionSlotGrid({
   disabled = false,
   language = "he",
   onCapture,
+  onAnnotatingChange,
 }: {
   requirements: CompletionRequirement[];
   fills: Array<SlotFill | null>;
@@ -31,6 +32,7 @@ export default function CompletionSlotGrid({
   disabled?: boolean;
   language?: EmployeeLanguage;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
+  onAnnotatingChange?: (busy: boolean) => void;
 }) {
   const [preview, setPreview] = useState<{ src: string; title: string; kind: "photo" | "video" } | null>(null);
   const hints = useSlotHintPlayback(language);
@@ -49,6 +51,7 @@ export default function CompletionSlotGrid({
           interactive={interactive}
           disabled={disabled}
           onCapture={onCapture}
+          onAnnotatingChange={onAnnotatingChange}
           onEnlarge={(src, title, kind) => setPreview({ src, title, kind: kind ?? "photo" })}
           hints={hints}
         />
@@ -111,6 +114,7 @@ function VisualSlotList({
   interactive,
   disabled,
   onCapture,
+  onAnnotatingChange,
   onEnlarge,
   hints,
 }: {
@@ -119,6 +123,7 @@ function VisualSlotList({
   interactive: boolean;
   disabled?: boolean;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
+  onAnnotatingChange?: (busy: boolean) => void;
   onEnlarge: (src: string, title: string, kind?: "photo" | "video") => void;
   hints: ReturnType<typeof useSlotHintPlayback>;
 }) {
@@ -141,6 +146,7 @@ function VisualSlotList({
             interactive={interactive}
             disabled={disabled}
             onCapture={onCapture ? (file, duration) => onCapture(index, file, duration) : undefined}
+            onAnnotatingChange={onAnnotatingChange}
             onEnlarge={(src, kind) => onEnlarge(src, slotDisplayTitle(req, index), kind)}
             hintControls={slotHintControls(req, index, hints)}
           />

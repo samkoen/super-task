@@ -56,6 +56,18 @@ def test_branch_manager_can_start_own_assigned_task():
     assert result["status"] == task_status.IN_PROGRESS
 
 
+def test_start_is_idempotent_when_already_in_progress():
+    current = _occurrence(status=task_status.IN_PROGRESS, started_by_id="m1")
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = current
+    actor = ActorContext(
+        user_id="m1", role=roles.BRANCH_MANAGER, network_id="n1", branch_id="b1"
+    )
+    result = _svc(occurrence_repo).start_occurrence(actor, "occ-1")
+    occurrence_repo.start.assert_not_called()
+    assert result["status"] == task_status.IN_PROGRESS
+
+
 def test_branch_manager_cannot_start_oved_task():
     occurrence_repo = MagicMock()
     occurrence_repo.find_by_id.return_value = _occurrence(assignee_user_id="e1")

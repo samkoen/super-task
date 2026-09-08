@@ -463,6 +463,8 @@ class TaskOccurrenceService:
             actor, assignee_user_id=occurrence.assignee_user_id, branch_id=occurrence.branch_id
         ):
             raise PermissionError("אין הרשאה לבצע משימה זו")
+        if occurrence.status == task_status.IN_PROGRESS:
+            return self._to_api(occurrence)
         if occurrence.status not in {task_status.PENDING, task_status.OVERDUE}:
             raise ValueError("ניתן להתחיל רק משימה במצב ממתין או באיחור")
         updated = self._occurrences.start(

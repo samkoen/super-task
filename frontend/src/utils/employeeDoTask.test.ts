@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { he } from "../i18n/he";
 import {
   applyStartedOnDashboard,
@@ -9,8 +9,15 @@ import {
   hasExternalStartUrl,
   needsTaskStart,
   revertStartedOnDashboard,
+  completeAfterEnsuringStart,
+  employeeSubmitLocked,
+  isAlreadyStartedError,
+  isCompleteBlockedUntilStart,
+  requireLinkedStart,
+  resolveTaskForComplete,
   shouldAutoCompleteEmployeeTask,
   shouldOpenStartUrlOnBegin,
+  shouldStopAfterOpeningStartUrl,
   waitForInFlightLinkedStart,
 } from "./employeeDoTask";
 
@@ -36,8 +43,97 @@ describe("employeeDoTask", () => {
     expect(canSubmitEmployeeTask("in_progress", url, false)).toBe(false);
     expect(canSubmitEmployeeTask("pending", null, false)).toBe(false);
     expect(canSubmitEmployeeTask("in_progress", url, true)).toBe(true);
-    expect(canSubmitEmployeeTask("in_progress", url, true, false)).toBe(false);
+    expect(canSubmitEmployeeTask("in_progress", url, true, false)).toBe(true);
     expect(canSubmitEmployeeTask("in_progress", url, false, false)).toBe(false);
+  });
+
+  it("does not skip complete when the slots are already filled", () => {
+    expect(shouldStopAfterOpeningStartUrl(true, false)).toBe(true);
+    expect(shouldStopAfterOpeningStartUrl(true, true)).toBe(false);
+    expect(shouldStopAfterOpeningStartUrl(false, true)).toBe(false);
+  });
+
+  it("surfaces a failed linked start instead of a silent skip", () => {
+    expect(requireLinkedStart({ id: "t1" })).toEqual({ id: "t1" });
+    expect(() => requireLinkedStart(null)).toThrow(he.taskStartNeedRetry);
+  });
+
+  it("only opens the link on the first tap when slots are empty", async () => {
+    const pending = { id: "t1", status: "pending" as const, start_url: "https://example.com/x" };
+    const started = await resolveTaskForComplete(pending, {
+      openLink: true,
+      slotsFilled: false,
+      start: async () => ({ occurrence: { status: "in_progress" } }),
+    });
+    expect(started.deferComplete).toBe(true);
+    expect(started.task.status).toBe("in_progress");
+  });
+
+  it("completes after start when the slots are already filled", async () => {
+    const pending = { id: "t1", status: "pending" as const, start_url: "https://example.com/x" };
+    const started = await resolveTaskForComplete(pending, {
+      openLink: true,
+      slotsFilled: true,
+      start: async () => ({ occurrence: { status: "in_progress" } }),
+    });
+    expect(started.deferComplete).toBe(false);
+    expect(started.task.status).toBe("in_progress");
+  });
+
+  it("treats an already-started server task as success", async () => {
+    const refused = new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור");
+    expect(isAlreadyStartedError(refused, "in_progress")).toBe(true);
+    expect(isAlreadyStartedError(refused, "completed")).toBe(false);
+    expect(isAlreadyStartedError(refused, "pending")).toBe(false);
+    const task = { id: "t1", status: "in_progress" as const };
+    const started = await resolveTaskForComplete(task, {
+      openLink: false,
+      slotsFilled: true,
+      start: async () => {
+        throw refused;
+      },
+    });
+    expect(started.deferComplete).toBe(false);
+    expect(started.task.status).toBe("in_progress");
+  });
+
+  it("does not force a completed task into in_progress when start is refused", async () => {
+    const task = { id: "t1", status: "completed" as const };
+    await expect(
+      resolveTaskForComplete(task, {
+        openLink: false,
+        slotsFilled: true,
+        start: async () => {
+          throw new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור");
+        },
+      }),
+    ).rejects.toThrow("ניתן להתחיל רק משימה");
+  });
+
+  it("starts on the server even if the card already looks in progress", async () => {
+    const start = vi.fn(async () => ({ occurrence: { status: "in_progress" as const } }));
+    const task = { id: "t1", status: "in_progress" as const, start_url: "https://example.com/x" };
+    const started = await resolveTaskForComplete(task, {
+      openLink: false,
+      slotsFilled: true,
+      start,
+    });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(started.deferComplete).toBe(false);
+    expect(started.task.status).toBe("in_progress");
+  });
+
+  it("retries complete after the server says the task was never started", async () => {
+    expect(isCompleteBlockedUntilStart(new Error("יש להתחיל את המשימה לפני הסיום"))).toBe(true);
+    expect(isCompleteBlockedUntilStart(new Error("network"))).toBe(false);
+    const start = vi.fn(async () => undefined);
+    const complete = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("יש להתחיל את המשימה לפני הסיום"))
+      .mockResolvedValueOnce(undefined);
+    await completeAfterEnsuringStart(complete, start);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledTimes(2);
   });
 
   it("auto-completes only after every required slot is filled", () => {
@@ -49,6 +145,13 @@ describe("employeeDoTask", () => {
       false,
     );
     expect(shouldAutoCompleteEmployeeTask(1, true, "pending", null)).toBe(true);
+    expect(shouldAutoCompleteEmployeeTask(1, false, "in_progress", null)).toBe(false);
+  });
+
+  it("locks submit while the annotation window is preparing or open", () => {
+    expect(employeeSubmitLocked(false, true)).toBe(true);
+    expect(employeeSubmitLocked(true, false)).toBe(true);
+    expect(employeeSubmitLocked(false, false)).toBe(false);
   });
 
   it("waits for the in-flight linked start before complete", async () => {

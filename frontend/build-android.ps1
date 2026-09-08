@@ -33,3 +33,5 @@ Write-Host "`nOK - APK :" -ForegroundColor Green
 Get-ChildItem -Path $apkDir -Filter *.apk | ForEach-Object {
     Write-Host $_.FullName -ForegroundColor Green
 }
+
+Set-Location ..

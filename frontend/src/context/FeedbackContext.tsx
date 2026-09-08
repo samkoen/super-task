@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Alert, Snackbar } from "@mui/material";
+import { he } from "../i18n/he";
+import { humanizeApiError } from "../utils/apiErrorMessage";
 import { withSystemBottomInsetCss } from "../utils/systemInsets";
 
 export type FeedbackSeverity = "success" | "error" | "info" | "warning";
@@ -18,8 +20,9 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [severity, setSeverity] = useState<FeedbackSeverity>("success");
 
   const showFeedback = useCallback((next: string, nextSeverity: FeedbackSeverity = "info") => {
-    if (!next.trim()) return;
-    setMessage(next);
+    const text = humanizeApiError(next) || (next === "[object Object]" ? he.errorGeneric : next.trim());
+    if (!text) return;
+    setMessage(text);
     setSeverity(nextSeverity);
     setOpen(true);
   }, []);

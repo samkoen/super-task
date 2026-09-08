@@ -122,9 +122,10 @@ public class VideoRecordActivity extends AppCompatActivity {
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
         Recorder recorder = new Recorder.Builder()
             .setQualitySelector(QualitySelector.fromOrderedList(
-                Arrays.asList(Quality.HD, Quality.SD),
+                Arrays.asList(Quality.SD, Quality.HD),
                 FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)
             ))
+            .setTargetVideoEncodingBitRate(VideoRecordSettings.targetBitrate())
             .build();
         videoCapture = VideoCapture.withOutput(recorder);
         cameraProvider.unbindAll();
@@ -164,7 +165,7 @@ public class VideoRecordActivity extends AppCompatActivity {
 
     private void toggleRecording() {
         if (recording != null) {
-            if (minSeconds > 0 && elapsedSeconds() < minSeconds) {
+            if (VideoRecordElapsed.tooShortToFinish(minSeconds, elapsedSeconds())) {
                 android.widget.Toast.makeText(
                     this,
                     getString(R.string.video_record_too_short, minSeconds),
@@ -249,18 +250,18 @@ public class VideoRecordActivity extends AppCompatActivity {
     }
 
     private int elapsedSeconds() {
-        long current = segmentStartedAt > 0 ? SystemClock.elapsedRealtime() - segmentStartedAt : 0;
-        return (int) Math.max(0, (completedMs + current) / 1000);
+        return VideoRecordElapsed.seconds(completedMs, segmentStartedAt, SystemClock.elapsedRealtime());
     }
 
     private void updateTimer() {
         int seconds = elapsedSeconds();
+        String progress = VideoRecordTimer.progressLabel(seconds, minSeconds);
         if (recording != null || switching) {
-            timerView.setText(getString(R.string.video_record_recording) + " " + seconds);
+            timerView.setText(getString(R.string.video_record_recording) + " " + progress);
             timerHandler.postDelayed(timerTick, 250);
             return;
         }
-        timerView.setText(seconds > 0 ? String.valueOf(seconds) : "");
+        timerView.setText(seconds > 0 ? progress : "");
     }
 
     private void onCloseClicked() {

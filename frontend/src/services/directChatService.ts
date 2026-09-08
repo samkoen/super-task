@@ -1,4 +1,6 @@
-import api from "./api";
+import api, { EMPTY_JSON_BODY } from "./api";
+import { compressPhotoForUpload } from "../utils/mediaCapture";
+import { uploadVideoFile } from "../utils/videoUpload";
 
 export interface DirectChatMessage {
   id: string;
@@ -53,8 +55,9 @@ export interface DirectChatPayload {
 }
 
 async function uploadChatFile(file: File, kind: "photo" | "video" | "audio" | "file") {
+  const payload = kind === "photo" ? await compressPhotoForUpload(file) : file;
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", payload);
   const { data } = await api.post<{ url: string; kind: string; filename?: string | null }>(
     `/direct-chats/upload-${kind}`,
     form,
@@ -69,12 +72,12 @@ export const directChatService = {
   },
   openMine: async (scope?: "branch" | "network") => {
     const { data } = scope
-      ? await api.post<DirectChatOpened>("/direct-chats/mine", undefined, { params: { scope } })
-      : await api.post<DirectChatOpened>("/direct-chats/mine");
+      ? await api.post<DirectChatOpened>("/direct-chats/mine", EMPTY_JSON_BODY, { params: { scope } })
+      : await api.post<DirectChatOpened>("/direct-chats/mine", EMPTY_JSON_BODY);
     return data;
   },
   openWith: async (userId: string) => {
-    const { data } = await api.post<DirectChatOpened>(`/direct-chats/with/${userId}`);
+    const { data } = await api.post<DirectChatOpened>(`/direct-chats/with/${userId}`, EMPTY_JSON_BODY);
     return data;
   },
   listMessages: async (conversationId: string, opts?: { before?: string; limit?: number }) => {
@@ -93,7 +96,7 @@ export const directChatService = {
     return data;
   },
   uploadPhoto: (file: File) => uploadChatFile(file, "photo"),
-  uploadVideo: (file: File) => uploadChatFile(file, "video"),
+  uploadVideo: (file: File) => uploadVideoFile(file, "chat", (payload) => uploadChatFile(payload, "video")),
   uploadAudio: (file: File) => uploadChatFile(file, "audio"),
   uploadFile: (file: File) => uploadChatFile(file, "file"),
 };

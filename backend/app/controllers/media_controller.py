@@ -3,15 +3,17 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.auth.actor import load_actor
+from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
 from app.repositories.user_repository import UserRepository
 from app.services import blob_storage
 from app.services.media_access_service import actor_can_access_media_url
+from app.services.video_direct_upload_service import create_video_upload_intent
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,6 +40,19 @@ def _serve_media(request: Request, media_url: str, db: Session) -> Response:
         media_type=payload.content_type,
         headers={"Cache-Control": "private, max-age=300"},
     )
+
+
+@router.post("/video-intent")
+@handle_controller_errors
+def video_upload_intent(
+    request: Request,
+    db: Session = Depends(get_db),
+    payload: dict = Body(...),
+):
+    load_actor(request, UserRepository(db))
+    purpose = str(payload.get("purpose") or "")
+    content_type = str(payload.get("content_type") or "video/mp4")
+    return create_video_upload_intent(purpose, content_type)
 
 
 @router.get("/proxy")

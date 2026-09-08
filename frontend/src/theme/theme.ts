@@ -1,5 +1,6 @@
 import { alpha, createTheme } from "@mui/material/styles";
 import { dialogActionsPbCss, withSystemBottomInsetCss } from "../utils/systemInsets";
+import { webviewOverlayDefaultProps } from "./webviewOverlay";
 
 /** Deep teal — retail ops brand */
 const primaryMain = "#0A6B5C";
@@ -166,6 +167,7 @@ export const theme = createTheme({
       },
     },
     MuiDialog: {
+      defaultProps: { ...webviewOverlayDefaultProps },
       styleOverrides: {
         paper: {
           borderRadius: 18,
@@ -177,10 +179,17 @@ export const theme = createTheme({
         },
       },
     },
+    MuiDrawer: {
+      defaultProps: { ...webviewOverlayDefaultProps },
+    },
+    MuiMenu: {
+      defaultProps: { ...webviewOverlayDefaultProps },
+    },
     MuiDialogActions: {
       styleOverrides: {
         root: {
           paddingBottom: dialogActionsPbCss(),
+          flexShrink: 0,
         },
       },
     },

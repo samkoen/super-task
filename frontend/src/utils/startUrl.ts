@@ -1,5 +1,4 @@
 import { he } from "../i18n/he";
-import { isNativeApp } from "./isNativeApp";
 
 const MAX_START_URL = 1024;
 
@@ -17,15 +16,12 @@ export function startUrlFieldError(value: string | null | undefined): string {
   return normalizeStartUrl(value) ? "" : he.startUrlInvalid;
 }
 
-/** Doit rester synchrone dans le clic — un await avant bloque le popup desktop. */
+/** Doit rester synchrone dans le clic — un await avant bloque le popup desktop.
+ *  Toujours via <a target=_blank> : window.open dans le WebView Android remplace l'app. */
 export function openExternalUrl(url: string | null | undefined): boolean {
   const clean = normalizeStartUrl(url);
   if (!clean) return false;
   if (typeof window === "undefined") return false;
-  if (isNativeApp()) {
-    window.open(clean, "_blank");
-    return true;
-  }
   return clickNewTabLink(clean);
 }
 

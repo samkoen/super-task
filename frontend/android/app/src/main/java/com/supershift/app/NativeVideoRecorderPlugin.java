@@ -35,22 +35,17 @@ public class NativeVideoRecorderPlugin extends Plugin {
         if (call == null) {
             return;
         }
+        boolean ok = result.getResultCode() == Activity.RESULT_OK && result.getData() != null;
+        String path = ok ? result.getData().getStringExtra(VideoRecordActivity.EXTRA_PATH) : null;
+        int duration = ok ? result.getData().getIntExtra(VideoRecordActivity.EXTRA_DURATION, 1) : 0;
+        NativeCaptureOutcome outcome = NativeCaptureOutcome.fromActivity(ok, path, duration);
         JSObject body = new JSObject();
-        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
-            body.put("cancelled", true);
-            call.resolve(body);
-            return;
+        body.put("cancelled", outcome.cancelled);
+        if (!outcome.cancelled) {
+            body.put("path", outcome.path);
+            body.put("mimeType", "video/mp4");
+            body.put("durationSeconds", Math.max(1, outcome.durationSeconds));
         }
-        String path = result.getData().getStringExtra(VideoRecordActivity.EXTRA_PATH);
-        if (path == null || path.isEmpty()) {
-            body.put("cancelled", true);
-            call.resolve(body);
-            return;
-        }
-        body.put("cancelled", false);
-        body.put("path", path);
-        body.put("mimeType", "video/mp4");
-        body.put("durationSeconds", result.getData().getIntExtra(VideoRecordActivity.EXTRA_DURATION, 1));
         call.resolve(body);
     }
 }

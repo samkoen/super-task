@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
-import pytest
 from fastapi import HTTPException
 
 from app.controllers.controller_helpers import handle_controller_errors
@@ -44,3 +44,13 @@ def test_handle_controller_errors_sync_maps_http_exception():
     response = not_found()
     assert response.status_code == 404
     assert response.body == b'{"error":"missing"}'
+
+
+def test_handle_controller_errors_stringifies_http_exception_object():
+    @handle_controller_errors
+    def bad_request():
+        raise HTTPException(status_code=400, detail={"message": "יש להתחיל את המשימה לפני הסיום"})
+
+    response = bad_request()
+    assert response.status_code == 400
+    assert json.loads(response.body) == {"error": "יש להתחיל את המשימה לפני הסיום"}

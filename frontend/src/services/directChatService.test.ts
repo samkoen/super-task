@@ -4,6 +4,7 @@ const mockGet = vi.fn();
 const mockPost = vi.fn();
 
 vi.mock("./api", () => ({
+  EMPTY_JSON_BODY: {},
   default: {
     get: (...args: unknown[]) => mockGet(...args),
     post: (...args: unknown[]) => mockPost(...args),
@@ -27,7 +28,7 @@ describe("directChatService", () => {
       data: { conversation: { id: "c1" }, messages: [], peer: null },
     });
     const opened = await directChatService.openMine();
-    expect(mockPost).toHaveBeenCalledWith("/direct-chats/mine");
+    expect(mockPost).toHaveBeenCalledWith("/direct-chats/mine", {});
     expect(opened.conversation.id).toBe("c1");
   });
 
@@ -36,7 +37,7 @@ describe("directChatService", () => {
       data: { conversation: { id: "cn" }, messages: [], peer: null },
     });
     const opened = await directChatService.openMine("network");
-    expect(mockPost).toHaveBeenCalledWith("/direct-chats/mine", undefined, { params: { scope: "network" } });
+    expect(mockPost).toHaveBeenCalledWith("/direct-chats/mine", {}, { params: { scope: "network" } });
     expect(opened.conversation.id).toBe("cn");
   });
 });
