@@ -398,6 +398,7 @@ export const he = {
   startUrlInvalid: "הקישור חייב להתחיל ב-https://",
   openStartUrl: "פתיחת הקישור",
   startTaskOpenedLink: "המשימה התחילה — הקישור נפתח בדפדפן",
+  taskStartNeedRetry: "יש להתחיל את המשימה מחדש לפני הסיום",
   taskReferenceMediaHint:
     "תמונה, וידאו או שמע לדוגמה (אופציונלי). הקלטה תתומלל לתיאור, תיווצר כותרת, ואם נאמר שם עובד — ישויך אוטומטית",
   taskReferenceMediaLabel: "הודעה מהמנהל",

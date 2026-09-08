@@ -19,7 +19,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
-import { ApiError } from "../../services/api";
+import { apiErrorMessage } from "../../utils/apiErrorMessage";
 import { useFeedback } from "../../context/FeedbackContext";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
@@ -74,11 +74,11 @@ import {
   canDoTask,
   canSubmitEmployeeTask,
   cardAfterStart,
-  needsTaskStart,
+  completeAfterEnsuringStart,
+  resolveTaskForComplete,
   revertStartedOnDashboard,
   shouldAutoCompleteEmployeeTask,
   shouldOpenStartUrlOnBegin,
-  waitForInFlightLinkedStart,
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
@@ -263,7 +263,7 @@ export default function EmployeeTasksPage() {
       ];
       void translatePendingTasks(lang, allTasks);
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -312,7 +312,7 @@ export default function EmployeeTasksPage() {
         setLinkedStartReady(true);
         return true;
       } catch (e) {
-        showError(e instanceof ApiError ? e.message : he.errorGeneric);
+        showError(apiErrorMessage(e, he.errorGeneric));
         setDashboard((prev) => revertStartedOnDashboard(prev, task));
         setDetailTask((prev) => (prev?.id === task.id ? task : prev));
         setLinkedStartReady(false);
@@ -373,7 +373,7 @@ export default function EmployeeTasksPage() {
       if (kind === "video") setReportVideoUrl(res.url);
       if (kind === "audio") setReportAudioUrl(res.url);
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setReportUploadingKind(null);
     }
@@ -396,7 +396,7 @@ export default function EmployeeTasksPage() {
       setReportOpen(false);
       showSuccess(he.issueReportSuccess);
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setReportSaving(false);
     }
@@ -405,44 +405,46 @@ export default function EmployeeTasksPage() {
   const handleSubmit = async (slots = slotMedia) => {
     if (!detailTask || saving) return;
     const openLink = shouldOpenStartUrlOnBegin(detailTask.status, detailTask.start_url);
+    const slotsFilled = meetsCompletionRequirements(
+      requirements,
+      slots.map((item, i) =>
+        item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
+      ),
+    );
     if (openLink) {
       openExternalUrl(detailTask.start_url);
     }
     setSaving(true);
     try {
-      let task = detailTask;
-      if (needsTaskStart(task.status)) {
-        const result = await taskService.start(task.id);
-        task = cardAfterStart(task, result.occurrence);
-        setDashboard((prev) => applyStartedOnDashboard(prev, detailTask.id, task));
-        setDetailTask(task);
-        setLinkedStartReady(true);
-        if (openLink) {
-          showSuccess(he.startTaskOpenedLink);
-          return;
-        }
-      } else {
-        const started = await waitForInFlightLinkedStart(
-          task,
-          linkedStartRef.current,
-          linkedStartIdRef.current,
-        );
-        if (!started) return;
-        task = started;
+      const resolved = await resolveTaskForComplete(detailTask, {
+        openLink,
+        slotsFilled,
+        start: () => taskService.start(detailTask.id),
+      });
+      setDashboard((prev) => applyStartedOnDashboard(prev, detailTask.id, resolved.task));
+      setDetailTask(resolved.task);
+      setLinkedStartReady(true);
+      if (resolved.deferComplete) {
+        showSuccess(he.startTaskOpenedLink);
+        return;
       }
-      const attachments = await uploadRequirementSlots(effectiveRequirements(task), slots);
-      await taskService.complete(task.id, {
-        status: "completed",
+      const attachments = await uploadRequirementSlots(effectiveRequirements(resolved.task), slots);
+      const payload = {
+        status: "completed" as const,
         note: note || undefined,
         completion_attachments: attachments,
-      });
+      };
+      await completeAfterEnsuringStart(
+        () => taskService.complete(resolved.task.id, payload).then(() => undefined),
+        () => taskService.start(resolved.task.id).then(() => undefined),
+      );
       clearCompletionMedia();
       setDetailTask(null);
       if (!onBreak) playTaskEndSound();
       showSuccess(he.taskSubmitSuccess);
       await load();
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setSaving(false);
     }
@@ -480,7 +482,7 @@ export default function EmployeeTasksPage() {
       dispatchBreakChange(Boolean(res.on_break));
       showSuccess(onBreak ? he.employeeBreakEnded : he.employeeBreakStarted);
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setBreakBusy(false);
     }
@@ -495,7 +497,7 @@ export default function EmployeeTasksPage() {
       showSuccess(he.employeePhotoStylized);
       setAvatarOpen(false);
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setAvatarUploading(false);
     }
@@ -509,7 +511,7 @@ export default function EmployeeTasksPage() {
       await load(true);
       showSuccess(he.employeePhotoDeleted);
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setAvatarUploading(false);
     }

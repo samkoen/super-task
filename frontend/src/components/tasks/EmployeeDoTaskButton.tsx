@@ -33,6 +33,7 @@ export default function EmployeeDoTaskButton({
   );
   return (
     <Button
+      type="button"
       fullWidth={fullWidth}
       variant="contained"
       color={finishing ? "success" : "primary"}

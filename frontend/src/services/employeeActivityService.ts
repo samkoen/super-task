@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { EMPTY_JSON_BODY } from "./api";
 
 export interface BreakState {
   on_break: boolean;
@@ -15,6 +15,7 @@ export const employeeActivityService = {
   startBreak: async () => {
     const response = await api.post<BreakState & { message: string }>(
       "/employee-activity/break/start",
+      EMPTY_JSON_BODY,
     );
     return response.data;
   },
@@ -22,6 +23,7 @@ export const employeeActivityService = {
   endBreak: async () => {
     const response = await api.post<BreakState & { message: string }>(
       "/employee-activity/break/end",
+      EMPTY_JSON_BODY,
     );
     return response.data;
   },

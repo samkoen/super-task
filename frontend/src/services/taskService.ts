@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { EMPTY_JSON_BODY } from "./api";
 import type { CompletionAttachment, CompletionRequirement } from "../utils/completionMedia";
 
 export type TaskRecurrence = "daily" | "weekly" | "biweekly" | "monthly";
@@ -231,6 +231,7 @@ async function uploadTaskFile(file: File, kind: "photo" | "video" | "audio" | "f
   const response = await api.post<{ url: string; kind: string; filename?: string | null }>(
     `/tasks/upload-${kind}`,
     form,
+    { timeout: 120_000 },
   );
   return response.data;
 }
@@ -324,7 +325,8 @@ export const taskService = {
 
   start: async (occurrenceId: string) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
-      `/tasks/occurrences/${occurrenceId}/start`
+      `/tasks/occurrences/${occurrenceId}/start`,
+      EMPTY_JSON_BODY,
     );
     return response.data;
   },
@@ -340,6 +342,7 @@ export const taskService = {
   resolveChatTask: async (occurrenceId: string) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/chat-resolve`,
+      EMPTY_JSON_BODY,
     );
     return response.data;
   },

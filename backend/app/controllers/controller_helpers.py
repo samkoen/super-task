@@ -7,9 +7,20 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 
+def _http_error_text(detail: object) -> str:
+    if isinstance(detail, str) and detail.strip():
+        return detail
+    if isinstance(detail, dict):
+        for key in ("error", "detail", "message", "msg"):
+            value = detail.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    return str(detail)
+
+
 def _error_response(exc: Exception) -> JSONResponse:
     if isinstance(exc, HTTPException):
-        return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+        return JSONResponse({"error": _http_error_text(exc.detail)}, status_code=exc.status_code)
     if isinstance(exc, PermissionError):
         return JSONResponse({"error": str(exc)}, status_code=403)
     if isinstance(exc, ValueError):

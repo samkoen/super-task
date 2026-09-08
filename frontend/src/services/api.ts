@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { he } from "../i18n/he";
+import { apiErrorMessage, humanizeApiError } from "../utils/apiErrorMessage";
 import { resolveApiBaseUrl } from "./apiBaseUrl";
 
 const api = axios.create({
@@ -8,6 +9,9 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
+
+/** CapacitorHttp Android n'envoie pas correctement un POST sans body. */
+export const EMPTY_JSON_BODY = {};
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (config.data instanceof FormData) {
@@ -83,28 +87,10 @@ api.interceptors.response.use(
       }
     }
     const msg =
-      error.response?.data?.error ??
-      formatApiDetail(error.response?.data?.detail) ??
-      (error.response
-        ? error.message ?? "אירעה שגיאה"
-        : he.errorServerUnreachable);
-    return Promise.reject(new ApiError(String(msg), error.response?.status ?? 500));
+      humanizeApiError(error.response?.data) ||
+      apiErrorMessage(error, error.response ? he.errorGeneric : he.errorServerUnreachable);
+    return Promise.reject(new ApiError(msg, error.response?.status ?? 500));
   }
 );
-
-function formatApiDetail(detail: unknown): string | undefined {
-  if (typeof detail === "string" && detail.trim()) return detail;
-  if (!Array.isArray(detail)) return undefined;
-  const parts = detail
-    .map((item) => {
-      if (!item || typeof item !== "object") return "";
-      const row = item as { msg?: string; loc?: unknown[] };
-      const field = Array.isArray(row.loc) ? row.loc.filter((x) => x !== "body").join(".") : "";
-      const message = row.msg || "";
-      return field ? `${field}: ${message}` : message;
-    })
-    .filter(Boolean);
-  return parts.length ? parts.join(" | ") : undefined;
-}
 
 export default api;

@@ -30,6 +30,7 @@ import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
 import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
+import { videoElapsedLabel } from "../../utils/videoElapsedLabel";
 
 export type MediaKind = "photo" | "video" | "audio";
 
@@ -338,7 +339,7 @@ function VideoCaptureDialog({
         {recording && (
           <Typography variant="body2" color="error.main">
             {he.mediaCaptureRecording}
-            {` · ${elapsedSeconds}${minSeconds ? ` / ${minSeconds}` : ""} ${he.secondsShort}`}
+            {` · ${videoElapsedLabel(elapsedSeconds, minSeconds)} ${he.secondsShort}`}
           </Typography>
         )}
         {hasPreview && tooShort && minSeconds && (

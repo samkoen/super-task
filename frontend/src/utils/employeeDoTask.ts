@@ -20,16 +20,83 @@ export function shouldOpenStartUrlOnBegin(
   return needsTaskStart(status) && hasExternalStartUrl(startUrl);
 }
 
-/** Premier tap avec URL : start + navigateur, même sans cases de clôture. */
+/** Premier tap avec URL : start + navigateur, même sans cases de clôture.
+ *  Le start en vol n'interdit plus le bouton : handleSubmit attend le POST. */
 export function canSubmitEmployeeTask(
   status: TaskStatus | string,
   startUrl: string | null | undefined,
   slotsFilled: boolean,
-  startConfirmed = true,
+  _startConfirmed = true,
 ): boolean {
   if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return true;
-  if (hasExternalStartUrl(startUrl) && !startConfirmed) return false;
   return slotsFilled;
+}
+
+/** Premier tap lié : ouvrir le lien seulement si les cases ne sont pas prêtes. */
+export function shouldStopAfterOpeningStartUrl(openedLink: boolean, slotsFilled: boolean): boolean {
+  return openedLink && !slotsFilled;
+}
+
+export function requireLinkedStart<T>(started: T | null): T {
+  if (!started) {
+    throw new Error(he.taskStartNeedRetry);
+  }
+  return started;
+}
+
+export function isAlreadyStartedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("ניתן להתחיל רק משימה");
+}
+
+export async function startIgnoringIfAlreadyStarted<
+  T extends { status: string; started_at?: string | null },
+>(
+  task: T,
+  start: () => Promise<{ occurrence?: { status?: string; started_at?: string | null } | null }>,
+): Promise<T> {
+  try {
+    const result = await start();
+    return cardAfterStart(task, result.occurrence);
+  } catch (error) {
+    if (isAlreadyStartedError(error)) return cardAfterStart(task);
+    throw error;
+  }
+}
+
+export async function resolveTaskForComplete<
+  T extends { id: string; status: string; start_url?: string | null; started_at?: string | null },
+>(
+  task: T,
+  opts: {
+    openLink: boolean;
+    slotsFilled: boolean;
+    start: () => Promise<{ occurrence?: { status?: string; started_at?: string | null } | null }>;
+  },
+): Promise<{ task: T; deferComplete: boolean }> {
+  const next = await startIgnoringIfAlreadyStarted(task, opts.start);
+  return {
+    task: next,
+    deferComplete: shouldStopAfterOpeningStartUrl(opts.openLink, opts.slotsFilled),
+  };
+}
+
+export function isCompleteBlockedUntilStart(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("יש להתחיל את המשימה");
+}
+
+export async function completeAfterEnsuringStart(
+  complete: () => Promise<void>,
+  start: () => Promise<void>,
+): Promise<void> {
+  try {
+    await complete();
+  } catch (error) {
+    if (!isCompleteBlockedUntilStart(error)) throw error;
+    await start();
+    await complete();
+  }
 }
 
 /** Clôture auto dès que toutes les cases obligatoires sont remplies. */

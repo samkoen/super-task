@@ -255,12 +255,13 @@ public class VideoRecordActivity extends AppCompatActivity {
 
     private void updateTimer() {
         int seconds = elapsedSeconds();
+        String progress = VideoRecordTimer.progressLabel(seconds, minSeconds);
         if (recording != null || switching) {
-            timerView.setText(getString(R.string.video_record_recording) + " " + seconds);
+            timerView.setText(getString(R.string.video_record_recording) + " " + progress);
             timerHandler.postDelayed(timerTick, 250);
             return;
         }
-        timerView.setText(seconds > 0 ? String.valueOf(seconds) : "");
+        timerView.setText(seconds > 0 ? progress : "");
     }
 
     private void onCloseClicked() {

@@ -143,6 +143,20 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("still finishes after the oved types a note (WebView focus)", () => {
+    const onSubmit = vi.fn();
+    render(
+      <EmployeeTaskDetailDialog
+        task={task("in_progress")}
+        capture={capture({ onSubmit, note: "" })}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(he.note), { target: { value: "בוצע" } });
+    fireEvent.click(screen.getByRole("button", { name: he.markDone }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
   it("shows hint icons from the slot title when no hint was written", () => {
     render(
       <EmployeeTaskDetailDialog

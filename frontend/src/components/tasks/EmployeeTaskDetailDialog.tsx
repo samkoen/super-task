@@ -21,6 +21,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { canDoTask } from "../../utils/employeeDoTask";
 import { rejectionRemark } from "../../utils/taskReview";
@@ -88,7 +89,16 @@ export default function EmployeeTaskDetailDialog({
   const remark = rejectionRemark(task.completion);
 
   return (
-    <Dialog open={Boolean(task)} onClose={onClose} fullWidth maxWidth="sm" dir="rtl">
+    <Dialog
+      open={Boolean(task)}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      dir="rtl"
+      disableEnforceFocus
+      disableAutoFocus
+      disableRestoreFocus
+    >
       <DialogTitle>{titleNode ?? task.title}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
         <TaskStatusRow task={task} />
@@ -268,7 +278,7 @@ function TaskDetailActions({
   starting: boolean;
 }) {
   return (
-    <DialogActions sx={{ px: 3, flexWrap: "wrap", gap: 1 }}>
+    <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1, flexShrink: 0 }}>
       <Button onClick={onClose}>{he.close}</Button>
       {capture ? (
         <EmployeeDoTaskButton

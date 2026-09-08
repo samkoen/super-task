@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { EMPTY_JSON_BODY } from "./api";
 
 export interface DirectChatMessage {
   id: string;
@@ -69,12 +69,12 @@ export const directChatService = {
   },
   openMine: async (scope?: "branch" | "network") => {
     const { data } = scope
-      ? await api.post<DirectChatOpened>("/direct-chats/mine", undefined, { params: { scope } })
-      : await api.post<DirectChatOpened>("/direct-chats/mine");
+      ? await api.post<DirectChatOpened>("/direct-chats/mine", EMPTY_JSON_BODY, { params: { scope } })
+      : await api.post<DirectChatOpened>("/direct-chats/mine", EMPTY_JSON_BODY);
     return data;
   },
   openWith: async (userId: string) => {
-    const { data } = await api.post<DirectChatOpened>(`/direct-chats/with/${userId}`);
+    const { data } = await api.post<DirectChatOpened>(`/direct-chats/with/${userId}`, EMPTY_JSON_BODY);
     return data;
   },
   listMessages: async (conversationId: string, opts?: { before?: string; limit?: number }) => {

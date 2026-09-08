@@ -26,4 +26,14 @@ describe("startUrl", () => {
     expect(openExternalUrl("ftp://x")).toBe(false);
     click.mockRestore();
   });
+
+  it("does not call window.open — it navigates the Android WebView", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    expect(openExternalUrl("https://example.com/order")).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+    expect(click).toHaveBeenCalled();
+    open.mockRestore();
+    click.mockRestore();
+  });
 });

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../services/api";
-import { he } from "../i18n/he";
 import { chatErrorMessage, uploadChatMedia } from "./chatTransport";
 
 describe("chatTransport helpers", () => {
   it("maps API errors and falls back to the generic message", () => {
     expect(chatErrorMessage(new ApiError("אין הרשאה", 403))).toBe("אין הרשאה");
-    expect(chatErrorMessage(new Error("boom"))).toBe(he.errorGeneric);
+    expect(chatErrorMessage(new Error("boom"))).toBe("boom");
+    expect(chatErrorMessage({ error: "המשימה כבר נסגרה" })).toBe("המשימה כבר נסגרה");
   });
 
   it("uploads each media kind onto the matching payload field", async () => {
