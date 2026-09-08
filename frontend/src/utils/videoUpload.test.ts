@@ -9,6 +9,7 @@ vi.mock("../services/api", () => ({
 import {
   blobPutUrl,
   putBlobWithClientToken,
+  unpatchedFetch,
   uploadVideoFile,
 } from "./videoUpload";
 
@@ -33,14 +34,21 @@ describe("videoUpload", () => {
     );
   });
 
+  it("uses a WebView fetch that is not window.fetch (CapacitorHttp)", () => {
+    const patched = vi.fn();
+    vi.stubGlobal("fetch", patched);
+    const raw = unpatchedFetch();
+    expect(raw).not.toBe(patched);
+    vi.unstubAllGlobals();
+  });
+
   it("uploads the video bytes straight to Blob with the client token", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ url: "https://store.private.blob.vercel-storage.com/a.mp4" }),
     });
-    vi.stubGlobal("fetch", fetchMock);
     const file = new File(["clip"], "clip.mp4", { type: "video/mp4" });
-    const result = await putBlobWithClientToken(directIntent, file);
+    const result = await putBlobWithClientToken(directIntent, file, fetchMock);
     expect(result.url).toContain("blob.vercel-storage.com");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://vercel.com/api/blob?pathname=task_videos%2Fa.mp4",
@@ -49,7 +57,6 @@ describe("videoUpload", () => {
         body: file,
       }),
     );
-    vi.unstubAllGlobals();
   });
 
   it("uses the direct intent when Blob is enabled", async () => {
@@ -58,27 +65,25 @@ describe("videoUpload", () => {
       ok: true,
       json: async () => ({ url: "https://blob.example/v.mp4" }),
     });
-    vi.stubGlobal("fetch", fetchMock);
     const proxy = vi.fn();
     const out = await uploadVideoFile(
       new File(["x"], "a.mp4", { type: "video/mp4" }),
       "task",
       proxy,
+      fetchMock,
     );
     expect(out.url).toBe("https://blob.example/v.mp4");
     expect(proxy).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 
   it("does not fall back to the 413 proxy after a failed direct Blob PUT", async () => {
     mockPost.mockResolvedValue({ data: directIntent });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
     const proxy = vi.fn();
     await expect(
-      uploadVideoFile(new File(["x"], "a.mp4", { type: "video/mp4" }), "task", proxy),
+      uploadVideoFile(new File(["x"], "a.mp4", { type: "video/mp4" }), "task", proxy, fetchMock),
     ).rejects.toThrow("upload failed");
     expect(proxy).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 
   it("falls back to the proxy multipart when Blob is off", async () => {

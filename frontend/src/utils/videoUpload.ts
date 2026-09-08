@@ -31,19 +31,49 @@ export async function requestVideoIntent(
   return data;
 }
 
+/** fetch du WebView, pas CapacitorHttp — évite de recharger la vidéo en base64. */
+export function unpatchedFetch(): typeof fetch {
+  const fromFrame = iframeWindowFetch();
+  return fromFrame ?? fetch.bind(globalThis);
+}
+
+function iframeWindowFetch(): typeof fetch | null {
+  if (typeof document === "undefined") return null;
+  try {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.display = "none";
+    document.documentElement.appendChild(frame);
+    const child = frame.contentWindow?.fetch;
+    const bound = typeof child === "function" ? child.bind(frame.contentWindow) : null;
+    frame.remove();
+    return bound;
+  } catch {
+    return null;
+  }
+}
+
+function blobPutHeaders(
+  intent: Extract<VideoUploadIntent, { mode: "direct" }>,
+  file: File,
+): Record<string, string> {
+  return {
+    authorization: `Bearer ${intent.token}`,
+    "x-api-version": intent.apiVersion,
+    "x-content-type": file.type || "video/mp4",
+    "x-add-random-suffix": "0",
+    "x-vercel-blob-access": intent.access,
+  };
+}
+
 export async function putBlobWithClientToken(
   intent: Extract<VideoUploadIntent, { mode: "direct" }>,
   file: File,
+  doFetch: typeof fetch = unpatchedFetch(),
 ): Promise<{ url: string; kind: string }> {
-  const response = await fetch(blobPutUrl(intent.apiUrl, intent.pathname), {
+  const response = await doFetch(blobPutUrl(intent.apiUrl, intent.pathname), {
     method: "PUT",
-    headers: {
-      authorization: `Bearer ${intent.token}`,
-      "x-api-version": intent.apiVersion,
-      "x-content-type": file.type || "video/mp4",
-      "x-add-random-suffix": "0",
-      "x-vercel-blob-access": intent.access,
-    },
+    headers: blobPutHeaders(intent, file),
     body: file,
   });
   if (!response.ok) {
@@ -60,12 +90,13 @@ export async function uploadVideoFile(
   file: File,
   purpose: VideoUploadPurpose,
   proxyUpload: (file: File) => Promise<{ url: string }>,
+  doFetch: typeof fetch = unpatchedFetch(),
 ): Promise<{ url: string }> {
   const intent = await requestVideoIntent(purpose, file.type).catch(
     (): VideoUploadIntent => ({ mode: "proxy" }),
   );
   if (intent.mode === "direct") {
-    return putBlobWithClientToken(intent, file);
+    return putBlobWithClientToken(intent, file, doFetch);
   }
   return proxyUpload(file);
 }

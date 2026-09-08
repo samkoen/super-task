@@ -81,17 +81,33 @@ describe("employeeDoTask", () => {
   });
 
   it("treats an already-started server task as success", async () => {
-    expect(isAlreadyStartedError(new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור"))).toBe(true);
+    const refused = new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור");
+    expect(isAlreadyStartedError(refused, "in_progress")).toBe(true);
+    expect(isAlreadyStartedError(refused, "completed")).toBe(false);
+    expect(isAlreadyStartedError(refused, "pending")).toBe(false);
     const task = { id: "t1", status: "in_progress" as const };
     const started = await resolveTaskForComplete(task, {
       openLink: false,
       slotsFilled: true,
       start: async () => {
-        throw new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור");
+        throw refused;
       },
     });
     expect(started.deferComplete).toBe(false);
     expect(started.task.status).toBe("in_progress");
+  });
+
+  it("does not force a completed task into in_progress when start is refused", async () => {
+    const task = { id: "t1", status: "completed" as const };
+    await expect(
+      resolveTaskForComplete(task, {
+        openLink: false,
+        slotsFilled: true,
+        start: async () => {
+          throw new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור");
+        },
+      }),
+    ).rejects.toThrow("ניתן להתחיל רק משימה");
   });
 
   it("starts on the server even if the card already looks in progress", async () => {

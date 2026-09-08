@@ -44,7 +44,8 @@ export function requireLinkedStart<T>(started: T | null): T {
   return started;
 }
 
-export function isAlreadyStartedError(error: unknown): boolean {
+export function isAlreadyStartedError(error: unknown, status?: string): boolean {
+  if (status !== "in_progress") return false;
   const message = error instanceof Error ? error.message : String(error ?? "");
   return message.includes("ניתן להתחיל רק משימה");
 }
@@ -59,7 +60,7 @@ export async function startIgnoringIfAlreadyStarted<
     const result = await start();
     return cardAfterStart(task, result.occurrence);
   } catch (error) {
-    if (isAlreadyStartedError(error)) return cardAfterStart(task);
+    if (isAlreadyStartedError(error, task.status)) return task;
     throw error;
   }
 }
