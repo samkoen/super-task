@@ -11,8 +11,11 @@ import {
   normalizeRequirements,
   parseRequirementWords,
   resolveRequirementExamples,
+  sanitizeVideoSecondsDraft,
   setRequirementHint,
   setRequirementTitle,
+  setVideoSeconds,
+  commitVideoSeconds,
   wordsToPhotoRequirements,
 } from "./completionMedia";
 
@@ -21,6 +24,19 @@ describe("completionMedia", () => {
     expect(normalizeMinVideoSeconds("")).toBeNull();
     expect(normalizeMinVideoSeconds(0)).toBeNull();
     expect(normalizeMinVideoSeconds(8)).toBe(8);
+  });
+
+  it("lets the menahel clear min seconds while typing then set 36", () => {
+    const list = [{ kind: "video" as const, min_seconds: 1 }];
+    expect(setVideoSeconds(list, 0, "")).toEqual([{ kind: "video" }]);
+    expect(setVideoSeconds(list, 0, "36")).toEqual([{ kind: "video", min_seconds: 36 }]);
+    expect(sanitizeVideoSecondsDraft("36s")).toBe("36");
+  });
+
+  it("commits the default when min seconds is left empty", () => {
+    expect(commitVideoSeconds([{ kind: "video" }], 0)).toEqual([
+      { kind: "video", min_seconds: 10 },
+    ]);
   });
 
   it("photo or video is enough without min duration", () => {

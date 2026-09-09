@@ -18,6 +18,7 @@ import {
   setRequirementExample,
   setRequirementHint,
   setRequirementTitle,
+  commitVideoSeconds,
   setVideoSeconds,
   type CompletionRequirement,
 } from "../../utils/completionMedia";
@@ -230,6 +231,7 @@ function RequirementItem({
       onTitle={(title) => onChange(setRequirementTitle(value, index, title))}
       onHint={(hint) => onChange(setRequirementHint(value, index, hint))}
       onSeconds={(seconds) => onChange(setVideoSeconds(value, index, seconds))}
+      onSecondsCommit={() => onChange(commitVideoSeconds(value, index))}
       onRemove={() => {
         revokeIfBlob(req.example_url);
         onChange(removeRequirement(value, index));
