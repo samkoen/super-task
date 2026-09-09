@@ -315,6 +315,33 @@ def test_ad_hoc_network_update_keeps_then_overwrites_local_title(
     assert listed[world["branch_b_id"]]["title"] == "לכולם"
 
 
+def test_ad_hoc_network_update_propagates_photo_required(client_nm, second_branch_seed):
+    world = second_branch_seed
+    rows = client_nm.post("/api/tasks/ad-hoc", json=_ad_hoc_payload(world)).json()[
+        "occurrences"
+    ]
+    by_branch = _by_branch(rows)
+    primary = by_branch[world["branch_id"]]
+    sibling = by_branch[world["branch_b_id"]]
+    group_id = primary["network_group_id"]
+
+    local = client_nm.post(
+        f"/api/tasks/occurrences/{sibling['id']}/update",
+        json=_occurrence_edit(sibling, title="כותרת סניף"),
+    )
+    assert local.status_code == 200, local.text
+
+    networked = client_nm.post(
+        f"/api/tasks/occurrences/{primary['id']}/update",
+        json=_occurrence_edit(primary, photo_required=True, apply_to_network=True),
+    )
+    assert networked.status_code == 200, networked.text
+    listed = _by_branch(_group_occurrences(client_nm, group_id))
+    assert listed[world["branch_id"]]["photo_required"] is True
+    assert listed[world["branch_b_id"]]["photo_required"] is True
+    assert listed[world["branch_b_id"]]["title"] == "כותרת סניף"
+
+
 def _template_edit(primary: dict, **over) -> dict:
     body = {
         "title": primary["title"],

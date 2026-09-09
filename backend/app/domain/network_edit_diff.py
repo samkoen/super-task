@@ -47,6 +47,7 @@ def merge_template_network_payload(existing, payload: dict, sibling) -> dict:
     _overlay_ops(merged, existing, sibling, payload)
     _overlay_start_url(merged, existing, sibling, payload)
     _overlay_completion(merged, existing, sibling, payload)
+    _overlay_photo_required(merged, existing, sibling, payload)
     return merged
 
 
@@ -135,12 +136,13 @@ def _keep_sibling_completion(merged: dict, sibling) -> None:
     merged["update_completion_requirements"] = False
     merged["update_min_video_seconds"] = False
     merged["min_video_seconds"] = getattr(sibling, "min_video_seconds", None)
-    merged["photo_required"] = getattr(sibling, "photo_required", None)
 
 
-def _overlay_photo_required(merged, existing, sibling, details: dict) -> None:
+def _overlay_photo_required(merged, existing, sibling, incoming: dict) -> None:
     if merged.get("update_completion_requirements"):
         return
-    incoming = details.get("photo_required")
-    if incoming is None or bool(incoming) == bool(existing.photo_required):
-        merged["photo_required"] = sibling.photo_required
+    value = incoming.get("photo_required")
+    if value is None or bool(value) == bool(existing.photo_required):
+        merged["photo_required"] = getattr(sibling, "photo_required", None)
+        return
+    merged["photo_required"] = bool(value)
