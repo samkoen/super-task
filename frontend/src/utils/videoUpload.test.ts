@@ -1,17 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockPost } = vi.hoisted(() => ({ mockPost: vi.fn() }));
+const { mockPost, mockNativePut, mockNativeAvailable, mockWriteCache } = vi.hoisted(() => ({
+  mockPost: vi.fn(),
+  mockNativePut: vi.fn(),
+  mockNativeAvailable: vi.fn(),
+  mockWriteCache: vi.fn(),
+}));
 
 vi.mock("../services/api", () => ({
   default: { post: (...args: unknown[]) => mockPost(...args) },
 }));
 
-import {
-  blobPutUrl,
-  putBlobWithClientToken,
-  unpatchedFetch,
-  uploadVideoFile,
-} from "./videoUpload";
+vi.mock("../plugins/nativeBlobUpload", () => ({
+  canUseNativeBlobUpload: () => mockNativeAvailable(),
+  putBlobFromNativePath: (...args: unknown[]) => mockNativePut(...args),
+  writeFileToNativeCache: (...args: unknown[]) => mockWriteCache(...args),
+}));
+
+import { attachNativeMediaPath } from "./nativeMediaPath";
+import { blobPutUrl, putBlobWithClientToken, shouldUseLocalVideoProxy, uploadVideoFile } from "./videoUpload";
 
 const directIntent = {
   mode: "direct" as const,
@@ -26,20 +33,19 @@ const directIntent = {
 describe("videoUpload", () => {
   beforeEach(() => {
     mockPost.mockReset();
+    mockNativePut.mockReset();
+    mockWriteCache.mockReset();
+    mockNativeAvailable.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("builds the Blob PUT url with the pathname query", () => {
     expect(blobPutUrl("https://vercel.com/api/blob", "task_videos/a.mp4")).toBe(
       "https://vercel.com/api/blob?pathname=task_videos%2Fa.mp4",
     );
-  });
-
-  it("uses a WebView fetch that is not window.fetch (CapacitorHttp)", () => {
-    const patched = vi.fn();
-    vi.stubGlobal("fetch", patched);
-    const raw = unpatchedFetch();
-    expect(raw).not.toBe(patched);
-    vi.unstubAllGlobals();
   });
 
   it("uploads the video bytes straight to Blob with the client token", async () => {
@@ -84,6 +90,54 @@ describe("videoUpload", () => {
       uploadVideoFile(new File(["x"], "a.mp4", { type: "video/mp4" }), "task", proxy, fetchMock),
     ).rejects.toThrow("upload failed");
     expect(proxy).not.toHaveBeenCalled();
+  });
+
+  it("streams an Android cache file through OkHttp instead of fetch", async () => {
+    mockNativeAvailable.mockReturnValue(true);
+    mockNativePut.mockResolvedValue({ url: "https://blob.example/native.mp4" });
+    const file = attachNativeMediaPath(
+      new File(["clip"], "clip.mp4", { type: "video/mp4" }),
+      "/data/cache/task-video.mp4",
+    );
+    const result = await putBlobWithClientToken(directIntent, file);
+    expect(result.url).toBe("https://blob.example/native.mp4");
+    expect(mockNativePut).toHaveBeenCalledWith(
+      "/data/cache/task-video.mp4",
+      "https://vercel.com/api/blob?pathname=task_videos%2Fa.mp4",
+      expect.objectContaining({ authorization: "Bearer vercel_blob_client_STORE_x" }),
+    );
+    expect(mockWriteCache).not.toHaveBeenCalled();
+  });
+
+  it("does not use WebView fetch for a webm recorded in the app", async () => {
+    mockNativeAvailable.mockReturnValue(true);
+    mockWriteCache.mockResolvedValue("/cache/upload-1.webm");
+    mockNativePut.mockResolvedValue({ url: "https://blob.example/app.webm" });
+    const file = new File(["clip"], "clip.webm", { type: "video/webm" });
+    const result = await putBlobWithClientToken(directIntent, file);
+    expect(result.url).toBe("https://blob.example/app.webm");
+    expect(mockWriteCache).toHaveBeenCalledWith(file);
+    expect(mockNativePut).toHaveBeenCalledWith(
+      "/cache/upload-1.webm",
+      "https://vercel.com/api/blob?pathname=task_videos%2Fa.mp4",
+      expect.any(Object),
+    );
+  });
+
+  it("uses the local API proxy in Vite instead of a CORS PUT to Blob", async () => {
+    expect(shouldUseLocalVideoProxy(true)).toBe(true);
+    expect(shouldUseLocalVideoProxy(false)).toBe(false);
+    mockPost.mockResolvedValue({ data: directIntent });
+    const proxy = vi.fn().mockResolvedValue({ url: "/uploads/local.webm" });
+    const out = await uploadVideoFile(
+      new File(["x"], "a.webm", { type: "video/webm" }),
+      "task",
+      proxy,
+      undefined,
+      true,
+    );
+    expect(out.url).toBe("/uploads/local.webm");
+    expect(proxy).toHaveBeenCalled();
   });
 
   it("falls back to the proxy multipart when Blob is off", async () => {

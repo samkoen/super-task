@@ -6,6 +6,14 @@ export function isRequestEntityTooLarge(text: string): boolean {
   return /request entity too large|payload too large/i.test(text);
 }
 
+export function isFetchScopeShutdown(text: string): boolean {
+  return /global scope is shutting down/i.test(text);
+}
+
+export function isFailedToFetch(text: string): boolean {
+  return /failed to fetch/i.test(text);
+}
+
 const OBJECT_STRING = "[object Object]";
 
 export function humanizeApiError(payload: unknown, depth = 0): string {
@@ -20,7 +28,9 @@ export function humanizeApiError(payload: unknown, depth = 0): string {
         return text;
       }
     }
-    return isRequestEntityTooLarge(text) ? he.errorRequestTooLarge : text;
+    if (isRequestEntityTooLarge(text)) return he.errorRequestTooLarge;
+    if (isFetchScopeShutdown(text) || isFailedToFetch(text)) return he.errorFetchInterrupted;
+    return text;
   }
   if (typeof payload === "number" || typeof payload === "boolean") return String(payload);
   if (Array.isArray(payload)) {

@@ -312,8 +312,8 @@ function VideoCaptureDialog({
         blobToFile(blob, `task-video-${Date.now()}.webm`, blob.type || "video/webm"),
         elapsedSeconds,
       );
-      onClose();
     } finally {
+      onClose();
       setConfirming(false);
     }
   };

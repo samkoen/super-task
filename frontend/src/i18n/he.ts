@@ -18,6 +18,7 @@ export const he = {
   errorGeneric: "אירעה שגיאה",
   errorServerUnreachable: "לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.",
   errorRequestTooLarge: "הקובץ גדול מדי לשליחה. הקליטו סרטון קצר יותר ונסו שוב.",
+  errorFetchInterrupted: "השליחה נקטעה. נסו שוב.",
   loginFailed: "מזהה או סיסמה שגויים",
   emailNotVerified: "יש לאמת את האימייל לפני ההתחברות",
   registerSuccessAwaitVerification:

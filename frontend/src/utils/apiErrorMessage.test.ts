@@ -32,6 +32,21 @@ describe("apiErrorMessage", () => {
     );
   });
 
+  it("maps Chromium fetch shutdown to a retry message", () => {
+    expect(
+      apiErrorMessage(
+        new Error("Failed to execute 'fetch' on 'Window': The global scope is shutting down"),
+        he.errorGeneric,
+      ),
+    ).toBe(he.errorFetchInterrupted);
+  });
+
+  it("maps Failed to fetch to a retry message", () => {
+    expect(apiErrorMessage(new Error("Failed to fetch"), he.errorGeneric)).toBe(
+      he.errorFetchInterrupted,
+    );
+  });
+
   it("falls back when the payload is not readable", () => {
     expect(apiErrorMessage({ foo: 1 }, he.errorGeneric)).toBe(he.errorGeneric);
     expect(apiErrorMessage(new Error("יש להתחיל את המשימה לפני הסיום"), he.errorGeneric)).toBe(
