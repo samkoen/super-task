@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Box,
-  Button,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -28,6 +27,7 @@ import { defaultApplyAdHocEditToNetwork, isNetworkAdHocOccurrence } from "../../
 import TaskChatPanel from "./TaskChatPanel";
 import TaskReferenceMediaEditor from "./TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
+import EditDialogFooterIcons from "../ui/EditDialogFooterIcons";
 import {
   emptyOccurrenceEditForm,
   formFromOccurrence,
@@ -223,16 +223,13 @@ export default function TaskOccurrenceEditDialog({
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3 }}>
-        <Button onClick={onClose} disabled={saving || loading}>
-          {he.cancel}
-        </Button>
-        <Button
-          variant="contained"
-          onClick={() => void handleSave()}
-          disabled={saving || loading || !form.title.trim() || !form.due_at}
-        >
-          {saving ? <CircularProgress size={22} /> : he.submit}
-        </Button>
+        <EditDialogFooterIcons
+          onCancel={onClose}
+          onSubmit={() => void handleSave()}
+          disabled={saving || loading}
+          submitDisabled={!form.title.trim() || !form.due_at}
+          submitting={saving}
+        />
       </DialogActions>
     </Dialog>
   );
