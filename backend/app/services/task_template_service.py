@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from app.db import mappers as mp
 from app.domain import roles, task_recurrence, task_status
+from app.domain.network_edit_diff import merge_template_network_payload
 from app.domain.network_fixed_task import (
     can_edit_network_fixed_group,
     grouped_network_ids,
@@ -482,8 +483,13 @@ class TaskTemplateService:
             dept = sibling.department_id if keep else department_id
             if not keep:
                 self._validate_assignment(sibling.branch_id, assignee, dept)
+            body = (
+                payload
+                if sibling.id == existing.id
+                else merge_template_network_payload(existing, payload, sibling)
+            )
             updated = self._templates.update(
-                sibling.id, assignee_user_id=assignee, department_id=dept, **payload
+                sibling.id, assignee_user_id=assignee, department_id=dept, **body
             )
             if updated:
                 self._sync_open_occurrence_text(updated)

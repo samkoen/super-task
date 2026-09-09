@@ -289,6 +289,41 @@ def test_update_ad_hoc_network_keeps_sibling_assignee(monkeypatch):
     assert by_id["o2"]["title"] == "כותרת חדשה"
 
 
+def test_update_ad_hoc_network_keeps_sibling_local_title(monkeypatch):
+    svc, occ, o1, o2 = _network_edit_setup(monkeypatch)
+    o2.title = "כותרת סניף"
+    occ.list_by_network_group.return_value = [o1, o2]
+    result = svc.update_occurrence(
+        _actor(),
+        "o1",
+        **_edit_kwargs(
+            title="ביקור פתע",
+            description="חדש",
+            due_at="2026-08-18T10:00:00+03:00",
+        ),
+    )
+    assert result["updated_count"] == 2
+    by_id = {c.args[0]: c.kwargs for c in occ.update_details.call_args_list}
+    assert by_id["o1"]["title"] == "ביקור פתע"
+    assert by_id["o2"]["title"] == "כותרת סניף"
+    assert by_id["o1"]["description"] == "חדש"
+    assert by_id["o2"]["description"] == "חדש"
+
+
+def test_update_ad_hoc_network_changed_title_overwrites_sibling(monkeypatch):
+    svc, occ, o1, o2 = _network_edit_setup(monkeypatch)
+    o2.title = "כותרת סניף"
+    occ.list_by_network_group.return_value = [o1, o2]
+    svc.update_occurrence(
+        _actor(),
+        "o1",
+        **_edit_kwargs(title="לכולם", due_at="2026-08-18T10:00:00+03:00"),
+    )
+    by_id = {c.args[0]: c.kwargs for c in occ.update_details.call_args_list}
+    assert by_id["o1"]["title"] == "לכולם"
+    assert by_id["o2"]["title"] == "לכולם"
+
+
 def test_update_ad_hoc_local_only(monkeypatch):
     svc, occ, _, _ = _network_edit_setup(monkeypatch)
     result = svc.update_occurrence(_actor(), "o1", **_edit_kwargs(apply_to_network=False))

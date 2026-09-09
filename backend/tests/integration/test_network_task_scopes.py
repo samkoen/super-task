@@ -216,6 +216,146 @@ def test_fixed_update_network_keeps_assignees(client_nm, second_branch_seed):
     assert listed[world["branch_id"]]["due_time"] == "11:00"
 
 
+def test_fixed_network_update_keeps_then_overwrites_local_title(
+    client_nm, second_branch_seed
+):
+    world = second_branch_seed
+    created = client_nm.post("/api/tasks/templates", json=_fixed_payload())
+    assert created.status_code == 201, created.text
+    by_branch = _by_branch(created.json()["templates"])
+    primary = by_branch[world["branch_id"]]
+    sibling_title = by_branch[world["branch_b_id"]]["title"]
+    group_id = primary["network_group_id"]
+    due_time = primary["due_time"]
+
+    local = client_nm.patch(
+        f"/api/tasks/templates/{primary['id']}",
+        json=_template_edit(primary, title="כותרת סניף", apply_to_network=False),
+    )
+    assert local.status_code == 200, local.text
+
+    networked = client_nm.patch(
+        f"/api/tasks/templates/{primary['id']}",
+        json=_template_edit(
+            primary,
+            title="כותרת סניף",
+            description="תיאור חדש",
+            due_time=due_time,
+            apply_to_network=True,
+        ),
+    )
+    assert networked.status_code == 200, networked.text
+    listed = _by_branch(_group_templates(client_nm, group_id))
+    assert listed[world["branch_id"]]["title"] == "כותרת סניף"
+    assert listed[world["branch_b_id"]]["title"] == sibling_title
+    assert listed[world["branch_id"]]["description"] == "תיאור חדש"
+    assert listed[world["branch_b_id"]]["description"] == "תיאור חדש"
+
+    overwrite = client_nm.patch(
+        f"/api/tasks/templates/{primary['id']}",
+        json=_template_edit(
+            primary,
+            title="לכולם",
+            description="תיאור חדש",
+            due_time=due_time,
+            apply_to_network=True,
+        ),
+    )
+    assert overwrite.status_code == 200, overwrite.text
+    listed = _by_branch(_group_templates(client_nm, group_id))
+    assert listed[world["branch_id"]]["title"] == "לכולם"
+    assert listed[world["branch_b_id"]]["title"] == "לכולם"
+
+
+def test_ad_hoc_network_update_keeps_then_overwrites_local_title(
+    client_nm, second_branch_seed
+):
+    world = second_branch_seed
+    rows = client_nm.post("/api/tasks/ad-hoc", json=_ad_hoc_payload(world)).json()[
+        "occurrences"
+    ]
+    by_branch = _by_branch(rows)
+    primary = by_branch[world["branch_id"]]
+    sibling_title = by_branch[world["branch_b_id"]]["title"]
+    group_id = primary["network_group_id"]
+    due = primary["due_at"]
+
+    local = client_nm.post(
+        f"/api/tasks/occurrences/{primary['id']}/update",
+        json=_occurrence_edit(primary, title="כותרת סניף", apply_to_network=False),
+    )
+    assert local.status_code == 200, local.text
+
+    networked = client_nm.post(
+        f"/api/tasks/occurrences/{primary['id']}/update",
+        json=_occurrence_edit(
+            primary,
+            title="כותרת סניף",
+            description="תיאור חדש",
+            due_at=due,
+            apply_to_network=True,
+        ),
+    )
+    assert networked.status_code == 200, networked.text
+    listed = _by_branch(_group_occurrences(client_nm, group_id))
+    assert listed[world["branch_id"]]["title"] == "כותרת סניף"
+    assert listed[world["branch_b_id"]]["title"] == sibling_title
+    assert listed[world["branch_id"]]["description"] == "תיאור חדש"
+    assert listed[world["branch_b_id"]]["description"] == "תיאור חדש"
+
+    overwrite = client_nm.post(
+        f"/api/tasks/occurrences/{primary['id']}/update",
+        json=_occurrence_edit(
+            primary, title="לכולם", description="תיאור חדש", due_at=due, apply_to_network=True
+        ),
+    )
+    assert overwrite.status_code == 200, overwrite.text
+    listed = _by_branch(_group_occurrences(client_nm, group_id))
+    assert listed[world["branch_id"]]["title"] == "לכולם"
+    assert listed[world["branch_b_id"]]["title"] == "לכולם"
+
+
+def _template_edit(primary: dict, **over) -> dict:
+    body = {
+        "title": primary["title"],
+        "description": primary.get("description") or "",
+        "due_time": primary["due_time"],
+        "assignee_user_id": primary["assignee_user_id"],
+        "is_active": True,
+        "apply_to_network": False,
+    }
+    body.update(over)
+    return body
+
+
+def _occurrence_edit(primary: dict, **over) -> dict:
+    body = {
+        "title": primary["title"],
+        "description": primary.get("description") or "",
+        "due_at": primary["due_at"],
+        "assignee_user_id": primary["assignee_user_id"],
+        "apply_to_network": False,
+    }
+    body.update(over)
+    return body
+
+
+def _group_templates(client_nm, group_id: str) -> list[dict]:
+    return [
+        row
+        for row in client_nm.get("/api/tasks/templates").json()
+        if row.get("network_group_id") == group_id
+    ]
+
+
+def _group_occurrences(client_nm, group_id: str) -> list[dict]:
+    return [
+        row
+        for row in client_nm.get("/api/tasks/occurrences").json()
+        if row.get("network_group_id") == group_id
+    ]
+
+
 def test_branch_manager_cannot_fan_out(client_mgr, second_branch_seed):
     world = second_branch_seed
     ad_hoc = client_mgr.post(

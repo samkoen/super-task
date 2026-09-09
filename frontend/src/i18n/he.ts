@@ -14,6 +14,7 @@ export const he = {
   firstName: "שם פרטי",
   lastName: "שם משפחה",
   submit: "שליחה",
+  confirm: "אישור",
   loading: "טוען…",
   errorGeneric: "אירעה שגיאה",
   errorServerUnreachable: "לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.",
@@ -290,7 +291,8 @@ export const he = {
   fixedTaskNetworkChipCount: (count: number) =>
     count === 1 ? "סניף אחד" : `${count} סניפים`,
   fixedTaskUpdateAllBranches: "עדכון בכל הסניפים",
-  fixedTaskUpdateAllBranchesHint: "התוכן יעודכן בכל הסניפים. השיוך לעובד נשאר בכל סניף.",
+  fixedTaskUpdateAllBranchesHint: "רק השדות שערכת יעודכנו בכל הסניפים. השיוך לעובד נשאר בכל סניף.",
+  fixedTaskUpdateAllBranchesConfirm: "כל הסניפים יעודכנו בערכים החדשים",
   fixedTaskNetworkChip: "כל הרשת",
   managerFixedTasksCreatedNetwork: (count: number) =>
     count === 1 ? "משימה קבועה נוצרה בסניף אחד" : `נוצרו ${count} משימות קבועות ברשת`,

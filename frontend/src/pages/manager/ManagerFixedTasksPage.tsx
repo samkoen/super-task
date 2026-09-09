@@ -48,7 +48,7 @@ import TaskReferenceMediaEditor, {
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
 import PageHeader from "../../components/ui/PageHeader";
-import EditDialogFooterIcons from "../../components/ui/EditDialogFooterIcons";
+import EditDialogSaveActions from "../../components/ui/EditDialogSaveActions";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
@@ -639,9 +639,11 @@ export default function ManagerFixedTasksPage() {
             </span>
           </Tooltip>
           <Box>
-            <EditDialogFooterIcons
+            <EditDialogSaveActions
+              applyToNetwork={Boolean(editForm?.apply_to_network)}
+              resetKey={editing?.id}
               onCancel={() => setEditing(null)}
-              onSubmit={() => void handleSaveEdit()}
+              onSave={() => void handleSaveEdit()}
               disabled={saving}
               submitDisabled={!editForm}
               submitting={saving}
