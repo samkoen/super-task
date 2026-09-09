@@ -103,42 +103,11 @@ def test_unchanged_ops_keeps_sibling_category():
     assert merged["update_ops_category"] is False
 
 
-def test_occurrence_keeps_local_title_when_due_unchanged():
+def _occ_details(existing, **over) -> dict:
     from datetime import datetime
 
-    existing = _occ()
-    sibling = _occ(title="כותרת סניף")
-    details = {
+    body = {
         "title": "ביקור",
-        "description": "חדש",
-        "due_at": datetime.fromisoformat(existing.due_at),
-        "photo_required": False,
-        "update_min_video_seconds": False,
-        "update_completion_requirements": False,
-        "completion_requirements": [],
-        "update_reference_photo": False,
-        "update_reference_video": False,
-        "update_reference_audio": False,
-        "update_start_url": False,
-        "start_url": None,
-        "reference_photo_url": None,
-        "reference_video_url": None,
-        "reference_audio_url": None,
-        "min_video_seconds": None,
-    }
-    merged = merge_occurrence_network_details(existing, details, sibling)
-    assert merged["title"] == "כותרת סניף"
-    assert merged["description"] == "חדש"
-    assert merged["due_at"] == datetime.fromisoformat(sibling.due_at)
-
-
-def test_occurrence_changed_title_overwrites_sibling():
-    from datetime import datetime
-
-    existing = _occ()
-    sibling = _occ(title="כותרת סניף")
-    details = {
-        "title": "לכולם",
         "description": "",
         "due_at": datetime.fromisoformat(existing.due_at),
         "photo_required": False,
@@ -155,5 +124,44 @@ def test_occurrence_changed_title_overwrites_sibling():
         "reference_audio_url": None,
         "min_video_seconds": None,
     }
-    merged = merge_occurrence_network_details(existing, details, sibling)
+    body.update(over)
+    return body
+
+
+def test_occurrence_keeps_local_title_when_due_unchanged():
+    from datetime import datetime
+
+    existing = _occ()
+    sibling = _occ(title="כותרת סניף")
+    merged = merge_occurrence_network_details(
+        existing, _occ_details(existing, description="חדש"), sibling
+    )
+    assert merged["title"] == "כותרת סניף"
+    assert merged["description"] == "חדש"
+    assert merged["due_at"] == datetime.fromisoformat(sibling.due_at)
+
+
+def test_occurrence_changed_title_overwrites_sibling():
+    existing = _occ()
+    sibling = _occ(title="כותרת סניף")
+    merged = merge_occurrence_network_details(
+        existing, _occ_details(existing, title="לכולם"), sibling
+    )
     assert merged["title"] == "לכולם"
+
+
+def test_occurrence_changed_photo_required_overwrites_sibling():
+    existing = _occ(photo_required=False)
+    sibling = _occ(photo_required=False, title="כותרת סניף")
+    merged = merge_occurrence_network_details(
+        existing, _occ_details(existing, photo_required=True), sibling
+    )
+    assert merged["photo_required"] is True
+    assert merged["title"] == "כותרת סניף"
+
+
+def test_occurrence_keeps_local_photo_required_when_unchanged():
+    existing = _occ(photo_required=False)
+    sibling = _occ(photo_required=True)
+    merged = merge_occurrence_network_details(existing, _occ_details(existing), sibling)
+    assert merged["photo_required"] is True
