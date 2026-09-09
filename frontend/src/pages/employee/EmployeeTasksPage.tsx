@@ -82,6 +82,7 @@ import {
   shouldOpenStartUrlOnBegin,
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
+import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 function jobLabel(jobFunction: string | null | undefined): string {
@@ -223,6 +224,7 @@ export default function EmployeeTasksPage() {
   const [linkedStartReady, setLinkedStartReady] = useState(true);
   const linkedStartRef = useRef<Promise<boolean> | null>(null);
   const linkedStartIdRef = useRef<string | null>(null);
+  const autoCompleteGen = useRef(0);
 
   const translatePendingTasks = useCallback(
     async (language: EmployeeLanguage, tasks: EmployeeTaskCard[]) => {
@@ -463,7 +465,7 @@ export default function EmployeeTasksPage() {
       ),
     );
     if (
-      shouldAutoCompleteEmployeeTask(
+      !shouldAutoCompleteEmployeeTask(
         requirements.length,
         filled,
         detailTask.status,
@@ -471,8 +473,16 @@ export default function EmployeeTasksPage() {
         linkedStartReady,
       )
     ) {
-      void handleSubmit(next);
+      return;
     }
+    const gen = (autoCompleteGen.current += 1);
+    void submitAfterSlotsReady(next, gen);
+  };
+
+  const submitAfterSlotsReady = async (next: Array<PendingMedia | null>, gen: number) => {
+    await waitUntilPendingVideosReady(next);
+    if (gen !== autoCompleteGen.current) return;
+    await handleSubmit(next);
   };
 
   const handleToggleBreak = async () => {

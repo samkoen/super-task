@@ -100,7 +100,7 @@ export async function completeAfterEnsuringStart(
   }
 }
 
-/** Clôture auto après confirmation des cases (flèches), pas au déclencheur photo. */
+/** Clôture auto une fois les cases prêtes. La page attend que la vidéo soit montée avant l'envoi. */
 export function shouldAutoCompleteEmployeeTask(
   requirementCount: number,
   slotsFilled: boolean,

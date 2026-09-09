@@ -38,6 +38,7 @@ public class MainActivityInstrumentedTest {
                 assertNotNull(activity.getBridge().getPlugin("MediaPermissions"));
                 assertNotNull(activity.getBridge().getPlugin("NativeVideoRecorder"));
                 assertNotNull(activity.getBridge().getPlugin("NativePhotoCapture"));
+                assertNotNull(activity.getBridge().getPlugin("NativeBlobUpload"));
             });
         }
     }

@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { ensureNativeAvPermissions } from "./mediaPermissions";
 import { blobToFile } from "../utils/mediaCapture";
+import { attachNativeMediaPath } from "../utils/nativeMediaPath";
 
 export type NativeVideoRecordResult = {
   cancelled: boolean;
@@ -73,7 +74,10 @@ export async function recordNativeVideo(options?: {
     throw new Error("too-short");
   }
   return {
-    file: await fileFromNativePath(raw.path, raw.mimeType || "video/mp4"),
+    file: attachNativeMediaPath(
+      await fileFromNativePath(raw.path, raw.mimeType || "video/mp4"),
+      raw.path,
+    ),
     durationSeconds: Math.max(1, durationSeconds),
   };
 }

@@ -23,6 +23,7 @@ vi.mock("./mediaPermissions", () => ({
   ensureNativeAvPermissions: (...args: unknown[]) => ensureNativeAvPermissions(...args),
 }));
 
+import { nativeMediaPath } from "../utils/nativeMediaPath";
 import { canUseNativeVideoRecorder, fileFromNativePath, recordNativeVideo } from "./nativeVideoRecorder";
 
 describe("nativeVideoRecorder", () => {
@@ -78,6 +79,7 @@ describe("nativeVideoRecorder", () => {
     expect(result?.durationSeconds).toBe(8);
     expect(result?.file.type).toBe("video/mp4");
     expect(result?.file.name.endsWith(".mp4")).toBe(true);
+    expect(nativeMediaPath(result?.file)).toBe("/data/cache/task-video.mp4");
     expect(convertFileSrc).toHaveBeenCalled();
   });
 

@@ -15,7 +15,7 @@ ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
 
 def create_video_upload_intent(purpose: str, content_type: str) -> dict:
     folder = video_folder_for_purpose(purpose)
-    if not config.blob_storage_enabled():
+    if not config.blob_storage_enabled() or not config.IS_VERCEL:
         return {"mode": "proxy"}
     pathname = f"{folder}/{uuid.uuid4().hex}{video_extension(content_type)}"
     token = generate_blob_client_token(

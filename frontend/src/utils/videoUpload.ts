@@ -1,4 +1,10 @@
 import api from "../services/api";
+import {
+  canUseNativeBlobUpload,
+  putBlobFromNativePath,
+  writeFileToNativeCache,
+} from "../plugins/nativeBlobUpload";
+import { nativeMediaPath } from "./nativeMediaPath";
 
 export type VideoUploadPurpose = "task" | "chat" | "issue";
 
@@ -31,29 +37,7 @@ export async function requestVideoIntent(
   return data;
 }
 
-/** fetch du WebView, pas CapacitorHttp — évite de recharger la vidéo en base64. */
-export function unpatchedFetch(): typeof fetch {
-  const fromFrame = iframeWindowFetch();
-  return fromFrame ?? fetch.bind(globalThis);
-}
-
-function iframeWindowFetch(): typeof fetch | null {
-  if (typeof document === "undefined") return null;
-  try {
-    const frame = document.createElement("iframe");
-    frame.setAttribute("aria-hidden", "true");
-    frame.style.display = "none";
-    document.documentElement.appendChild(frame);
-    const child = frame.contentWindow?.fetch;
-    const bound = typeof child === "function" ? child.bind(frame.contentWindow) : null;
-    frame.remove();
-    return bound;
-  } catch {
-    return null;
-  }
-}
-
-function blobPutHeaders(
+export function blobPutHeaders(
   intent: Extract<VideoUploadIntent, { mode: "direct" }>,
   file: File,
 ): Record<string, string> {
@@ -66,16 +50,7 @@ function blobPutHeaders(
   };
 }
 
-export async function putBlobWithClientToken(
-  intent: Extract<VideoUploadIntent, { mode: "direct" }>,
-  file: File,
-  doFetch: typeof fetch = unpatchedFetch(),
-): Promise<{ url: string; kind: string }> {
-  const response = await doFetch(blobPutUrl(intent.apiUrl, intent.pathname), {
-    method: "PUT",
-    headers: blobPutHeaders(intent, file),
-    body: file,
-  });
+async function readBlobPutResponse(response: Response): Promise<{ url: string; kind: string }> {
   if (!response.ok) {
     throw new Error("upload failed");
   }
@@ -86,17 +61,43 @@ export async function putBlobWithClientToken(
   return { url: data.url, kind: "video" };
 }
 
+async function putViaAndroid(url: string, headers: Record<string, string>, file: File) {
+  const path = nativeMediaPath(file) ?? (await writeFileToNativeCache(file));
+  const uploaded = await putBlobFromNativePath(path, url, headers);
+  return { url: uploaded.url, kind: "video" as const };
+}
+
+export async function putBlobWithClientToken(
+  intent: Extract<VideoUploadIntent, { mode: "direct" }>,
+  file: File,
+  doFetch?: typeof fetch,
+): Promise<{ url: string; kind: string }> {
+  const url = blobPutUrl(intent.apiUrl, intent.pathname);
+  const headers = blobPutHeaders(intent, file);
+  if (!doFetch && canUseNativeBlobUpload()) {
+    return putViaAndroid(url, headers, file);
+  }
+  const response = await (doFetch ?? fetch)(url, { method: "PUT", headers, body: file });
+  return readBlobPutResponse(response);
+}
+
+/** Vite / uvicorn local : pas de PUT navigateur vers vercel.com (CORS). L'APK prod n'est pas DEV. */
+export function shouldUseLocalVideoProxy(isDev: boolean): boolean {
+  return isDev;
+}
+
 export async function uploadVideoFile(
   file: File,
   purpose: VideoUploadPurpose,
   proxyUpload: (file: File) => Promise<{ url: string }>,
-  doFetch: typeof fetch = unpatchedFetch(),
+  doFetch?: typeof fetch,
+  isDev = Boolean(import.meta.env.DEV),
 ): Promise<{ url: string }> {
   const intent = await requestVideoIntent(purpose, file.type).catch(
     (): VideoUploadIntent => ({ mode: "proxy" }),
   );
-  if (intent.mode === "direct") {
-    return putBlobWithClientToken(intent, file, doFetch);
+  if (intent.mode !== "direct" || (!doFetch && shouldUseLocalVideoProxy(isDev))) {
+    return proxyUpload(file);
   }
-  return proxyUpload(file);
+  return putBlobWithClientToken(intent, file, doFetch);
 }
