@@ -394,6 +394,62 @@ def test_update_network_keeps_per_branch_assignee(monkeypatch):
     assert by_id["t2"]["ops_category"] == "orders"
 
 
+def test_update_network_keeps_sibling_local_title(monkeypatch):
+    svc, templates, actor = _network_update_setup(monkeypatch)
+    t1 = templates.find_by_id.return_value
+    t2 = _domain_tpl(id="t2", branch_id="b2", assignee_user_id="e2a", title="כותרת סניף")
+    templates.list_by_network_group.return_value = [t1, t2]
+    templates.update.side_effect = _update_from_kwargs(t1, t2)
+    result = svc.update_template(
+        actor,
+        "t1",
+        **_edit_kwargs(
+            title="כותרת",
+            description="חדש",
+            due_time="09:00",
+            update_ops_category=False,
+            ops_category="cleaning",
+        ),
+    )
+    assert result["updated_count"] == 2
+    by_id = {c.args[0]: c.kwargs for c in templates.update.call_args_list}
+    assert by_id["t1"]["title"] == "כותרת"
+    assert by_id["t2"]["title"] == "כותרת סניף"
+    assert by_id["t1"]["description"] == "חדש"
+    assert by_id["t2"]["description"] == "חדש"
+
+
+def test_update_network_changed_title_overwrites_sibling(monkeypatch):
+    svc, templates, actor = _network_update_setup(monkeypatch)
+    t1 = templates.find_by_id.return_value
+    t2 = _domain_tpl(id="t2", branch_id="b2", assignee_user_id="e2a", title="כותרת סניף")
+    templates.list_by_network_group.return_value = [t1, t2]
+    templates.update.side_effect = _update_from_kwargs(t1, t2)
+    svc.update_template(
+        actor,
+        "t1",
+        **_edit_kwargs(title="לכולם", due_time="09:00", update_ops_category=False),
+    )
+    by_id = {c.args[0]: c.kwargs for c in templates.update.call_args_list}
+    assert by_id["t1"]["title"] == "לכולם"
+    assert by_id["t2"]["title"] == "לכולם"
+
+
+def _update_from_kwargs(t1, t2):
+    def do_update(id_, **kw):
+        src = t1 if id_ == t1.id else t2
+        return _domain_tpl(
+            id=src.id,
+            branch_id=src.branch_id,
+            title=kw["title"],
+            description=kw["description"],
+            assignee_user_id=kw["assignee_user_id"],
+            ops_category=kw.get("ops_category"),
+        )
+
+    return do_update
+
+
 def test_update_without_network_flag_only_one(monkeypatch):
     svc, templates, actor = _network_update_setup(monkeypatch)
     result = svc.update_template(actor, "t1", **_edit_kwargs(apply_to_network=False))

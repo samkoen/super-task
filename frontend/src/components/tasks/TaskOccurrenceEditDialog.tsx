@@ -27,7 +27,7 @@ import { defaultApplyAdHocEditToNetwork, isNetworkAdHocOccurrence } from "../../
 import TaskChatPanel from "./TaskChatPanel";
 import TaskReferenceMediaEditor from "./TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
-import EditDialogFooterIcons from "../ui/EditDialogFooterIcons";
+import EditDialogSaveActions from "../ui/EditDialogSaveActions";
 import {
   emptyOccurrenceEditForm,
   formFromOccurrence,
@@ -95,7 +95,7 @@ export default function TaskOccurrenceEditDialog({
     return () => {
       cancelled = true;
     };
-  }, [occurrenceId, employeesProp, onClose, showError]);
+  }, [occurrenceId, employeesProp, onClose, showError, user?.role]);
 
   const editEmployees = useMemo(() => {
     if (!target) return employees;
@@ -223,9 +223,11 @@ export default function TaskOccurrenceEditDialog({
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3 }}>
-        <EditDialogFooterIcons
+        <EditDialogSaveActions
+          applyToNetwork={form.apply_to_network}
+          resetKey={occurrenceId ?? undefined}
           onCancel={onClose}
-          onSubmit={() => void handleSave()}
+          onSave={() => void handleSave()}
           disabled={saving || loading}
           submitDisabled={!form.title.trim() || !form.due_at}
           submitting={saving}

@@ -13,13 +13,13 @@ export function isNetworkAdHocOccurrence(
 }
 
 export function defaultApplyAdHocEditToNetwork(
-  task: Pick<TaskOccurrence, "task_kind" | "network_group_id" | "is_network_task"> & {
+  _task: Pick<TaskOccurrence, "task_kind" | "network_group_id" | "is_network_task"> & {
     id?: string;
   },
-  canPickBranch: boolean,
-  networkIds?: Set<string>,
+  _canPickBranch: boolean,
+  _networkIds?: Set<string>,
 ): boolean {
-  return Boolean(canPickBranch && isNetworkAdHocOccurrence(task, networkIds));
+  return false;
 }
 
 export function networkAdHocIds(tasks: TaskOccurrence[]): Set<string> {

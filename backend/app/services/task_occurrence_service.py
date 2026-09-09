@@ -40,6 +40,7 @@ from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
 from app.domain.gallery_employee_claim import gallery_item_claimable_by_employee
+from app.domain.network_edit_diff import merge_occurrence_network_details
 from app.domain.network_fixed_task import (
     can_edit_network_fixed_group,
     grouped_occurrence_ids,
@@ -998,8 +999,13 @@ class TaskOccurrenceService:
             assignee = sibling.assignee_user_id if keep else self._resolve_edit_assignee(
                 actor, existing, assignee_user_id
             )
+            body = (
+                details
+                if sibling.id == existing.id
+                else merge_occurrence_network_details(existing, details, sibling)
+            )
             updated = self._occurrences.update_details(
-                sibling.id, assignee_user_id=assignee, **details
+                sibling.id, assignee_user_id=assignee, **body
             )
             if sibling.id == existing.id:
                 primary = updated

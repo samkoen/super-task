@@ -43,9 +43,9 @@ describe("adHocNetworkTasks", () => {
     expect(isNetworkAdHocOccurrence(items[3], ids)).toBe(false);
   });
 
-  it("defaults edit-all-branches for network manager only", () => {
+  it("defaults ad-hoc edit to the current branch only", () => {
     const task = occ({ id: "1", title: "A", is_network_task: true });
-    expect(defaultApplyAdHocEditToNetwork(task, true)).toBe(true);
+    expect(defaultApplyAdHocEditToNetwork(task, true)).toBe(false);
     expect(defaultApplyAdHocEditToNetwork(task, false)).toBe(false);
   });
 
