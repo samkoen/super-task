@@ -48,6 +48,7 @@ import TaskReferenceMediaEditor, {
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
 import PageHeader from "../../components/ui/PageHeader";
+import EditDialogFooterIcons from "../../components/ui/EditDialogFooterIcons";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
@@ -638,14 +639,13 @@ export default function ManagerFixedTasksPage() {
             </span>
           </Tooltip>
           <Box>
-            <Button onClick={() => setEditing(null)} disabled={saving}>{he.cancel}</Button>
-            <Button
-              variant="contained"
-              onClick={() => void handleSaveEdit()}
-              disabled={saving || !editForm}
-            >
-              {he.submit}
-            </Button>
+            <EditDialogFooterIcons
+              onCancel={() => setEditing(null)}
+              onSubmit={() => void handleSaveEdit()}
+              disabled={saving}
+              submitDisabled={!editForm}
+              submitting={saving}
+            />
           </Box>
         </DialogActions>
       </Dialog>
