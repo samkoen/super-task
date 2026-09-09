@@ -1,9 +1,15 @@
+import { useEffect, useState } from "react";
 import { Box, IconButton, TextField, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import MediaCaptureActions from "../media/MediaCaptureActions";
 import { he } from "../../i18n/he";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { MAX_SLOT_HINT, MAX_SLOT_TITLE, type CompletionRequirement } from "../../utils/completionMedia";
+import {
+  MAX_SLOT_HINT,
+  MAX_SLOT_TITLE,
+  sanitizeVideoSecondsDraft,
+  type CompletionRequirement,
+} from "../../utils/completionMedia";
 
 export default function VisualRequirementCard({
   req,
@@ -13,6 +19,7 @@ export default function VisualRequirementCard({
   onHint,
   onExample,
   onSeconds,
+  onSecondsCommit,
   onRemove,
 }: {
   req: CompletionRequirement;
@@ -22,6 +29,7 @@ export default function VisualRequirementCard({
   onHint: (hint: string) => void;
   onExample: (url: string, file: File | null) => void;
   onSeconds: (value: string) => void;
+  onSecondsCommit: () => void;
   onRemove: () => void;
 }) {
   const exampleSrc = mediaUrl(req.example_url || null);
@@ -75,15 +83,11 @@ export default function VisualRequirementCard({
         fullWidth
       />
       {req.kind === "video" && (
-        <TextField
-          size="small"
-          type="number"
-          label={he.completionVideoMinSeconds}
-          value={req.min_seconds ?? ""}
-          onChange={(e) => onSeconds(e.target.value)}
+        <VideoMinSecondsField
+          seconds={req.min_seconds}
           disabled={disabled}
-          inputProps={{ min: 1, max: 600 }}
-          sx={{ width: 160 }}
+          onChange={onSeconds}
+          onCommit={onSecondsCommit}
         />
       )}
       <ExamplePhotoField
@@ -93,6 +97,50 @@ export default function VisualRequirementCard({
         onExample={onExample}
       />
     </Box>
+  );
+}
+
+function VideoMinSecondsField({
+  seconds,
+  disabled,
+  onChange,
+  onCommit,
+}: {
+  seconds?: number;
+  disabled: boolean;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+}) {
+  const committed = seconds == null ? "" : String(seconds);
+  const [draft, setDraft] = useState(committed);
+
+  useEffect(() => {
+    setDraft((current) => (current === committed ? current : committed));
+  }, [committed]);
+
+  return (
+    <TextField
+      size="small"
+      type="text"
+      label={he.completionVideoMinSeconds}
+      value={draft}
+      onChange={(e) => {
+        const next = sanitizeVideoSecondsDraft(e.target.value);
+        setDraft(next);
+        onChange(next);
+      }}
+      onBlur={onCommit}
+      disabled={disabled}
+      autoComplete="off"
+      inputProps={{
+        inputMode: "numeric",
+        pattern: "[0-9]*",
+        dir: "ltr",
+        maxLength: 3,
+        "aria-label": he.completionVideoMinSeconds,
+      }}
+      sx={{ width: 160 }}
+    />
   );
 }
 

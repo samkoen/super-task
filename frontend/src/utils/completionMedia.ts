@@ -197,13 +197,34 @@ export function removeRequirement(list: CompletionRequirement[], index: number):
   return list.filter((_, i) => i !== index);
 }
 
+export function sanitizeVideoSecondsDraft(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, 3);
+}
+
 export function setVideoSeconds(
   list: CompletionRequirement[],
   index: number,
   seconds: number | string,
 ): CompletionRequirement[] {
-  const min = normalizeMinVideoSeconds(seconds) ?? DEFAULT_VIDEO_SECONDS;
-  return list.map((item, i) => (i === index && item.kind === "video" ? { ...item, min_seconds: min } : item));
+  const min = normalizeMinVideoSeconds(seconds);
+  return list.map((item, i) => {
+    if (i !== index || item.kind !== "video") return item;
+    if (min == null) {
+      const { min_seconds: _drop, ...rest } = item;
+      return rest;
+    }
+    return { ...item, min_seconds: min };
+  });
+}
+
+export function commitVideoSeconds(
+  list: CompletionRequirement[],
+  index: number,
+): CompletionRequirement[] {
+  const item = list[index];
+  if (!item || item.kind !== "video") return list;
+  if (normalizeMinVideoSeconds(item.min_seconds) != null) return list;
+  return setVideoSeconds(list, index, DEFAULT_VIDEO_SECONDS);
 }
 
 export function setRequirementTitle(

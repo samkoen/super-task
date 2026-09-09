@@ -624,22 +624,29 @@ export default function ManagerFixedTasksPage() {
             />
           </DialogContent>
         )}
-        <DialogActions sx={{ px: 3 }}>
-          <Button
-            color="error"
-            onClick={() => editing && openDelete(editing)}
-            disabled={saving}
-          >
-            {he.managerFixedTasksDelete}
-          </Button>
-          <Button onClick={() => setEditing(null)} disabled={saving}>{he.cancel}</Button>
-          <Button
-            variant="contained"
-            onClick={() => void handleSaveEdit()}
-            disabled={saving || !editForm}
-          >
-            {he.submit}
-          </Button>
+        <DialogActions sx={{ px: 3, justifyContent: "space-between" }}>
+          <Tooltip title={he.managerFixedTasksDelete}>
+            <span>
+              <IconButton
+                color="error"
+                onClick={() => editing && openDelete(editing)}
+                disabled={saving}
+                aria-label={he.managerFixedTasksDelete}
+              >
+                <DeleteOutlineIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Box>
+            <Button onClick={() => setEditing(null)} disabled={saving}>{he.cancel}</Button>
+            <Button
+              variant="contained"
+              onClick={() => void handleSaveEdit()}
+              disabled={saving || !editForm}
+            >
+              {he.submit}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 

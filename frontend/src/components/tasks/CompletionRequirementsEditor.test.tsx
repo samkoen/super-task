@@ -95,6 +95,25 @@ describe("CompletionRequirementsEditor", () => {
     expect(screen.queryByText(he.completionSlotExample)).toBeNull();
   });
 
+  it("lets the menahel replace min seconds by clearing the field", () => {
+    const onChange = vi.fn();
+    render(
+      <CompletionRequirementsEditor
+        value={[{ kind: "video", min_seconds: 1 }]}
+        onChange={onChange}
+      />,
+    );
+    const field = screen.getByLabelText(he.completionVideoMinSeconds);
+    fireEvent.change(field, { target: { value: "" } });
+    expect(onChange).toHaveBeenCalledWith([
+      { kind: "video" },
+    ]);
+    fireEvent.change(field, { target: { value: "36" } });
+    expect(onChange).toHaveBeenLastCalledWith([
+      { kind: "video", min_seconds: 36 },
+    ]);
+  });
+
   it("lets the menahel add a second video", () => {
     const onChange = vi.fn();
     const { rerender } = render(
