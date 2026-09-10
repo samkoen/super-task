@@ -1,10 +1,11 @@
 export const VIDEO_SLOT_IDLE_MS = 300;
 
-export function isVideoPending(media: { file: File }): boolean {
+export function isVideoPending(media: { file: File | null }): boolean {
+  if (!media.file || media.file.size <= 0) return false;
   return media.file.type.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(media.file.name);
 }
 
-export function pendingVideoSlots<T extends { file: File; previewUrl: string }>(
+export function pendingVideoSlots<T extends { file: File | null; previewUrl: string }>(
   slots: Array<T | null>,
 ): T[] {
   return slots.filter((item): item is T => Boolean(item && isVideoPending(item)));
@@ -51,7 +52,7 @@ export function waitUntilVideoCanPlay(previewUrl: string, timeoutMs = 8000): Pro
   });
 }
 
-export async function waitUntilPendingVideosReady<T extends { file: File; previewUrl: string }>(
+export async function waitUntilPendingVideosReady<T extends { file: File | null; previewUrl: string }>(
   slots: Array<T | null>,
   opts?: {
     idleMs?: number;

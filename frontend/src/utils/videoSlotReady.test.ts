@@ -56,6 +56,15 @@ describe("videoSlotReady", () => {
     expect(video.remove).toHaveBeenCalled();
   });
 
+  it("skips a kept video that has no local file", async () => {
+    const canPlay = vi.fn();
+    await waitUntilPendingVideosReady(
+      [{ file: null, previewUrl: "", keptUrl: "/uploads/v1.mp4" }],
+      { canPlay },
+    );
+    expect(canPlay).not.toHaveBeenCalled();
+  });
+
   it("does not wait when there is no video slot", async () => {
     const canPlay = vi.fn();
     await waitUntilPendingVideosReady(

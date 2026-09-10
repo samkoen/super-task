@@ -86,7 +86,7 @@ describe("pendingMedia", () => {
     const first = applyPendingSlot([null, null, null], 0, new File(["a"], "a.webm", { type: "video/webm" }), 12);
     const second = applyPendingSlot(first, 1, new File(["b"], "b.webm", { type: "video/webm" }), 11);
     const third = applyPendingSlot(second, 2, new File(["c"], "c.webm", { type: "video/webm" }), 10);
-    expect(third.map((item) => item?.file.name)).toEqual(["a.webm", "b.webm", "c.webm"]);
+    expect(third.map((item) => item?.file?.name)).toEqual(["a.webm", "b.webm", "c.webm"]);
     third.forEach((item) => revokePendingMedia(item));
   });
 });
