@@ -150,15 +150,19 @@ describe("TaskCompletionReviewDialog", () => {
     expect(screen.getByText(`${he.notCompletedReason}: אין מה לצלם`)).toBeTruthy();
   });
 
-  it("blocks reopen without a remark", () => {
+  it("reopens with a fallback remark when the note is empty", async () => {
+    vi.mocked(taskService.reopen).mockResolvedValue({} as never);
     const onDone = vi.fn();
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={onDone} />,
     );
     fireEvent.click(screen.getByRole("button", { name: he.taskReopen }));
-    expect(screen.getByText(he.taskReopenNoteRequired)).toBeTruthy();
-    expect(taskService.reopen).not.toHaveBeenCalled();
-    expect(onDone).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(taskService.reopen).toHaveBeenCalledWith("occ-1", {
+        rejection_note: he.taskReopenNoteFallback,
+      });
+      expect(onDone).toHaveBeenCalledWith(he.taskReopenedSuccess);
+    });
   });
 
   it("reopens the task with the manager remark", async () => {

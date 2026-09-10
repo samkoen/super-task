@@ -18,8 +18,8 @@ import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
-import { reopenNoteError } from "../../utils/taskReview";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
 import ClosedTaskReopenConfirm from "./ClosedTaskReopenConfirm";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
@@ -92,13 +92,10 @@ export default function TaskCompletionReviewDialog({
   };
 
   const handleReopen = () => {
-    const noteErr = reopenNoteError(note);
-    if (noteErr) {
-      setError(noteErr);
-      return;
-    }
     void runAction(async () => {
-      await taskService.reopen(task!.id, { rejection_note: note.trim() });
+      await taskService.reopen(task!.id, {
+        rejection_note: note.trim() || he.taskReopenNoteFallback,
+      });
       return he.taskReopenedSuccess;
     });
   };
@@ -208,7 +205,16 @@ export default function TaskCompletionReviewDialog({
 
         {error && <Alert severity="error">{error}</Alert>}
       </DialogContent>
-      <DialogActions sx={{ px: 3, flexWrap: "wrap", gap: 1 }}>
+      <DialogActions
+        sx={{
+          px: 3,
+          pb: dialogActionsPbCss(),
+          flexWrap: "wrap",
+          gap: 1,
+          flexDirection: { xs: "column", sm: "row" },
+          "& > :not(style)": { width: { xs: "100%", sm: "auto" } },
+        }}
+      >
         <Button onClick={handleClose} disabled={saving}>
           {he.cancel}
         </Button>

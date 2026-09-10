@@ -568,19 +568,20 @@ async def reopen_occurrence(
     occurrence_id: str,
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
     messages: TaskMessageService = Depends(get_message_service),
     db: Session = Depends(get_db),
 ):
-    """Compat : reject photo → message chat + retour in_progress."""
+    """Reject → in_progress d'abord, puis message chat (l'i18n ne bloque plus)."""
     actor = load_actor(request, UserRepository(db))
-    payload = data or {}
-    note = (payload.get("rejection_note") or "").strip() or "נא לתקן לפי ההודעה"
-    result = await messages.post_message(actor, occurrence_id, body=note)
-    _emit_task_event(db, result["event_type"], result["occurrence"])
+    note = ((data or {}).get("rejection_note") or "").strip() or "נא לתקן לפי ההודעה"
+    item = service.reopen_occurrence(actor, occurrence_id, rejection_note=note)
+    chat = await messages.post_message(actor, occurrence_id, body=note)
+    _emit_task_event(db, chat["event_type"], chat["occurrence"])
     return {
         "message": "הודעה נשלחה והמשימה נפתחה מחדש",
-        "occurrence": result["occurrence"],
-        "chat_message": result["message"],
+        "occurrence": chat["occurrence"],
+        "chat_message": chat["message"],
     }
 
 

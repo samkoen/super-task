@@ -147,6 +147,7 @@ describe("employeeDoTask", () => {
     );
     expect(shouldAutoCompleteEmployeeTask(1, true, "pending", null)).toBe(true);
     expect(shouldAutoCompleteEmployeeTask(1, false, "in_progress", null)).toBe(false);
+    expect(shouldAutoCompleteEmployeeTask(2, true, "in_progress", null, true, true)).toBe(false);
   });
 
   it("locks submit while the annotation window is preparing or open", () => {
