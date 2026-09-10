@@ -1,10 +1,12 @@
 /** Média capturé en local — upload serveur uniquement à la soumission. */
 
 export type PendingMedia = {
-  file: File;
+  file: File | null;
   previewUrl: string;
   durationSeconds?: number | null;
   capturedAt: string;
+  /** URL déjà envoyée — l’oved peut la garder ou la remplacer. */
+  keptUrl?: string;
 };
 
 export function createPendingMedia(
@@ -37,10 +39,27 @@ export function completionAttachmentFromPending(
   };
 }
 
+export function createKeptMedia(
+  url: string,
+  durationSeconds?: number | null,
+): PendingMedia {
+  return {
+    file: null,
+    previewUrl: "",
+    durationSeconds: durationSeconds ?? null,
+    capturedAt: "",
+    keptUrl: url,
+  };
+}
+
 export function revokePendingMedia(media: PendingMedia | null | undefined): void {
   if (media?.previewUrl?.startsWith("blob:")) {
     URL.revokeObjectURL(media.previewUrl);
   }
+}
+
+export function pendingSlotIsFilled(media: PendingMedia | null | undefined): boolean {
+  return pendingSlotHasFile(media) || Boolean(media?.keptUrl);
 }
 
 export function replacePendingMedia(
@@ -56,7 +75,25 @@ export async function uploadPendingMedia(
   pending: PendingMedia | null | undefined,
   upload: (file: File) => Promise<{ url: string }>,
 ): Promise<string | undefined> {
-  if (!pending) return undefined;
+  if (!pendingSlotHasFile(pending)) return undefined;
   const res = await upload(pending.file);
   return res.url;
+}
+
+export function pendingSlotHasFile(
+  media: PendingMedia | null | undefined,
+): media is PendingMedia & { file: File } {
+  return Boolean(media?.file && media.file.size > 0);
+}
+
+export function applyPendingSlot(
+  slots: Array<PendingMedia | null>,
+  index: number,
+  file: File,
+  durationSeconds?: number | null,
+): Array<PendingMedia | null> {
+  const next = slots.slice();
+  while (next.length <= index) next.push(null);
+  next[index] = replacePendingMedia(next[index], file, durationSeconds ?? null);
+  return next;
 }

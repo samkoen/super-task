@@ -159,4 +159,21 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(await screen.findByText(he.punchClockOut)).toBeTruthy();
     await waitFor(() => expect(screen.queryByText("מדף חלב")).toBeNull());
   });
+
+  it("lets the oved open completed tasks above the שיחה bar", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        today_tasks: [card({ id: "t", title: "מדף חלב" })],
+        completed_tasks: [card({ id: "c", title: "ניקוי רצפה", status: "completed" })],
+      }),
+    );
+    renderPage();
+    const toggle = await screen.findByText(`${he.employeeShowCompleted} (1)`);
+    expect(screen.getByTestId("employee-chat-bar-spacer")).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.directChatOpen })).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(await screen.findByText("ניקוי רצפה")).toBeTruthy();
+    expect(screen.getByText(`${he.employeeHideCompleted} (1)`)).toBeTruthy();
+  });
 });

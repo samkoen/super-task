@@ -21,6 +21,21 @@ describe("completionSlotView", () => {
     expect(slotGuideText({ kind: "photo" })).toBe("");
   });
 
+  it("maps three videos to the same slot index", () => {
+    const reqs: CompletionRequirement[] = [
+      { kind: "video", min_seconds: 10 },
+      { kind: "video", min_seconds: 10 },
+      { kind: "video", min_seconds: 10 },
+    ];
+    const fills = fillsFromAttachments(reqs, [
+      { kind: "video", url: "/v1.mp4" },
+      { kind: "video", url: "/v2.mp4" },
+      { kind: "video", url: "/v3.mp4" },
+    ]);
+    expect(fills.map((item) => item?.url)).toEqual(["/v1.mp4", "/v2.mp4", "/v3.mp4"]);
+    expect(filledVisualCount(reqs, fills)).toBe(3);
+  });
+
   it("maps attachments to the same slot index", () => {
     const reqs: CompletionRequirement[] = [
       { kind: "video", min_seconds: 10, title: "קופה" },

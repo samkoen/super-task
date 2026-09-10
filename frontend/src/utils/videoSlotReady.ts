@@ -26,6 +26,14 @@ export function waitForCaptureUiIdle(
   });
 }
 
+/** Ne pas appeler video.load() : ça détache le blob partagé dans le WebView Android. */
+export function releaseVideoElement(video: HTMLVideoElement): void {
+  video.onloadeddata = null;
+  video.onerror = null;
+  video.removeAttribute("src");
+  video.remove();
+}
+
 export function waitUntilVideoCanPlay(previewUrl: string, timeoutMs = 8000): Promise<void> {
   if (!previewUrl) return Promise.resolve();
   return new Promise((resolve) => {
@@ -33,10 +41,7 @@ export function waitUntilVideoCanPlay(previewUrl: string, timeoutMs = 8000): Pro
     video.preload = "auto";
     const finish = () => {
       window.clearTimeout(timer);
-      video.onloadeddata = null;
-      video.onerror = null;
-      video.removeAttribute("src");
-      video.load();
+      releaseVideoElement(video);
       resolve();
     };
     const timer = window.setTimeout(finish, timeoutMs);

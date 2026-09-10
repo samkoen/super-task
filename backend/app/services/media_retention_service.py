@@ -33,6 +33,9 @@ class MediaRetentionService:
         self._occurrences.set_media_purge_after(occurrence_id, purge_after)
         return purge_after
 
+    def cancel_purge(self, occurrence_id: str) -> None:
+        self._occurrences.set_media_purge_after(occurrence_id, None)
+
     def purge_due(self, *, now: datetime | None = None) -> dict:
         moment = now or datetime.now(TZ)
         due = self._occurrences.list_due_for_media_purge(moment)

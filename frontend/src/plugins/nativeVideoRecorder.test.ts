@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { record, isNativePlatform, getPlatform, convertFileSrc, ensureNativeAvPermissions } = vi.hoisted(
-  () => ({
-    record: vi.fn(),
-    isNativePlatform: vi.fn(),
-    getPlatform: vi.fn(),
-    convertFileSrc: vi.fn((src: string) => `converted:${src}`),
-    ensureNativeAvPermissions: vi.fn(),
-  }),
-);
+const {
+  record,
+  isNativePlatform,
+  getPlatform,
+  convertFileSrc,
+  ensureNativeAvPermissions,
+  writeFileToNativeCache,
+  canUseNativeBlobUpload,
+} = vi.hoisted(() => ({
+  record: vi.fn(),
+  isNativePlatform: vi.fn(),
+  getPlatform: vi.fn(),
+  convertFileSrc: vi.fn((src: string) => `converted:${src}`),
+  ensureNativeAvPermissions: vi.fn(),
+  writeFileToNativeCache: vi.fn(),
+  canUseNativeBlobUpload: vi.fn(),
+}));
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
@@ -23,8 +31,18 @@ vi.mock("./mediaPermissions", () => ({
   ensureNativeAvPermissions: (...args: unknown[]) => ensureNativeAvPermissions(...args),
 }));
 
+vi.mock("./nativeBlobUpload", () => ({
+  canUseNativeBlobUpload: () => canUseNativeBlobUpload(),
+  writeFileToNativeCache: (...args: unknown[]) => writeFileToNativeCache(...args),
+}));
+
 import { nativeMediaPath } from "../utils/nativeMediaPath";
-import { canUseNativeVideoRecorder, fileFromNativePath, recordNativeVideo } from "./nativeVideoRecorder";
+import {
+  canUseNativeVideoRecorder,
+  fileFromNativePath,
+  recordNativeVideo,
+  stabilizeNativeVideoFile,
+} from "./nativeVideoRecorder";
 
 describe("nativeVideoRecorder", () => {
   beforeEach(() => {
@@ -32,6 +50,10 @@ describe("nativeVideoRecorder", () => {
     isNativePlatform.mockReset();
     getPlatform.mockReset();
     ensureNativeAvPermissions.mockReset();
+    writeFileToNativeCache.mockReset();
+    canUseNativeBlobUpload.mockReset();
+    canUseNativeBlobUpload.mockReturnValue(true);
+    writeFileToNativeCache.mockResolvedValue("/cache/upload-stable.mp4");
     vi.unstubAllGlobals();
   });
 
@@ -79,7 +101,8 @@ describe("nativeVideoRecorder", () => {
     expect(result?.durationSeconds).toBe(8);
     expect(result?.file.type).toBe("video/mp4");
     expect(result?.file.name.endsWith(".mp4")).toBe(true);
-    expect(nativeMediaPath(result?.file)).toBe("/data/cache/task-video.mp4");
+    expect(nativeMediaPath(result?.file)).toBe("/cache/upload-stable.mp4");
+    expect(writeFileToNativeCache).toHaveBeenCalled();
     expect(convertFileSrc).toHaveBeenCalled();
   });
 
@@ -102,6 +125,22 @@ describe("nativeVideoRecorder", () => {
     ensureNativeAvPermissions.mockResolvedValue(false);
     await expect(recordNativeVideo()).rejects.toThrow("permission");
     expect(record).not.toHaveBeenCalled();
+  });
+
+  it("snapshots each clip to a unique cache path before upload", async () => {
+    writeFileToNativeCache
+      .mockResolvedValueOnce("/cache/upload-1.mp4")
+      .mockResolvedValueOnce("/cache/upload-2.mp4");
+    const first = await stabilizeNativeVideoFile(
+      new File(["a"], "a.mp4", { type: "video/mp4" }),
+      "/data/cache/task-video.mp4",
+    );
+    const second = await stabilizeNativeVideoFile(
+      new File(["b"], "b.mp4", { type: "video/mp4" }),
+      "/data/cache/task-video.mp4",
+    );
+    expect(nativeMediaPath(first)).toBe("/cache/upload-1.mp4");
+    expect(nativeMediaPath(second)).toBe("/cache/upload-2.mp4");
   });
 
   it("reads a cache path through the Capacitor file URL", async () => {

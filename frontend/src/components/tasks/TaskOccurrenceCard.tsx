@@ -150,6 +150,7 @@ export default function TaskOccurrenceCard({
     Boolean(onEdit) &&
     !["completed", "cancelled", "pending_review"].includes(task.status);
   const canReview = awaitingReview && Boolean(onReview);
+  const canOpenClosed = task.status === "completed" && Boolean(onReview);
   const canMarkNext =
     Boolean(onSetManagerNext) &&
     Boolean(task.assignee_user_id) &&
@@ -558,6 +559,17 @@ export default function TaskOccurrenceCard({
                 onClick={() => onReview(task)}
               >
                 {he.taskReviewAction}
+              </Button>
+            )}
+            {canOpenClosed && onReview && (
+              <Button
+                fullWidth
+                variant="outlined"
+                color="warning"
+                size="small"
+                onClick={() => onReview(task)}
+              >
+                {he.taskClosedDetailAction}
               </Button>
             )}
             {onOpen && (
