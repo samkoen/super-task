@@ -10,6 +10,9 @@ export type QualityRatingSummary = {
   by_category: QualityCategoryAverage[];
 };
 
+/** דירוג ביצוע pré-sélectionné dans la revue menahel. */
+export const DEFAULT_REVIEW_QUALITY_RATING = 4;
+
 export function formatQualityAverage(average: number | null): string {
   if (average == null) return "";
   return average.toFixed(1);

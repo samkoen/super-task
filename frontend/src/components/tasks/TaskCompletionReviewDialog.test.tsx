@@ -102,14 +102,16 @@ describe("TaskCompletionReviewDialog", () => {
     expect(chat.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("approves and closes the task", async () => {
+  it("approves with the default four-star rating", async () => {
     vi.mocked(taskService.approve).mockResolvedValue({} as never);
     const onDone = vi.fn();
     const onClose = vi.fn();
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={onClose} onDone={onDone} />,
     );
-    fireEvent.click(screen.getByRole("radio", { name: he.qualityStarLabel(4) }));
+    expect(screen.getByRole("radio", { name: he.qualityStarLabel(4) }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
     fireEvent.click(screen.getByRole("button", { name: he.taskApproveClose }));
     await waitFor(() => {
       expect(taskService.approve).toHaveBeenCalledWith("occ-1", { quality_rating: 4 });
@@ -119,12 +121,31 @@ describe("TaskCompletionReviewDialog", () => {
     expect(taskService.reopen).not.toHaveBeenCalled();
   });
 
-  it("blocks approve until a rating is chosen", () => {
+  it("shows when the oved sent the task without finishing", () => {
     render(
-      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+      <TaskCompletionReviewDialog
+        task={reviewTask({
+          completion: {
+            id: "c1",
+            occurrence_id: "occ-1",
+            status: "not_completed",
+            note: null,
+            photo_path: null,
+            video_path: null,
+            audio_path: null,
+            not_completed_reason: "אין מה לצלם",
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "pending",
+          },
+        })}
+        onClose={vi.fn()}
+        onDone={vi.fn()}
+      />,
     );
-    expect(screen.getByRole("button", { name: he.taskApproveClose })).toHaveProperty("disabled", true);
-    expect(taskService.approve).not.toHaveBeenCalled();
+    expect(screen.getByTestId("completion-outcome-not-done")).toBeTruthy();
+    expect(screen.getByText(he.taskNotCompletedAlert)).toBeTruthy();
+    expect(screen.getByText(`${he.notCompletedReason}: אין מה לצלם`)).toBeTruthy();
   });
 
   it("blocks reopen without a remark", () => {

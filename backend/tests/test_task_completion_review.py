@@ -364,6 +364,69 @@ def test_employee_complete_requires_min_video_duration():
         )
 
 
+def test_employee_not_completed_goes_to_review_without_photo():
+    occurrence = _occurrence(completion_requirements=[{"kind": "photo"}], photo_required=True)
+    pending = _occurrence(status=task_status.PENDING_REVIEW)
+    completion = _completion(
+        status=task_status.COMPLETION_NOT_DONE,
+        photo_path=None,
+        not_completed_reason="אין מה לצלם",
+    )
+
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    occurrence_repo.update_status.return_value = pending
+    occurrence_repo.get_branch_name.return_value = "Branch"
+    occurrence_repo.get_department_name.return_value = None
+    occurrence_repo.get_assignee_name.return_value = "Worker"
+    occurrence_repo.get_manager_name.return_value = "Manager"
+
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    completion_repo.create.return_value = completion
+
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+
+    result = asyncio.run(
+        svc.complete_occurrence(
+            actor,
+            "occ-1",
+            completion_status=task_status.COMPLETION_NOT_DONE,
+            not_completed_reason="אין מה לצלם",
+        )
+    )
+
+    occurrence_repo.update_status.assert_called_once_with("occ-1", task_status.PENDING_REVIEW)
+    created = completion_repo.create.call_args.kwargs
+    assert created["status"] == task_status.COMPLETION_NOT_DONE
+    assert created["not_completed_reason"] == "אין מה לצלם"
+    assert result["status"] == task_status.PENDING_REVIEW
+
+
+def test_employee_not_completed_requires_reason():
+    occurrence = _occurrence()
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    svc = _service(occurrence_repo, MagicMock())
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+
+    with pytest.raises(ValueError, match="יש להסביר"):
+        asyncio.run(
+            svc.complete_occurrence(
+                actor,
+                "occ-1",
+                completion_status=task_status.COMPLETION_NOT_DONE,
+            )
+        )
+
+
 def test_employee_complete_requires_each_listed_video():
     occurrence = _occurrence(
         completion_requirements=[

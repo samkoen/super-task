@@ -63,6 +63,23 @@ def _tpl(**overrides) -> TaskTemplate:
     return TaskTemplate(**base)
 
 
+def _card_service() -> DashboardService:
+    occ_repo = MagicMock()
+    occ_repo.get_department_name.return_value = None
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    tpl_repo = MagicMock()
+    tpl_repo.find_by_id.return_value = None
+    return DashboardService(
+        occ_repo,
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        completion_repo,
+        template_repo=tpl_repo,
+    )
+
+
 def test_employee_card_merges_blob_media_from_template():
     occ_repo = MagicMock()
     occ_repo.get_department_name.return_value = None
@@ -200,3 +217,13 @@ def test_employee_card_fills_start_url_from_template():
     )
     card = svc._employee_task_card(_occ(start_url=None))
     assert card["start_url"] == url
+
+
+def test_employee_card_includes_ops_category():
+    card = _card_service()._employee_task_card(_occ(ops_category="cleaning"))
+    assert card["ops_category"] == "cleaning"
+
+
+def test_employee_card_ops_category_none_when_missing():
+    card = _card_service()._employee_task_card(_occ())
+    assert card["ops_category"] is None

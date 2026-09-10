@@ -14,6 +14,7 @@ export function employeeCardToOccurrence(card: EmployeeTaskCard): TaskOccurrence
     assignee_user_id: null,
     department_id: null,
     task_kind: card.task_kind,
+    ops_category: card.ops_category,
     manager_user_id: null,
     photo_required: card.photo_required,
     min_video_seconds: card.min_video_seconds,

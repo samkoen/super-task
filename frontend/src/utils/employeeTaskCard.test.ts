@@ -29,6 +29,15 @@ describe("employeeCardToOccurrence", () => {
     expect(occ.spoken_text).toBe("hello");
     expect(occ.start_url).toBeUndefined();
     expect(occ.reference_photo_url).toBeUndefined();
+    expect(occ.ops_category).toBeUndefined();
+  });
+
+  it("keeps the ops category on the shared occurrence shape", () => {
+    const occ = employeeCardToOccurrence({
+      ...baseCard,
+      ops_category: "fronts_signage",
+    });
+    expect(occ.ops_category).toBe("fronts_signage");
   });
 
   it("keeps the start url on the shared occurrence shape", () => {

@@ -225,18 +225,18 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByText("ניקיון")).toBeTruthy();
   });
 
-  it("blocks finish while a word photo is still missing", () => {
+  it("lets the oved click send even when a photo is still missing", () => {
     render(
       <EmployeeTaskDetailDialog
         task={{
-          ...task(),
+          ...task("in_progress"),
           completion_requirements: [
             { kind: "photo", title: "חלב" },
             { kind: "photo", title: "לחם" },
             { kind: "photo", title: "ביצים" },
           ],
         }}
-        capture={capture({ canSubmit: false, slots: [null, null, null] })}
+        capture={capture({ canSubmit: true, slotsFilled: false, slots: [null, null, null] })}
         onClose={vi.fn()}
       />,
     );
@@ -244,7 +244,9 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByText("לחם")).toBeTruthy();
     expect(screen.getByText("ביצים")).toBeTruthy();
     expect(screen.getByText(he.completionFillSlotsHint)).toBeTruthy();
-    expect((screen.getByRole("button", { name: he.doTask }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: he.markDone }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it("does not show do-task when waiting for manager review", () => {
@@ -257,5 +259,19 @@ describe("EmployeeTaskDetailDialog", () => {
     );
     expect(screen.queryByRole("button", { name: he.doTask })).toBeNull();
     expect(screen.queryByRole("button", { name: he.markDone })).toBeNull();
+  });
+
+  it("shows task chat above media while waiting for manager approval", () => {
+    render(<EmployeeTaskDetailDialog task={task("pending_review")} onClose={vi.fn()} />);
+    const chat = screen.getByTestId("task-chat-panel");
+    const media = screen.getByText(he.taskNoReferenceMedia);
+    expect(chat.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows task chat above media after the manager accepted", () => {
+    render(<EmployeeTaskDetailDialog task={task("completed")} onClose={vi.fn()} />);
+    const chat = screen.getByTestId("task-chat-panel");
+    const media = screen.getByText(he.taskNoReferenceMedia);
+    expect(chat.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

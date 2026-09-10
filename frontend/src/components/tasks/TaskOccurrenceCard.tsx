@@ -27,6 +27,7 @@ import ChatIcon from "@mui/icons-material/Chat";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
+import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import TaskStatusChip from "./TaskStatusChip";
 import TaskChatPanel from "./TaskChatPanel";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
@@ -491,6 +492,7 @@ export default function TaskOccurrenceCard({
               variant={urgency === "normal" ? "outlined" : "filled"}
             />
             <TaskStatusChip status={task.status} />
+            {task.completion ? <CompletionOutcomeChip status={task.completion.status} /> : null}
             {isManagerNextTask(task) && (
               <Chip
                 size="small"
