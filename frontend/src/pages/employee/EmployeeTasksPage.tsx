@@ -81,7 +81,7 @@ import {
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
-import { employeeChatBarBottomCss, employeeChatBarContentPadCss } from "../../utils/employeeChatBar";
+import { employeeChatBarPaperSx, employeeChatBarSpacerSx } from "../../utils/employeeChatBar";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -477,6 +477,7 @@ export default function EmployeeTasksPage() {
         detailTask.status,
         detailTask.start_url,
         linkedStartReady,
+        Boolean(detailTask.completion),
       )
     ) {
       return;
@@ -743,7 +744,7 @@ export default function EmployeeTasksPage() {
                 border: 1,
                 borderColor: "divider",
                 position: "relative",
-                zIndex: (t) => t.zIndex.fab + 1,
+                zIndex: 1400,
               }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -766,24 +767,9 @@ export default function EmployeeTasksPage() {
       <Box
         aria-hidden
         data-testid="employee-chat-bar-spacer"
-        sx={{ height: employeeChatBarContentPadCss(), flexShrink: 0 }}
+        sx={employeeChatBarSpacerSx()}
       />
-      <Paper
-        elevation={6}
-        sx={{
-          position: "fixed",
-          bottom: employeeChatBarBottomCss(),
-          left: 16,
-          right: 16,
-          maxWidth: 520,
-          mx: "auto",
-          zIndex: (t) => t.zIndex.fab,
-          borderRadius: 3,
-          p: 1.25,
-          border: "1px solid",
-          borderColor: "divider",
-        }}
-      >
+      <Paper elevation={6} sx={employeeChatBarPaperSx()}>
         <Badge badgeContent={chatUnread} color="error" sx={{ width: "100%", display: "block" }}>
           <Button
             fullWidth

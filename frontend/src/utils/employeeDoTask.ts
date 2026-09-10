@@ -88,14 +88,16 @@ export async function completeAfterEnsuringStart(
   }
 }
 
-/** Clôture auto une fois les cases prêtes. La page attend que la vidéo soit montée avant l'envoi. */
+/** Clôture auto une fois les cases prêtes. Tâche rouverte : l'oved clique סיום משימה. */
 export function shouldAutoCompleteEmployeeTask(
   requirementCount: number,
   slotsFilled: boolean,
   status: TaskStatus | string,
   startUrl: string | null | undefined,
   startConfirmed = true,
+  priorCompletion = false,
 ): boolean {
+  if (priorCompletion) return false;
   if (requirementCount < 1 || !slotsFilled) return false;
   if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return false;
   if (hasExternalStartUrl(startUrl) && !startConfirmed) return false;

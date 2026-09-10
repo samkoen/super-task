@@ -1,5 +1,6 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 import { he } from "../../i18n/he";
+import { dialogActionsPbCss } from "../../utils/systemInsets";
 
 export default function ClosedTaskReopenConfirm({
   open,
@@ -18,7 +19,7 @@ export default function ClosedTaskReopenConfirm({
       <DialogContent>
         <Typography variant="body2">{he.taskReopenClosedConfirm}</Typography>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ pb: dialogActionsPbCss() }}>
         <Button onClick={onCancel} disabled={saving}>
           {he.cancel}
         </Button>

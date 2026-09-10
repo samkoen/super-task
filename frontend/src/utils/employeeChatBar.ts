@@ -1,19 +1,32 @@
-import { withSystemBottomInsetCss } from "./systemInsets";
-
 /** Hauteur barre שיחה (px), hors safe-area. */
 export const EMPLOYEE_CHAT_BAR_HEIGHT_PX = 80;
-/** Marge sous l’accordéon משימות שהושלמו pour ne pas être sous le bouton. */
-export const EMPLOYEE_CHAT_BAR_GAP_PX = 48;
-/** Distance du bord bas. */
-export const EMPLOYEE_CHAT_BAR_OFFSET_PX = 16;
+/** Marge sous l’accordéon — px simples : calc() est souvent ignoré sur Android. */
+export const EMPLOYEE_CHAT_BAR_GAP_PX = 72;
+export const EMPLOYEE_CHAT_BAR_OFFSET_PX = 24;
+export const EMPLOYEE_CHAT_BAR_SPACER_PX =
+  EMPLOYEE_CHAT_BAR_OFFSET_PX + EMPLOYEE_CHAT_BAR_HEIGHT_PX + EMPLOYEE_CHAT_BAR_GAP_PX;
 
-export function employeeChatBarBottomCss(): string {
-  return withSystemBottomInsetCss(`${EMPLOYEE_CHAT_BAR_OFFSET_PX}px`);
+export function employeeChatBarSpacerSx() {
+  return {
+    height: EMPLOYEE_CHAT_BAR_SPACER_PX,
+    minHeight: EMPLOYEE_CHAT_BAR_SPACER_PX,
+    flexShrink: 0,
+  } as const;
 }
 
-/** Spacer réel : le pb du scroller est souvent ignoré par WebView Android. */
-export function employeeChatBarContentPadCss(): string {
-  const base =
-    EMPLOYEE_CHAT_BAR_OFFSET_PX + EMPLOYEE_CHAT_BAR_HEIGHT_PX + EMPLOYEE_CHAT_BAR_GAP_PX;
-  return withSystemBottomInsetCss(`${base}px`);
+/** Coin bas, pas pleine largeur — l’accordéon reste cliquable. */
+export function employeeChatBarPaperSx() {
+  return {
+    position: "fixed" as const,
+    bottom: EMPLOYEE_CHAT_BAR_OFFSET_PX,
+    insetInlineStart: 16,
+    insetInlineEnd: "auto",
+    width: "auto",
+    maxWidth: 200,
+    zIndex: 1200,
+    borderRadius: 3,
+    p: 1,
+    border: "1px solid",
+    borderColor: "divider",
+  };
 }
