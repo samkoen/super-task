@@ -39,9 +39,6 @@ function captureOptions(root: HTMLElement) {
     width: Math.max(1, Math.round(rect.width || window.innerWidth)),
     height: Math.max(1, Math.round(rect.height || window.innerHeight)),
     filter: (node: Node) => !isSystemBugUi(node),
-    onclone: (_doc: Document, cloned?: HTMLElement) => {
-      if (cloned) restoreClonedScroll(cloned);
-    },
   };
 }
 
@@ -58,26 +55,32 @@ async function captureViewportFallback(
 }
 
 function stampScrollOffsets(root: HTMLElement): () => void {
-  const stamped: HTMLElement[] = [];
+  const restores: Array<() => void> = [];
   for (const el of [root, ...root.querySelectorAll<HTMLElement>("*")]) {
-    if (!el.scrollTop && !el.scrollLeft) continue;
-    el.dataset.bugScrollTop = String(el.scrollTop);
-    el.dataset.bugScrollLeft = String(el.scrollLeft);
-    stamped.push(el);
+    const top = el.scrollTop;
+    const left = el.scrollLeft;
+    if (!top && !left) continue;
+    restores.push(shiftChildrenForScroll(el, left, top));
+    el.scrollTop = 0;
+    el.scrollLeft = 0;
+    restores.push(() => {
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    });
   }
   return () => {
-    for (const el of stamped) {
-      delete el.dataset.bugScrollTop;
-      delete el.dataset.bugScrollLeft;
-    }
+    for (const restore of restores.reverse()) restore();
   };
 }
 
-function restoreClonedScroll(cloned: HTMLElement) {
-  for (const el of [cloned, ...cloned.querySelectorAll<HTMLElement>("*")]) {
-    if (el.dataset.bugScrollTop) el.scrollTop = Number(el.dataset.bugScrollTop);
-    if (el.dataset.bugScrollLeft) el.scrollLeft = Number(el.dataset.bugScrollLeft);
-    delete el.dataset.bugScrollTop;
-    delete el.dataset.bugScrollLeft;
+function shiftChildrenForScroll(el: HTMLElement, left: number, top: number): () => void {
+  const children = Array.from(el.children) as HTMLElement[];
+  const prev = children.map((child) => child.style.transform);
+  const offset = `translate(${-left}px, ${-top}px)`;
+  for (const child of children) {
+    child.style.transform = child.style.transform ? `${offset} ${child.style.transform}` : offset;
   }
+  return () => children.forEach((child, i) => {
+    child.style.transform = prev[i];
+  });
 }

@@ -84,15 +84,18 @@ describe("captureViewportPng", () => {
     const root = document.createElement("div");
     root.id = "root";
     const panel = document.createElement("div");
+    const inner = document.createElement("div");
+    panel.append(inner);
     Object.defineProperty(panel, "scrollTop", { value: 80, writable: true, configurable: true });
     root.append(panel);
     document.body.append(root);
-    vi.mocked(toJpeg).mockImplementation(async (node, options) => {
-      const cloned = (node as HTMLElement).cloneNode(true) as HTMLElement;
-      options?.onclone?.(document, cloned);
-      expect((cloned.firstElementChild as HTMLElement).scrollTop).toBe(80);
+    vi.mocked(toJpeg).mockImplementation(async () => {
+      expect(inner.style.transform).toContain("-80px");
+      expect(panel.scrollTop).toBe(0);
       return "data:image/jpeg;base64,/9j/4AAQ";
     });
     await captureViewportPng();
+    expect(inner.style.transform).toBe("");
+    expect(panel.scrollTop).toBe(80);
   });
 });
