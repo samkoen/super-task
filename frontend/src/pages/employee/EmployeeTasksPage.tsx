@@ -71,6 +71,8 @@ import {
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
+import { waitUntilRemoteVideosReady, remoteVideoUrls } from "../../utils/uploadedVideoReady";
+import { mediaService } from "../../services/mediaService";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -150,6 +152,7 @@ async function submitEmployeeCompletion(opts: {
     },
     opts.slotsFilled,
   );
+  await waitUntilRemoteVideosReady(remoteVideoUrls(attachments), (url) => mediaService.isReady(url));
   const payload = employeeCompletePayload({
     slotsFilled: opts.slotsFilled,
     note: opts.note,

@@ -8,12 +8,14 @@ from app.domain import roles, task_status
 from app.domain.completion_media import (
     assert_attachments_match,
     assert_completion_media,
+    assert_completion_videos_ready,
     effective_requirements,
     first_path_of_kind,
     packed_media_fields,
     parse_requirements_input,
     resolve_completion_attachments,
 )
+from app.services import blob_storage
 from app.domain.audio_transcription_fallback import (
     transcript_or_unavailable,
     transcription_unavailable_message,
@@ -610,9 +612,11 @@ class TaskOccurrenceService:
         packed = TaskOccurrenceService._pack_attachments(attachments)
         if not require_complete:
             filled = [item for item in attachments if (item.get("url") or "").strip()]
+            assert_completion_videos_ready(filled, blob_storage.media_is_ready)
             return TaskOccurrenceService._pack_attachments(filled)
         if raw_reqs is not None:
             assert_attachments_match(reqs, attachments)
+            assert_completion_videos_ready(attachments, blob_storage.media_is_ready)
             return packed
         requires_visual = (
             employee_can_see_occurrence(
@@ -629,6 +633,7 @@ class TaskOccurrenceService:
             video_duration_seconds=video_duration_seconds,
             requires_visual=bool(requires_visual),
         )
+        assert_completion_videos_ready(attachments, blob_storage.media_is_ready)
         return packed
 
     def _stamp_work_start_arrival(self, occurrence, attachments) -> None:

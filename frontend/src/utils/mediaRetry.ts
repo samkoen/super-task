@@ -1,5 +1,5 @@
 /** Délais de retry quand le proxy média répond trop tôt (blob / ACL). */
-export const MEDIA_RETRY_DELAYS_MS = [300, 1000, 3000] as const;
+export const MEDIA_RETRY_DELAYS_MS = [300, 1000, 3000, 5000, 8000] as const;
 
 export function nextMediaRetryDelayMs(attempt: number): number | null {
   return MEDIA_RETRY_DELAYS_MS[attempt] ?? null;

@@ -44,9 +44,16 @@ def test_cancel_and_reopen_go_to_assignee():
     ) == {"oved1"}
 
 
+def test_approved_goes_to_assignee():
+    assert recipients_for_task_event(
+        "task_approved", assignee_user_id="oved1", branch_manager_ids=["mgr1"]
+    ) == {"oved1"}
+
+
 def test_sounds_employee_vs_manager():
     assert notification_sound_for("task_created", recipient_is_employee=True) == SOUND_NEW_TASK
     assert notification_sound_for("task_cancelled", recipient_is_employee=True) == SOUND_TASK_END
+    assert notification_sound_for("task_approved", recipient_is_employee=True) == SOUND_TASK_END
     assert notification_sound_for("employee_idle_no_tasks", recipient_is_employee=True) == SOUND_ALERT
     assert notification_sound_for("task_created", recipient_is_employee=False) == SOUND_NONE
     assert notification_sound_for("direct_message", recipient_is_employee=True) == SOUND_TASK_END

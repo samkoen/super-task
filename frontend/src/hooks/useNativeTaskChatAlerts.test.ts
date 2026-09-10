@@ -82,6 +82,17 @@ describe("deliverEmployeeTaskSync", () => {
     expect(seen.has("reopen-1")).toBe(true);
   });
 
+  it("refetches the oved dashboard when a task is approved", () => {
+    sessionStorage.clear();
+    const seen = new Set<string>();
+    const onChange = vi.fn();
+    window.addEventListener(TASK_CHANGE_EVENT, onChange);
+    deliverEmployeeTaskSync([note("approved-1", "task_approved")], seen);
+    window.removeEventListener(TASK_CHANGE_EVENT, onChange);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(seen.has("approved-1")).toBe(true);
+  });
+
   it("does not refetch already primed reopen notifications", () => {
     sessionStorage.clear();
     const seen = new Set<string>();

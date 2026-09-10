@@ -14,7 +14,7 @@ describe("taskChatAlert", () => {
     expect(isTaskChatAlertKind("task_created")).toBe(false);
     expect(isEmployeeTaskSyncKind("task_reopened")).toBe(true);
     expect(isEmployeeTaskSyncKind("task_created")).toBe(true);
-    expect(isEmployeeTaskSyncKind("task_approved")).toBe(false);
+    expect(isEmployeeTaskSyncKind("task_approved")).toBe(true);
   });
 
   it("hides the banner on break or when already viewing the task", () => {

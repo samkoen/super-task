@@ -176,6 +176,20 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(screen.getByText(`${he.employeeHideCompleted} (1)`)).toBeTruthy();
   });
 
+  it("shows pending-review tasks while the start door is open", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        today_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true })],
+        pending_review_tasks: [card({ id: "p", title: "מילוי מדף", status: "pending_review" })],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(screen.getByText(`${he.taskPendingReview} (1)`)).toBeTruthy();
+    fireEvent.click(screen.getByText("מילוי מדף"));
+    expect(screen.getByText("detail:מילוי מדף")).toBeTruthy();
+  });
+
   it("keeps completed tasks visible while the start door is open", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({

@@ -101,6 +101,35 @@ def read_media_bytes(url: str | None) -> tuple[bytes, str] | None:
     return payload.content, payload.suffix
 
 
+def media_is_ready(url: str | None) -> bool:
+    """HEAD Blob / fichier local : True seulement si le média est déjà lisible."""
+    cleaned = (url or "").strip()
+    if not cleaned:
+        return False
+    if cleaned.startswith("/uploads/"):
+        return True
+    if not is_vercel_blob_url(cleaned) or not config.blob_storage_enabled():
+        return False
+    for pause in (0.0, 0.4, 1.0):
+        if pause:
+            time.sleep(pause)
+        if _blob_head_ok(cleaned):
+            return True
+    return False
+
+
+def _blob_head_ok(url: str) -> bool:
+    try:
+        result = _client().head(url)
+    except Exception:
+        logger.info("Blob head not ready for %s", url[:120])
+        return False
+    size = getattr(result, "size", None)
+    if size is None and isinstance(result, dict):
+        size = result.get("size")
+    return size is None or int(size) > 0
+
+
 def fetch_media(url: str | None) -> MediaPayload | None:
     if not url or not url.strip():
         return None

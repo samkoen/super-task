@@ -18,6 +18,23 @@ function card(over: Partial<EmployeeTaskCard> & Pick<EmployeeTaskCard, "id" | "t
 }
 
 describe("EmployeeFinishedTaskSections", () => {
+  it("lists tasks waiting for menahel approval", () => {
+    const onOpen = vi.fn();
+    const task = card({ id: "p", title: "מילוי מדף", status: "pending_review" });
+    render(
+      <EmployeeFinishedTaskSections
+        pendingReviewTasks={[task]}
+        completedTasks={[]}
+        showCompleted={false}
+        onToggleCompleted={vi.fn()}
+        onOpen={onOpen}
+      />,
+    );
+    expect(screen.getByText(`${he.taskPendingReview} (1)`)).toBeTruthy();
+    fireEvent.click(screen.getByText("מילוי מדף"));
+    expect(onOpen).toHaveBeenCalledWith(task);
+  });
+
   it("keeps the completed accordion visible even with no open work", () => {
     const onOpen = vi.fn();
     render(

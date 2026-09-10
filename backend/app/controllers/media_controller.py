@@ -55,6 +55,21 @@ def video_upload_intent(
     return create_video_upload_intent(purpose, content_type)
 
 
+@router.get("/ready")
+def media_ready(
+    request: Request,
+    src: str = Query(..., min_length=8),
+    db: Session = Depends(get_db),
+):
+    """L'oved poll après upload : le complete n'a pas encore inscrit l'ACL."""
+    load_actor(request, UserRepository(db))
+    cleaned = src.strip()
+    allowed = blob_storage.is_vercel_blob_url(cleaned) or cleaned.startswith("/uploads/")
+    if not allowed:
+        raise HTTPException(status_code=400, detail="URL media invalide")
+    return {"ready": blob_storage.media_is_ready(cleaned)}
+
+
 @router.get("/proxy")
 def proxy_media(
     request: Request,

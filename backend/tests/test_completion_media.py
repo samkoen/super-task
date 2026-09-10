@@ -1,6 +1,8 @@
 from app.domain.completion_media import (
+    COMPLETION_VIDEOS_NOT_READY,
     assert_attachments_match,
     assert_completion_media,
+    assert_completion_videos_ready,
     drop_stale_migrated_photo,
     effective_requirements,
     has_required_completion_visual_media,
@@ -279,3 +281,15 @@ def test_normalize_keeps_valid_captured_at():
         [{"kind": "photo", "url": "/p.jpg", "captured_at": "2026-08-18T08:12:00+03:00"}]
     )
     assert items[0]["captured_at"] == "2026-08-18T08:12:00+03:00"
+
+
+def test_complete_blocked_until_videos_are_readable():
+    attachments = [
+        {"kind": "video", "url": "https://x.private.blob.vercel-storage.com/v1.mp4"},
+        {"kind": "video", "url": "https://x.private.blob.vercel-storage.com/v2.mp4"},
+    ]
+    ready = {"https://x.private.blob.vercel-storage.com/v1.mp4"}
+    with pytest.raises(ValueError, match="נטענים"):
+        assert_completion_videos_ready(attachments, ready.__contains__)
+    assert_completion_videos_ready(attachments, lambda _url: True)
+    assert COMPLETION_VIDEOS_NOT_READY

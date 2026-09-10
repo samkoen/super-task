@@ -223,6 +223,26 @@ def attachment_urls(attachments: list[dict] | None) -> list[str]:
     return [item["url"].strip() for item in attachments if (item.get("url") or "").strip()]
 
 
+COMPLETION_VIDEOS_NOT_READY = "הסרטונים עדיין נטענים. נסה שוב בעוד רגע"
+
+
+def video_attachment_urls(attachments: list[dict] | None) -> list[str]:
+    if not attachments:
+        return []
+    return [
+        item["url"].strip()
+        for item in attachments
+        if item.get("kind") == "video" and (item.get("url") or "").strip()
+    ]
+
+
+def assert_completion_videos_ready(attachments: list[dict], ready) -> None:
+    """Ne passe en ממתין לאישור que si chaque vidéo est déjà lisible."""
+    for url in video_attachment_urls(attachments):
+        if not ready(url):
+            raise ValueError(COMPLETION_VIDEOS_NOT_READY)
+
+
 def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
     if not isinstance(requirements, list):
         return []
