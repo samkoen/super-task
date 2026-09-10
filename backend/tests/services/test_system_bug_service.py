@@ -296,12 +296,56 @@ def test_delete_inbox_denies_other_user():
 
 def test_set_inbox_status_open_and_closed():
     repo = MagicMock()
-    repo.set_status.return_value = SimpleNamespace(to_dict=lambda: {"id": "bug-1", "status": "closed"})
+    repo.patch.return_value = SimpleNamespace(to_dict=lambda: {"id": "bug-1", "status": "closed"})
     users = MagicMock()
     users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
     result = SystemBugService(repo, users).set_inbox_status(_actor(), "bug-1", "closed")
     assert result["status"] == "closed"
-    repo.set_status.assert_called_once_with("bug-1", "closed")
+    repo.patch.assert_called_once_with("bug-1", status="closed", comments=None)
+
+
+def test_patch_inbox_appends_comment_without_closing():
+    repo = MagicMock()
+    repo.find_by_id.return_value = SimpleNamespace(comments=[])
+    repo.patch.return_value = SimpleNamespace(
+        to_dict=lambda: {
+            "id": "bug-1",
+            "status": "open",
+            "comments": [{"author_name": "יצחק ריצ'רד", "body": "נבדק", "created_at": "t"}],
+        }
+    )
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    result = SystemBugService(repo, users).patch_inbox(_actor(), "bug-1", comment="נבדק")
+    assert result["comments"][0]["body"] == "נבדק"
+    kwargs = repo.patch.call_args.kwargs
+    assert kwargs["status"] is None
+    assert kwargs["comments"][0]["body"] == "נבדק"
+    assert kwargs["comments"][0]["author_name"] == "יצחק ריצ'רד"
+
+
+def test_patch_inbox_closes_with_comment():
+    repo = MagicMock()
+    repo.find_by_id.return_value = SimpleNamespace(comments=[])
+    repo.patch.return_value = SimpleNamespace(
+        to_dict=lambda: {"id": "bug-1", "status": "closed", "comments": [{"body": "תוקן"}]}
+    )
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    result = SystemBugService(repo, users).patch_inbox(
+        _actor(), "bug-1", status="closed", comment="תוקן"
+    )
+    assert result["status"] == "closed"
+    repo.patch.assert_called_once()
+    assert repo.patch.call_args.kwargs["status"] == "closed"
+
+
+def test_patch_inbox_rejects_empty_payload():
+    repo = MagicMock()
+    users = MagicMock()
+    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    with pytest.raises(ValueError, match="הערה"):
+        SystemBugService(repo, users).patch_inbox(_actor(), "bug-1")
 
 
 def test_set_inbox_status_denies_other_user():

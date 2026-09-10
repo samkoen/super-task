@@ -108,5 +108,10 @@ def patch_system_bug(
     service: SystemBugService = Depends(get_system_bug_service),
 ):
     actor = load_actor(request, UserRepository(db))
-    report = service.set_inbox_status(actor, report_id, str(body.get("status") or ""))
+    report = service.patch_inbox(
+        actor,
+        report_id,
+        status=body.get("status"),
+        comment=body.get("comment"),
+    )
     return {"report": report}

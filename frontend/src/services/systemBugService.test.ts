@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getSystemBug, listSystemBugs, deleteSystemBug, setSystemBugStatus, submitSystemBug } from "./systemBugService";
+import { getSystemBug, listSystemBugs, deleteSystemBug, patchSystemBug, setSystemBugStatus, submitSystemBug } from "./systemBugService";
 import api from "./api";
 
 vi.mock("./api", () => ({
@@ -66,5 +66,14 @@ describe("submitSystemBug", () => {
     const report = await setSystemBugStatus("1", "closed");
     expect(api.patch).toHaveBeenCalledWith("/system-bugs/1", { status: "closed" });
     expect(report.status).toBe("closed");
+  });
+
+  it("patches a comment without changing status", async () => {
+    vi.mocked(api.patch).mockResolvedValueOnce({
+      data: { report: { id: "1", status: "open", comments: [{ body: "נבדק" }] } },
+    });
+    const report = await patchSystemBug("1", { comment: "  נבדק  " });
+    expect(api.patch).toHaveBeenCalledWith("/system-bugs/1", { comment: "נבדק" });
+    expect(report.comments?.[0].body).toBe("נבדק");
   });
 });

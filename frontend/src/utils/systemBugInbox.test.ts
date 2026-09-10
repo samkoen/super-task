@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canViewSystemBugInbox, isSystemBugOpen, normalizePersonName } from "./systemBugInbox";
+import { canSubmitSystemBugComment, canViewSystemBugInbox, isSystemBugOpen, normalizePersonName } from "./systemBugInbox";
 
 describe("canViewSystemBugInbox", () => {
   it("allows יצחק with or without geresh", () => {
@@ -22,5 +22,13 @@ describe("isSystemBugOpen", () => {
     expect(isSystemBugOpen()).toBe(true);
     expect(isSystemBugOpen("open")).toBe(true);
     expect(isSystemBugOpen("closed")).toBe(false);
+  });
+});
+
+describe("canSubmitSystemBugComment", () => {
+  it("requires non-empty text", () => {
+    expect(canSubmitSystemBugComment("")).toBe(false);
+    expect(canSubmitSystemBugComment("   ")).toBe(false);
+    expect(canSubmitSystemBugComment("תוקן")).toBe(true);
   });
 });

@@ -28,3 +28,7 @@ export function canViewSystemBugInbox(
 export function isSystemBugOpen(status?: string | null): boolean {
   return (status || SYSTEM_BUG_OPEN) !== SYSTEM_BUG_CLOSED;
 }
+
+export function canSubmitSystemBugComment(body: string): boolean {
+  return Boolean(body.trim());
+}
