@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
-  Badge,
   Box,
   Button,
   CircularProgress,
@@ -12,12 +8,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Paper,
   TextField,
   Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { apiErrorMessage } from "../../utils/apiErrorMessage";
 import { useFeedback } from "../../context/FeedbackContext";
@@ -36,7 +29,7 @@ import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { playTaskEndSound } from "../../utils/notificationSounds";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { taskIdFromSearch } from "../../utils/notificationNavigation";
 import {
   collectUniqueTasks,
@@ -51,13 +44,10 @@ import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import EmployeePunchDoor from "../../components/employee/EmployeePunchDoor";
-import EmployeeTaskRow from "../../components/employee/EmployeeTaskRow";
+import EmployeeFinishedTaskSections from "../../components/employee/EmployeeFinishedTaskSections";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
 import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
-import { directChatService } from "../../services/directChatService";
-import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
-import { employeeSurfaceChatState } from "../../utils/employeeDirectChat";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import { type PendingMedia, revokePendingMedia } from "../../utils/pendingMedia";
@@ -81,7 +71,6 @@ import {
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
-import { employeeChatBarPaperSx, employeeChatBarSpacerSx } from "../../utils/employeeChatBar";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -91,6 +80,56 @@ function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
   const labels = he.jobFunctionLabels as Record<string, string>;
   return labels[jobFunction] ?? jobFunction;
+}
+
+function EmployeeOpenWorkLists({
+  punchEnd,
+  onRequestEnd,
+  openCount,
+  workLists,
+  onOpen,
+}: {
+  punchEnd: EmployeeTaskCard | null | undefined;
+  onRequestEnd: () => void;
+  openCount: number;
+  workLists: { dynamic: EmployeeTaskCard[]; routine: EmployeeTaskCard[] };
+  onOpen: (task: EmployeeTaskCard) => void;
+}) {
+  return (
+    <>
+      {punchEnd ? (
+        <Box sx={{ mb: 1.5, display: "flex", justifyContent: "center" }}>
+          <Button variant="outlined" color="error" onClick={onRequestEnd}>
+            {he.punchOpenEndEarly}
+          </Button>
+        </Box>
+      ) : null}
+      {openCount === 0 ? (
+        <EmptyState
+          title={he.noTasksToday}
+          description={he.noTasksHint}
+          icon={<TaskAltOutlinedIcon fontSize="inherit" />}
+          compact
+        />
+      ) : (
+        <>
+          <EmployeeTaskSection
+            title={he.employeeRoutineTasks}
+            tasks={workLists.routine}
+            onOpen={onOpen}
+            layout="list"
+          />
+          <EmployeeTaskSection
+            title={he.employeeDynamicTasks}
+            tasks={workLists.dynamic}
+            onOpen={onOpen}
+            layout="tile"
+            color="error.main"
+          />
+        </>
+      )}
+    </>
+  );
 }
 
 async function submitEmployeeCompletion(opts: {
@@ -207,7 +246,6 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
 
 export default function EmployeeTasksPage() {
   const { user, refresh } = useAuth();
-  const navigate = useNavigate();
   const employeeLanguage = ((user?.preferred_language || "he") as EmployeeLanguage);
   const [searchParams, setSearchParams] = useSearchParams();
   const { showSuccess, showError } = useFeedback();
@@ -221,7 +259,6 @@ export default function EmployeeTasksPage() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
-  const [chatUnread, setChatUnread] = useState(0);
   const [reportText, setReportText] = useState("");
   const [reportPhotoUrl, setReportPhotoUrl] = useState("");
   const [reportVideoUrl, setReportVideoUrl] = useState("");
@@ -293,21 +330,6 @@ export default function EmployeeTasksPage() {
   useTaskChangeListener(useCallback(() => {
     load(true);
   }, [load]));
-
-  const loadChatUnread = useCallback(async () => {
-    try {
-      const data = await directChatService.inbox();
-      const surface = employeeSurfaceChatState(data, user?.role);
-      setChatUnread(surface.unread);
-    } catch {
-      /* ignore */
-    }
-  }, [user?.role]);
-
-  useEffect(() => {
-    void loadChatUnread();
-  }, [loadChatUnread]);
-  useDirectChatLiveSync(null, () => void loadChatUnread());
 
   const clearCompletionMedia = useCallback(() => {
     setSlotMedia((prev) => {
@@ -633,6 +655,15 @@ export default function EmployeeTasksPage() {
   const headerJob = dashboard?.employee?.job_function;
   const onShift = dashboard?.on_shift;
   const photoUrl = dashboard?.employee?.avatar_url ?? user?.avatar_url;
+  const finishedSections = (
+    <EmployeeFinishedTaskSections
+      pendingReviewTasks={pendingReviewTasks}
+      completedTasks={completedTasks}
+      showCompleted={showCompleted}
+      onToggleCompleted={() => setShowCompleted((v) => !v)}
+      onOpen={openDetail}
+    />
+  );
 
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", px: { xs: 1, sm: 2 } }}>
@@ -672,109 +703,50 @@ export default function EmployeeTasksPage() {
 
       {loading ? (
         <ListSkeleton variant="table" rows={5} />
-      ) : punch.showStart && punch.start ? (
-        <EmployeePunchDoor
-          kind="start"
-          name={headerName}
-          photoUrl={photoUrl}
-          taskTitle={punch.start.title}
-          onOpen={() => {
-            if (punch.start) openDetail(punch.start);
-          }}
-        />
-      ) : punch.showEnd && punch.end ? (
-        <EmployeePunchDoor
-          kind="end"
-          name={headerName}
-          photoUrl={photoUrl}
-          taskTitle={punch.end.title}
-          remainingCount={openCount}
-          onOpen={() => {
-            if (punch.end) openDetail(punch.end);
-          }}
-          onBack={punch.dismissEnd}
-        />
       ) : (
         <>
-          {punch.end ? (
-            <Box sx={{ mb: 1.5, display: "flex", justifyContent: "center" }}>
-              <Button variant="outlined" color="error" onClick={punch.requestEnd}>
-                {he.punchOpenEndEarly}
-              </Button>
-            </Box>
-          ) : null}
-          {openCount === 0 ? (
-            <EmptyState
-              title={he.noTasksToday}
-              description={he.noTasksHint}
-              icon={<TaskAltOutlinedIcon fontSize="inherit" />}
-              compact
-            />
-          ) : (
+          {punch.showStart && punch.start ? (
             <>
-              <EmployeeTaskSection
-                title={he.employeeRoutineTasks}
-                tasks={workLists.routine}
-                onOpen={openWorkTask}
-                layout="list"
-              />
-              <EmployeeTaskSection
-                title={he.employeeDynamicTasks}
-                tasks={workLists.dynamic}
-                onOpen={openWorkTask}
-                layout="tile"
-                color="error.main"
+              {finishedSections}
+              <EmployeePunchDoor
+                kind="start"
+                name={headerName}
+                photoUrl={photoUrl}
+                taskTitle={punch.start.title}
+                onOpen={() => {
+                  if (punch.start) openDetail(punch.start);
+                }}
               />
             </>
-          )}
-
-          <EmployeeTaskSection
-            title={he.taskPendingReview}
-            tasks={excludeAttendancePunch(pendingReviewTasks)}
-            onOpen={openWorkTask}
-          />
-
-          {completedTasks.length > 0 && (
-            <Accordion
-              expanded={showCompleted}
-              onChange={() => setShowCompleted((v) => !v)}
-              sx={{ mt: 1, mb: 2, boxShadow: 0, border: 1, borderColor: "divider" }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={700}>
-                  {showCompleted ? he.employeeHideCompleted : he.employeeShowCompleted} ({completedTasks.length})
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails sx={{ pt: 1, px: 1.5 }}>
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
-                  {completedTasks.map((task) => (
-                    <EmployeeTaskRow key={task.id} task={task} onOpen={openWorkTask} />
-                  ))}
-                </Box>
-              </AccordionDetails>
-            </Accordion>
+          ) : punch.showEnd && punch.end ? (
+            <>
+              {finishedSections}
+              <EmployeePunchDoor
+                kind="end"
+                name={headerName}
+                photoUrl={photoUrl}
+                taskTitle={punch.end.title}
+                remainingCount={openCount}
+                onOpen={() => {
+                  if (punch.end) openDetail(punch.end);
+                }}
+                onBack={punch.dismissEnd}
+              />
+            </>
+          ) : (
+            <>
+              <EmployeeOpenWorkLists
+                punchEnd={punch.end}
+                onRequestEnd={punch.requestEnd}
+                openCount={openCount}
+                workLists={workLists}
+                onOpen={openWorkTask}
+              />
+              {finishedSections}
+            </>
           )}
         </>
       )}
-
-      <Paper elevation={6} sx={employeeChatBarPaperSx()}>
-        <Badge badgeContent={chatUnread} color="error" sx={{ width: "100%", display: "block" }}>
-          <Button
-            fullWidth
-            variant="contained"
-            startIcon={<ChatOutlinedIcon />}
-            onClick={() => navigate("/employee/chats")}
-            sx={{ borderRadius: 2.5, py: 1.1 }}
-          >
-            {he.directChatOpen}
-          </Button>
-        </Badge>
-      </Paper>
-      <Box
-        aria-hidden
-        data-testid="employee-chat-bar-spacer"
-        sx={employeeChatBarSpacerSx()}
-      />
 
       <EmployeeClaimTaskDialog
         open={claimOpen}

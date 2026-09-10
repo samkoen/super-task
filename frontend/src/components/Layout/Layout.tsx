@@ -52,6 +52,7 @@ import ManagerBottomNav from "./ManagerBottomNav";
 import ManagerNewTaskFab from "./ManagerNewTaskFab";
 import MobileMenuTopBar from "./MobileMenuTopBar";
 import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
+import EmployeeChromeChatButton from "./EmployeeChromeChatButton";
 import EmployeeChromeMenu from "./EmployeeChromeMenu";
 import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
@@ -368,6 +369,7 @@ function Layout() {
           </Box>
           <Box display="flex" alignItems="center" gap={0.25}>
             <NotificationBell muteIncoming={breakMuted} />
+            <EmployeeChromeChatButton />
             <EmployeeChromeMenu onLogout={handleLogout} />
           </Box>
         </Box>

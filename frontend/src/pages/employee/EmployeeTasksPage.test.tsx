@@ -160,7 +160,7 @@ describe("EmployeeTasksPage punch doors", () => {
     await waitFor(() => expect(screen.queryByText("מדף חלב")).toBeNull());
   });
 
-  it("lets the oved open completed tasks above the שיחה bar", async () => {
+  it("lets the oved open completed tasks without a bottom שיחה overlay", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
@@ -170,10 +170,28 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     const toggle = await screen.findByText(`${he.employeeShowCompleted} (1)`);
-    expect(screen.getByTestId("employee-chat-bar-spacer")).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.directChatOpen })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.directChatOpen })).toBeNull();
     fireEvent.click(toggle);
     expect(await screen.findByText("ניקוי רצפה")).toBeTruthy();
     expect(screen.getByText(`${he.employeeHideCompleted} (1)`)).toBeTruthy();
+  });
+
+  it("keeps completed tasks visible while the start door is open", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        today_tasks: [
+          card({ id: "s", title: "פתיחת משמרת", is_work_start: true }),
+          card({ id: "t", title: "מדף חלב" }),
+        ],
+        completed_tasks: [card({ id: "c", title: "ניקוי רצפה", status: "completed" })],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(screen.queryByText("מדף חלב")).toBeNull();
+    expect(screen.getByText(`${he.employeeShowCompleted} (1)`)).toBeTruthy();
+    fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (1)`));
+    fireEvent.click(screen.getByText("ניקוי רצפה"));
+    expect(screen.getByText("detail:ניקוי רצפה")).toBeTruthy();
   });
 });
