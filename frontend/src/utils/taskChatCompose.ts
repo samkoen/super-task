@@ -19,3 +19,8 @@ const MANAGER_COMPOSE: ReadonlySet<TaskStatus> = new Set([
 export function canComposeTaskChat(status: TaskStatus, isEmployee: boolean): boolean {
   return (isEmployee ? EMPLOYEE_COMPOSE : MANAGER_COMPOSE).has(status);
 }
+
+/** Review / fermée : chat en haut, comme l’ouverture « en attente ». */
+export function employeeOpensTaskChatFirst(status: TaskStatus): boolean {
+  return status === "pending_review" || status === "completed";
+}

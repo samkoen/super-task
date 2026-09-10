@@ -236,4 +236,31 @@ describe("TaskOccurrenceCard", () => {
     expect(screen.getByTestId("completion-outcome-not-done")).toBeTruthy();
     expect(screen.getByText(he.taskNotCompleted)).toBeTruthy();
   });
+
+  it("hides the outcome chip after the menahel reopens the task", () => {
+    render(
+      <TaskOccurrenceCard
+        task={baseTask({
+          status: "in_progress",
+          completion: {
+            id: "c1",
+            occurrence_id: "t1",
+            status: "completed",
+            note: null,
+            photo_path: "/p.jpg",
+            video_path: null,
+            audio_path: null,
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "rejected",
+            rejection_note: "תקן את התמונה",
+          },
+        })}
+        index={0}
+        onEdit={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("completion-outcome-done")).toBeNull();
+  });
 });

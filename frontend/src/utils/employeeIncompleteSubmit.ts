@@ -15,6 +15,11 @@ export function completionOutcomeLabel(
   return isTaskNotCompleted(status) ? he.taskNotCompleted : he.taskCompleted;
 }
 
+/** Badge בוצע / לא בוצע : seulement tant que la soumission est en revue ou close. */
+export function showsCompletionOutcome(occurrenceStatus: string): boolean {
+  return occurrenceStatus === "pending_review" || occurrenceStatus === "completed";
+}
+
 export function incompleteReasonError(reason: string): string {
   const text = reason.trim();
   if (!text) return he.incompleteTaskReasonRequired;

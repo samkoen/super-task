@@ -128,6 +128,8 @@ describe("EmployeeTaskDetailDialog", () => {
     );
     expect(screen.getByText(he.taskRejectedReopen)).toBeTruthy();
     expect(screen.getByText("תקן את התמונה")).toBeTruthy();
+    expect(screen.queryByTestId("completion-outcome-done")).toBeNull();
+    expect(screen.queryByTestId("completion-outcome-not-done")).toBeNull();
   });
 
   it("submits from the same dialog once the slots are filled", () => {

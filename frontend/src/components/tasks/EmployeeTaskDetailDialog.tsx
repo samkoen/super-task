@@ -25,6 +25,7 @@ import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { canComposeTaskChat, employeeOpensTaskChatFirst } from "../../utils/taskChatCompose";
 import { canDoTask } from "../../utils/employeeDoTask";
+import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
 import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import {
@@ -186,7 +187,9 @@ function TaskStatusRow({ task }: { task: EmployeeTaskDetailTask }) {
   return (
     <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
       <TaskStatusChip status={task.status} />
-      {task.completion ? <CompletionOutcomeChip status={task.completion.status} /> : null}
+      {task.completion && showsCompletionOutcome(task.status) ? (
+        <CompletionOutcomeChip status={task.completion.status} />
+      ) : null}
       <Typography variant="caption" color="text.secondary" dir="ltr">
         {he.dueAt}: {formatDueAt(task.due_at)}
       </Typography>

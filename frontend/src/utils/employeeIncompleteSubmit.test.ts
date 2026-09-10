@@ -6,6 +6,7 @@ import {
   incompleteReasonError,
   isTaskNotCompleted,
   shouldPromptIncomplete,
+  showsCompletionOutcome,
 } from "./employeeIncompleteSubmit";
 
 describe("employeeIncompleteSubmit", () => {
@@ -50,5 +51,12 @@ describe("employeeIncompleteSubmit", () => {
     expect(isTaskNotCompleted("completed")).toBe(false);
     expect(completionOutcomeLabel("not_completed")).toBe(he.taskNotCompleted);
     expect(completionOutcomeLabel("completed")).toBe(he.taskCompleted);
+  });
+
+  it("hides the outcome chip after the menahel reopens the task", () => {
+    expect(showsCompletionOutcome("pending_review")).toBe(true);
+    expect(showsCompletionOutcome("completed")).toBe(true);
+    expect(showsCompletionOutcome("in_progress")).toBe(false);
+    expect(showsCompletionOutcome("pending")).toBe(false);
   });
 });
