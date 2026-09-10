@@ -141,6 +141,15 @@ def test_ad_hoc_reject_via_reopen_creates_chat_message(
     assert messages.status_code == 200
     assert any(m["body"] == "תקן את התמונה" for m in messages.json()["messages"])
 
+    notifs = client_emp.get("/api/notifications")
+    assert notifs.status_code == 200
+    reopened_n = next(
+        (n for n in notifs.json()["items"] if n.get("kind") == "task_reopened"),
+        None,
+    )
+    assert reopened_n is not None
+    assert reopened_n["occurrence_id"] == occ_id
+
 
 def test_reopen_closed_after_approve_notifies_oved(
     client_mgr, client_emp, world_seed, jpeg_bytes

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isEmployeeTaskSyncKind,
   isTaskChatAlertKind,
   notificationIdToLocalId,
   shouldShowTaskChatBanner,
@@ -11,6 +12,9 @@ describe("taskChatAlert", () => {
     expect(isTaskChatAlertKind("task_message_manager")).toBe(true);
     expect(isTaskChatAlertKind("task_message_employee")).toBe(true);
     expect(isTaskChatAlertKind("task_created")).toBe(false);
+    expect(isEmployeeTaskSyncKind("task_reopened")).toBe(true);
+    expect(isEmployeeTaskSyncKind("task_created")).toBe(true);
+    expect(isEmployeeTaskSyncKind("task_approved")).toBe(false);
   });
 
   it("hides the banner on break or when already viewing the task", () => {

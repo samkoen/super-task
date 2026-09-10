@@ -5,7 +5,10 @@ from unittest.mock import MagicMock, patch
 
 from app.domain import roles
 from app.domain.scope import ActorContext
-from app.services.media_access_service import actor_can_access_media_url
+from app.services.media_access_service import (
+    _completion_media_match,
+    actor_can_access_media_url,
+)
 
 
 def _actor(
@@ -22,6 +25,12 @@ def _actor(
 
 def test_empty_url_denied():
     assert actor_can_access_media_url(MagicMock(), _actor(roles.EMPLOYEE), "") is False
+
+
+def test_completion_acl_includes_attachment_urls():
+    clause = str(_completion_media_match("/uploads/task_videos/v2.mp4"))
+    assert "completion_attachments" in clause
+    assert "video_path" in clause
 
 
 def test_employee_without_branches_denied():

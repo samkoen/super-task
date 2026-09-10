@@ -689,7 +689,7 @@ class TaskOccurrenceService:
         existing = self._completions.find_by_occurrence(occurrence_id)
         employee_submission = as_assignee
         needs_review = employee_submission_needs_review(employee_submission)
-        if employee_submission:
+        if employee_submission and not existing:
             self._stamp_work_start_arrival(occurrence, media["attachments"])
 
         if existing and occurrence.status == task_status.IN_PROGRESS:

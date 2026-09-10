@@ -19,6 +19,15 @@ vi.mock("../../hooks/useVideoPoster", () => ({
   useVideoPoster: () => "data:image/jpeg;base64,poster",
 }));
 
+vi.mock("../../hooks/useResolvedMediaSrc", () => ({
+  useResolvedMediaSrc: (path: string | null) => ({
+    src: path?.startsWith("blob:") ? path : path ? `blob:kept-${path}` : null,
+    loading: false,
+    failed: false,
+    onError: () => undefined,
+  }),
+}));
+
 describe("CompletionSlotTile", () => {
   it("shows the first frame, play, and retake after a video is captured", () => {
     const onEnlarge = vi.fn();
@@ -39,6 +48,24 @@ describe("CompletionSlotTile", () => {
     expect(screen.queryByText(he.completionSlotVideoMin(10))).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: he.completionPlayVideo }));
     expect(onEnlarge).toHaveBeenCalledWith("blob:oved-video", "video");
+  });
+
+  it("shows a kept remote video after reopen as already filled", () => {
+    const onEnlarge = vi.fn();
+    render(
+      <CompletionSlotTile
+        req={{ kind: "video", title: "צילום של בסטות", min_seconds: 10 }}
+        index={1}
+        fill={{ url: "/uploads/v2.mp4", kind: "video" }}
+        interactive
+        onCapture={vi.fn()}
+        onEnlarge={onEnlarge}
+      />,
+    );
+    expect(screen.getByRole("button", { name: he.completionPlayVideo })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.completionRetake })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.completionPlayVideo }));
+    expect(onEnlarge).toHaveBeenCalledWith("blob:kept-/uploads/v2.mp4", "video");
   });
 
   it("keeps the take-video label before a video exists", () => {

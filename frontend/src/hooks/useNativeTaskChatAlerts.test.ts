@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { deliverNewChatAlerts, primeSeenChatAlerts } from "./useNativeTaskChatAlerts";
+import {
+  deliverEmployeeTaskSync,
+  deliverNewChatAlerts,
+  primeSeenChatAlerts,
+} from "./useNativeTaskChatAlerts";
+import { TASK_CHANGE_EVENT } from "../constants/events";
 import type { AppNotification } from "../services/notificationService";
 import { playNotificationSound } from "../utils/notificationSounds";
 import { showNativeChatBanner } from "../utils/nativeLocalNotifications";
@@ -62,5 +67,29 @@ describe("deliverNewChatAlerts", () => {
     });
     expect(playNotificationSound).toHaveBeenCalledWith("manager_question");
     expect(showNativeChatBanner).toHaveBeenCalled();
+  });
+});
+
+describe("deliverEmployeeTaskSync", () => {
+  it("refetches the oved dashboard when a task is reopened", () => {
+    sessionStorage.clear();
+    const seen = new Set<string>();
+    const onChange = vi.fn();
+    window.addEventListener(TASK_CHANGE_EVENT, onChange);
+    deliverEmployeeTaskSync([note("reopen-1", "task_reopened")], seen);
+    window.removeEventListener(TASK_CHANGE_EVENT, onChange);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(seen.has("reopen-1")).toBe(true);
+  });
+
+  it("does not refetch already primed reopen notifications", () => {
+    sessionStorage.clear();
+    const seen = new Set<string>();
+    primeSeenChatAlerts([note("old-reopen", "task_reopened")], seen);
+    const onChange = vi.fn();
+    window.addEventListener(TASK_CHANGE_EVENT, onChange);
+    deliverEmployeeTaskSync([note("old-reopen", "task_reopened")], seen);
+    window.removeEventListener(TASK_CHANGE_EVENT, onChange);
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

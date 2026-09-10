@@ -24,14 +24,28 @@ vi.mock("../media/MediaCaptureActions", () => ({
   default: ({
     photoLabel,
     videoLabel,
+    photoDoneLabel,
+    videoDoneLabel,
+    photoAdded,
+    videoAdded,
     allowedKinds,
   }: {
     photoLabel?: string;
     videoLabel?: string;
+    photoDoneLabel?: string;
+    videoDoneLabel?: string;
+    photoAdded?: boolean;
+    videoAdded?: boolean;
     allowedKinds?: string[];
   }) => (
     <button type="button">
-      {allowedKinds?.[0] === "video" ? videoLabel ?? "video" : photoLabel ?? "photo"}
+      {allowedKinds?.[0] === "video"
+        ? videoAdded
+          ? videoDoneLabel ?? "video-done"
+          : videoLabel ?? "video"
+        : photoAdded
+          ? photoDoneLabel ?? "photo-done"
+          : photoLabel ?? "photo"}
     </button>
   ),
 }));
@@ -185,6 +199,32 @@ describe("EmployeeTaskDetailDialog", () => {
       />,
     );
     expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
+  });
+
+  it("keeps the three previous videos when the oved opens a reopened task", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("in_progress"),
+          completion_requirements: [
+            { kind: "video", title: "א", min_seconds: 10 },
+            { kind: "video", title: "ב", min_seconds: 10 },
+            { kind: "video", title: "ג", min_seconds: 10 },
+          ],
+        }}
+        capture={capture({
+          slots: [
+            { file: null, previewUrl: "", keptUrl: "/uploads/v1.mp4", capturedAt: "", durationSeconds: 12 },
+            { file: null, previewUrl: "", keptUrl: "/uploads/v2.mp4", capturedAt: "", durationSeconds: 11 },
+            { file: null, previewUrl: "", keptUrl: "/uploads/v3.mp4", capturedAt: "", durationSeconds: 10 },
+          ],
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.completionSlotsProgress(3, 3))).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: he.completionRetake })).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: he.completionTakeVideo })).toBeNull();
   });
 
   it("shows capture buttons as soon as the oved opens a doable task", () => {

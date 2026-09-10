@@ -5,8 +5,22 @@ export const TASK_CHAT_ALERT_KINDS = new Set([
   "task_message_manager",
 ]);
 
+/** Kinds that must refetch the oved dashboard (SSE off on the APK). */
+export const EMPLOYEE_TASK_SYNC_KINDS = new Set([
+  ...TASK_CHAT_ALERT_KINDS,
+  "task_reopened",
+  "task_created",
+  "task_delegated",
+  "task_cancelled",
+  "task_updated",
+]);
+
 export function isTaskChatAlertKind(kind: string | undefined): boolean {
   return Boolean(kind && TASK_CHAT_ALERT_KINDS.has(kind));
+}
+
+export function isEmployeeTaskSyncKind(kind: string | undefined): boolean {
+  return Boolean(kind && EMPLOYEE_TASK_SYNC_KINDS.has(kind));
 }
 
 export function shouldShowTaskChatBanner(input: {

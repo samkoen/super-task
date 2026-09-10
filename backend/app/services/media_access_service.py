@@ -230,6 +230,7 @@ def _completion_media_match(url: str):
         orm.TaskCompletion.photo_path == url,
         orm.TaskCompletion.video_path == url,
         orm.TaskCompletion.audio_path == url,
+        _json_column_has_url(orm.TaskCompletion.completion_attachments, url),
     )
 
 
