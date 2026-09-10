@@ -18,6 +18,7 @@ class SystemBugReport:
     audio_url: str | None
     github_issue_url: str | None
     status: str
+    comments: list
     created_at: str
 
     def to_dict(self) -> dict:
@@ -36,6 +37,7 @@ class SystemBugReport:
             "audio_url": self.audio_url,
             "github_issue_url": self.github_issue_url,
             "status": self.status,
+            "comments": self.comments,
             "created_at": self.created_at,
         }
 
@@ -54,3 +56,15 @@ def trail_from_json(raw: str | None) -> list[str]:
     if not isinstance(data, list):
         return []
     return [str(item) for item in data if str(item).strip()]
+
+
+def comments_to_json(comments: list) -> str:
+    from app.domain.system_bug import parse_system_bug_comments
+
+    return json.dumps(parse_system_bug_comments(comments), ensure_ascii=False)
+
+
+def comments_from_json(raw: str | None) -> list:
+    from app.domain.system_bug import parse_system_bug_comments
+
+    return parse_system_bug_comments(raw)

@@ -1,5 +1,7 @@
 import api, { EMPTY_JSON_BODY } from "./api";
 import type { CompletionAttachment, CompletionRequirement } from "../utils/completionMedia";
+
+export type { CompletionAttachment, CompletionRequirement };
 import { compressPhotoForUpload } from "../utils/mediaCapture";
 import { uploadVideoFile } from "../utils/videoUpload";
 

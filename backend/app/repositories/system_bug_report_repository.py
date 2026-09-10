@@ -6,6 +6,8 @@ from app.db import mappers as mp
 from app.domain.system_bug import SYSTEM_BUG_STATUS_OPEN, parse_system_bug_status
 from app.models.system_bug_report import (
     SystemBugReport,
+    comments_from_json,
+    comments_to_json,
     trail_from_json,
     trail_to_json,
 )
@@ -48,6 +50,7 @@ class SystemBugReportRepository:
             audio_url=audio_url,
             github_issue_url=github_issue_url,
             status=SYSTEM_BUG_STATUS_OPEN,
+            comments="[]",
         )
         self._db.add(row)
         self._db.flush()
@@ -70,16 +73,28 @@ class SystemBugReportRepository:
         closed_items = [item for item in items if item.status != SYSTEM_BUG_STATUS_OPEN]
         return open_items + closed_items
 
-    def set_status(self, report_id: str, status: str) -> SystemBugReport | None:
+    def patch(
+        self,
+        report_id: str,
+        *,
+        status: str | None = None,
+        comments: list | None = None,
+    ) -> SystemBugReport | None:
         try:
             row = self._db.get(orm.SystemBugReport, mp.parse_uuid(report_id))
         except ValueError:
             return None
         if row is None:
             return None
-        row.status = status
+        if status is not None:
+            row.status = status
+        if comments is not None:
+            row.comments = comments_to_json(comments)
         self._db.flush()
         return self._to_domain(row)
+
+    def set_status(self, report_id: str, status: str) -> SystemBugReport | None:
+        return self.patch(report_id, status=status)
 
     def delete(self, report_id: str) -> bool:
         try:
@@ -112,5 +127,6 @@ class SystemBugReportRepository:
             audio_url=row.audio_url,
             github_issue_url=row.github_issue_url,
             status=parse_system_bug_status(getattr(row, "status", None)),
+            comments=comments_from_json(getattr(row, "comments", None)),
             created_at=mp.parse_datetime_iso(row.created_at),
         )

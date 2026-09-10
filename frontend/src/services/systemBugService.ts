@@ -1,6 +1,12 @@
 import api from "./api";
 import { mailAudioFileName } from "../utils/audioToMailSafe";
 
+export interface SystemBugInboxComment {
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
 export interface SystemBugInboxItem {
   id: string;
   reporter_user_id: string | null;
@@ -16,6 +22,7 @@ export interface SystemBugInboxItem {
   audio_url: string | null;
   github_issue_url: string | null;
   status: "open" | "closed";
+  comments?: SystemBugInboxComment[];
   created_at: string;
 }
 
@@ -62,9 +69,21 @@ export async function deleteSystemBug(reportId: string): Promise<void> {
 export async function setSystemBugStatus(
   reportId: string,
   status: "open" | "closed",
+  comment?: string,
 ): Promise<SystemBugInboxItem> {
-  const response = await api.patch<{ report: SystemBugInboxItem }>(`/system-bugs/${reportId}`, {
-    status,
-  });
+  return patchSystemBug(reportId, { status, comment });
+}
+
+export async function patchSystemBug(
+  reportId: string,
+  payload: { status?: "open" | "closed"; comment?: string },
+): Promise<SystemBugInboxItem> {
+  const body: { status?: "open" | "closed"; comment?: string } = {};
+  if (payload.status) body.status = payload.status;
+  if (payload.comment?.trim()) body.comment = payload.comment.trim();
+  const response = await api.patch<{ report: SystemBugInboxItem }>(
+    `/system-bugs/${reportId}`,
+    body,
+  );
   return response.data.report;
 }

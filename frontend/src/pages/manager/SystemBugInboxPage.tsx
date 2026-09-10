@@ -109,6 +109,9 @@ export default function SystemBugInboxPage() {
         reportId={selectedId}
         onClose={() => setSelectedId(null)}
         onAskDelete={setDeleteTarget}
+        onUpdated={(report) => {
+          setItems((prev) => prev.map((item) => (item.id === report.id ? { ...item, ...report } : item)));
+        }}
       />
       <DeleteConfirmDialog
         open={Boolean(deleteTarget)}

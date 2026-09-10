@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from html import escape
+from zoneinfo import ZoneInfo
 
 from app.core.config import APP_NAME, SYSTEM_BUG_EMAIL, SYSTEM_BUG_INBOX_USER_IDS
 from app.domain.media_compression import compress_photo_bytes
@@ -10,6 +12,7 @@ from app.domain.scope import ActorContext
 from app.domain.system_bug import (
     MAX_NOTE_LEN,
     SystemBugIdentity,
+    append_system_bug_comment,
     audio_blob_meta,
     can_view_system_bug_inbox,
     has_system_bug_explanation,
@@ -32,6 +35,7 @@ from app.services.email_delivery import deliver_html_email
 
 Attachment = tuple[str, bytes]
 logger = logging.getLogger(__name__)
+TZ = ZoneInfo("Asia/Jerusalem")
 
 
 class SystemBugService:
@@ -115,12 +119,48 @@ class SystemBugService:
             raise ValueError("דיווח לא נמצא")
 
     def set_inbox_status(self, actor: ActorContext, report_id: str, status: str) -> dict:
+        return self.patch_inbox(actor, report_id, status=status)
+
+    def patch_inbox(
+        self,
+        actor: ActorContext,
+        report_id: str,
+        *,
+        status: str | None = None,
+        comment: str | None = None,
+    ) -> dict:
         self._assert_inbox(actor)
-        cleaned = parse_system_bug_status(status)
-        row = self._repo.set_status(report_id, cleaned) if self._repo else None
+        if self._repo is None:
+            raise ValueError("דיווח לא נמצא")
+        cleaned = _optional_status(status)
+        comments = self._comments_after_note(actor, report_id, comment)
+        if cleaned is None and comments is None:
+            raise ValueError("נא לכתוב הערה או לבחור סטטוס")
+        row = self._repo.patch(report_id, status=cleaned, comments=comments)
         if not row:
             raise ValueError("דיווח לא נמצא")
         return row.to_dict()
+
+    def _comments_after_note(
+        self, actor: ActorContext, report_id: str, comment: str | None
+    ) -> list | None:
+        if not (comment or "").strip():
+            return None
+        row = self._repo.find_by_id(report_id) if self._repo else None
+        if not row:
+            raise ValueError("דיווח לא נמצא")
+        return append_system_bug_comment(
+            list(row.comments or []),
+            author_name=self._actor_name(actor),
+            body=comment or "",
+            created_at=datetime.now(TZ).isoformat(),
+        )
+
+    def _actor_name(self, actor: ActorContext) -> str:
+        if not self._users:
+            return ""
+        user = self._users.find_by_id(actor.user_id)
+        return ((user.full_name if user else "") or "").strip()
 
     def _assert_inbox(self, actor: ActorContext) -> None:
         name = ""
@@ -426,3 +466,9 @@ def _screenshot_html(has_screenshot: bool) -> str:
         "<p><img src='cid:bug-screenshot' alt='screenshot' "
         "style='max-width:100%;height:auto'/></p>"
     )
+
+
+def _optional_status(raw: str | None) -> str | None:
+    if raw is None or not str(raw).strip():
+        return None
+    return parse_system_bug_status(raw)

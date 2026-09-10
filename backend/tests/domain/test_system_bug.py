@@ -4,10 +4,12 @@ from app.domain.system_bug import (
     SYSTEM_BUG_STATUS_CLOSED,
     SYSTEM_BUG_STATUS_OPEN,
     SystemBugIdentity,
+    append_system_bug_comment,
     clip_route_trail,
     has_system_bug_explanation,
     mail_safe_audio_attachment,
     mail_safe_audio_filename,
+    parse_system_bug_comments,
     parse_system_bug_emails,
     parse_system_bug_status,
     system_bug_recipients,
@@ -128,3 +130,26 @@ def test_parse_system_bug_status_open_or_closed():
     assert parse_system_bug_status("closed") == SYSTEM_BUG_STATUS_CLOSED
     with pytest.raises(ValueError, match="סטטוס"):
         parse_system_bug_status("done")
+
+
+def test_append_system_bug_comment_keeps_author_and_clips():
+    first = append_system_bug_comment(
+        [], author_name="יצחק", body="  תוקן בדשבורד  ", created_at="2026-09-10T12:00:00+03:00"
+    )
+    assert first == [
+        {
+            "author_name": "יצחק",
+            "body": "תוקן בדשבורד",
+            "created_at": "2026-09-10T12:00:00+03:00",
+        }
+    ]
+    with pytest.raises(ValueError, match="הערה"):
+        append_system_bug_comment(first, author_name="יצחק", body="  ", created_at="t")
+
+
+def test_parse_system_bug_comments_skips_junk():
+    assert parse_system_bug_comments("not-json") == []
+    parsed = parse_system_bug_comments(
+        '[{"author_name":"א","body":"ok","created_at":"t"},{"body":""}]'
+    )
+    assert parsed == [{"author_name": "א", "body": "ok", "created_at": "t"}]

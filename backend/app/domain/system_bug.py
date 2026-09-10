@@ -199,6 +199,8 @@ def audio_blob_meta(data: bytes | None) -> tuple[str, str] | None:
 SYSTEM_BUG_STATUS_OPEN = "open"
 SYSTEM_BUG_STATUS_CLOSED = "closed"
 SYSTEM_BUG_STATUSES = frozenset({SYSTEM_BUG_STATUS_OPEN, SYSTEM_BUG_STATUS_CLOSED})
+MAX_COMMENT_LEN = 2000
+MAX_COMMENTS = 50
 
 
 def parse_system_bug_status(raw: str | None) -> str:
@@ -206,3 +208,61 @@ def parse_system_bug_status(raw: str | None) -> str:
     if value not in SYSTEM_BUG_STATUSES:
         raise ValueError("סטטוס לא תקין")
     return value
+
+
+def clip_system_bug_comment(body: str) -> str:
+    return (body or "").strip()[:MAX_COMMENT_LEN]
+
+
+def parse_system_bug_comments(raw) -> list[dict]:
+    items = _comments_list(raw)
+    out: list[dict] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        body = clip_system_bug_comment(str(item.get("body") or ""))
+        if not body:
+            continue
+        out.append(
+            {
+                "author_name": str(item.get("author_name") or "").strip() or "—",
+                "body": body,
+                "created_at": str(item.get("created_at") or ""),
+            }
+        )
+    return out[-MAX_COMMENTS:]
+
+
+def append_system_bug_comment(
+    existing: list[dict],
+    *,
+    author_name: str,
+    body: str,
+    created_at: str,
+) -> list[dict]:
+    text = clip_system_bug_comment(body)
+    if not text:
+        raise ValueError("נא לכתוב הערה")
+    next_item = {
+        "author_name": (author_name or "").strip() or "—",
+        "body": text,
+        "created_at": created_at,
+    }
+    return parse_system_bug_comments([*existing, next_item])
+
+
+def _comments_list(raw) -> list:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return raw
+    text = str(raw).strip()
+    if not text:
+        return []
+    import json
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    return data if isinstance(data, list) else []

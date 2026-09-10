@@ -572,6 +572,7 @@ class SystemBugReport(Base):
     audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     github_issue_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", index=True)
+    comments: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
