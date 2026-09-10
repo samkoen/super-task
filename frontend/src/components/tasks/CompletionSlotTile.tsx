@@ -5,13 +5,13 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import CompletionSlotHintButtons from "./CompletionSlotHintButtons";
 import MediaCaptureActions from "../media/MediaCaptureActions";
+import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { useVideoPoster } from "../../hooks/useVideoPoster";
 import { he } from "../../i18n/he";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import {
   slotDisplayTitle,
   slotExampleSrc,
-  slotFillSrc,
   slotGuideText,
   type SlotFill,
 } from "../../utils/completionSlotView";
@@ -45,10 +45,12 @@ export default function CompletionSlotTile({
   onEnlarge?: (src: string, kind?: "photo" | "video") => void;
   hintControls?: HintControls;
 }) {
-  const filledSrc = slotFillSrc(fill);
+  const rawFill = fill?.previewUrl || fill?.url || null;
+  const resolved = useResolvedMediaSrc(rawFill, Boolean(rawFill && !rawFill.startsWith("blob:")));
+  const filledSrc = resolved.src;
   const exampleSrc = slotExampleSrc(req);
   const title = slotDisplayTitle(req, index);
-  const filled = Boolean(filledSrc);
+  const filled = Boolean(rawFill);
 
   return (
     <Box

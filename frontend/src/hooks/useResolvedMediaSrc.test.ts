@@ -37,6 +37,16 @@ describe("useResolvedMediaSrc", () => {
     expect(result.current.loading).toBe(false);
   });
 
+  it("eagerly fetches a remote file with the session instead of painting the proxy url", async () => {
+    const blob = new Blob(["vid"], { type: "video/mp4" });
+    vi.mocked(fetchMediaBlobWithRetry).mockResolvedValue(blob);
+    stubObjectUrl("blob:kept-video");
+    const { result } = renderHook(() => useResolvedMediaSrc("/uploads/v2.mp4", true));
+    expect(result.current.src).toBeNull();
+    await waitFor(() => expect(result.current.src).toBe("blob:kept-video"));
+    expect(fetchMediaBlobWithRetry).toHaveBeenCalledWith("/uploads/v2.mp4");
+  });
+
   it("starts with the proxied url then swaps after a failed first paint", async () => {
     const blob = new Blob(["img"], { type: "image/jpeg" });
     vi.mocked(fetchMediaBlobWithRetry).mockResolvedValue(blob);

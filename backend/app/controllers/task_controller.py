@@ -577,7 +577,7 @@ async def reopen_occurrence(
     note = ((data or {}).get("rejection_note") or "").strip() or "נא לתקן לפי ההודעה"
     item = service.reopen_occurrence(actor, occurrence_id, rejection_note=note)
     chat = await messages.post_message(actor, occurrence_id, body=note)
-    _emit_task_event(db, chat["event_type"], chat["occurrence"])
+    _emit_task_event(db, "task_reopened", chat.get("occurrence") or item)
     return {
         "message": "הודעה נשלחה והמשימה נפתחה מחדש",
         "occurrence": chat["occurrence"],

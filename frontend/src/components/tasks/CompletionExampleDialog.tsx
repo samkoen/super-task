@@ -1,6 +1,7 @@
 import { Box, Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { he } from "../../i18n/he";
+import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 
 export default function CompletionExampleDialog({
   src,
@@ -13,6 +14,8 @@ export default function CompletionExampleDialog({
   kind?: "photo" | "video";
   onClose: () => void;
 }) {
+  const media = useResolvedMediaSrc(src, Boolean(src && !src.startsWith("blob:")));
+  const playSrc = media.src;
   return (
     <Dialog open={Boolean(src)} onClose={onClose} fullWidth maxWidth="sm" dir="rtl">
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 1 }}>
@@ -22,17 +25,17 @@ export default function CompletionExampleDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {src && kind === "video" ? (
+        {playSrc && kind === "video" ? (
           <Box
             component="video"
-            src={src}
+            src={playSrc}
             controls
             autoPlay
             playsInline
             sx={{ width: "100%", borderRadius: 1, display: "block", bgcolor: "common.black" }}
           />
-        ) : src ? (
-          <img src={src} alt={title} style={{ width: "100%", borderRadius: 8, display: "block" }} />
+        ) : playSrc ? (
+          <img src={playSrc} alt={title} style={{ width: "100%", borderRadius: 8, display: "block" }} />
         ) : null}
       </DialogContent>
     </Dialog>

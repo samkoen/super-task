@@ -738,14 +738,7 @@ export default function EmployeeTasksPage() {
             <Accordion
               expanded={showCompleted}
               onChange={() => setShowCompleted((v) => !v)}
-              sx={{
-                mt: 1,
-                boxShadow: 0,
-                border: 1,
-                borderColor: "divider",
-                position: "relative",
-                zIndex: 1400,
-              }}
+              sx={{ mt: 1, mb: 2, boxShadow: 0, border: 1, borderColor: "divider" }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography fontWeight={700}>
@@ -764,11 +757,6 @@ export default function EmployeeTasksPage() {
         </>
       )}
 
-      <Box
-        aria-hidden
-        data-testid="employee-chat-bar-spacer"
-        sx={employeeChatBarSpacerSx()}
-      />
       <Paper elevation={6} sx={employeeChatBarPaperSx()}>
         <Badge badgeContent={chatUnread} color="error" sx={{ width: "100%", display: "block" }}>
           <Button
@@ -782,6 +770,11 @@ export default function EmployeeTasksPage() {
           </Button>
         </Badge>
       </Paper>
+      <Box
+        aria-hidden
+        data-testid="employee-chat-bar-spacer"
+        sx={employeeChatBarSpacerSx()}
+      />
 
       <EmployeeClaimTaskDialog
         open={claimOpen}

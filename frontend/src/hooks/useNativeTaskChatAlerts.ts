@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { NOTIFICATION_EVENT } from "../constants/events";
+import { NOTIFICATION_EVENT, TASK_CHANGE_EVENT } from "../constants/events";
 import { notificationService, type AppNotification } from "../services/notificationService";
 import { loadSeenAlertIds, rememberAlertIds } from "../utils/seenChatAlerts";
 import { isNativeApp } from "../utils/isNativeApp";
@@ -12,6 +12,7 @@ import {
   showNativeChatBanner,
 } from "../utils/nativeLocalNotifications";
 import {
+  isEmployeeTaskSyncKind,
   isTaskChatAlertKind,
   shouldShowTaskChatBanner,
   taskChatAlertPath,
@@ -81,6 +82,7 @@ function startNativeChatAlertPoll(ctx: {
         primed = true;
         return;
       }
+      deliverEmployeeTaskSync(data.items, seen);
       deliverNewChatAlerts(data.items, seen, {
         onBreak: ctx.onBreakRef.current,
         viewingOccurrenceId: ctx.viewingRef.current,
@@ -105,8 +107,22 @@ function startNativeChatAlertPoll(ctx: {
   };
 }
 
+export function deliverEmployeeTaskSync(items: AppNotification[], seen: Set<string>): void {
+  let refresh = false;
+  for (const item of items) {
+    if (!isEmployeeTaskSyncKind(item.kind) || isTaskChatAlertKind(item.kind)) continue;
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    rememberAlertIds([item.id]);
+    refresh = true;
+  }
+  if (refresh) {
+    window.dispatchEvent(new CustomEvent(TASK_CHANGE_EVENT, { detail: { type: "task_reopened" } }));
+  }
+}
+
 export function primeSeenChatAlerts(items: AppNotification[], seen: Set<string>): void {
-  const ids = items.filter((item) => isTaskChatAlertKind(item.kind)).map((item) => item.id);
+  const ids = items.filter((item) => isEmployeeTaskSyncKind(item.kind)).map((item) => item.id);
   ids.forEach((id) => seen.add(id));
   rememberAlertIds(ids);
 }
@@ -157,4 +173,5 @@ function announceChatAlert(
   window.dispatchEvent(
     new CustomEvent(NOTIFICATION_EVENT, { detail: { kind: item.kind, sound: "none" } }),
   );
+  window.dispatchEvent(new CustomEvent(TASK_CHANGE_EVENT, { detail: { type: item.kind } }));
 }

@@ -3,7 +3,7 @@ import { peekChatMediaPreview } from "../utils/chatMediaPreview";
 import { fetchMediaBlobWithRetry } from "../utils/fetchMediaBlob";
 import { mediaUrl } from "../utils/mediaUrl";
 
-export function useResolvedMediaSrc(path: string | null | undefined) {
+export function useResolvedMediaSrc(path: string | null | undefined, eager = false) {
   const preview = peekChatMediaPreview(path);
   const [retrySrc, setRetrySrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -17,12 +17,29 @@ export function useResolvedMediaSrc(path: string | null | undefined) {
 
   useEffect(() => () => revokeIfBlob(retrySrc), [retrySrc]);
 
+  useEffect(() => {
+    if (!eager || !path || preview || path.startsWith("blob:")) return;
+    startProxyRetry(path, preview, retryRef, setRetrySrc, setFailed);
+  }, [path, eager, preview]);
+
   return {
-    src: preview || retrySrc || mediaUrl(path),
+    src: resolvedMediaSrc(path, preview, retrySrc, eager),
     loading: retryRef.current.busy && !retrySrc && !preview,
     failed,
     onError: () => startProxyRetry(path, preview, retryRef, setRetrySrc, setFailed),
   };
+}
+
+function resolvedMediaSrc(
+  path: string | null | undefined,
+  preview: string | null,
+  retrySrc: string | null,
+  eager: boolean,
+): string | null {
+  if (preview) return preview;
+  if (path?.startsWith("blob:")) return path;
+  if (retrySrc) return retrySrc;
+  return eager ? null : mediaUrl(path);
 }
 
 function revokeIfBlob(src: string | null) {

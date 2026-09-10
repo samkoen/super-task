@@ -121,3 +121,24 @@ def test_regular_task_does_not_stamp_arrival():
         )
     )
     occurrence_repo.set_started_at.assert_not_called()
+
+
+def test_work_start_resubmit_after_reopen_keeps_first_arrival():
+    occurrence_repo, completion_repo = _repos(_occurrence())
+    completion_repo.find_by_occurrence.return_value = _completion()
+    completion_repo.update_submission.return_value = _completion()
+    asyncio.run(
+        _service(occurrence_repo, completion_repo).complete_occurrence(
+            _employee(),
+            "occ-1",
+            completion_status=task_status.COMPLETION_DONE,
+            completion_attachments=[
+                {
+                    "kind": "photo",
+                    "url": "/uploads/p2.jpg",
+                    "captured_at": "2026-01-01T11:40:00+02:00",
+                }
+            ],
+        )
+    )
+    occurrence_repo.set_started_at.assert_not_called()
