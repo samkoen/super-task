@@ -37,6 +37,26 @@ def test_copy_local_duplicates_file(monkeypatch, tmp_path: Path):
     assert (tmp_path / copied.removeprefix("/uploads/")).read_bytes() == b"photo"
 
 
+def test_media_is_ready_local_uploads_are_sync():
+    from app.services.blob_storage import media_is_ready
+
+    assert media_is_ready("") is False
+    assert media_is_ready("/uploads/task_videos/a.mp4") is True
+
+
+def test_media_is_ready_uses_blob_head(monkeypatch):
+    monkeypatch.setattr("app.services.blob_storage.config.BLOB_READ_WRITE_TOKEN", "tok")
+    monkeypatch.setattr("app.services.blob_storage.config.blob_storage_enabled", lambda: True)
+    monkeypatch.setattr("app.services.blob_storage.time.sleep", lambda _ms: None)
+    monkeypatch.setattr("app.services.blob_storage._blob_head_ok", lambda _url: True)
+    from app.services import blob_storage
+
+    url = "https://x.private.blob.vercel-storage.com/v.mp4"
+    assert blob_storage.media_is_ready(url) is True
+    monkeypatch.setattr("app.services.blob_storage._blob_head_ok", lambda _url: False)
+    assert blob_storage.media_is_ready(url) is False
+
+
 def test_is_remote_media_url():
     from app.services.blob_storage import is_private_blob_url, is_remote_media_url, is_vercel_blob_url
 

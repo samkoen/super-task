@@ -491,6 +491,44 @@ def test_employee_complete_persists_three_videos():
     assert [item["url"] for item in saved] == ["/uploads/v1.mp4", "/uploads/v2.mp4", "/uploads/v3.mp4"]
 
 
+def test_employee_complete_blocked_while_blob_videos_not_ready(monkeypatch):
+    occurrence = _occurrence(
+        completion_requirements=[
+            {"kind": "video", "min_seconds": 8},
+            {"kind": "video", "min_seconds": 8},
+            {"kind": "video", "min_seconds": 8},
+        ]
+    )
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+    monkeypatch.setattr("app.services.blob_storage.media_is_ready", lambda _url: False)
+    videos = [
+        {
+            "kind": "video",
+            "url": f"https://x.private.blob.vercel-storage.com/v{i}.mp4",
+            "duration_seconds": 10,
+        }
+        for i in (1, 2, 3)
+    ]
+    with pytest.raises(ValueError, match="נטענים"):
+        asyncio.run(
+            svc.complete_occurrence(
+                actor,
+                "occ-1",
+                completion_status=task_status.COMPLETION_DONE,
+                completion_attachments=videos,
+            )
+        )
+    completion_repo.create.assert_not_called()
+
+
 def _closed_reopen_setup(*, reviewer_id="mgr-1", actor_id="mgr-2", role=roles.BRANCH_MANAGER):
     occurrence = _occurrence(status=task_status.COMPLETED)
     reopened = _occurrence(status=task_status.IN_PROGRESS)

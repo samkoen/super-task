@@ -10,7 +10,9 @@ describe("mediaRetry", () => {
     expect(nextMediaRetryDelayMs(0)).toBe(300);
     expect(nextMediaRetryDelayMs(1)).toBe(1000);
     expect(nextMediaRetryDelayMs(2)).toBe(3000);
-    expect(nextMediaRetryDelayMs(3)).toBeNull();
+    expect(nextMediaRetryDelayMs(3)).toBe(5000);
+    expect(nextMediaRetryDelayMs(4)).toBe(8000);
+    expect(nextMediaRetryDelayMs(5)).toBeNull();
   });
 
   it("retries transient proxy failures but not client auth errors", () => {

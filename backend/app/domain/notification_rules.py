@@ -14,7 +14,13 @@ def notification_sound_for(kind: str, *, recipient_is_employee: bool) -> str:
         return SOUND_NONE
     if kind in {"task_created", "task_delegated"}:
         return SOUND_NEW_TASK
-    if kind in {"task_cancelled", "task_reopened", "task_message_manager", "direct_message"}:
+    if kind in {
+        "task_cancelled",
+        "task_reopened",
+        "task_approved",
+        "task_message_manager",
+        "direct_message",
+    }:
         return SOUND_TASK_END
     if kind in {"employee_idle", "employee_idle_no_tasks", "employee_idle_has_tasks", "employee_idle_on_break"}:
         return SOUND_ALERT
@@ -58,6 +64,11 @@ def recipients_for_task_event(
         return recipients
 
     if event_type == "task_reopened":
+        if assignee:
+            recipients.add(assignee)
+        return recipients
+
+    if event_type == "task_approved":
         if assignee:
             recipients.add(assignee)
         return recipients

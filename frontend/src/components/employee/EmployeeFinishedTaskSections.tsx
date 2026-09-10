@@ -25,6 +25,7 @@ export default function EmployeeFinishedTaskSections({
         title={he.taskPendingReview}
         tasks={excludeAttendancePunch(pendingReviewTasks)}
         onOpen={onOpen}
+        layout="list"
       />
       {completedTasks.length > 0 ? (
         <CompletedTasksAccordion

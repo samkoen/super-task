@@ -9,6 +9,7 @@ export const TASK_CHAT_ALERT_KINDS = new Set([
 export const EMPLOYEE_TASK_SYNC_KINDS = new Set([
   ...TASK_CHAT_ALERT_KINDS,
   "task_reopened",
+  "task_approved",
   "task_created",
   "task_delegated",
   "task_cancelled",

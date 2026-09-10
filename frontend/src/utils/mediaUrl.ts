@@ -19,6 +19,14 @@ export function mediaUrl(path: string | null | undefined): string | null {
   return `${base}${path}`;
 }
 
+export function isVercelBlobMediaUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase().includes("blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export function isPrivateVercelBlobUrl(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
