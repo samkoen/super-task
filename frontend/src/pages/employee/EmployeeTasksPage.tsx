@@ -63,6 +63,7 @@ import { he } from "../../i18n/he";
 import { type PendingMedia, revokePendingMedia } from "../../utils/pendingMedia";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import {
+  slotsFromTaskCompletion,
   slotsMeetTaskRequirements,
   uploadRequirementSlots,
 } from "../../utils/employeeCompletionUpload";
@@ -348,9 +349,13 @@ export default function EmployeeTasksPage() {
       openExternalUrl(task.start_url);
     }
     clearCompletionMedia();
-    setNote("");
     const next: EmployeeTaskCard = openLink ? cardAfterStart(task) : task;
-    setSlotMedia(canDoTask(next.status) ? effectiveRequirements(next).map(() => null) : []);
+    setSlotMedia(
+      canDoTask(next.status)
+        ? slotsFromTaskCompletion(effectiveRequirements(next), next.completion)
+        : [],
+    );
+    setNote(next.completion?.note ?? "");
     setDetailTask(next);
     setLinkedStartReady(!openLink);
     if (openLink) {

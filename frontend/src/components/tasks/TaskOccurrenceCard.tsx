@@ -38,7 +38,6 @@ import { showsHebrewTitle } from "../../utils/employeeTaskCard";
 import { isNativeApp } from "../../utils/isNativeApp";
 import { mediaUrl } from "../../utils/mediaUrl";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
-import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import { taskUrgencyLevel, type TaskUrgencyLevel } from "../../utils/taskUrgency";
@@ -151,7 +150,7 @@ export default function TaskOccurrenceCard({
     Boolean(onEdit) &&
     !["completed", "cancelled", "pending_review"].includes(task.status);
   const canReview = awaitingReview && Boolean(onReview);
-  const canOpenClosed = canReopenClosedTask(task) && Boolean(onReview);
+  const canOpenClosed = task.status === "completed" && Boolean(onReview);
   const canMarkNext =
     Boolean(onSetManagerNext) &&
     Boolean(task.assignee_user_id) &&

@@ -182,6 +182,34 @@ describe("TaskCompletionReviewDialog", () => {
     expect(taskService.approve).not.toHaveBeenCalled();
   });
 
+  it("shows completion media for a closed task that is not approved", () => {
+    render(
+      <TaskCompletionReviewDialog
+        task={reviewTask({
+          status: "completed",
+          completion: {
+            id: "c1",
+            occurrence_id: "occ-1",
+            status: "completed",
+            note: "בוצע",
+            photo_path: "/p.jpg",
+            video_path: null,
+            audio_path: null,
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: null,
+          },
+        })}
+        onClose={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("completion-preview")).toBeTruthy();
+    expect(screen.getByTestId("completion-outcome-done")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.taskReopenClosed })).toBeNull();
+  });
+
   it("reopens a closed approved task after confirmation", async () => {
     vi.mocked(taskService.reopenClosed).mockResolvedValue({} as never);
     const onDone = vi.fn();

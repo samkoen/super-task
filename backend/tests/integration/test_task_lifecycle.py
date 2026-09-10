@@ -168,6 +168,13 @@ def test_reopen_closed_after_approve_notifies_oved(
     assert again.status_code == 400
     assert "פתוחה" in again.json()["error"]
 
+    again_submit = client_emp.post(
+        f"/api/tasks/occurrences/{occ_id}/complete",
+        json={"status": "completed", "photo_path": photo},
+    )
+    assert again_submit.status_code == 200, again_submit.text
+    assert again_submit.json()["occurrence"]["completion"]["photo_path"] == photo
+
     notifs = client_emp.get("/api/notifications")
     assert notifs.status_code == 200
     reopened_n = next(

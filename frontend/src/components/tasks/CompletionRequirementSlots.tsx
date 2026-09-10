@@ -1,8 +1,12 @@
 import { useRef } from "react";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
-import type { CompletionRequirement } from "../../utils/completionMedia";
-import { applyPendingSlot, type PendingMedia } from "../../utils/pendingMedia";
+import type { CompletionKind, CompletionRequirement } from "../../utils/completionMedia";
+import {
+  applyPendingSlot,
+  pendingSlotHasFile,
+  type PendingMedia,
+} from "../../utils/pendingMedia";
 
 export default function CompletionRequirementSlots({
   requirements,
@@ -30,10 +34,7 @@ export default function CompletionRequirementSlots({
   return (
     <CompletionSlotGrid
       requirements={requirements}
-      fills={requirements.map((req, index) => {
-        const media = slots[index];
-        return media ? { previewUrl: media.previewUrl, kind: req.kind } : null;
-      })}
+      fills={requirements.map((req, index) => fillFromSlot(req.kind, slots[index]))}
       interactive
       disabled={disabled}
       language={language}
@@ -41,4 +42,10 @@ export default function CompletionRequirementSlots({
       onAnnotatingChange={onAnnotatingChange}
     />
   );
+}
+
+function fillFromSlot(kind: CompletionKind, media: PendingMedia | null) {
+  if (pendingSlotHasFile(media)) return { previewUrl: media.previewUrl, kind };
+  if (media?.keptUrl) return { url: media.keptUrl, kind };
+  return null;
 }

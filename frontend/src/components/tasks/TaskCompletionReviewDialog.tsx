@@ -47,7 +47,7 @@ export default function TaskCompletionReviewDialog({
   const isAwaiting = task?.status === "awaiting_response";
   const isReview = task?.status === "pending_review";
   const isClosedApproved = canReopenClosedTask(task);
-  const showCompletion = isReview || isClosedApproved;
+  const showCompletion = Boolean(completion);
 
   useEffect(() => {
     setNote("");

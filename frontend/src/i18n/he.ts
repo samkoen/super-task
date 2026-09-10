@@ -598,7 +598,7 @@ export const he = {
   taskReopen: "פתיחה מחדש",
   taskReopenClosed: "פתח מחדש",
   taskReopenClosedConfirmTitle: "פתיחה מחדש",
-  taskReopenClosedConfirm: "לפתוח מחדש את המשימה לעובד? המדיה והשיחה יישמרו.",
+  taskReopenClosedConfirm: "לפתוח מחדש את המשימה לעובד? התמונות והסרטונים יישמרו, והעובד יוכל להחליף אותם.",
   taskClosedDetailTitle: "משימה שאושרה",
   taskClosedDetailAction: "צפייה בסיום",
   taskReopenNote: "הערה לעובד",

@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { he } from "../i18n/he";
 import {
+  slotsFromKeptAttachments,
   slotsMeetTaskRequirements,
   uploadRequirementSlots,
 } from "./employeeCompletionUpload";
-import { applyPendingSlot, createPendingMedia, revokePendingMedia } from "./pendingMedia";
+import {
+  applyPendingSlot,
+  createKeptMedia,
+  createPendingMedia,
+  revokePendingMedia,
+} from "./pendingMedia";
 import type { CompletionRequirement } from "./completionMedia";
 
 const threeVideos: CompletionRequirement[] = [
@@ -61,6 +67,37 @@ describe("employeeCompletionUpload", () => {
       he.completionFillSlotsHint,
     );
     slots.forEach((item) => revokePendingMedia(item));
+  });
+
+  it("keeps existing videos and uploads only the replaced slot", async () => {
+    const slots = [
+      createKeptMedia("/uploads/v1.mp4", 12),
+      applyPendingSlot([null], 0, new File(["b"], "b.webm", { type: "video/webm" }), 11)[0],
+      createKeptMedia("/uploads/v3.mp4", 10),
+    ];
+    const uploaders = {
+      photo: vi.fn(),
+      video: vi.fn(async (file: File) => ({ url: `/uploads/${file.name}` })),
+      audio: vi.fn(),
+    };
+    const attachments = await uploadRequirementSlots(threeVideos, slots, uploaders, true);
+    expect(attachments.map((item) => item.url)).toEqual([
+      "/uploads/v1.mp4",
+      "/uploads/b.webm",
+      "/uploads/v3.mp4",
+    ]);
+    expect(uploaders.video).toHaveBeenCalledTimes(1);
+    slots.forEach((item) => revokePendingMedia(item));
+  });
+
+  it("prefills three kept videos from the previous submission", () => {
+    const slots = slotsFromKeptAttachments(threeVideos, [
+      { kind: "video", url: "/v1.mp4", duration_seconds: 12 },
+      { kind: "video", url: "/v2.mp4", duration_seconds: 11 },
+      { kind: "video", url: "/v3.mp4", duration_seconds: 10 },
+    ]);
+    expect(slots.map((item) => item?.keptUrl)).toEqual(["/v1.mp4", "/v2.mp4", "/v3.mp4"]);
+    expect(slotsMeetTaskRequirements(threeVideos, slots)).toBe(true);
   });
 
   it("does not treat a zero-byte video as ready", () => {

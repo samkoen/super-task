@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   completionAttachmentFromPending,
   applyPendingSlot,
+  createKeptMedia,
   createPendingMedia,
+  pendingSlotIsFilled,
   replacePendingMedia,
   revokePendingMedia,
   uploadPendingMedia,
@@ -72,6 +74,12 @@ describe("pendingMedia", () => {
     const url = await uploadPendingMedia(pending, async () => ({ url: "nope" }));
     expect(url).toBeUndefined();
     revokePendingMedia(pending);
+  });
+
+  it("treats a kept server url as already filled", () => {
+    const kept = createKeptMedia("/uploads/v1.mp4", 12);
+    expect(pendingSlotIsFilled(kept)).toBe(true);
+    expect(kept.keptUrl).toBe("/uploads/v1.mp4");
   });
 
   it("applyPendingSlot keeps earlier videos when filling the third slot", () => {
