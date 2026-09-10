@@ -27,6 +27,7 @@ import ChatIcon from "@mui/icons-material/Chat";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
+import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import TaskStatusChip from "./TaskStatusChip";
 import TaskChatPanel from "./TaskChatPanel";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
@@ -37,6 +38,7 @@ import { showsHebrewTitle } from "../../utils/employeeTaskCard";
 import { isNativeApp } from "../../utils/isNativeApp";
 import { mediaUrl } from "../../utils/mediaUrl";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
+import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import { taskUrgencyLevel, type TaskUrgencyLevel } from "../../utils/taskUrgency";
 import type { TaskOccurrence } from "../../services/taskService";
@@ -491,6 +493,9 @@ export default function TaskOccurrenceCard({
               variant={urgency === "normal" ? "outlined" : "filled"}
             />
             <TaskStatusChip status={task.status} />
+            {task.completion && showsCompletionOutcome(task.status) ? (
+              <CompletionOutcomeChip status={task.completion.status} />
+            ) : null}
             {isManagerNextTask(task) && (
               <Chip
                 size="small"

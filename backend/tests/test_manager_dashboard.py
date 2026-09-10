@@ -88,6 +88,8 @@ def test_build_timeline_item_duration():
     )
     assert item["duration_minutes"] == 45
     assert item["segment"] == "completed"
+    assert item["completion_status"] == "done"
+    assert item["not_completed_reason"] is None
 
 
 def test_build_timeline_item_elapsed_for_in_progress():

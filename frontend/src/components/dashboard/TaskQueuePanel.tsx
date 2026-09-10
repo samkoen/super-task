@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import RateReviewIcon from "@mui/icons-material/RateReview";
+import CompletionOutcomeChip from "../tasks/CompletionOutcomeChip";
 import type { TaskQueues, TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
@@ -82,6 +83,9 @@ function QueueItem({
             )}
             {task.segment === "pending_review" && (
               <Chip label={he.timelineSegmentPendingReview} size="small" color="info" />
+            )}
+            {task.segment === "pending_review" && task.completion_status && (
+              <CompletionOutcomeChip status={task.completion_status} />
             )}
             {showLongAlert && (
               <Chip label={he.dashboardInProgressLong} size="small" color="error" />

@@ -40,11 +40,12 @@ describe("employeeDoTask", () => {
     expect(shouldOpenStartUrlOnBegin("in_progress", url)).toBe(false);
     expect(canSubmitEmployeeTask("pending", url, false)).toBe(true);
     expect(canSubmitEmployeeTask("overdue", url, false)).toBe(true);
-    expect(canSubmitEmployeeTask("in_progress", url, false)).toBe(false);
-    expect(canSubmitEmployeeTask("pending", null, false)).toBe(false);
+    expect(canSubmitEmployeeTask("in_progress", url, false)).toBe(true);
+    expect(canSubmitEmployeeTask("pending", null, false)).toBe(true);
     expect(canSubmitEmployeeTask("in_progress", url, true)).toBe(true);
     expect(canSubmitEmployeeTask("in_progress", url, true, false)).toBe(true);
-    expect(canSubmitEmployeeTask("in_progress", url, false, false)).toBe(false);
+    expect(canSubmitEmployeeTask("in_progress", url, false, false)).toBe(true);
+    expect(canSubmitEmployeeTask("pending_review", null, false)).toBe(false);
   });
 
   it("does not skip complete when the slots are already filled", () => {

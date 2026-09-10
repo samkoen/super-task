@@ -20,18 +20,6 @@ export function shouldOpenStartUrlOnBegin(
   return needsTaskStart(status) && hasExternalStartUrl(startUrl);
 }
 
-/** Premier tap avec URL : start + navigateur, même sans cases de clôture.
- *  Le start en vol n'interdit plus le bouton : handleSubmit attend le POST. */
-export function canSubmitEmployeeTask(
-  status: TaskStatus | string,
-  startUrl: string | null | undefined,
-  slotsFilled: boolean,
-  _startConfirmed = true,
-): boolean {
-  if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return true;
-  return slotsFilled;
-}
-
 /** Premier tap lié : ouvrir le lien seulement si les cases ne sont pas prêtes. */
 export function shouldStopAfterOpeningStartUrl(openedLink: boolean, slotsFilled: boolean): boolean {
   return openedLink && !slotsFilled;
@@ -120,6 +108,17 @@ export function employeeSubmitLocked(saving: boolean, annotating: boolean): bool
 
 export function canDoTask(status: TaskStatus | string): boolean {
   return DOABLE.has(status);
+}
+
+/** Le bouton reste cliquable même sans cases : l'oved peut expliquer pourquoi. */
+export function canSubmitEmployeeTask(
+  status: TaskStatus | string,
+  startUrl: string | null | undefined,
+  _slotsFilled: boolean,
+  _startConfirmed = true,
+): boolean {
+  if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return true;
+  return canDoTask(status);
 }
 
 export function doTaskButtonLabel(status: TaskStatus | string): string {

@@ -21,6 +21,12 @@ from app.domain.audio_transcription_fallback import (
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
 from app.domain.quality_rating import normalize_quality_rating
+from app.domain.task_completion_submit import (
+    employee_submission_needs_review,
+    normalize_completion_status,
+    normalize_not_completed_reason,
+    requires_completion_media,
+)
 from app.domain.task_translation_source import task_source_language
 from app.domain.scope import ActorContext
 from app.domain.start_url import normalize_start_url
@@ -550,6 +556,7 @@ class TaskOccurrenceService:
         audio_path,
         video_duration_seconds,
         completion_attachments,
+        require_complete=True,
     ) -> dict:
         raw_reqs = getattr(occurrence, "completion_requirements", None)
         reqs = (
@@ -569,6 +576,9 @@ class TaskOccurrenceService:
             audio_path=audio_path,
             video_duration_seconds=video_duration_seconds,
         )
+        if not require_complete:
+            filled = [item for item in attachments if (item.get("url") or "").strip()]
+            return TaskOccurrenceService._pack_attachments(filled)
         if raw_reqs is not None:
             assert_attachments_match(reqs, attachments)
             return TaskOccurrenceService._pack_attachments(attachments)
@@ -633,10 +643,10 @@ class TaskOccurrenceService:
             task_status.IN_PROGRESS,
         }:
             raise ValueError("יש להתחיל את המשימה לפני הסיום")
-        if completion_status == task_status.COMPLETION_NOT_DONE:
-            raise ValueError("לא ניתן לסמן לא בוצע — שלחו שאלה בצ׳אט המשימה")
-        if completion_status != task_status.COMPLETION_DONE:
-            raise ValueError("סטטוס סיום לא תקין")
+        completion_status = normalize_completion_status(completion_status)
+        reason_clean = normalize_not_completed_reason(
+            completion_status, not_completed_reason
+        )
         media = self._validated_completion_media(
             actor,
             occurrence,
@@ -645,15 +655,13 @@ class TaskOccurrenceService:
             audio_path=audio_path,
             video_duration_seconds=video_duration_seconds,
             completion_attachments=completion_attachments,
+            require_complete=requires_completion_media(completion_status),
         )
 
         note_clean = (note or "").strip() or None
-        reason_clean = (not_completed_reason or "").strip() or None
         existing = self._completions.find_by_occurrence(occurrence_id)
         employee_submission = as_assignee
-        needs_review = (
-            employee_submission and completion_status == task_status.COMPLETION_DONE
-        )
+        needs_review = employee_submission_needs_review(employee_submission)
         if employee_submission:
             self._stamp_work_start_arrival(occurrence, media["attachments"])
 

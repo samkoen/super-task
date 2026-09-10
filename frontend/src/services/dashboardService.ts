@@ -1,7 +1,7 @@
 import api from "./api";
 import type { QualityRatingSummary } from "../utils/qualityRating";
 import type { CompletionRequirement } from "../utils/completionMedia";
-import type { TaskCompletion, TaskKind, TaskStatus } from "./taskService";
+import type { CompletionStatus, TaskCompletion, TaskKind, TaskStatus } from "./taskService";
 
 export type HealthLevel = "green" | "orange" | "red";
 
@@ -71,6 +71,8 @@ export interface TimelineTask {
   is_work_start?: boolean;
   is_work_end?: boolean;
   min_video_seconds?: number | null;
+  completion_status?: CompletionStatus | null;
+  not_completed_reason?: string | null;
 }
 
 export interface TeamMember {
@@ -167,6 +169,7 @@ export interface EmployeeTaskCard {
   created_at?: string | null;
   status: TaskStatus;
   task_kind: TaskKind;
+  ops_category?: OpsCategory | null;
   photo_required: boolean;
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];

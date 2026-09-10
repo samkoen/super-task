@@ -19,6 +19,8 @@ import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { reopenNoteError } from "../../utils/taskReview";
+import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
+import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import QualityRatingStars from "./QualityRatingStars";
 
 interface TaskCompletionReviewDialogProps {
@@ -35,7 +37,7 @@ export default function TaskCompletionReviewDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
-  const [rating, setRating] = useState<number | null>(null);
+  const [rating, setRating] = useState<number | null>(DEFAULT_REVIEW_QUALITY_RATING);
 
   const completion = task?.completion;
   const open = Boolean(task);
@@ -45,7 +47,7 @@ export default function TaskCompletionReviewDialog({
   useEffect(() => {
     setNote("");
     setError("");
-    setRating(null);
+    setRating(DEFAULT_REVIEW_QUALITY_RATING);
   }, [task?.id]);
 
   const handleClose = () => {
@@ -127,6 +129,23 @@ export default function TaskCompletionReviewDialog({
             reference_video_url={task.reference_video_url}
             reference_audio_url={task.reference_audio_url}
           />
+        )}
+        {isReview && completion && (
+          <Box>
+            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={1}>
+              <CompletionOutcomeChip status={completion.status} />
+            </Box>
+            {completion.status === "not_completed" && (
+              <Alert severity="warning">
+                {he.taskNotCompletedAlert}
+                {completion.not_completed_reason ? (
+                  <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
+                    {he.notCompletedReason}: {completion.not_completed_reason}
+                  </Typography>
+                ) : null}
+              </Alert>
+            )}
+          </Box>
         )}
         {isReview && completion?.note && (
           <Box>

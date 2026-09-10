@@ -797,6 +797,7 @@ class DashboardService:
             "created_at": task.created_at,
             "status": task.status,
             "task_kind": task.task_kind,
+            "ops_category": getattr(task, "ops_category", None),
             "photo_required": task.photo_required,
             "min_video_seconds": task.min_video_seconds,
             "completion_requirements": getattr(task, "completion_requirements", None) or [],

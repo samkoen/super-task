@@ -15,6 +15,7 @@ import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionRequirementSlots from "./CompletionRequirementSlots";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
+import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import TaskChatPanel from "./TaskChatPanel";
 import TaskStatusChip from "./TaskStatusChip";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -22,8 +23,9 @@ import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
+import { canComposeTaskChat, employeeOpensTaskChatFirst } from "../../utils/taskChatCompose";
 import { canDoTask } from "../../utils/employeeDoTask";
+import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
 import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import {
@@ -59,6 +61,7 @@ export type EmployeeTaskCaptureProps = {
   onNoteChange: (value: string) => void;
   onSubmit: () => void;
   canSubmit: boolean;
+  slotsFilled?: boolean;
   saving: boolean;
   onAnnotatingChange?: (busy: boolean) => void;
 };
@@ -87,7 +90,6 @@ export default function EmployeeTaskDetailDialog({
 }: EmployeeTaskDetailDialogProps) {
   if (!task) return null;
   const liveCapture = capture && canDoTask(task.status) ? capture : undefined;
-  const remark = rejectionRemark(task.completion);
 
   return (
     <Dialog
@@ -109,23 +111,12 @@ export default function EmployeeTaskDetailDialog({
           </Typography>
         ) : null}
         <StartUrlButton url={task.start_url} fullWidth />
-        {remark ? (
-          <Alert severity="warning">
-            {he.taskRejectedReopen}
-            {remark !== he.taskRejectedReopen ? (
-              <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
-                {remark}
-              </Typography>
-            ) : null}
-          </Alert>
-        ) : null}
-        <TaskDetailMedia task={task} language={language} capture={liveCapture} />
-        <TaskChatPanel
-          key={task.id}
-          occurrenceId={task.id}
-          compact
-          composeEnabled={canComposeTaskChat(task.status, true)}
-          onOccurrenceUpdated={() => onChatUpdated?.()}
+        <TaskRejectionRemark completion={task.completion} />
+        <TaskDetailChatAndMedia
+          task={task}
+          language={language}
+          liveCapture={liveCapture}
+          onChatUpdated={onChatUpdated}
         />
       </DialogContent>
       <TaskDetailActions
@@ -139,10 +130,66 @@ export default function EmployeeTaskDetailDialog({
   );
 }
 
+function TaskRejectionRemark({ completion }: { completion?: TaskCompletion | null }) {
+  const remark = rejectionRemark(completion);
+  if (!remark) return null;
+  return (
+    <Alert severity="warning">
+      {he.taskRejectedReopen}
+      {remark !== he.taskRejectedReopen ? (
+        <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
+          {remark}
+        </Typography>
+      ) : null}
+    </Alert>
+  );
+}
+
+function TaskDetailChatAndMedia({
+  task,
+  language,
+  liveCapture,
+  onChatUpdated,
+}: {
+  task: EmployeeTaskDetailTask;
+  language: EmployeeLanguage;
+  liveCapture?: EmployeeTaskCaptureProps;
+  onChatUpdated?: () => void;
+}) {
+  const chat = (
+    <TaskChatPanel
+      key={task.id}
+      occurrenceId={task.id}
+      occurrenceStatus={task.status}
+      compact
+      composeEnabled={canComposeTaskChat(task.status, true)}
+      onOccurrenceUpdated={() => onChatUpdated?.()}
+    />
+  );
+  const media = <TaskDetailMedia task={task} language={language} capture={liveCapture} />;
+  if (employeeOpensTaskChatFirst(task.status)) {
+    return (
+      <>
+        {chat}
+        {media}
+      </>
+    );
+  }
+  return (
+    <>
+      {media}
+      {chat}
+    </>
+  );
+}
+
 function TaskStatusRow({ task }: { task: EmployeeTaskDetailTask }) {
   return (
     <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
       <TaskStatusChip status={task.status} />
+      {task.completion && showsCompletionOutcome(task.status) ? (
+        <CompletionOutcomeChip status={task.completion.status} />
+      ) : null}
       <Typography variant="caption" color="text.secondary" dir="ltr">
         {he.dueAt}: {formatDueAt(task.due_at)}
       </Typography>
@@ -236,7 +283,7 @@ function TaskLiveCapture({
         rows={2}
         placeholder={he.completionMediaHint}
       />
-      {!capture.canSubmit && (
+      {capture.slotsFilled === false && (
         <Typography variant="caption" color="warning.main">
           {he.completionFillSlotsHint}
         </Typography>

@@ -46,6 +46,7 @@ import { formatHebrewDay, todayIso } from "../../utils/dateView";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
+import IncompleteTaskSendDialog from "../../components/tasks/IncompleteTaskSendDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
 import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
@@ -84,6 +85,10 @@ import {
 import { openExternalUrl } from "../../utils/startUrl";
 import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
+import {
+  employeeCompletePayload,
+  shouldPromptIncomplete,
+} from "../../utils/employeeIncompleteSubmit";
 
 function jobLabel(jobFunction: string | null | undefined): string {
   if (!jobFunction) return he.roleEmployee;
@@ -110,6 +115,39 @@ async function uploadRequirementSlots(
     attachments.push(completionAttachmentFromPending(req.kind, url, media));
   }
   return attachments;
+}
+
+function slotsMeetTaskRequirements(
+  requirements: ReturnType<typeof effectiveRequirements>,
+  slots: Array<PendingMedia | null>,
+) {
+  return meetsCompletionRequirements(
+    requirements,
+    slots.map((item, i) =>
+      item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
+    ),
+  );
+}
+
+async function submitEmployeeCompletion(opts: {
+  taskId: string;
+  slotsFilled: boolean;
+  note: string;
+  requirements: ReturnType<typeof effectiveRequirements>;
+  slots: Array<PendingMedia | null>;
+  incompleteReason?: string;
+}) {
+  const attachments = await uploadRequirementSlots(opts.requirements, opts.slots);
+  const payload = employeeCompletePayload({
+    slotsFilled: opts.slotsFilled,
+    note: opts.note,
+    attachments,
+    incompleteReason: opts.incompleteReason,
+  });
+  await completeAfterEnsuringStart(
+    () => taskService.complete(opts.taskId, payload).then(() => undefined),
+    () => taskService.start(opts.taskId).then(() => undefined),
+  );
 }
 
 function mergeTaskTranslations<T extends EmployeeTaskCard>(
@@ -172,6 +210,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     created_at: task.created_at,
     status: task.status,
     task_kind: task.task_kind,
+    ops_category: task.ops_category ?? null,
     photo_required: task.photo_required,
     min_video_seconds: task.min_video_seconds ?? null,
     completion_requirements: task.completion_requirements ?? [],
@@ -222,6 +261,7 @@ export default function EmployeeTasksPage() {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [linkedStartReady, setLinkedStartReady] = useState(true);
+  const [incompleteOpen, setIncompleteOpen] = useState(false);
   const linkedStartRef = useRef<Promise<boolean> | null>(null);
   const linkedStartIdRef = useRef<string | null>(null);
   const autoCompleteGen = useRef(0);
@@ -351,6 +391,7 @@ export default function EmployeeTasksPage() {
   const closeDetail = useCallback(() => {
     clearCompletionMedia();
     setPhotoAnnotating(false);
+    setIncompleteOpen(false);
     setDetailTask(null);
   }, [clearCompletionMedia]);
 
@@ -358,12 +399,7 @@ export default function EmployeeTasksPage() {
     () => (detailTask && canDoTask(detailTask.status) ? effectiveRequirements(detailTask) : []),
     [detailTask],
   );
-  const canSubmitDone = meetsCompletionRequirements(
-    requirements,
-    slotMedia.map((item, i) =>
-      item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
-    ),
-  );
+  const canSubmitDone = slotsMeetTaskRequirements(requirements, slotMedia);
 
   const handleReportUpload = useCallback(async (file: File, kind: MediaKind) => {
     setReportUploadingKind(kind);
@@ -407,17 +443,16 @@ export default function EmployeeTasksPage() {
     }
   };
 
-  const handleSubmit = async (slots = slotMedia) => {
+  const handleSubmit = async (slots = slotMedia, incompleteReason?: string) => {
     if (!detailTask || saving) return;
     const openLink = shouldOpenStartUrlOnBegin(detailTask.status, detailTask.start_url);
-    const slotsFilled = meetsCompletionRequirements(
-      requirements,
-      slots.map((item, i) =>
-        item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
-      ),
-    );
+    const slotsFilled = slotsMeetTaskRequirements(requirements, slots);
     if (openLink) {
       openExternalUrl(detailTask.start_url);
+    }
+    if (shouldPromptIncomplete(slotsFilled, openLink) && incompleteReason == null) {
+      setIncompleteOpen(true);
+      return;
     }
     setSaving(true);
     try {
@@ -433,16 +468,15 @@ export default function EmployeeTasksPage() {
         showSuccess(he.startTaskOpenedLink);
         return;
       }
-      const attachments = await uploadRequirementSlots(effectiveRequirements(resolved.task), slots);
-      const payload = {
-        status: "completed" as const,
-        note: note || undefined,
-        completion_attachments: attachments,
-      };
-      await completeAfterEnsuringStart(
-        () => taskService.complete(resolved.task.id, payload).then(() => undefined),
-        () => taskService.start(resolved.task.id).then(() => undefined),
-      );
+      await submitEmployeeCompletion({
+        taskId: resolved.task.id,
+        slotsFilled,
+        note,
+        requirements: effectiveRequirements(resolved.task),
+        slots,
+        incompleteReason,
+      });
+      setIncompleteOpen(false);
       clearCompletionMedia();
       setDetailTask(null);
       if (!onBreak) playTaskEndSound();
@@ -458,12 +492,7 @@ export default function EmployeeTasksPage() {
   const handleSlotsChange = (next: Array<PendingMedia | null>) => {
     setSlotMedia(next);
     if (!detailTask || saving) return;
-    const filled = meetsCompletionRequirements(
-      requirements,
-      next.map((item, i) =>
-        item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
-      ),
-    );
+    const filled = slotsMeetTaskRequirements(requirements, next);
     if (
       !shouldAutoCompleteEmployeeTask(
         requirements.length,
@@ -841,6 +870,7 @@ export default function EmployeeTasksPage() {
                     canSubmitDone,
                     linkedStartReady,
                   ) && !photoAnnotating,
+                slotsFilled: canSubmitDone,
                 saving: employeeSubmitLocked(saving, photoAnnotating),
                 onAnnotatingChange: setPhotoAnnotating,
               }
@@ -849,6 +879,15 @@ export default function EmployeeTasksPage() {
         onChatUpdated={() => {
           void load();
           showSuccess(he.taskChatSent);
+        }}
+      />
+      <IncompleteTaskSendDialog
+        open={incompleteOpen}
+        saving={saving}
+        onClose={() => setIncompleteOpen(false)}
+        onConfirm={(reason) => {
+          setIncompleteOpen(false);
+          void handleSubmit(slotMedia, reason);
         }}
       />
 
