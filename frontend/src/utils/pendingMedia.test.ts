@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   completionAttachmentFromPending,
+  applyPendingSlot,
   createPendingMedia,
   replacePendingMedia,
   revokePendingMedia,
@@ -64,5 +65,20 @@ describe("pendingMedia", () => {
   it("uploadPendingMedia returns undefined when empty", async () => {
     const url = await uploadPendingMedia(null, async () => ({ url: "nope" }));
     expect(url).toBeUndefined();
+  });
+
+  it("uploadPendingMedia skips a zero-byte file", async () => {
+    const pending = createPendingMedia(new File([], "empty.webm", { type: "video/webm" }));
+    const url = await uploadPendingMedia(pending, async () => ({ url: "nope" }));
+    expect(url).toBeUndefined();
+    revokePendingMedia(pending);
+  });
+
+  it("applyPendingSlot keeps earlier videos when filling the third slot", () => {
+    const first = applyPendingSlot([null, null, null], 0, new File(["a"], "a.webm", { type: "video/webm" }), 12);
+    const second = applyPendingSlot(first, 1, new File(["b"], "b.webm", { type: "video/webm" }), 11);
+    const third = applyPendingSlot(second, 2, new File(["c"], "c.webm", { type: "video/webm" }), 10);
+    expect(third.map((item) => item?.file.name)).toEqual(["a.webm", "b.webm", "c.webm"]);
+    third.forEach((item) => revokePendingMedia(item));
   });
 });

@@ -19,7 +19,9 @@ import TaskChatPanel from "./TaskChatPanel";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { reopenNoteError } from "../../utils/taskReview";
+import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
+import ClosedTaskReopenConfirm from "./ClosedTaskReopenConfirm";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import QualityRatingStars from "./QualityRatingStars";
 
@@ -38,15 +40,19 @@ export default function TaskCompletionReviewDialog({
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [rating, setRating] = useState<number | null>(DEFAULT_REVIEW_QUALITY_RATING);
+  const [confirmReopenClosed, setConfirmReopenClosed] = useState(false);
 
   const completion = task?.completion;
   const open = Boolean(task);
   const isAwaiting = task?.status === "awaiting_response";
   const isReview = task?.status === "pending_review";
+  const isClosedApproved = canReopenClosedTask(task);
+  const showCompletion = isReview || isClosedApproved;
 
   useEffect(() => {
     setNote("");
     setError("");
+    setConfirmReopenClosed(false);
     setRating(DEFAULT_REVIEW_QUALITY_RATING);
   }, [task?.id]);
 
@@ -54,6 +60,7 @@ export default function TaskCompletionReviewDialog({
     if (saving) return;
     setError("");
     setNote("");
+    setConfirmReopenClosed(false);
     onClose();
   };
 
@@ -96,10 +103,19 @@ export default function TaskCompletionReviewDialog({
     });
   };
 
+  const handleReopenClosed = () => {
+    setConfirmReopenClosed(false);
+    void runAction(async () => {
+      await taskService.reopenClosed(task!.id);
+      return he.taskReopenedSuccess;
+    });
+  };
+
   return (
+    <>
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" dir="rtl">
       <DialogTitle>
-        {isAwaiting ? he.taskChatTitle : he.taskReviewTitle}
+        {isClosedApproved ? he.taskClosedDetailTitle : isAwaiting ? he.taskChatTitle : he.taskReviewTitle}
       </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         {task && (
@@ -130,7 +146,7 @@ export default function TaskCompletionReviewDialog({
             reference_audio_url={task.reference_audio_url}
           />
         )}
-        {isReview && completion && (
+        {showCompletion && completion && (
           <Box>
             <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={1}>
               <CompletionOutcomeChip status={completion.status} />
@@ -147,7 +163,7 @@ export default function TaskCompletionReviewDialog({
             )}
           </Box>
         )}
-        {isReview && completion?.note && (
+        {showCompletion && completion?.note && (
           <Box>
             <Typography variant="caption" color="text.secondary" display="block">
               {he.note}
@@ -155,7 +171,7 @@ export default function TaskCompletionReviewDialog({
             <Typography variant="body2">{completion.note}</Typography>
           </Box>
         )}
-        {isReview && completion && (
+        {showCompletion && completion && (
           <CompletionMediaPreview
             photo_path={completion.photo_path}
             video_path={completion.video_path}
@@ -211,7 +227,24 @@ export default function TaskCompletionReviewDialog({
             {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
           </Button>
         )}
+        {isClosedApproved && (
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={() => setConfirmReopenClosed(true)}
+            disabled={saving}
+          >
+            {he.taskReopenClosed}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
+    <ClosedTaskReopenConfirm
+      open={confirmReopenClosed}
+      saving={saving}
+      onCancel={() => setConfirmReopenClosed(false)}
+      onConfirm={handleReopenClosed}
+    />
+    </>
   );
 }

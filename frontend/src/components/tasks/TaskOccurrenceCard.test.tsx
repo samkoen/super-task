@@ -263,4 +263,32 @@ describe("TaskOccurrenceCard", () => {
     );
     expect(screen.queryByTestId("completion-outcome-done")).toBeNull();
   });
+
+  it("opens closed approved detail from the card", () => {
+    const onReview = vi.fn();
+    render(
+      <TaskOccurrenceCard
+        task={baseTask({
+          status: "completed",
+          completion: {
+            id: "c1",
+            occurrence_id: "t1",
+            status: "completed",
+            note: null,
+            photo_path: "/p.jpg",
+            video_path: null,
+            audio_path: null,
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "approved",
+          },
+        })}
+        index={0}
+        onReview={onReview}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.taskClosedDetailAction }));
+    expect(onReview).toHaveBeenCalledTimes(1);
+  });
 });

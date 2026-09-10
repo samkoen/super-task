@@ -42,6 +42,10 @@ from app.domain.task_scope import (
 )
 from app.domain.team_roster import worker_roles_for_roster
 from app.domain.work_start import arrival_at_from_visual
+from app.domain.task_reopen_closed import (
+    can_reopen_closed_occurrence,
+    reopen_closed_blocked_reason,
+)
 from app.domain.task_title_from_description import resolve_create_title
 from app.domain.task_reference_media import merge_occurrence_reference_media
 from app.domain.gallery_add_eligibility import can_add_occurrence_to_gallery
@@ -546,8 +550,19 @@ class TaskOccurrenceService:
             "audio_path": first_path_of_kind(attachments, "audio"),
         }
 
-    @staticmethod
+    def _media_requirements(self, occurrence) -> tuple[object | None, list]:
+        merged = self._with_reference_media(occurrence)
+        raw = getattr(merged, "completion_requirements", None)
+        if raw is None:
+            return None, []
+        return raw, effective_requirements(
+            raw,
+            photo_required=getattr(merged, "photo_required", None),
+            min_video_seconds=getattr(merged, "min_video_seconds", None),
+        )
+
     def _validated_completion_media(
+        self,
         actor,
         occurrence,
         *,
@@ -558,16 +573,7 @@ class TaskOccurrenceService:
         completion_attachments,
         require_complete=True,
     ) -> dict:
-        raw_reqs = getattr(occurrence, "completion_requirements", None)
-        reqs = (
-            effective_requirements(
-                raw_reqs,
-                photo_required=getattr(occurrence, "photo_required", None),
-                min_video_seconds=getattr(occurrence, "min_video_seconds", None),
-            )
-            if raw_reqs is not None
-            else []
-        )
+        raw_reqs, reqs = self._media_requirements(occurrence)
         attachments = resolve_completion_attachments(
             reqs,
             attachments=completion_attachments,
@@ -576,12 +582,38 @@ class TaskOccurrenceService:
             audio_path=audio_path,
             video_duration_seconds=video_duration_seconds,
         )
+        return self._finalize_completion_media(
+            actor,
+            occurrence,
+            raw_reqs,
+            reqs,
+            attachments,
+            photo_path=photo_path,
+            video_path=video_path,
+            video_duration_seconds=video_duration_seconds,
+            require_complete=require_complete,
+        )
+
+    @staticmethod
+    def _finalize_completion_media(
+        actor,
+        occurrence,
+        raw_reqs,
+        reqs,
+        attachments,
+        *,
+        photo_path,
+        video_path,
+        video_duration_seconds,
+        require_complete,
+    ) -> dict:
+        packed = TaskOccurrenceService._pack_attachments(attachments)
         if not require_complete:
             filled = [item for item in attachments if (item.get("url") or "").strip()]
             return TaskOccurrenceService._pack_attachments(filled)
         if raw_reqs is not None:
             assert_attachments_match(reqs, attachments)
-            return TaskOccurrenceService._pack_attachments(attachments)
+            return packed
         requires_visual = (
             employee_can_see_occurrence(
                 actor,
@@ -591,18 +623,13 @@ class TaskOccurrenceService:
             or occurrence.photo_required
         )
         assert_completion_media(
-            photo_path=photo_path,
-            video_path=video_path,
+            photo_path=packed["photo_path"] or photo_path,
+            video_path=packed["video_path"] or video_path,
             min_video_seconds=occurrence.min_video_seconds,
             video_duration_seconds=video_duration_seconds,
             requires_visual=bool(requires_visual),
         )
-        return {
-            "attachments": attachments,
-            "photo_path": photo_path,
-            "video_path": video_path,
-            "audio_path": audio_path,
-        }
+        return packed
 
     def _stamp_work_start_arrival(self, occurrence, attachments) -> None:
         if not getattr(occurrence, "is_work_start", False):
@@ -781,6 +808,41 @@ class TaskOccurrenceService:
         data = self._to_api(updated)
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
+
+    def reopen_closed_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
+        occurrence = self._require_closed_reopenable(actor, occurrence_id)
+        completion = self._completions.find_by_occurrence(occurrence_id)
+        if not completion:
+            raise ValueError("לא נמצאה הגשת סיום")
+        if not can_reopen_closed_occurrence(
+            status=occurrence.status,
+            manager_review_status=completion.manager_review_status,
+        ):
+            raise ValueError(
+                reopen_closed_blocked_reason(
+                    status=occurrence.status,
+                    manager_review_status=completion.manager_review_status,
+                )
+            )
+        cleared = self._completions.clear_approved_review(occurrence_id)
+        assert cleared is not None
+        updated = self._occurrences.reopen_after_review(occurrence_id)
+        assert updated is not None
+        self._media_retention.cancel_purge(occurrence_id)
+        data = self._to_api(updated)
+        data["completion"] = mp.task_completion_domain_to_api(cleared)
+        return data
+
+    def _require_closed_reopenable(self, actor: ActorContext, occurrence_id: str):
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לפתוח מחדש משימות")
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_branch_access(actor, occurrence.branch_id)
+        if not can_review_assigned_work(actor, assignee_user_id=occurrence.assignee_user_id):
+            raise PermissionError("לא ניתן לאשר או לדחות את המשימה של עצמך")
+        return occurrence
 
     def _require_reviewable(self, actor: ActorContext, occurrence_id: str):
         if not can_manage_tasks(actor):

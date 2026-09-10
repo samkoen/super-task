@@ -169,6 +169,23 @@ class TaskCompletionRepository:
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)
 
+    def clear_approved_review(self, occurrence_id: str) -> TaskCompletion | None:
+        """Enlève le drapeau d'approbation ; conserve médias et fil de chat."""
+        row = (
+            self._db.query(orm.TaskCompletion)
+            .filter(orm.TaskCompletion.occurrence_id == mp.parse_uuid(occurrence_id))
+            .first()
+        )
+        if not row:
+            return None
+        row.manager_review_status = None
+        row.manager_reviewed_by_id = None
+        row.manager_reviewed_at = None
+        row.rejection_note = None
+        row.quality_rating = None
+        self._db.flush()
+        return mp.task_completion_orm_to_domain(row)
+
     def update_audio_transcripts(
         self,
         occurrence_id: str,

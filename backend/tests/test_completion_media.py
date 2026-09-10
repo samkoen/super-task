@@ -11,6 +11,7 @@ from app.domain.completion_media import (
     normalize_requirements,
     parse_requirements_input,
     requirement_example_urls,
+    resolve_completion_attachments,
 )
 import pytest
 
@@ -76,6 +77,51 @@ def test_assert_min_video_accepts_long_enough():
 
 def test_empty_requirements_allow_no_media():
     assert_attachments_match([], [])
+
+
+def test_three_video_attachments_keep_each_url():
+    reqs = normalize_requirements(
+        [
+            {"kind": "video", "min_seconds": 10},
+            {"kind": "video", "min_seconds": 10},
+            {"kind": "video", "min_seconds": 10},
+        ]
+    )
+    attachments = resolve_completion_attachments(
+        reqs,
+        attachments=[
+            {"kind": "video", "url": "/v1.mp4", "duration_seconds": 12},
+            {"kind": "video", "url": "/v2.mp4", "duration_seconds": 11},
+            {"kind": "video", "url": "/v3.mp4", "duration_seconds": 10},
+        ],
+        photo_path=None,
+        video_path="/legacy-only.mp4",
+        audio_path=None,
+        video_duration_seconds=12,
+    )
+    assert [item["url"] for item in attachments] == ["/v1.mp4", "/v2.mp4", "/v3.mp4"]
+    assert_attachments_match(reqs, attachments)
+
+
+def test_legacy_video_path_fills_only_the_first_of_three_slots():
+    reqs = normalize_requirements(
+        [
+            {"kind": "video", "min_seconds": 10},
+            {"kind": "video", "min_seconds": 10},
+            {"kind": "video", "min_seconds": 10},
+        ]
+    )
+    attachments = resolve_completion_attachments(
+        reqs,
+        attachments=None,
+        photo_path=None,
+        video_path="/only.mp4",
+        audio_path=None,
+        video_duration_seconds=12,
+    )
+    assert attachments[0]["url"] == "/only.mp4"
+    assert attachments[1]["url"] == ""
+    assert attachments[2]["url"] == ""
 
 
 def test_two_videos_and_photo_must_all_match():

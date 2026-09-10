@@ -56,7 +56,23 @@ export async function uploadPendingMedia(
   pending: PendingMedia | null | undefined,
   upload: (file: File) => Promise<{ url: string }>,
 ): Promise<string | undefined> {
-  if (!pending) return undefined;
+  if (!pendingSlotHasFile(pending)) return undefined;
   const res = await upload(pending.file);
   return res.url;
+}
+
+export function pendingSlotHasFile(media: PendingMedia | null | undefined): media is PendingMedia {
+  return Boolean(media && media.file.size > 0);
+}
+
+export function applyPendingSlot(
+  slots: Array<PendingMedia | null>,
+  index: number,
+  file: File,
+  durationSeconds?: number | null,
+): Array<PendingMedia | null> {
+  const next = slots.slice();
+  while (next.length <= index) next.push(null);
+  next[index] = replacePendingMedia(next[index], file, durationSeconds ?? null);
+  return next;
 }

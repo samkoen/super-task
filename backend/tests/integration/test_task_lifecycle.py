@@ -142,6 +142,42 @@ def test_ad_hoc_reject_via_reopen_creates_chat_message(
     assert any(m["body"] == "תקן את התמונה" for m in messages.json()["messages"])
 
 
+def test_reopen_closed_after_approve_notifies_oved(
+    client_mgr, client_emp, world_seed, jpeg_bytes
+):
+    occ_id = _submit_for_review(client_mgr, client_emp, world_seed, jpeg_bytes)
+    approved = client_mgr.post(
+        f"/api/tasks/occurrences/{occ_id}/approve",
+        json={"quality_rating": 4},
+    )
+    assert approved.status_code == 200, approved.text
+    photo = approved.json()["occurrence"]["completion"]["photo_path"]
+
+    denied = client_emp.post(f"/api/tasks/occurrences/{occ_id}/reopen-closed")
+    assert denied.status_code == 403
+
+    reopened = client_mgr.post(f"/api/tasks/occurrences/{occ_id}/reopen-closed")
+    assert reopened.status_code == 200, reopened.text
+    body = reopened.json()["occurrence"]
+    assert body["id"] == occ_id
+    assert body["status"] == "in_progress"
+    assert body["completion"]["manager_review_status"] is None
+    assert body["completion"]["photo_path"] == photo
+
+    again = client_mgr.post(f"/api/tasks/occurrences/{occ_id}/reopen-closed")
+    assert again.status_code == 400
+    assert "פתוחה" in again.json()["error"]
+
+    notifs = client_emp.get("/api/notifications")
+    assert notifs.status_code == 200
+    reopened_n = next(
+        (n for n in notifs.json()["items"] if n.get("kind") == "task_reopened"),
+        None,
+    )
+    assert reopened_n is not None
+    assert reopened_n["occurrence_id"] == occ_id
+
+
 def test_task_created_notification_and_mark_read(client_mgr, client_emp, world_seed):
     occ = _create_ad_hoc(client_mgr, world_seed)
     notifs = client_emp.get("/api/notifications")

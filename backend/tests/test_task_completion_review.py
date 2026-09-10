@@ -453,3 +453,121 @@ def test_employee_complete_requires_each_listed_video():
                 ],
             )
         )
+
+
+def test_employee_complete_persists_three_videos():
+    occurrence = _occurrence(
+        completion_requirements=[
+            {"kind": "video", "min_seconds": 8},
+            {"kind": "video", "min_seconds": 8},
+            {"kind": "video", "min_seconds": 8},
+        ]
+    )
+    pending = _occurrence(status=task_status.PENDING_REVIEW)
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    occurrence_repo.update_status.return_value = pending
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = None
+    completion_repo.create.return_value = _completion()
+    svc = _service(occurrence_repo, completion_repo)
+    actor = MagicMock()
+    actor.role = roles.EMPLOYEE
+    actor.user_id = "emp-1"
+    actor.branch_id = "b1"
+    videos = [
+        {"kind": "video", "url": f"/uploads/v{i}.mp4", "duration_seconds": 10}
+        for i in (1, 2, 3)
+    ]
+    asyncio.run(
+        svc.complete_occurrence(
+            actor,
+            "occ-1",
+            completion_status=task_status.COMPLETION_DONE,
+            completion_attachments=videos,
+        )
+    )
+    saved = completion_repo.create.call_args.kwargs["completion_attachments"]
+    assert [item["url"] for item in saved] == ["/uploads/v1.mp4", "/uploads/v2.mp4", "/uploads/v3.mp4"]
+
+
+def _closed_reopen_setup(*, reviewer_id="mgr-1", actor_id="mgr-2", role=roles.BRANCH_MANAGER):
+    occurrence = _occurrence(status=task_status.COMPLETED)
+    reopened = _occurrence(status=task_status.IN_PROGRESS)
+    approved = _completion(
+        manager_review_status=task_status.REVIEW_APPROVED,
+        manager_reviewed_by_id=reviewer_id,
+        photo_path="/uploads/p.jpg",
+    )
+    cleared = _completion(manager_review_status=None, photo_path="/uploads/p.jpg")
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = occurrence
+    occurrence_repo.reopen_after_review.return_value = reopened
+    occurrence_repo.get_branch_name.return_value = "Branch"
+    occurrence_repo.get_department_name.return_value = None
+    occurrence_repo.get_assignee_name.return_value = "Worker"
+    occurrence_repo.get_manager_name.return_value = "Manager"
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = approved
+    completion_repo.clear_approved_review.return_value = cleared
+    actor = MagicMock()
+    actor.role = role
+    actor.user_id = actor_id
+    actor.branch_id = "b1"
+    actor.network_id = "n1"
+    return occurrence_repo, completion_repo, actor
+
+
+def test_any_branch_manager_can_reopen_closed_approved_task():
+    occurrence_repo, completion_repo, actor = _closed_reopen_setup()
+    result = _service(occurrence_repo, completion_repo).reopen_closed_occurrence(actor, "occ-1")
+    occurrence_repo.reopen_after_review.assert_called_once_with("occ-1")
+    completion_repo.clear_approved_review.assert_called_once_with("occ-1")
+    occurrence_repo.set_media_purge_after.assert_called_once_with("occ-1", None)
+    assert result["status"] == task_status.IN_PROGRESS
+    assert result["id"] == "occ-1"
+    assert result["completion"]["manager_review_status"] is None
+    assert result["completion"]["photo_path"] == "/uploads/p.jpg"
+
+
+def test_network_manager_can_reopen_closed_approved_task():
+    from types import SimpleNamespace
+
+    occurrence_repo, completion_repo, actor = _closed_reopen_setup(
+        role=roles.NETWORK_MANAGER, actor_id="net-1"
+    )
+    actor.branch_id = None
+    branch_repo = MagicMock()
+    branch_repo.list_branches.return_value = [SimpleNamespace(id="b1")]
+    stub_occurrence_batch_lookups(occurrence_repo, completion_repo)
+    svc = TaskOccurrenceService(occurrence_repo, completion_repo, branch_repo, MagicMock())
+    result = svc.reopen_closed_occurrence(actor, "occ-1")
+    assert result["status"] == task_status.IN_PROGRESS
+
+
+def test_employee_cannot_reopen_closed_task():
+    occurrence_repo, completion_repo, actor = _closed_reopen_setup(
+        role=roles.EMPLOYEE, actor_id="emp-1"
+    )
+    with pytest.raises(PermissionError, match="לפתוח מחדש"):
+        _service(occurrence_repo, completion_repo).reopen_closed_occurrence(actor, "occ-1")
+    occurrence_repo.reopen_after_review.assert_not_called()
+
+
+def test_cannot_reopen_closed_when_already_open():
+    occurrence_repo, completion_repo, actor = _closed_reopen_setup()
+    occurrence_repo.find_by_id.return_value = _occurrence(status=task_status.IN_PROGRESS)
+    completion_repo.find_by_occurrence.return_value = _completion(
+        manager_review_status=None
+    )
+    with pytest.raises(ValueError, match="כבר פתוחה"):
+        _service(occurrence_repo, completion_repo).reopen_closed_occurrence(actor, "occ-1")
+    occurrence_repo.reopen_after_review.assert_not_called()
+
+
+def test_cannot_reopen_closed_without_completion():
+    occurrence_repo, completion_repo, actor = _closed_reopen_setup()
+    completion_repo.find_by_occurrence.return_value = None
+    with pytest.raises(ValueError, match="הגשת סיום"):
+        _service(occurrence_repo, completion_repo).reopen_closed_occurrence(actor, "occ-1")
+    occurrence_repo.reopen_after_review.assert_not_called()

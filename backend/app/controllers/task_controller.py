@@ -584,6 +584,20 @@ async def reopen_occurrence(
     }
 
 
+@router.post("/occurrences/{occurrence_id}/reopen-closed")
+@handle_controller_errors
+def reopen_closed_occurrence(
+    occurrence_id: str,
+    request: Request,
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    item = service.reopen_closed_occurrence(actor, occurrence_id)
+    _emit_task_event(db, "task_reopened", item)
+    return {"message": "המשימה נפתחה מחדש לעובד", "occurrence": item}
+
+
 @router.get("/employee-chats")
 @handle_controller_errors
 def list_employee_chats(

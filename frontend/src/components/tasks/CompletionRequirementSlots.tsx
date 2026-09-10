@@ -1,10 +1,8 @@
+import { useRef } from "react";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import type { CompletionRequirement } from "../../utils/completionMedia";
-import {
-  type PendingMedia,
-  replacePendingMedia,
-} from "../../utils/pendingMedia";
+import { applyPendingSlot, type PendingMedia } from "../../utils/pendingMedia";
 
 export default function CompletionRequirementSlots({
   requirements,
@@ -21,12 +19,12 @@ export default function CompletionRequirementSlots({
   language?: EmployeeLanguage;
   onAnnotatingChange?: (busy: boolean) => void;
 }) {
+  const slotsRef = useRef(slots);
+  slotsRef.current = slots;
   if (!requirements.length) return null;
 
   const setSlot = (index: number, file: File, durationSeconds?: number) => {
-    const next = [...slots];
-    next[index] = replacePendingMedia(slots[index] ?? null, file, durationSeconds ?? null);
-    onChange(next);
+    onChange(applyPendingSlot(slotsRef.current, index, file, durationSeconds));
   };
 
   return (

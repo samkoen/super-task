@@ -60,16 +60,12 @@ import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { employeeSurfaceChatState } from "../../utils/employeeDirectChat";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
+import { type PendingMedia, revokePendingMedia } from "../../utils/pendingMedia";
+import { effectiveRequirements } from "../../utils/completionMedia";
 import {
-  type PendingMedia,
-  completionAttachmentFromPending,
-  revokePendingMedia,
-  uploadPendingMedia,
-} from "../../utils/pendingMedia";
-import {
-  effectiveRequirements,
-  meetsCompletionRequirements,
-} from "../../utils/completionMedia";
+  slotsMeetTaskRequirements,
+  uploadRequirementSlots,
+} from "../../utils/employeeCompletionUpload";
 import {
   applyStartedOnDashboard,
   canDoTask,
@@ -84,7 +80,7 @@ import {
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
-import { withSystemBottomInsetCss } from "../../utils/systemInsets";
+import { employeeChatBarBottomCss, employeeChatBarContentPadCss } from "../../utils/employeeChatBar";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -96,39 +92,6 @@ function jobLabel(jobFunction: string | null | undefined): string {
   return labels[jobFunction] ?? jobFunction;
 }
 
-async function uploadRequirementSlots(
-  requirements: ReturnType<typeof effectiveRequirements>,
-  slots: Array<PendingMedia | null>,
-) {
-  const attachments = [];
-  for (let i = 0; i < requirements.length; i += 1) {
-    const req = requirements[i];
-    const media = slots[i];
-    const upload =
-      req.kind === "photo"
-        ? taskService.uploadPhoto
-        : req.kind === "video"
-          ? taskService.uploadVideo
-          : taskService.uploadAudio;
-    const url = await uploadPendingMedia(media, upload);
-    if (!url) continue;
-    attachments.push(completionAttachmentFromPending(req.kind, url, media));
-  }
-  return attachments;
-}
-
-function slotsMeetTaskRequirements(
-  requirements: ReturnType<typeof effectiveRequirements>,
-  slots: Array<PendingMedia | null>,
-) {
-  return meetsCompletionRequirements(
-    requirements,
-    slots.map((item, i) =>
-      item ? { kind: requirements[i]?.kind ?? "photo", durationSeconds: item.durationSeconds } : null,
-    ),
-  );
-}
-
 async function submitEmployeeCompletion(opts: {
   taskId: string;
   slotsFilled: boolean;
@@ -137,7 +100,16 @@ async function submitEmployeeCompletion(opts: {
   slots: Array<PendingMedia | null>;
   incompleteReason?: string;
 }) {
-  const attachments = await uploadRequirementSlots(opts.requirements, opts.slots);
+  const attachments = await uploadRequirementSlots(
+    opts.requirements,
+    opts.slots,
+    {
+      photo: taskService.uploadPhoto,
+      video: taskService.uploadVideo,
+      audio: taskService.uploadAudio,
+    },
+    opts.slotsFilled,
+  );
   const payload = employeeCompletePayload({
     slotsFilled: opts.slotsFilled,
     note: opts.note,
@@ -657,7 +629,7 @@ export default function EmployeeTasksPage() {
   const photoUrl = dashboard?.employee?.avatar_url ?? user?.avatar_url;
 
   return (
-    <Box sx={{ maxWidth: 760, mx: "auto", pb: withSystemBottomInsetCss("112px"), px: { xs: 1, sm: 2 } }}>
+    <Box sx={{ maxWidth: 760, mx: "auto", px: { xs: 1, sm: 2 } }}>
       <EmployeeShiftHeader
         dateLabel={todayLabel}
         name={headerName}
@@ -757,7 +729,18 @@ export default function EmployeeTasksPage() {
           />
 
           {completedTasks.length > 0 && (
-            <Accordion expanded={showCompleted} onChange={() => setShowCompleted((v) => !v)} sx={{ mt: 1, boxShadow: 0, border: 1, borderColor: "divider" }}>
+            <Accordion
+              expanded={showCompleted}
+              onChange={() => setShowCompleted((v) => !v)}
+              sx={{
+                mt: 1,
+                boxShadow: 0,
+                border: 1,
+                borderColor: "divider",
+                position: "relative",
+                zIndex: (t) => t.zIndex.fab + 1,
+              }}
+            >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography fontWeight={700}>
                   {showCompleted ? he.employeeHideCompleted : he.employeeShowCompleted} ({completedTasks.length})
@@ -775,11 +758,16 @@ export default function EmployeeTasksPage() {
         </>
       )}
 
+      <Box
+        aria-hidden
+        data-testid="employee-chat-bar-spacer"
+        sx={{ height: employeeChatBarContentPadCss(), flexShrink: 0 }}
+      />
       <Paper
         elevation={6}
         sx={{
           position: "fixed",
-          bottom: withSystemBottomInsetCss("16px"),
+          bottom: employeeChatBarBottomCss(),
           left: 16,
           right: 16,
           maxWidth: 520,

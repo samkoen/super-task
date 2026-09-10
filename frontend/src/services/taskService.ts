@@ -393,6 +393,14 @@ export const taskService = {
     return response.data;
   },
 
+  reopenClosed: async (occurrenceId: string) => {
+    const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/reopen-closed`,
+      EMPTY_JSON_BODY,
+    );
+    return response.data;
+  },
+
   listEmployeeChats: async () => {
     const { data } = await api.get<{ items: EmployeeTaskChat[] }>("/tasks/employee-chats");
     return data;

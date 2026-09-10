@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { ensureNativeAvPermissions } from "./mediaPermissions";
+import { canUseNativeBlobUpload, writeFileToNativeCache } from "./nativeBlobUpload";
 import { blobToFile } from "../utils/mediaCapture";
 import { attachNativeMediaPath } from "../utils/nativeMediaPath";
 
@@ -74,10 +75,22 @@ export async function recordNativeVideo(options?: {
     throw new Error("too-short");
   }
   return {
-    file: attachNativeMediaPath(
+    file: await stabilizeNativeVideoFile(
       await fileFromNativePath(raw.path, raw.mimeType || "video/mp4"),
       raw.path,
     ),
     durationSeconds: Math.max(1, durationSeconds),
   };
+}
+
+/** Copie unique : le fichier camera peut être écrasé ou evincé avant l'upload. */
+export async function stabilizeNativeVideoFile(file: File, sourcePath: string): Promise<File> {
+  if (!canUseNativeBlobUpload()) {
+    return attachNativeMediaPath(file, sourcePath);
+  }
+  try {
+    return attachNativeMediaPath(file, await writeFileToNativeCache(file));
+  } catch {
+    return attachNativeMediaPath(file, sourcePath);
+  }
 }

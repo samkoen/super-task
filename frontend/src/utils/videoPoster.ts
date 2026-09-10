@@ -1,5 +1,7 @@
 /** Première image d'une vidéo (blob ou URL) pour l'aperçu de case. */
 
+import { releaseVideoElement } from "./videoSlotReady";
+
 export async function captureVideoPoster(src: string): Promise<string | null> {
   if (!src) return null;
   const video = document.createElement("video");
@@ -12,8 +14,7 @@ export async function captureVideoPoster(src: string): Promise<string | null> {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
-      video.removeAttribute("src");
-      video.load();
+      releaseVideoElement(video);
       resolve(url);
     };
     const timer = window.setTimeout(() => finish(frameToJpeg(video)), 2000);

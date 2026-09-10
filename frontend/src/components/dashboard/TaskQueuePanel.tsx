@@ -106,6 +106,17 @@ function QueueItem({
           {he.taskReviewAction}
         </Button>
       )}
+      {task.segment === "completed" && onReview && (
+        <Button
+          size="small"
+          variant="outlined"
+          color="warning"
+          onClick={() => onReview(task.id)}
+          sx={{ alignSelf: "flex-start", mt: 0.5 }}
+        >
+          {he.taskClosedDetailAction}
+        </Button>
+      )}
     </ListItem>
   );
 }
@@ -232,7 +243,9 @@ export default function TaskQueuePanel({ queues, onReviewTask }: TaskQueuePanelP
               key={task.id}
               task={task}
               showLongAlert={tab === "in_progress" && isLongInProgress(task)}
-              onReview={tab === "pending_review" ? onReviewTask : undefined}
+              onReview={
+                tab === "pending_review" || tab === "completed" ? onReviewTask : undefined
+              }
             />
           ))}
         </List>

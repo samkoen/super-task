@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   isVideoPending,
   pendingVideoSlots,
+  releaseVideoElement,
   waitUntilPendingVideosReady,
 } from "./videoSlotReady";
 
@@ -39,6 +40,20 @@ describe("videoSlotReady", () => {
     await waitUntilPendingVideosReady([video], { idleMs: 50, wait, canPlay });
     expect(wait).toHaveBeenCalledWith(50);
     expect(canPlay).toHaveBeenCalledWith("blob:ready");
+  });
+
+  it("releases a probe video without load() so the blob stays readable", () => {
+    const video = {
+      onloadeddata: 1,
+      onerror: 1,
+      removeAttribute: vi.fn(),
+      remove: vi.fn(),
+      load: vi.fn(),
+    };
+    releaseVideoElement(video as unknown as HTMLVideoElement);
+    expect(video.load).not.toHaveBeenCalled();
+    expect(video.removeAttribute).toHaveBeenCalledWith("src");
+    expect(video.remove).toHaveBeenCalled();
   });
 
   it("does not wait when there is no video slot", async () => {
