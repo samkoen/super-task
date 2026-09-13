@@ -16,6 +16,7 @@ from app.domain.completion_media import (
     parse_requirements_input,
     requirement_example_urls,
     resolve_completion_attachments,
+    should_alert_manager_review,
 )
 import pytest
 
@@ -317,6 +318,13 @@ def test_normalize_keeps_video_poster_url():
     )
     assert items[0]["poster_url"] == "/uploads/task_photos/poster.jpg"
     assert attachment_urls(items) == ["/uploads/v.mp4", "/uploads/task_photos/poster.jpg"]
+
+
+def test_should_alert_manager_review_waits_for_media_ready():
+    assert should_alert_manager_review(None) is True
+    assert should_alert_manager_review({"media_ready": True}) is True
+    assert should_alert_manager_review({}) is True
+    assert should_alert_manager_review({"media_ready": False}) is False
 
 
 def test_normalize_drops_invalid_poster_url():

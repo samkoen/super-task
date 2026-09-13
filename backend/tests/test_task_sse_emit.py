@@ -37,3 +37,38 @@ def test_emit_task_event_commits_before_sse(monkeypatch):
 
     assert order == ["commit", "sse", "notification_sse"]
     db.commit.assert_called_once()
+
+
+def test_emit_after_complete_skips_manager_alert_until_media_ready(monkeypatch):
+    db = MagicMock()
+    emitted: list[str] = []
+    assignee_events: list[str] = []
+    monkeypatch.setattr(
+        task_controller,
+        "_emit_task_event",
+        lambda _db, event_type, _item: emitted.append(event_type),
+    )
+    monkeypatch.setattr(
+        task_controller,
+        "notify_assignee_only",
+        lambda **kwargs: assignee_events.append(kwargs["event_type"]),
+    )
+    monkeypatch.setattr(task_controller, "EmployeeActivityService", MagicMock())
+    monkeypatch.setattr(task_controller, "UserRepository", MagicMock())
+    monkeypatch.setattr(task_controller, "TaskOccurrenceRepository", MagicMock())
+    monkeypatch.setattr(task_controller, "EmployeeBreakRepository", MagicMock())
+
+    pending = {
+        "id": "o1",
+        "branch_id": "b1",
+        "assignee_user_id": "emp-1",
+        "status": "pending_review",
+        "completion": {"media_ready": False},
+    }
+    task_controller.emit_after_complete(db, pending)
+    assert emitted == []
+    assert assignee_events == ["task_updated"]
+
+    ready = {**pending, "completion": {"media_ready": True}}
+    task_controller.emit_after_complete(db, ready)
+    assert emitted == ["task_completed"]

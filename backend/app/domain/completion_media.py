@@ -232,6 +232,15 @@ def attachment_urls(attachments: list[dict] | None) -> list[str]:
 COMPLETION_VIDEOS_NOT_READY = "הסרטונים עדיין נטענים. נסה שוב בעוד רגע"
 
 
+def should_alert_manager_review(completion: object | None) -> bool:
+    """Notif / SSE ichour seulement quand les vidéos sont déjà lisibles."""
+    if completion is None:
+        return True
+    if isinstance(completion, dict):
+        return completion.get("media_ready", True) is not False
+    return bool(getattr(completion, "media_ready", True))
+
+
 def video_attachment_urls(attachments: list[dict] | None) -> list[str]:
     if not attachments:
         return []

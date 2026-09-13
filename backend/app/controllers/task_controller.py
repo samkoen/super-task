@@ -18,7 +18,8 @@ from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
 from app.repositories.user_repository import UserRepository
-from app.realtime.task_events import notify_task_change
+from app.domain.completion_media import should_alert_manager_review
+from app.realtime.task_events import notify_assignee_only, notify_task_change
 from app.services.media_upload_service import upload_attachment
 from app.services.employee_activity_service import EmployeeActivityService
 from app.services.notification_service import NotificationService
@@ -45,6 +46,34 @@ def _notify_occurrence(event_type: str, item: dict) -> None:
         assignee_user_id=item.get("assignee_user_id"),
         occurrence_id=item.get("id"),
         status=item.get("status"),
+    )
+
+
+def emit_after_complete(db: Session, item: dict) -> None:
+    """Notif ichour seulement si media_ready. Sinon activité oved sans alerte menahel."""
+    if should_alert_manager_review(item.get("completion")):
+        _emit_task_event(db, "task_completed", item)
+        return
+    _finalize_hidden_review_submit(db, item)
+
+
+def _finalize_hidden_review_submit(db: Session, item: dict) -> None:
+    db.commit()
+    assignee = item.get("assignee_user_id")
+    if assignee:
+        activity = EmployeeActivityService(
+            UserRepository(db),
+            TaskOccurrenceRepository(db),
+            break_repo=EmployeeBreakRepository(db),
+        )
+        activity.on_left_in_progress(str(assignee))
+        db.commit()
+    notify_assignee_only(
+        event_type="task_updated",
+        assignee_user_id=assignee,
+        occurrence_id=item.get("id"),
+        status=item.get("status"),
+        branch_id=str(item.get("branch_id") or ""),
     )
 
 
@@ -555,7 +584,7 @@ async def complete_occurrence(
         video_duration_seconds=payload.get("video_duration_seconds"),
         completion_attachments=payload.get("completion_attachments") or payload.get("attachments"),
     )
-    _emit_task_event(db, "task_completed", item)
+    emit_after_complete(db, item)
     return {"message": "המשימה עודכנה", "occurrence": item}
 
 
