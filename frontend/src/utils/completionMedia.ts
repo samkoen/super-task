@@ -15,6 +15,7 @@ export type CompletionAttachment = {
   url: string;
   duration_seconds?: number;
   captured_at?: string;
+  poster_url?: string;
 };
 
 export const MAX_COMPLETION_REQUIREMENTS = 10;

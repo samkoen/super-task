@@ -43,6 +43,7 @@ def test_expected_cron_paths():
 
 
 def test_helper_detects_subdaily():
+    assert _runs_more_than_once_per_day("*/2 * * * *")
     assert _runs_more_than_once_per_day("*/5 5-19 * * *")
     assert _runs_more_than_once_per_day("0 * * * *")
     assert not _runs_more_than_once_per_day("15 3 * * *")

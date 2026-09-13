@@ -50,6 +50,28 @@ def notify_task_change(
     sse_hub.publish_many_sync(channels, event)
 
 
+def notify_assignee_only(
+    *,
+    event_type: str,
+    assignee_user_id: str | None,
+    occurrence_id: str | None = None,
+    status: str | None = None,
+    branch_id: str | None = None,
+) -> None:
+    """SSE oved seul — pas le canal branche (évite un refresh menahel trop tôt)."""
+    assignee = str(assignee_user_id or "").strip()
+    if not assignee:
+        return
+    event: dict[str, Any] = {"type": event_type}
+    if branch_id:
+        event["branch_id"] = str(branch_id)
+    if occurrence_id:
+        event["occurrence_id"] = str(occurrence_id)
+    if status:
+        event["status"] = status
+    sse_hub.publish_many_sync([f"user:{assignee}"], event)
+
+
 def notify_direct_message(*, conversation_id: str, recipient_ids: set[str]) -> None:
     event = {"type": "direct_message", "conversation_id": str(conversation_id)}
     channels = [f"user:{uid}" for uid in recipient_ids if uid]

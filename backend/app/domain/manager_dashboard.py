@@ -96,6 +96,7 @@ def build_timeline_item(
         "min_video_seconds": getattr(task, "min_video_seconds", None),
         "completion_status": completion.status if completion else None,
         "not_completed_reason": completion.not_completed_reason if completion else None,
+        "media_ready": True if completion is None else bool(getattr(completion, "media_ready", True)),
     }
 
 
@@ -112,6 +113,15 @@ def sort_timeline_tasks(tasks: list[TaskOccurrence], tz) -> list[TaskOccurrence]
         return (2, task.due_at)
 
     return sorted(tasks, key=key)
+
+
+def hide_from_manager_review_queue(status: str, completion) -> bool:
+    """L'oved a envoyé, mais le menahel n'ichour pas tant que Blob n'est pas lu."""
+    if status != task_status.PENDING_REVIEW:
+        return False
+    if completion is None:
+        return False
+    return not bool(getattr(completion, "media_ready", True))
 
 
 def task_queue_bucket(status: str) -> str | None:

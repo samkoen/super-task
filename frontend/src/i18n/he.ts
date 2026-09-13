@@ -368,6 +368,8 @@ export const he = {
   completionRequirementN: (n: number) => `קובץ ${n}`,
   completionFillSlotsHint: "צרפו את כל הקבצים שהמנהל דרש — או שלחו עם הסבר אם אי אפשר",
   completionVideosNotReady: "הסרטונים עדיין נטענים. נסה שוב בעוד רגע",
+  reviewVideoLoading: "הסרטון עדיין נטען",
+  reviewVideosNotReady: "אי אפשר לאשר לפני שהסרטונים מוכנים",
   incompleteTaskTitle: "לא סיימת את המשימה",
   incompleteTaskBody:
     "חסרים קבצים שהמנהל דרש — למשל תמונה. אפשר לחזור ולסיים, או לשלוח עם הסבר.",

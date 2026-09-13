@@ -220,10 +220,25 @@ def first_path_of_kind(attachments: list[dict], kind: str) -> str | None:
 def attachment_urls(attachments: list[dict] | None) -> list[str]:
     if not attachments:
         return []
-    return [item["url"].strip() for item in attachments if (item.get("url") or "").strip()]
+    urls: list[str] = []
+    for item in attachments:
+        for key in ("url", "poster_url"):
+            value = str(item.get(key) or "").strip()
+            if value:
+                urls.append(value)
+    return urls
 
 
 COMPLETION_VIDEOS_NOT_READY = "הסרטונים עדיין נטענים. נסה שוב בעוד רגע"
+
+
+def should_alert_manager_review(completion: object | None) -> bool:
+    """Notif / SSE ichour seulement quand les vidéos sont déjà lisibles."""
+    if completion is None:
+        return True
+    if isinstance(completion, dict):
+        return completion.get("media_ready", True) is not False
+    return bool(getattr(completion, "media_ready", True))
 
 
 def video_attachment_urls(attachments: list[dict] | None) -> list[str]:
@@ -236,11 +251,14 @@ def video_attachment_urls(attachments: list[dict] | None) -> list[str]:
     ]
 
 
+def completion_videos_are_ready(attachments: list[dict] | None, ready) -> bool:
+    """True s'il n'y a pas de vidéo, ou si chaque URL passe le probe (GET)."""
+    return all(ready(url) for url in video_attachment_urls(attachments))
+
+
 def assert_completion_videos_ready(attachments: list[dict], ready) -> None:
-    """Ne passe en ממתין לאישור que si chaque vidéo est déjà lisible."""
-    for url in video_attachment_urls(attachments):
-        if not ready(url):
-            raise ValueError(COMPLETION_VIDEOS_NOT_READY)
+    if not completion_videos_are_ready(attachments, ready):
+        raise ValueError(COMPLETION_VIDEOS_NOT_READY)
 
 
 def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
@@ -338,6 +356,15 @@ def _as_item_list(raw: object | None) -> list:
     return raw
 
 
+def _optional_media_url(value: object | None) -> str | None:
+    text = str(value or "").strip()
+    if not text or len(text) > MAX_EXAMPLE_URL:
+        return None
+    if text.startswith("/uploads/") or text.startswith("https://") or text.startswith("http://"):
+        return text
+    return None
+
+
 def _optional_text(value: object | None, *, max_len: int) -> str | None:
     text = str(value or "").strip()
     if not text:
@@ -389,6 +416,9 @@ def _normalize_attachment(item: object) -> dict:
         entry["duration_seconds"] = parse_video_duration_seconds(
             item.get("duration_seconds") or item.get("video_duration_seconds")
         )
+        poster = _optional_media_url(item.get("poster_url"))
+        if poster:
+            entry["poster_url"] = poster
     captured = normalize_captured_at(item.get("captured_at"))
     if captured:
         entry["captured_at"] = captured

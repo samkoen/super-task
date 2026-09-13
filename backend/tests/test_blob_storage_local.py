@@ -44,16 +44,16 @@ def test_media_is_ready_local_uploads_are_sync():
     assert media_is_ready("/uploads/task_videos/a.mp4") is True
 
 
-def test_media_is_ready_uses_blob_head(monkeypatch):
+def test_media_is_ready_uses_blob_prefix_get(monkeypatch):
     monkeypatch.setattr("app.services.blob_storage.config.BLOB_READ_WRITE_TOKEN", "tok")
     monkeypatch.setattr("app.services.blob_storage.config.blob_storage_enabled", lambda: True)
-    monkeypatch.setattr("app.services.blob_storage.time.sleep", lambda _ms: None)
-    monkeypatch.setattr("app.services.blob_storage._blob_head_ok", lambda _url: True)
+    monkeypatch.setattr("app.services.blob_storage._blob_prefix_ok", lambda _url: True)
     from app.services import blob_storage
 
     url = "https://x.private.blob.vercel-storage.com/v.mp4"
     assert blob_storage.media_is_ready(url) is True
-    monkeypatch.setattr("app.services.blob_storage._blob_head_ok", lambda _url: False)
+    assert blob_storage.media_is_readable(url) is True
+    monkeypatch.setattr("app.services.blob_storage._blob_prefix_ok", lambda _url: False)
     assert blob_storage.media_is_ready(url) is False
 
 

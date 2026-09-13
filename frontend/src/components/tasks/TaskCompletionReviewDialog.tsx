@@ -21,6 +21,7 @@ import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
+import { initialReviewMediaReady, reviewActionsBlocked } from "../../utils/reviewMediaGate";
 import ClosedTaskReopenConfirm from "./ClosedTaskReopenConfirm";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import QualityRatingStars from "./QualityRatingStars";
@@ -41,6 +42,7 @@ export default function TaskCompletionReviewDialog({
   const [note, setNote] = useState("");
   const [rating, setRating] = useState<number | null>(DEFAULT_REVIEW_QUALITY_RATING);
   const [confirmReopenClosed, setConfirmReopenClosed] = useState(false);
+  const [mediaReady, setMediaReady] = useState(true);
 
   const completion = task?.completion;
   const open = Boolean(task);
@@ -48,13 +50,35 @@ export default function TaskCompletionReviewDialog({
   const isReview = task?.status === "pending_review";
   const isClosedApproved = canReopenClosedTask(task);
   const showCompletion = Boolean(completion);
+  const actionsBlocked = reviewActionsBlocked({ isReview, mediaReady });
 
   useEffect(() => {
     setNote("");
     setError("");
     setConfirmReopenClosed(false);
     setRating(DEFAULT_REVIEW_QUALITY_RATING);
-  }, [task?.id]);
+    setMediaReady(initialReviewMediaReady(task?.completion?.media_ready));
+  }, [task?.id, task?.completion?.media_ready]);
+
+  useEffect(() => {
+    const taskId = task?.id;
+    if (!open || !isReview || mediaReady || !taskId) return undefined;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const result = await taskService.confirmMedia(taskId);
+        if (!stop && result.media_ready) setMediaReady(true);
+      } catch {
+        /* retry next tick */
+      }
+    };
+    const timer = window.setInterval(() => void tick(), 2000);
+    void tick();
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [open, isReview, mediaReady, task?.id]);
 
   const handleClose = () => {
     if (saving) return;
@@ -176,7 +200,11 @@ export default function TaskCompletionReviewDialog({
             attachments={completion.completion_attachments}
             requirements={task.completion_requirements}
             audio_transcript={completion.audio_transcript}
+            videosPending={isReview && !mediaReady}
           />
+        )}
+        {actionsBlocked && (
+          <Alert severity="info">{he.reviewVideosNotReady}</Alert>
         )}
 
         {isReview && (
@@ -219,7 +247,7 @@ export default function TaskCompletionReviewDialog({
           {he.cancel}
         </Button>
         {isReview && (
-          <Button variant="outlined" color="warning" onClick={handleReopen} disabled={saving}>
+          <Button variant="outlined" color="warning" onClick={handleReopen} disabled={saving || actionsBlocked}>
             {he.taskReopen}
           </Button>
         )}
@@ -228,7 +256,7 @@ export default function TaskCompletionReviewDialog({
             variant="contained"
             color="success"
             onClick={handleApprove}
-            disabled={saving || rating == null}
+            disabled={saving || rating == null || actionsBlocked}
           >
             {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
           </Button>

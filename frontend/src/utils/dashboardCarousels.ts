@@ -41,7 +41,12 @@ export function buildQuestionsQueue(
 export function buildPendingReviewQueue(queues: TaskQueues | null | undefined): ActionQueueItem[] {
   if (!queues) return [];
   return (queues.pending_review ?? [])
-    .filter((t) => t.status !== "awaiting_response" && t.segment !== "awaiting_response")
+    .filter(
+      (t) =>
+        t.status !== "awaiting_response" &&
+        t.segment !== "awaiting_response" &&
+        t.media_ready !== false,
+    )
     .sort(
       (a, b) =>
         new Date(b.completed_at ?? b.due_at).getTime() -

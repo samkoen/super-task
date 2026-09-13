@@ -68,6 +68,20 @@ describe("CompletionSlotTile", () => {
     expect(onEnlarge).toHaveBeenCalledWith("blob:kept-/uploads/v2.mp4", "video");
   });
 
+  it("shows the uploaded poster and a spinner while the video is mounting", () => {
+    render(
+      <CompletionSlotTile
+        req={{ kind: "video", title: "צילום של בסטות", min_seconds: 10 }}
+        index={0}
+        fill={{ url: "/v.mp4", posterUrl: "/poster.jpg", kind: "video", pending: true }}
+        interactive={false}
+      />,
+    );
+    expect(screen.getByAltText("צילום של בסטות").getAttribute("src")).toBe("blob:kept-/poster.jpg");
+    expect(screen.getByText(he.reviewVideoLoading)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.completionPlayVideo })).toBeNull();
+  });
+
   it("keeps the take-video label before a video exists", () => {
     render(
       <CompletionSlotTile

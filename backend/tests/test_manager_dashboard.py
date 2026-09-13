@@ -9,6 +9,7 @@ from app.domain.manager_dashboard import (
     build_timeline_item,
     build_unfinished_item,
     duration_minutes,
+    hide_from_manager_review_queue,
     sort_timeline_tasks,
     task_queue_bucket,
     timeline_segment,
@@ -137,6 +138,64 @@ def test_duration_minutes_non_negative():
     start = datetime(2026, 7, 14, 10, 0, tzinfo=TZ)
     end = datetime(2026, 7, 14, 9, 0, tzinfo=TZ)
     assert duration_minutes(start, end) == 0
+
+
+def test_hide_from_manager_review_queue_until_media_ready():
+    pending = TaskCompletion(
+        id="c1",
+        occurrence_id="t1",
+        status="done",
+        note=None,
+        photo_path=None,
+        video_path="/v.mp4",
+        audio_path=None,
+        not_completed_reason=None,
+        completed_by_id="u1",
+        completed_at="2026-07-14T09:45:00+03:00",
+        media_ready=False,
+    )
+    ready = TaskCompletion(
+        id="c1",
+        occurrence_id="t1",
+        status="done",
+        note=None,
+        photo_path=None,
+        video_path="/v.mp4",
+        audio_path=None,
+        not_completed_reason=None,
+        completed_by_id="u1",
+        completed_at="2026-07-14T09:45:00+03:00",
+        media_ready=True,
+    )
+    assert hide_from_manager_review_queue(task_status.PENDING_REVIEW, pending) is True
+    assert hide_from_manager_review_queue(task_status.PENDING_REVIEW, ready) is False
+    assert hide_from_manager_review_queue(task_status.IN_PROGRESS, pending) is False
+
+
+def test_build_timeline_item_includes_media_ready():
+    task = _task(status=task_status.PENDING_REVIEW, started_at="2026-07-14T09:00:00+03:00")
+    completion = TaskCompletion(
+        id="c1",
+        occurrence_id="t1",
+        status="done",
+        note=None,
+        photo_path=None,
+        video_path="/v.mp4",
+        audio_path=None,
+        not_completed_reason=None,
+        completed_by_id="u1",
+        completed_at="2026-07-14T09:45:00+03:00",
+        media_ready=False,
+    )
+    item = build_timeline_item(
+        task,
+        now=NOW,
+        tz=TZ,
+        completion=completion,
+        department_name=None,
+        assignee_name="יוסי",
+    )
+    assert item["media_ready"] is False
 
 
 def test_task_queue_bucket_includes_pending_and_overdue_before_start():

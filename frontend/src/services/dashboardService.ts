@@ -73,6 +73,7 @@ export interface TimelineTask {
   min_video_seconds?: number | null;
   completion_status?: CompletionStatus | null;
   not_completed_reason?: string | null;
+  media_ready?: boolean;
 }
 
 export interface TeamMember {

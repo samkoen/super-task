@@ -9,6 +9,7 @@ import {
   pendingSlotIsFilled,
   uploadPendingMedia,
 } from "./pendingMedia";
+import { posterFileFromVideoSrc } from "./videoPosterFile";
 
 export type SlotUploaders = {
   photo: (file: File) => Promise<{ url: string }>;
@@ -32,7 +33,7 @@ export function slotsFromKeptAttachments(
   return requirements.map((req, i) => {
     const item = attachments?.[i];
     if (!item?.url || item.kind !== req.kind) return null;
-    return createKeptMedia(item.url, item.duration_seconds);
+    return createKeptMedia(item.url, item.duration_seconds, item.poster_url);
   });
 }
 
@@ -74,14 +75,35 @@ async function uploadOneRequirementSlot(
   requireAll: boolean,
 ): Promise<CompletionAttachment | null> {
   const url = await uploadPendingMedia(media, uploaders[req.kind]);
-  if (url) return completionAttachmentFromPending(req.kind, url, media);
+  if (url) {
+    const withPoster = await withUploadedVideoPoster(req.kind, media, uploaders.photo);
+    return completionAttachmentFromPending(req.kind, url, withPoster);
+  }
   if (media?.keptUrl) {
     return {
       kind: req.kind,
       url: media.keptUrl,
       duration_seconds: media.durationSeconds ?? undefined,
+      poster_url: media.posterUrl,
     };
   }
   if (requireAll) throw new Error(he.completionFillSlotsHint);
   return null;
+}
+
+async function withUploadedVideoPoster(
+  kind: CompletionRequirement["kind"],
+  media: PendingMedia | null,
+  uploadPhoto: SlotUploaders["photo"],
+): Promise<PendingMedia | null> {
+  if (kind !== "video" || !media) return media;
+  if (media.posterUrl) return media;
+  const file = media.posterFile ?? (await posterFileFromVideoSrc(media.previewUrl));
+  if (!file) return media;
+  try {
+    const uploaded = await uploadPhoto(file);
+    return { ...media, posterUrl: uploaded.url };
+  } catch {
+    return media;
+  }
 }

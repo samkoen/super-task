@@ -9,6 +9,7 @@ vi.mock("../../services/taskService", () => ({
     approve: vi.fn(),
     reopen: vi.fn(),
     reopenClosed: vi.fn(),
+    confirmMedia: vi.fn(),
   },
 }));
 
@@ -76,6 +77,8 @@ beforeEach(() => {
   vi.mocked(taskService.approve).mockReset();
   vi.mocked(taskService.reopen).mockReset();
   vi.mocked(taskService.reopenClosed).mockReset();
+  vi.mocked(taskService.confirmMedia).mockReset();
+  vi.mocked(taskService.confirmMedia).mockResolvedValue({ media_ready: false });
 });
 
 describe("TaskCompletionReviewDialog", () => {
@@ -148,6 +151,25 @@ describe("TaskCompletionReviewDialog", () => {
     expect(screen.getByTestId("completion-outcome-not-done")).toBeTruthy();
     expect(screen.getByText(he.taskNotCompletedAlert)).toBeTruthy();
     expect(screen.getByText(`${he.notCompletedReason}: אין מה לצלם`)).toBeTruthy();
+  });
+
+  it("blocks approve and reject while the video is still mounting", () => {
+    render(
+      <TaskCompletionReviewDialog
+        task={reviewTask({
+          completion: {
+            ...reviewTask().completion!,
+            video_path: "/v.mp4",
+            media_ready: false,
+          },
+        })}
+        onClose={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.reviewVideosNotReady)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.taskApproveClose })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: he.taskReopen })).toHaveProperty("disabled", true);
   });
 
   it("reopens with a fallback remark when the note is empty", async () => {

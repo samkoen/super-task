@@ -394,6 +394,7 @@ def task_completion_orm_to_domain(row: orm.TaskCompletion | None) -> TaskComplet
         manager_reviewed_at=parse_datetime_iso(row.manager_reviewed_at) if row.manager_reviewed_at else None,
         rejection_note=row.rejection_note,
         quality_rating=getattr(row, "quality_rating", None),
+        media_ready=bool(getattr(row, "media_ready", True)),
     )
 
 
