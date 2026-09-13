@@ -1,8 +1,10 @@
 from app.domain.completion_media import (
     COMPLETION_VIDEOS_NOT_READY,
+    attachment_urls,
     assert_attachments_match,
     assert_completion_media,
     assert_completion_videos_ready,
+    completion_videos_are_ready,
     drop_stale_migrated_photo,
     effective_requirements,
     has_required_completion_visual_media,
@@ -293,3 +295,32 @@ def test_complete_blocked_until_videos_are_readable():
         assert_completion_videos_ready(attachments, ready.__contains__)
     assert_completion_videos_ready(attachments, lambda _url: True)
     assert COMPLETION_VIDEOS_NOT_READY
+
+
+def test_completion_videos_are_ready_without_videos():
+    assert completion_videos_are_ready([], lambda _url: False) is True
+    assert completion_videos_are_ready(
+        [{"kind": "photo", "url": "/p.jpg"}], lambda _url: False
+    ) is True
+
+
+def test_normalize_keeps_video_poster_url():
+    items = normalize_attachments(
+        [
+            {
+                "kind": "video",
+                "url": "/uploads/v.mp4",
+                "duration_seconds": 8,
+                "poster_url": "/uploads/task_photos/poster.jpg",
+            }
+        ]
+    )
+    assert items[0]["poster_url"] == "/uploads/task_photos/poster.jpg"
+    assert attachment_urls(items) == ["/uploads/v.mp4", "/uploads/task_photos/poster.jpg"]
+
+
+def test_normalize_drops_invalid_poster_url():
+    items = normalize_attachments(
+        [{"kind": "video", "url": "/v.mp4", "poster_url": "javascript:alert(1)"}]
+    )
+    assert "poster_url" not in items[0]

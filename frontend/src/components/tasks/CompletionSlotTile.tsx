@@ -1,4 +1,4 @@
-import { Box, IconButton, Typography } from "@mui/material";
+import { Box, CircularProgress, IconButton, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -47,7 +47,13 @@ export default function CompletionSlotTile({
 }) {
   const rawFill = fill?.previewUrl || fill?.url || null;
   const resolved = useResolvedMediaSrc(rawFill, Boolean(rawFill && !rawFill.startsWith("blob:")));
+  const rawPoster = fill?.posterUrl || null;
+  const posterMedia = useResolvedMediaSrc(
+    rawPoster,
+    Boolean(rawPoster && !rawPoster.startsWith("blob:") && !rawPoster.startsWith("data:")),
+  );
   const filledSrc = resolved.src;
+  const posterSrc = posterMedia.src || rawPoster;
   const exampleSrc = slotExampleSrc(req);
   const title = slotDisplayTitle(req, index);
   const filled = Boolean(rawFill);
@@ -67,6 +73,8 @@ export default function CompletionSlotTile({
       <SlotBackground
         filled={filled}
         filledSrc={filledSrc}
+        posterSrc={posterSrc}
+        pending={Boolean(fill?.pending)}
         exampleSrc={exampleSrc}
         kind={req.kind}
         title={title}
@@ -141,6 +149,8 @@ function SlotCaptureBar({
 function SlotBackground({
   filled,
   filledSrc,
+  posterSrc,
+  pending,
   exampleSrc,
   kind,
   title,
@@ -148,14 +158,22 @@ function SlotBackground({
 }: {
   filled: boolean;
   filledSrc: string | null;
+  posterSrc: string | null;
+  pending: boolean;
   exampleSrc: string | null;
   kind: CompletionRequirement["kind"];
   title: string;
   onEnlarge?: (src: string, kind?: "photo" | "video") => void;
 }) {
-  if (filled && filledSrc && kind === "video") {
+  if (filled && kind === "video" && (filledSrc || posterSrc || pending)) {
     return (
-      <SlotFilledVideo src={filledSrc} title={title} onPlay={() => onEnlarge?.(filledSrc, "video")} />
+      <SlotFilledVideo
+        src={filledSrc}
+        posterSrc={posterSrc}
+        pending={pending}
+        title={title}
+        onPlay={() => (filledSrc && !pending ? onEnlarge?.(filledSrc, "video") : undefined)}
+      />
     );
   }
   const src = filled ? filledSrc : exampleSrc;
@@ -177,8 +195,21 @@ function SlotBackground({
   );
 }
 
-function SlotFilledVideo({ src, title, onPlay }: { src: string; title: string; onPlay: () => void }) {
-  const poster = useVideoPoster(src);
+function SlotFilledVideo({
+  src,
+  posterSrc,
+  pending,
+  title,
+  onPlay,
+}: {
+  src: string | null;
+  posterSrc: string | null;
+  pending: boolean;
+  title: string;
+  onPlay: () => void;
+}) {
+  const capturedPoster = useVideoPoster(pending || posterSrc ? null : src);
+  const poster = posterSrc || capturedPoster;
   return (
     <>
       {poster ? (
@@ -188,7 +219,7 @@ function SlotFilledVideo({ src, title, onPlay }: { src: string; title: string; o
           alt={title}
           sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
-      ) : (
+      ) : src && !pending ? (
         <Box
           component="video"
           src={src}
@@ -197,9 +228,34 @@ function SlotFilledVideo({ src, title, onPlay }: { src: string; title: string; o
           preload="metadata"
           sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }}
         />
+      ) : (
+        <Box sx={{ width: "100%", height: "100%", bgcolor: "action.hover" }} />
       )}
-      <SlotPlayButton onPlay={onPlay} />
+      {pending ? <SlotPendingOverlay /> : src ? <SlotPlayButton onPlay={onPlay} /> : null}
     </>
+  );
+}
+
+function SlotPendingOverlay() {
+  return (
+    <Box
+      sx={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 1,
+        bgcolor: "rgba(0,0,0,0.35)",
+        zIndex: 3,
+      }}
+    >
+      <CircularProgress size={28} sx={{ color: "common.white" }} />
+      <Typography variant="caption" color="common.white">
+        {he.reviewVideoLoading}
+      </Typography>
+    </Box>
   );
 }
 

@@ -517,6 +517,21 @@ def delegate_occurrence(
     return {"message": "המשימה שויכה לעובד", "occurrence": item}
 
 
+@router.post("/occurrences/{occurrence_id}/confirm-media")
+@handle_controller_errors
+def confirm_completion_media(
+    occurrence_id: str,
+    request: Request,
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    result = service.confirm_completion_media(actor, occurrence_id)
+    if result.get("promoted"):
+        _emit_task_event(db, "task_completed", result["occurrence"])
+    return {"media_ready": result["media_ready"], "promoted": result["promoted"]}
+
+
 @router.post("/occurrences/{occurrence_id}/complete")
 @handle_controller_errors
 async def complete_occurrence(

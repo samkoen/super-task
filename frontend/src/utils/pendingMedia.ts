@@ -7,6 +7,8 @@ export type PendingMedia = {
   capturedAt: string;
   /** URL déjà envoyée — l’oved peut la garder ou la remplacer. */
   keptUrl?: string;
+  posterUrl?: string;
+  posterFile?: File | null;
 };
 
 export function createPendingMedia(
@@ -30,18 +32,21 @@ export function completionAttachmentFromPending(
   url: string;
   duration_seconds?: number;
   captured_at?: string;
+  poster_url?: string;
 } {
   return {
     kind,
     url,
     duration_seconds: media?.durationSeconds ?? undefined,
     captured_at: media?.capturedAt,
+    ...(kind === "video" && media?.posterUrl ? { poster_url: media.posterUrl } : {}),
   };
 }
 
 export function createKeptMedia(
   url: string,
   durationSeconds?: number | null,
+  posterUrl?: string,
 ): PendingMedia {
   return {
     file: null,
@@ -49,6 +54,7 @@ export function createKeptMedia(
     durationSeconds: durationSeconds ?? null,
     capturedAt: "",
     keptUrl: url,
+    posterUrl,
   };
 }
 

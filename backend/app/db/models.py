@@ -372,6 +372,9 @@ class TaskCompletion(Base):
     )
     rejection_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     quality_rating: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    media_ready: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     completed_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

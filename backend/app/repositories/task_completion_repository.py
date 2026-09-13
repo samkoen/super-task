@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 import app.db.models as orm
 from app.db import mappers as mp
+from app.domain import task_status
 from app.models.task_completion import TaskCompletion
 
 
@@ -83,6 +84,7 @@ class TaskCompletionRepository:
         completed_by_id: str,
         manager_review_status: str | None = None,
         completion_attachments: list | None = None,
+        media_ready: bool = True,
     ) -> TaskCompletion:
         import uuid
 
@@ -98,6 +100,7 @@ class TaskCompletionRepository:
             not_completed_reason=not_completed_reason,
             completed_by_id=mp.parse_uuid(completed_by_id),
             manager_review_status=manager_review_status,
+            media_ready=media_ready,
         )
         self._db.add(row)
         self._db.flush()
@@ -118,6 +121,7 @@ class TaskCompletionRepository:
         completed_by_id: str,
         manager_review_status: str | None,
         completion_attachments: list | None = None,
+        media_ready: bool | None = None,
     ) -> TaskCompletion | None:
         row = (
             self._db.query(orm.TaskCompletion)
@@ -141,8 +145,35 @@ class TaskCompletionRepository:
         row.manager_reviewed_at = None
         row.rejection_note = None
         row.quality_rating = None
+        if media_ready is not None:
+            row.media_ready = media_ready
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)
+
+    def set_media_ready(self, occurrence_id: str, ready: bool) -> TaskCompletion | None:
+        row = (
+            self._db.query(orm.TaskCompletion)
+            .filter(orm.TaskCompletion.occurrence_id == mp.parse_uuid(occurrence_id))
+            .first()
+        )
+        if not row:
+            return None
+        row.media_ready = ready
+        self._db.flush()
+        return mp.task_completion_orm_to_domain(row)
+
+    def list_not_ready_for_review(self, *, limit: int = 40) -> list[TaskCompletion]:
+        rows = (
+            self._db.query(orm.TaskCompletion)
+            .join(orm.TaskOccurrence, orm.TaskOccurrence.id == orm.TaskCompletion.occurrence_id)
+            .filter(
+                orm.TaskCompletion.media_ready.is_(False),
+                orm.TaskOccurrence.status == task_status.PENDING_REVIEW,
+            )
+            .limit(limit)
+            .all()
+        )
+        return [domain for row in rows if (domain := mp.task_completion_orm_to_domain(row))]
 
     def update_review(
         self,

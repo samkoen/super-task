@@ -27,6 +27,7 @@ from app.repositories.department_repository import DepartmentRepository
 from app.domain.manager_dashboard import (
     build_timeline_item,
     build_unfinished_item,
+    hide_from_manager_review_queue,
     sort_timeline_tasks,
     task_queue_bucket,
 )
@@ -40,7 +41,9 @@ from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
+from app.services import blob_storage
 from app.services.fixed_task_expiry import close_expired_fixed_occurrences
+from app.services.media_ready_service import MediaReadyService
 from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
 
@@ -325,12 +328,14 @@ class DashboardService:
             roles_in=worker_roles_for_roster(actor.role),
             branch_ids=[branch_id],
         )
-        completion_map = self._completions.find_by_occurrence_ids(
-            [
-                t.id
-                for t in tasks_today
-                if t.status in {task_status.COMPLETED, task_status.PENDING_REVIEW}
-            ]
+        completion_map = self._with_promoted_media(
+            self._completions.find_by_occurrence_ids(
+                [
+                    t.id
+                    for t in tasks_today
+                    if t.status in {task_status.COMPLETED, task_status.PENDING_REVIEW}
+                ]
+            )
         )
         team = self._team_timelines(
             employees,
@@ -500,7 +505,9 @@ class DashboardService:
             for t in collected["tasks"]
             if t.status in {task_status.COMPLETED, task_status.PENDING_REVIEW}
         ]
-        completion_map = self._completions.find_by_occurrence_ids(done_ids)
+        completion_map = self._with_promoted_media(
+            self._completions.find_by_occurrence_ids(done_ids)
+        )
         team = self._annotate_team_branches(
             self._team_timelines(
                 employees, collected["tasks"], collected["overdue"], completion_map, day, now
@@ -684,6 +691,8 @@ class DashboardService:
             bucket = task_queue_bucket(task.status)
             if not bucket:
                 continue
+            if hide_from_manager_review_queue(task.status, completion_map.get(task.id)):
+                continue
             task = self._with_reference_media(task)
             item = build_timeline_item(
                 task,
@@ -705,6 +714,19 @@ class DashboardService:
             "pending_review": pending_review,
             "upcoming": upcoming,
         }
+
+    def _with_promoted_media(self, completion_map: dict) -> dict:
+        svc = MediaReadyService(self._completions, blob_storage.media_is_readable)
+        changed = [
+            oid
+            for oid, completion in completion_map.items()
+            if completion and not completion.media_ready and svc.promote_occurrence(oid)
+        ]
+        if not changed:
+            return completion_map
+        next_map = dict(completion_map)
+        next_map.update(self._completions.find_by_occurrence_ids(changed))
+        return next_map
 
     def _unfinished_tasks(
         self,

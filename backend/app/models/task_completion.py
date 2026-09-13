@@ -21,6 +21,7 @@ class TaskCompletion:
     rejection_note: str | None = None
     completion_attachments: list | None = None
     quality_rating: int | None = None
+    media_ready: bool = True
 
     def to_dict(self) -> dict:
         return {
@@ -42,4 +43,5 @@ class TaskCompletion:
             "manager_reviewed_at": self.manager_reviewed_at,
             "rejection_note": self.rejection_note,
             "quality_rating": self.quality_rating,
+            "media_ready": self.media_ready,
         }

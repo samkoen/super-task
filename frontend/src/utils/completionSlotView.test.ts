@@ -33,6 +33,11 @@ describe("completionSlotView", () => {
       { kind: "video", url: "/v3.mp4" },
     ]);
     expect(fills.map((item) => item?.url)).toEqual(["/v1.mp4", "/v2.mp4", "/v3.mp4"]);
+    expect(
+      fillsFromAttachments(reqs, [{ kind: "video", url: "/v1.mp4", poster_url: "/p.jpg" }], {
+        videosPending: true,
+      })[0],
+    ).toMatchObject({ posterUrl: "/p.jpg", pending: true });
     expect(filledVisualCount(reqs, fills)).toBe(3);
   });
 

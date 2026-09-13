@@ -102,7 +102,12 @@ def read_media_bytes(url: str | None) -> tuple[bytes, str] | None:
 
 
 def media_is_ready(url: str | None) -> bool:
-    """HEAD Blob / fichier local : True seulement si le média est déjà lisible."""
+    """True seulement si le média est déjà lisible (GET préfixe, pas seulement HEAD)."""
+    return media_is_readable(url)
+
+
+def media_is_readable(url: str | None) -> bool:
+    """GET des premiers octets Blob — HEAD peut réussir trop tôt."""
     cleaned = (url or "").strip()
     if not cleaned:
         return False
@@ -110,12 +115,32 @@ def media_is_ready(url: str | None) -> bool:
         return True
     if not is_vercel_blob_url(cleaned) or not config.blob_storage_enabled():
         return False
-    for pause in (0.0, 0.4, 1.0):
-        if pause:
-            time.sleep(pause)
-        if _blob_head_ok(cleaned):
-            return True
-    return False
+    return _blob_prefix_ok(cleaned)
+
+
+_PREFIX_BYTES = 2048
+
+
+def _blob_prefix_ok(url: str) -> bool:
+    """Range GET 2 Ko — prouve que Blob sert le fichier sans le télécharger entier."""
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {config.BLOB_READ_WRITE_TOKEN}",
+                "Range": f"bytes=0-{_PREFIX_BYTES - 1}",
+            },
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            if int(getattr(resp, "status", 200)) not in {200, 206}:
+                return False
+            return len(resp.read(_PREFIX_BYTES)) > 0
+    except Exception:
+        logger.info("Blob prefix not ready for %s", url[:120])
+        return False
 
 
 def _blob_head_ok(url: str) -> bool:

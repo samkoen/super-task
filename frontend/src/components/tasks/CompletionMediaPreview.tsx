@@ -26,6 +26,7 @@ interface CompletionMediaPreviewProps {
   disabled?: boolean;
   /** false = capture en cours, pas encore transcrit. */
   transcriptFallback?: boolean;
+  videosPending?: boolean;
 }
 
 function kindLabel(kind: string): string {
@@ -48,6 +49,7 @@ export default function CompletionMediaPreview({
   onRemoveAudio,
   disabled = false,
   transcriptFallback = true,
+  videosPending = false,
 }: CompletionMediaPreviewProps) {
   const items = attachmentsFromCompletion({
     completion_attachments: attachments,
@@ -74,12 +76,13 @@ export default function CompletionMediaPreview({
       {hasVisualGuides ? (
         <CompletionSlotGrid
           requirements={reqs}
-          fills={fillsFromAttachments(reqs, items)}
+          fills={fillsFromAttachments(reqs, items, { videosPending })}
         />
       ) : (
         <LegacyAttachmentList
           items={items}
           disabled={disabled}
+          videosPending={videosPending}
           onRemovePhoto={onRemovePhoto}
           onRemoveVideo={onRemoveVideo}
           onRemoveAudio={onRemoveAudio}
@@ -100,12 +103,14 @@ export default function CompletionMediaPreview({
 function LegacyAttachmentList({
   items,
   disabled,
+  videosPending,
   onRemovePhoto,
   onRemoveVideo,
   onRemoveAudio,
 }: {
   items: CompletionAttachment[];
   disabled: boolean;
+  videosPending: boolean;
   onRemovePhoto?: () => void;
   onRemoveVideo?: () => void;
   onRemoveAudio?: () => void;
@@ -123,7 +128,24 @@ function LegacyAttachmentList({
             {item.kind === "photo" && (
               <Box component="img" src={src} alt={he.taskReferencePhoto} sx={{ maxWidth: "100%", maxHeight: 180, borderRadius: 1, display: "block" }} />
             )}
-            {item.kind === "video" && (
+            {item.kind === "video" && videosPending && (
+              <Box sx={{ position: "relative", maxWidth: 240 }}>
+                {item.poster_url ? (
+                  <Box
+                    component="img"
+                    src={mediaUrl(item.poster_url) ?? undefined}
+                    alt={he.taskReferenceVideo}
+                    sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
+                  />
+                ) : (
+                  <Box sx={{ height: 120, bgcolor: "action.hover", borderRadius: 1 }} />
+                )}
+                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                  {he.reviewVideoLoading}
+                </Typography>
+              </Box>
+            )}
+            {item.kind === "video" && !videosPending && (
               <Box component="video" src={src} controls sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }} />
             )}
             {item.kind === "audio" && <CompactAudioPlayer src={src} />}

@@ -12,6 +12,11 @@ import {
   revokePendingMedia,
 } from "./pendingMedia";
 import type { CompletionRequirement } from "./completionMedia";
+import { posterFileFromVideoSrc } from "./videoPosterFile";
+
+vi.mock("./videoPosterFile", () => ({
+  posterFileFromVideoSrc: vi.fn(async () => null),
+}));
 
 const threeVideos: CompletionRequirement[] = [
   { kind: "video", min_seconds: 10 },
@@ -98,6 +103,35 @@ describe("employeeCompletionUpload", () => {
     ]);
     expect(slots.map((item) => item?.keptUrl)).toEqual(["/v1.mp4", "/v2.mp4", "/v3.mp4"]);
     expect(slotsMeetTaskRequirements(threeVideos, slots)).toBe(true);
+  });
+
+  it("uploads a video poster and keeps it on the attachment", async () => {
+    vi.mocked(posterFileFromVideoSrc).mockResolvedValueOnce(
+      new File(["frame"], "poster.jpg", { type: "image/jpeg" }),
+    );
+    const slots = [videoSlot("clip.webm")];
+    const uploaders = {
+      photo: vi.fn(async () => ({ url: "/uploads/poster.jpg" })),
+      video: vi.fn(async () => ({ url: "/uploads/clip.webm" })),
+      audio: vi.fn(),
+    };
+    const attachments = await uploadRequirementSlots(
+      [{ kind: "video", min_seconds: 10 }],
+      slots,
+      uploaders,
+      true,
+    );
+    expect(attachments[0]?.poster_url).toBe("/uploads/poster.jpg");
+    expect(uploaders.photo).toHaveBeenCalledTimes(1);
+    slots.forEach((item) => revokePendingMedia(item));
+  });
+
+  it("keeps the previous poster when the video is reused", () => {
+    const slots = slotsFromKeptAttachments(
+      [{ kind: "video", min_seconds: 10 }],
+      [{ kind: "video", url: "/v1.mp4", duration_seconds: 12, poster_url: "/p.jpg" }],
+    );
+    expect(slots[0]?.posterUrl).toBe("/p.jpg");
   });
 
   it("does not treat a zero-byte video as ready", () => {

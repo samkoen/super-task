@@ -5,6 +5,8 @@ import type { CompletionAttachment, CompletionRequirement } from "./completionMe
 export type SlotFill = {
   url?: string | null;
   previewUrl?: string | null;
+  posterUrl?: string | null;
+  pending?: boolean;
   kind?: CompletionRequirement["kind"];
 };
 
@@ -53,11 +55,17 @@ export function attachmentsFromCompletion(completion?: {
 export function fillsFromAttachments(
   requirements: CompletionRequirement[],
   attachments: CompletionAttachment[] | null | undefined,
+  opts?: { videosPending?: boolean },
 ): Array<SlotFill | null> {
   return requirements.map((req, index) => {
     const item = attachments?.[index];
     if (!item?.url || item.kind !== req.kind) return null;
-    return { url: item.url, kind: item.kind };
+    return {
+      url: item.url,
+      kind: item.kind,
+      posterUrl: item.poster_url,
+      pending: req.kind === "video" && Boolean(opts?.videosPending),
+    };
   });
 }
 

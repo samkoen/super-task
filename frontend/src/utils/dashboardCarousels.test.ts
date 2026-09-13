@@ -81,6 +81,20 @@ describe("buildQuestionsQueue / buildPendingReviewQueue", () => {
     };
     expect(buildQuestionsQueue(withQuestion).map((i) => i.task.id)).toEqual(["q1"]);
     expect(buildPendingReviewQueue(withQuestion).map((i) => i.task.id)).toEqual(["pr1"]);
+    expect(
+      buildPendingReviewQueue({
+        ...withQuestion,
+        pending_review: [
+          ...withQuestion.pending_review,
+          task({
+            id: "pr-loading",
+            status: "pending_review",
+            segment: "pending_review",
+            media_ready: false,
+          }),
+        ],
+      }).map((i) => i.task.id),
+    ).toEqual(["pr1"]);
     expect(buildActionQueue(withQuestion).map((i) => i.reason)).toEqual([
       "awaiting_response",
       "pending_review",

@@ -6,9 +6,9 @@ from app.core import config
 from app.db import mappers as mp
 from app.domain import roles, task_status
 from app.domain.completion_media import (
+    COMPLETION_VIDEOS_NOT_READY,
     assert_attachments_match,
     assert_completion_media,
-    assert_completion_videos_ready,
     effective_requirements,
     first_path_of_kind,
     packed_media_fields,
@@ -72,6 +72,7 @@ from app.repositories.user_repository import UserRepository
 from app.services import blob_storage
 from app.services.completion_audio_transcription_service import transcribe_completion_audio
 from app.services.fixed_task_expiry import close_expired_fixed_occurrences
+from app.services.media_ready_service import MediaReadyService
 from app.services.media_retention_service import MediaRetentionService
 from app.services.task_translation_service import TaskTranslationService
 
@@ -612,11 +613,9 @@ class TaskOccurrenceService:
         packed = TaskOccurrenceService._pack_attachments(attachments)
         if not require_complete:
             filled = [item for item in attachments if (item.get("url") or "").strip()]
-            assert_completion_videos_ready(filled, blob_storage.media_is_ready)
             return TaskOccurrenceService._pack_attachments(filled)
         if raw_reqs is not None:
             assert_attachments_match(reqs, attachments)
-            assert_completion_videos_ready(attachments, blob_storage.media_is_ready)
             return packed
         requires_visual = (
             employee_can_see_occurrence(
@@ -633,7 +632,6 @@ class TaskOccurrenceService:
             video_duration_seconds=video_duration_seconds,
             requires_visual=bool(requires_visual),
         )
-        assert_completion_videos_ready(attachments, blob_storage.media_is_ready)
         return packed
 
     def _stamp_work_start_arrival(self, occurrence, attachments) -> None:
@@ -689,6 +687,7 @@ class TaskOccurrenceService:
             completion_attachments=completion_attachments,
             require_complete=requires_completion_media(completion_status),
         )
+        media_ready = self._media_ready().initial_ready(media["attachments"])
 
         note_clean = (note or "").strip() or None
         existing = self._completions.find_by_occurrence(occurrence_id)
@@ -709,6 +708,7 @@ class TaskOccurrenceService:
                 not_completed_reason=reason_clean,
                 completed_by_id=actor.user_id,
                 manager_review_status=task_status.REVIEW_PENDING if needs_review else None,
+                media_ready=media_ready,
             )
         else:
             if existing:
@@ -724,6 +724,7 @@ class TaskOccurrenceService:
                 not_completed_reason=reason_clean,
                 completed_by_id=actor.user_id,
                 manager_review_status=task_status.REVIEW_PENDING if needs_review else None,
+                media_ready=media_ready,
             )
         assert completion is not None
 
@@ -776,6 +777,7 @@ class TaskOccurrenceService:
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
+        self._assert_review_media_ready(occurrence_id)
         stars = normalize_quality_rating(quality_rating)
         reviewed = self._completions.update_review(
             occurrence_id,
@@ -799,6 +801,7 @@ class TaskOccurrenceService:
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
             raise ValueError("לא נמצאה הגשת סיום")
+        self._assert_review_media_ready(occurrence_id)
         note_clean = (rejection_note or "").strip() or None
         reviewed = self._completions.update_review(
             occurrence_id,
@@ -861,6 +864,34 @@ class TaskOccurrenceService:
         if occurrence.status != task_status.PENDING_REVIEW:
             raise ValueError("המשימה לא ממתינה לאישור")
         return occurrence
+
+    def confirm_completion_media(self, actor: ActorContext, occurrence_id: str) -> dict:
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_can_complete(actor, occurrence)
+        before = self._completion_media_ready(occurrence_id)
+        ready = self._promote_completion_media(occurrence_id)
+        return {
+            "media_ready": ready,
+            "promoted": ready and not before,
+            "occurrence": self._to_api(occurrence),
+        }
+
+    def _media_ready(self) -> MediaReadyService:
+        return MediaReadyService(self._completions, blob_storage.media_is_readable)
+
+    def _promote_completion_media(self, occurrence_id: str) -> bool:
+        return self._media_ready().promote_occurrence(occurrence_id)
+
+    def _completion_media_ready(self, occurrence_id: str) -> bool:
+        completion = self._completions.find_by_occurrence(occurrence_id)
+        return True if completion is None else bool(completion.media_ready)
+
+    def _assert_review_media_ready(self, occurrence_id: str) -> None:
+        if self._promote_completion_media(occurrence_id):
+            return
+        raise ValueError(COMPLETION_VIDEOS_NOT_READY)
 
     def cancel_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, apply_to_network: bool = False
@@ -1117,6 +1148,7 @@ class TaskOccurrenceService:
         if not occurrence:
             raise ValueError("משימה לא נמצאה")
         self._assert_branch_access(actor, occurrence.branch_id)
+        self._promote_completion_media(occurrence.id)
         # Fusion lecture seule (template) — ne pas persister les URLs template sur l'occurrence
         # (sinon cancel/purge supprimerait les fichiers du modèle récurrent).
         return self._to_api(occurrence)

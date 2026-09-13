@@ -126,6 +126,7 @@ export interface TaskCompletion {
   manager_reviewed_at?: string | null;
   rejection_note?: string | null;
   quality_rating?: number | null;
+  media_ready?: boolean;
 }
 
 export interface TaskOccurrence {
@@ -364,6 +365,13 @@ export const taskService = {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/delegate`,
       { assignee_user_id: assigneeUserId }
+    );
+    return response.data;
+  },
+
+  confirmMedia: async (occurrenceId: string) => {
+    const response = await api.post<{ media_ready: boolean; promoted?: boolean }>(
+      `/tasks/occurrences/${occurrenceId}/confirm-media`,
     );
     return response.data;
   },
