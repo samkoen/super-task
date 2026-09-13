@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -40,11 +41,13 @@ from app.core.config import (
     CORS_ALLOW_ORIGIN_REGEX,
     CORS_ALLOW_ORIGINS,
     IS_PRODUCTION,
+    IS_VERCEL,
     LOG_LEVEL,
     SECRET_KEY,
     UPLOADS_DIR,
     assert_secure_runtime_config,
 )
+from app.db.auto_migrate import run_startup_migrations
 from app.realtime.sse_hub import sse_hub
 
 logger = logging.getLogger(__name__)
@@ -64,6 +67,11 @@ def _configure_logging() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_startup_migrations(
+        is_production=IS_PRODUCTION,
+        is_vercel=IS_VERCEL,
+        database_url=os.environ.get("DATABASE_URL", ""),
+    )
     sse_hub.bind_loop(asyncio.get_running_loop())
     yield
 
