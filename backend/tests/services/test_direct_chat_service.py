@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from app.domain import roles
@@ -117,6 +118,30 @@ def test_oved_opens_network_thread_when_flag_and_no_bm():
     opened = svc.open_mine(oved)
     convs.get_or_create.assert_called_with("network", "n1", "e1")
     assert opened["conversation"]["id"] == "cn"
+
+
+def test_manager_inbox_adds_branch_and_sums_task_unread():
+    svc, convs, messages, reads, users = _svc()
+    oved = _user()
+    users.list_users.return_value = [oved]
+    convs.list_for_scope.return_value = [_conv()]
+    convs.find.return_value = None
+    messages.unread_count.return_value = 1
+    reads.last_read_at.return_value = None
+    users.find_network_manager.return_value = None
+    branches = MagicMock()
+    branches.list_branches.return_value = [SimpleNamespace(id="b1", name="תל אביב")]
+    tasks = MagicMock()
+    tasks.unread_today_by_assignees.return_value = {"e1": 2}
+    svc._branches = branches
+    svc._task_chats = tasks
+    inbox = svc.inbox(ActorContext("m1", roles.BRANCH_MANAGER, "n1", "b1"))
+    card = inbox["items"][0]
+    assert card["branch_name"] == "תל אביב"
+    assert card["direct_unread_count"] == 1
+    assert card["task_unread_count"] == 2
+    assert card["unread_count"] == 3
+    assert inbox["unread_count"] == 3
 
 
 def test_branch_manager_opens_oved_and_lists_inbox():

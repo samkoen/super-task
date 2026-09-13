@@ -412,6 +412,22 @@ class TaskMessage(Base):
     )
 
 
+class TaskMessageRead(Base):
+    __tablename__ = "task_message_reads"
+
+    occurrence_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("task_occurrences.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    last_read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class TaskGalleryItem(Base):
     __tablename__ = "task_gallery_items"
 

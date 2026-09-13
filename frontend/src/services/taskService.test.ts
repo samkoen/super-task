@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { emptyBody, mockPost } = vi.hoisted(() => ({
+const { emptyBody, mockPost, mockGet } = vi.hoisted(() => ({
   emptyBody: {} as Record<string, never>,
   mockPost: vi.fn(),
+  mockGet: vi.fn(),
 }));
 
 vi.mock("./api", () => ({
   EMPTY_JSON_BODY: emptyBody,
   default: {
     post: (...args: unknown[]) => mockPost(...args),
-    get: vi.fn(),
+    get: (...args: unknown[]) => mockGet(...args),
   },
 }));
 
@@ -64,5 +65,14 @@ describe("taskService CapacitorHttp empty POST", () => {
       { params: undefined },
     );
     expect(JSON.stringify(mockPost.mock.calls[0][1])).toBe("{}");
+  });
+});
+
+describe("taskService manager day chats", () => {
+  it("loads today's task threads for an employee", async () => {
+    mockGet.mockResolvedValue({ data: { items: [{ id: "o1", unread_count: 2 }] } });
+    const data = await taskService.listManagerDayChats("e1");
+    expect(mockGet).toHaveBeenCalledWith("/tasks/manager-day-chats/e1");
+    expect(data.items[0].unread_count).toBe(2);
   });
 });

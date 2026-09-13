@@ -25,9 +25,13 @@ export interface DirectChatCard {
   counterpart_name: string;
   counterpart_avatar_url?: string | null;
   counterpart_role: string;
+  branch_id?: string | null;
+  branch_name?: string | null;
   last_preview: string | null;
   last_at: string | null;
   unread_count: number;
+  direct_unread_count?: number;
+  task_unread_count?: number;
 }
 
 export interface DirectChatInbox {

@@ -22,8 +22,13 @@ from app.domain.employee_task_chats import (
     is_open_employee_chat_task,
     sort_employee_task_chats,
 )
-from app.domain.scope import ActorContext
-from app.domain.task_scope import can_manage_tasks, can_use_employee_work_surface
+from app.domain.manager_employee_chats import manager_task_chat_card, sort_manager_day_chats
+from app.domain.scope import ActorContext, assert_branch_visible
+from app.domain.task_scope import (
+    can_manage_tasks,
+    can_use_employee_work_surface,
+    visible_branch_ids_for_tasks,
+)
 from app.domain.task_chat import (
     can_employee_post,
     can_manager_post,
@@ -85,12 +90,14 @@ class TaskMessageService:
         user_repo: UserRepository,
         branch_repo: BranchRepository,
         completion_repo: TaskCompletionRepository | None = None,
+        read_repo=None,
     ):
         self._messages = message_repo
         self._occurrences = occurrence_repo
         self._users = user_repo
         self._branches = branch_repo
         self._completions = completion_repo
+        self._reads = read_repo
 
     def list_employee_chats(self, actor: ActorContext) -> dict:
         if not can_use_employee_work_surface(actor):
@@ -105,6 +112,32 @@ class TaskMessageService:
         ]
         return {"items": sort_employee_task_chats(items)}
 
+    def list_manager_day_chats(self, actor: ActorContext, employee_id: str) -> dict:
+        self._assert_can_list_employee_day(actor, employee_id)
+        occs = self._today_occurrences(actor, assignee_id=employee_id)
+        ids = [o.id for o in occs]
+        last = self._messages.last_messages_for(ids)
+        unreads = self._messages.unread_counts(ids, actor.user_id)
+        items = [
+            manager_task_chat_card(occ, last.get(occ.id), unreads.get(occ.id, 0))
+            for occ in occs
+        ]
+        return {"items": sort_manager_day_chats(items)}
+
+    def unread_today_by_assignees(
+        self, actor: ActorContext, assignee_ids: list[str]
+    ) -> dict[str, int]:
+        if not assignee_ids or not can_manage_tasks(actor):
+            return {}
+        wanted = set(assignee_ids)
+        occs = self._today_occurrences(actor, assignee_ids=wanted)
+        counts = self._messages.unread_counts([o.id for o in occs], actor.user_id)
+        by_user = {uid: 0 for uid in wanted}
+        for occ in occs:
+            if occ.assignee_user_id in by_user:
+                by_user[occ.assignee_user_id] += counts.get(occ.id, 0)
+        return by_user
+
     def list_messages(
         self,
         actor: ActorContext,
@@ -115,6 +148,8 @@ class TaskMessageService:
     ) -> dict:
         occurrence = self._require_occurrence(occurrence_id)
         self._assert_can_access(actor, occurrence)
+        if self._reads:
+            self._reads.mark_read(occurrence_id, actor.user_id)
         items, has_more = self._messages.list_page(
             occurrence_id, limit=clamp_chat_page_size(limit), before_id=before
         )
@@ -165,6 +200,8 @@ class TaskMessageService:
             file_name=stored_file_name(file_name, has_file=bool((file_url or "").strip())),
         )
 
+        if self._reads:
+            self._reads.mark_read(occurrence_id, actor.user_id)
         message = await self._enrich_i18n(message, actor=actor, occurrence=occurrence)
 
         new_status: str | None = None
@@ -283,13 +320,43 @@ class TaskMessageService:
             branch = self._branches.find_by_id(occurrence.branch_id)
             if not branch:
                 raise ValueError("סניף לא נמצא")
-            from app.domain.scope import assert_branch_visible
-
             assert_branch_visible(actor, branch.network_id, branch.id)
             return
         if actor.role == roles.EMPLOYEE and occurrence.assignee_user_id == actor.user_id:
             return
         raise PermissionError("אין הרשאה לצפות בהודעות")
+
+    def _assert_can_list_employee_day(self, actor: ActorContext, employee_id: str) -> None:
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לרשימת שיחות")
+        user = self._users.find_by_id(employee_id)
+        if not user or not user.is_active:
+            raise ValueError("משתמש לא נמצא")
+        if not user.branch_id:
+            if actor.role != roles.ADMIN:
+                raise PermissionError("אין הרשאה לצפות בעובד זה")
+            return
+        branch = self._branches.find_by_id(user.branch_id)
+        if not branch:
+            raise ValueError("סניף לא נמצא")
+        assert_branch_visible(actor, branch.network_id, branch.id)
+
+    def _today_occurrences(
+        self,
+        actor: ActorContext,
+        *,
+        assignee_id: str | None = None,
+        assignee_ids: set[str] | None = None,
+    ):
+        today = datetime.now(TZ).date()
+        occs = self._occurrences.list_occurrences(
+            branch_ids=visible_branch_ids_for_tasks(actor, self._branches),
+            assignee_user_id=assignee_id,
+            due_on=today,
+        )
+        if assignee_ids is None:
+            return occs
+        return [o for o in occs if o.assignee_user_id in assignee_ids]
 
     def _to_api(self, message, *, actor: ActorContext | None = None) -> dict:
         sender = self._users.find_by_id(message.sender_user_id)

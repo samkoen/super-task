@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ManagerDirectChatsPage from "./ManagerDirectChatsPage";
 import { he } from "../../i18n/he";
 import { directChatService } from "../../services/directChatService";
+import { taskService } from "../../services/taskService";
 
 const { showError, showSuccess } = vi.hoisted(() => ({
   showError: vi.fn(),
@@ -21,8 +22,18 @@ vi.mock("../../services/directChatService", () => ({
   },
 }));
 
+vi.mock("../../services/taskService", () => ({
+  taskService: {
+    listManagerDayChats: vi.fn(),
+  },
+}));
+
 vi.mock("../../components/chat/DirectChatThread", () => ({
   default: () => <div>thread</div>,
+}));
+
+vi.mock("../../components/tasks/TaskChatPanel", () => ({
+  default: () => <div>task-thread</div>,
 }));
 
 vi.mock("../../components/employee/EmployeeAvatar", () => ({
@@ -33,56 +44,89 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
   useDirectChatLiveSync: () => undefined,
 }));
 
+vi.mock("../../hooks/useTaskChangeListener", () => ({
+  useTaskChangeListener: () => undefined,
+}));
+
+function inboxOved(overrides: Record<string, unknown> = {}) {
+  return {
+    items: [
+      {
+        id: "c1",
+        kind: "down",
+        counterpart_user_id: "e1",
+        counterpart_name: "דן כהן",
+        counterpart_role: "employee",
+        branch_name: "תל אביב",
+        last_preview: "שלום",
+        last_at: "2026-08-26T10:00:00+03:00",
+        unread_count: 3,
+        direct_unread_count: 1,
+        task_unread_count: 2,
+        ...overrides,
+      },
+    ],
+    up: {
+      id: null,
+      kind: "up",
+      counterpart_user_id: "nm",
+      counterpart_name: "רשת לוי",
+      counterpart_role: "network_manager",
+      last_preview: null,
+      last_at: null,
+      unread_count: 0,
+    },
+    unread_count: 3,
+  };
+}
+
 describe("ManagerDirectChatsPage", () => {
-  it("lists ovdim and the network-manager thread", async () => {
-    vi.mocked(directChatService.inbox).mockResolvedValue({
+  it("lists ovdim with branch tag and the network-manager thread", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
+    expect(screen.getByText("תל אביב")).toBeTruthy();
+    expect(screen.getByText(he.directChatManagerTitle)).toBeTruthy();
+    expect(screen.getByText(he.directChatBroadcast)).toBeTruthy();
+    expect(screen.getByLabelText(he.directChatSearch)).toBeTruthy();
+  });
+
+  it("filters contacts by branch search", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(he.directChatSearch), { target: { value: "חיפה" } });
+    expect(screen.getByText(he.directChatNoSearchResults)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(he.directChatSearch), { target: { value: "תל" } });
+    expect(screen.getByText("דן כהן")).toBeTruthy();
+  });
+
+  it("opens employee day chats instead of the thread", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
+    vi.mocked(taskService.listManagerDayChats).mockResolvedValue({
       items: [
         {
-          id: "c1",
-          kind: "down",
-          counterpart_user_id: "e1",
-          counterpart_name: "דן כהן",
-          counterpart_role: "employee",
-          last_preview: "שלום",
-          last_at: "2026-08-26T10:00:00+03:00",
-          unread_count: 1,
+          id: "o1",
+          title: "מדף",
+          status: "in_progress",
+          last_preview: "היי",
+          last_at: "2026-08-26T11:00:00+03:00",
+          unread_count: 2,
         },
       ],
-      up: {
-        id: null,
-        kind: "up",
-        counterpart_user_id: "nm",
-        counterpart_name: "רשת לוי",
-        counterpart_role: "network_manager",
-        last_preview: null,
-        last_at: null,
-        unread_count: 0,
-      },
-      unread_count: 1,
     });
     render(<ManagerDirectChatsPage />);
     await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
-    expect(screen.getByText(he.directChatManagerTitle)).toBeTruthy();
-    expect(screen.getByText(he.directChatBroadcast)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /דן כהן/ }));
+    await waitFor(() => expect(screen.getByText(he.employeeGeneralChat)).toBeTruthy());
+    expect(screen.getByText("מדף")).toBeTruthy();
+    expect(screen.queryByText("thread")).toBeNull();
+    expect(directChatService.openWith).not.toHaveBeenCalled();
   });
 
-  it("opens a thread with a visible back control that returns to the list", async () => {
-    vi.mocked(directChatService.inbox).mockResolvedValue({
-      items: [
-        {
-          id: "c1",
-          kind: "down",
-          counterpart_user_id: "e1",
-          counterpart_name: "דן כהן",
-          counterpart_role: "employee",
-          last_preview: "שלום",
-          last_at: "2026-08-26T10:00:00+03:00",
-          unread_count: 0,
-        },
-      ],
-      up: null,
-      unread_count: 0,
-    });
+  it("opens the general thread from the employee list", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
+    vi.mocked(taskService.listManagerDayChats).mockResolvedValue({ items: [] });
     vi.mocked(directChatService.openWith).mockResolvedValue({
       conversation: { id: "c1" },
       messages: [],
@@ -91,8 +135,10 @@ describe("ManagerDirectChatsPage", () => {
     render(<ManagerDirectChatsPage />);
     await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /דן כהן/ }));
-    await waitFor(() => expect(screen.getByRole("button", { name: he.goBack })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: he.goBack }));
+    await waitFor(() => expect(screen.getByText(he.employeeGeneralChat)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(he.employeeGeneralChat) }));
+    await waitFor(() => expect(screen.getByText("thread")).toBeTruthy());
+    fireEvent.click(screen.getAllByRole("button", { name: he.goBack })[0]);
     await waitFor(() => expect(screen.queryByText("thread")).toBeNull());
   });
 });

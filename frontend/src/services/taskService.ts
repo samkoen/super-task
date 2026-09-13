@@ -54,6 +54,10 @@ export interface EmployeeTaskChat {
   last_at: string | null;
 }
 
+export interface ManagerDayTaskChat extends EmployeeTaskChat {
+  unread_count: number;
+}
+
 export interface TaskTemplate {
   id: string;
   branch_id: string;
@@ -411,6 +415,13 @@ export const taskService = {
 
   listEmployeeChats: async () => {
     const { data } = await api.get<{ items: EmployeeTaskChat[] }>("/tasks/employee-chats");
+    return data;
+  },
+
+  listManagerDayChats: async (employeeId: string) => {
+    const { data } = await api.get<{ items: ManagerDayTaskChat[] }>(
+      `/tasks/manager-day-chats/${employeeId}`,
+    );
     return data;
   },
 

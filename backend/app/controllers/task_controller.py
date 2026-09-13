@@ -13,7 +13,10 @@ from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
-from app.repositories.task_message_repository import TaskMessageRepository
+from app.repositories.task_message_repository import (
+    TaskMessageReadRepository,
+    TaskMessageRepository,
+)
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
@@ -183,6 +186,7 @@ def get_message_service(db: Session = Depends(get_db)) -> TaskMessageService:
         UserRepository(db),
         BranchRepository(db),
         TaskCompletionRepository(db),
+        TaskMessageReadRepository(db),
     )
 
 
@@ -654,6 +658,18 @@ def list_employee_chats(
     return service.list_employee_chats(actor)
 
 
+@router.get("/manager-day-chats/{employee_id}")
+@handle_controller_errors
+def list_manager_day_chats(
+    employee_id: str,
+    request: Request,
+    service: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    return service.list_manager_day_chats(actor, employee_id)
+
+
 @router.get("/occurrences/{occurrence_id}/messages")
 @handle_controller_errors
 def list_task_messages(
@@ -665,7 +681,9 @@ def list_task_messages(
     before: str | None = Query(None),
 ):
     actor = load_actor(request, UserRepository(db))
-    return service.list_messages(actor, occurrence_id, limit=limit, before=before)
+    page = service.list_messages(actor, occurrence_id, limit=limit, before=before)
+    db.commit()
+    return page
 
 
 @router.post("/occurrences/{occurrence_id}/messages", status_code=201)

@@ -831,6 +831,8 @@ export const he = {
     count === 1 ? "ההודעה נשלחה לעובד אחד" : `ההודעה נשלחה ל-${count} אנשים`,
   directChatNoPeers: "אין אנשי קשר לשיחה",
   directChatPickManager: "עם מי לשוחח?",
+  directChatSearch: "חיפוש איש קשר או סניף",
+  directChatNoSearchResults: "לא נמצאו אנשי קשר",
   issueReportPhoto: "תמונה",
   issueReportCreateTask: "צור משימה",
   issueReportDelete: "מחק דיווח",
