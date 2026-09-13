@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ManagerDirectChatsPage from "./ManagerDirectChatsPage";
 import { he } from "../../i18n/he";
-import { directChatService } from "../../services/directChatService";
+import { directChatService, type DirectChatCard, type DirectChatInbox } from "../../services/directChatService";
 import { taskService } from "../../services/taskService";
 
 const { showError, showSuccess } = vi.hoisted(() => ({
@@ -48,7 +48,7 @@ vi.mock("../../hooks/useTaskChangeListener", () => ({
   useTaskChangeListener: () => undefined,
 }));
 
-function inboxOved(overrides: Record<string, unknown> = {}) {
+function inboxOved(overrides: Partial<DirectChatCard> = {}): DirectChatInbox {
   return {
     items: [
       {
