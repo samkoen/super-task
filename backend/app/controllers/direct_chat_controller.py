@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.actor import load_actor
 from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
+from app.repositories.branch_repository import BranchRepository
 from app.repositories.direct_chat_repository import (
     DirectConversationReadRepository,
     DirectConversationRepository,
@@ -11,10 +12,17 @@ from app.repositories.direct_chat_repository import (
 )
 from app.repositories.network_repository import NetworkRepository
 from app.repositories.notification_repository import NotificationRepository
+from app.repositories.task_completion_repository import TaskCompletionRepository
+from app.repositories.task_message_repository import (
+    TaskMessageReadRepository,
+    TaskMessageRepository,
+)
+from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
 from app.services.direct_chat_service import DirectChatService
 from app.services.media_upload_service import upload_attachment
 from app.services.notification_service import NotificationService
+from app.services.task_message_service import TaskMessageService
 
 router = APIRouter()
 
@@ -27,13 +35,25 @@ _CHAT_FOLDERS = {
 
 
 def get_direct_chat_service(db: Session = Depends(get_db)) -> DirectChatService:
+    users = UserRepository(db)
+    branches = BranchRepository(db)
+    task_chats = TaskMessageService(
+        TaskMessageRepository(db),
+        TaskOccurrenceRepository(db),
+        users,
+        branches,
+        TaskCompletionRepository(db),
+        TaskMessageReadRepository(db),
+    )
     return DirectChatService(
         DirectConversationRepository(db),
         DirectMessageRepository(db),
         DirectConversationReadRepository(db),
-        UserRepository(db),
-        NotificationService(NotificationRepository(db), UserRepository(db)),
+        users,
+        NotificationService(NotificationRepository(db), users),
         NetworkRepository(db),
+        branches,
+        task_chats,
     )
 
 

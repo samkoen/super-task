@@ -19,6 +19,7 @@ from app.domain.direct_chat import (
     sort_downward_peers,
     upward_scope,
 )
+from app.domain.manager_employee_chats import contact_unread_total
 from app.domain.scope import ActorContext
 from app.domain.task_chat import has_message_content
 from app.models.direct_conversation import DirectConversation
@@ -43,6 +44,8 @@ class DirectChatService:
         user_repo: UserRepository,
         notification_service: NotificationService | None = None,
         network_repo: NetworkRepository | None = None,
+        branch_repo=None,
+        task_chats=None,
     ):
         self._convs = conv_repo
         self._messages = message_repo
@@ -50,6 +53,8 @@ class DirectChatService:
         self._users = user_repo
         self._notifications = notification_service
         self._networks = network_repo
+        self._branches = branch_repo
+        self._task_chats = task_chats
 
     def inbox(self, actor: ActorContext) -> dict:
         if actor.role == roles.EMPLOYEE:
@@ -61,6 +66,9 @@ class DirectChatService:
             for peer in self._peers(*down):
                 items.append(self._card(actor, peer, convs.get(peer.id), kind="down", scope=down[0]))
         up = self._up_card(actor)
+        items = self._enrich_manager_cards(actor, items)
+        if up:
+            up = self._enrich_manager_cards(actor, [up])[0]
         unread = sum(int(i.get("unread_count") or 0) for i in items)
         if up:
             unread += int(up.get("unread_count") or 0)
@@ -329,10 +337,40 @@ class DirectChatService:
             "counterpart_name": peer.full_name,
             "counterpart_avatar_url": peer.avatar_url,
             "counterpart_role": peer.role,
+            "branch_id": peer.branch_id,
+            "branch_name": None,
             "last_preview": conv.last_preview if conv else None,
             "last_at": conv.last_at if conv else None,
+            "direct_unread_count": unread,
+            "task_unread_count": 0,
             "unread_count": unread,
         }
+
+    def _enrich_manager_cards(self, actor: ActorContext, items: list[dict]) -> list[dict]:
+        if not items:
+            return items
+        names = self._branch_names(items)
+        task_unreads = self._task_unreads(actor, items)
+        for item in items:
+            bid = item.get("branch_id")
+            item["branch_name"] = names.get(bid) if bid else None
+            task_unread = int(task_unreads.get(item["counterpart_user_id"], 0))
+            direct = int(item.get("direct_unread_count") or 0)
+            item["task_unread_count"] = task_unread
+            item["unread_count"] = contact_unread_total(direct, task_unread)
+        return items
+
+    def _branch_names(self, items: list[dict]) -> dict[str, str]:
+        ids = list({i.get("branch_id") for i in items if i.get("branch_id")})
+        if not ids or not self._branches:
+            return {}
+        return {b.id: b.name for b in self._branches.list_branches(branch_ids=ids)}
+
+    def _task_unreads(self, actor: ActorContext, items: list[dict]) -> dict[str, int]:
+        if not self._task_chats:
+            return {}
+        ids = [i["counterpart_user_id"] for i in items]
+        return self._task_chats.unread_today_by_assignees(actor, ids)
 
     def _recipient_break_fields(self, actor: ActorContext, recipient_user_id: str) -> dict:
         if actor.role == roles.EMPLOYEE:
