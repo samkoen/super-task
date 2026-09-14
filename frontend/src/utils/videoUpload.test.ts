@@ -18,7 +18,7 @@ vi.mock("../plugins/nativeBlobUpload", () => ({
 }));
 
 import { attachNativeMediaPath } from "./nativeMediaPath";
-import { blobPutUrl, fileForBlobVideoUpload, putBlobWithClientToken, shouldUseLocalVideoProxy, shouldUseSameOriginVideoProxy, uploadVideoFile } from "./videoUpload";
+import { blobPutHeaders, blobPutUrl, fileForBlobVideoUpload, putBlobWithClientToken, shouldUseLocalVideoProxy, shouldUseSameOriginVideoProxy, uploadVideoFile } from "./videoUpload";
 
 const directIntent = {
   mode: "direct" as const,
@@ -41,6 +41,20 @@ describe("videoUpload", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+
+  it("omits x-add-random-suffix so Chrome CORS preflight can pass", () => {
+    const headers = blobPutHeaders(
+      directIntent,
+      new File(["clip"], "clip.webm", { type: "video/webm" }),
+    );
+    expect(headers).not.toHaveProperty("x-add-random-suffix");
+    expect(headers).toEqual({
+      authorization: "Bearer vercel_blob_client_STORE_x",
+      "x-api-version": "11",
+      "x-content-type": "video/webm",
+      "x-vercel-blob-access": "private",
+    });
   });
 
   it("builds the Blob PUT url with the pathname query", () => {
