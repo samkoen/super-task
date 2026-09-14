@@ -1,9 +1,11 @@
+import { resolveApiBaseUrl } from "../services/apiBaseUrl";
+
 /** Résout une URL média : preview locale, ou proxy API auth pour objet privé /uploads. */
 export function mediaUrl(path: string | null | undefined): string | null {
   if (!path) return null;
   if (path.startsWith("blob:")) return path;
 
-  const base = import.meta.env.VITE_API_URL?.replace(/\/api$/, "") ?? "";
+  const base = resolveApiBaseUrl().replace(/\/api$/, "");
 
   if (path.startsWith("http://") || path.startsWith("https://")) {
     if (isPrivateObjectMediaUrl(path)) {

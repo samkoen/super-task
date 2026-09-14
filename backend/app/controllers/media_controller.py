@@ -4,13 +4,14 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.auth.actor import load_actor
 from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
 from app.repositories.user_repository import UserRepository
+from app.domain.object_media_url import guess_content_type
 from app.services import blob_storage
 from app.services.media_access_service import actor_can_access_media_url
 from app.services.video_direct_upload_service import create_video_upload_intent
@@ -39,12 +40,12 @@ def _serve_media(request: Request, media_url: str, db: Session) -> Response:
 
 
 def _serve_local(cleaned: str) -> Response:
-    payload = blob_storage.fetch_media(cleaned)
-    if not payload:
+    path = blob_storage.local_file_path(cleaned)
+    if not path:
         raise HTTPException(status_code=404, detail="Media introuvable")
-    return Response(
-        content=payload.content,
-        media_type=payload.content_type,
+    return FileResponse(
+        path,
+        media_type=guess_content_type(path.suffix),
         headers={"Cache-Control": "private, max-age=300"},
     )
 

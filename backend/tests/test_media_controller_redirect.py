@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse
 
 from app.controllers import media_controller as ctrl
 
@@ -25,16 +25,17 @@ def test_serve_media_redirects_r2_to_presigned_get(monkeypatch):
     assert response.headers["location"] == "https://signed.example/get/v.webm"
 
 
-def test_serve_media_keeps_local_bytes(monkeypatch):
+def test_serve_media_streams_local_file(monkeypatch, tmp_path):
     monkeypatch.setattr(ctrl, "load_actor", lambda *_a, **_k: MagicMock(user_id="u1"))
     monkeypatch.setattr(ctrl, "UserRepository", lambda _db: MagicMock())
     monkeypatch.setattr(ctrl.blob_storage, "is_stored_media_url", lambda _url: True)
     monkeypatch.setattr(ctrl, "actor_can_access_media_url", lambda *_a, **_k: True)
-    payload = MagicMock(content=b"jpg", content_type="image/jpeg")
-    monkeypatch.setattr(ctrl.blob_storage, "fetch_media", lambda _url: payload)
-    response = ctrl._serve_media(MagicMock(), "/uploads/task_photos/a.jpg", MagicMock())
-    assert isinstance(response, Response)
-    assert response.body == b"jpg"
+    video = tmp_path / "a.webm"
+    video.write_bytes(b"webm")
+    monkeypatch.setattr(ctrl.blob_storage, "local_file_path", lambda _url: video)
+    response = ctrl._serve_media(MagicMock(), "/uploads/task_videos/a.webm", MagicMock())
+    assert isinstance(response, FileResponse)
+    assert response.path == video
 
 
 def test_serve_media_forbidden_skips_presign(monkeypatch):

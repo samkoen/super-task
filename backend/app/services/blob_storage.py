@@ -102,7 +102,7 @@ def media_is_readable(url: str | None) -> bool:
     if not cleaned:
         return False
     if is_local_upload_path(cleaned):
-        return True
+        return local_file_path(cleaned) is not None
     if is_object_store_url(cleaned) and config.object_storage_enabled():
         from app.services import object_store
 
@@ -201,7 +201,7 @@ def _delete_local(url: str) -> None:
         path.unlink()
 
 
-def _read_local(url: str) -> tuple[bytes, str] | None:
+def local_file_path(url: str) -> Path | None:
     relative = url.lstrip("/").removeprefix("uploads/")
     if relative.startswith("uploads/"):
         relative = relative[len("uploads/") :]
@@ -209,5 +209,12 @@ def _read_local(url: str) -> tuple[bytes, str] | None:
         return None
     path = UPLOADS_DIR / relative
     if not path.is_file():
+        return None
+    return path
+
+
+def _read_local(url: str) -> tuple[bytes, str] | None:
+    path = local_file_path(url)
+    if not path:
         return None
     return path.read_bytes(), path.suffix

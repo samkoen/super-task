@@ -38,11 +38,16 @@ def test_copy_local_duplicates_file(monkeypatch, tmp_path: Path):
     assert (tmp_path / copied.removeprefix("/uploads/")).read_bytes() == b"photo"
 
 
-def test_media_is_ready_local_uploads_are_sync():
+def test_media_is_ready_local_uploads_are_sync(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.blob_storage.UPLOADS_DIR", tmp_path)
+    video_dir = tmp_path / "task_videos"
+    video_dir.mkdir()
+    (video_dir / "a.mp4").write_bytes(b"vid")
     from app.services.blob_storage import media_is_ready
 
     assert media_is_ready("") is False
     assert media_is_ready("/uploads/task_videos/a.mp4") is True
+    assert media_is_ready("/uploads/task_videos/missing.mp4") is False
 
 
 def test_media_is_ready_uses_object_store(monkeypatch):

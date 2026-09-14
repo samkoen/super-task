@@ -4,9 +4,7 @@ from __future__ import annotations
 import logging
 import os
 from functools import lru_cache
-
-from botocore.client import BaseClient
-from botocore.config import Config
+from typing import Any
 
 from app.core import config
 from app.domain.object_media_url import (
@@ -26,8 +24,9 @@ os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
 
 
 @lru_cache(maxsize=1)
-def s3_client() -> BaseClient:
+def s3_client() -> Any:
     import boto3
+    from botocore.config import Config
 
     if not config.object_storage_enabled():
         raise RuntimeError("R2 object storage is not configured")

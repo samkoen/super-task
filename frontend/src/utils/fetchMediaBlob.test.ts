@@ -13,7 +13,7 @@ describe("fetchMediaBlob", () => {
     await expect(fetchMediaBlob("/uploads/p.jpg")).resolves.toBe(blob);
     expect(fetchMock).toHaveBeenCalledWith("/proxy?src=/uploads/p.jpg", {
       credentials: "include",
-      redirect: "manual",
+      redirect: "follow",
     });
     vi.unstubAllGlobals();
   });
@@ -29,7 +29,14 @@ describe("fetchMediaBlob", () => {
       })
       .mockResolvedValueOnce({ ok: true, status: 200, blob: async () => blob });
     vi.stubGlobal("fetch", fetchMock);
-    await expect(fetchMediaBlob("/uploads/p.jpg")).resolves.toBe(blob);
+    await expect(fetchMediaBlob("https://abc.r2.cloudflarestorage.com/super-media/v.webm")).resolves.toBe(
+      blob,
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/proxy?src=https://abc.r2.cloudflarestorage.com/super-media/v.webm",
+      { credentials: "include", redirect: "manual" },
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(2, "https://signed.example/v.webm");
     vi.unstubAllGlobals();
   });

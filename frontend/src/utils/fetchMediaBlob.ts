@@ -8,12 +8,19 @@ import {
 export async function fetchMediaBlob(path: string): Promise<Blob> {
   const url = mediaUrl(path);
   if (!url) throw new Error("empty media path");
-  const response = await fetch(url, { credentials: "include", redirect: "manual" });
+  const response = await fetch(url, {
+    credentials: "include",
+    redirect: shouldFollowRedirect(path) ? "follow" : "manual",
+  });
   if (isRedirect(response.status)) {
     return fetchRedirectedBlob(response);
   }
   if (!response.ok) throw new Error(`media fetch failed: ${response.status}`);
   return response.blob();
+}
+
+function shouldFollowRedirect(path: string): boolean {
+  return path.startsWith("/uploads/") || path.startsWith("blob:");
 }
 
 function isRedirect(status: number): boolean {
