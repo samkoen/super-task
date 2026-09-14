@@ -121,8 +121,8 @@ async function completeWithLostResponseRetry(complete: () => Promise<void>): Pro
   }
 }
 
-/** Clôture auto une fois les cases prêtes. Tâche rouverte : l'oved clique סיום משימה. */
-export function shouldAutoCompleteEmployeeTask(
+/** Règles métier si on réactive l'auto-siyum. Désactivé en prod : voir shouldAutoComplete. */
+export function employeeTaskAutoCompleteEligible(
   requirementCount: number,
   slotsFilled: boolean,
   status: TaskStatus | string,
@@ -135,6 +135,22 @@ export function shouldAutoCompleteEmployeeTask(
   if (needsTaskStart(status) && hasExternalStartUrl(startUrl)) return false;
   if (hasExternalStartUrl(startUrl) && !startConfirmed) return false;
   return true;
+}
+
+/**
+ * Toujours false. L'auto-siyum lançait l'upload pendant le teardown caméra :
+ * PUT CORS vers vercel.com/api/blob → Failed to fetch, complete jamais appelé
+ * (logs Vercel : video-intent 200, zéro complete / upload-video).
+ */
+export function shouldAutoCompleteEmployeeTask(
+  _requirementCount: number,
+  _slotsFilled: boolean,
+  _status: TaskStatus | string,
+  _startUrl: string | null | undefined,
+  _startConfirmed = true,
+  _priorCompletion = false,
+): boolean {
+  return false;
 }
 
 export function employeeSubmitLocked(saving: boolean, annotating: boolean): boolean {

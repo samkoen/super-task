@@ -25,6 +25,7 @@ import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./Photo
 import CameraFacingPreview from "./CameraFacingPreview";
 import { he } from "../../i18n/he";
 import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
+import { snapshotMediaFile } from "../../utils/videoUpload";
 import { canUseNativePhotoCapture } from "../../plugins/nativePhotoCapture";
 import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
 import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
@@ -314,8 +315,9 @@ function VideoCaptureDialog({
         (blob.type || "video/webm").split(";")[0].trim() || "video/webm",
       );
       const durationSeconds = elapsedSeconds;
+      const frozen = await snapshotMediaFile(file);
+      await onCapture(frozen, durationSeconds);
       onClose();
-      await onCapture(file, durationSeconds);
     } finally {
       setConfirming(false);
     }
