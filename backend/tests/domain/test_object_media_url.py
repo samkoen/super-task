@@ -25,6 +25,7 @@ def test_is_r2_and_vercel_detection():
     assert is_vercel_blob_url(r2) is False
     assert is_private_object_url(r2) is True
     assert is_vercel_blob_url(blob) is True
-    assert is_private_object_url(blob) is True
+    assert is_private_object_url(blob) is False
     assert is_private_object_url("https://x.public.blob.vercel-storage.com/a.jpg") is False
+    assert is_r2_media_url("https://pub-abc.r2.dev/super-media/a.mp4") is True
     assert is_r2_media_url("/uploads/a.jpg") is False

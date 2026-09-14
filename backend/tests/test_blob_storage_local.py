@@ -73,7 +73,7 @@ def test_is_remote_media_url():
     assert is_remote_media_url("/uploads/task_photos/a.jpg") is False
     assert is_remote_media_url(None) is False
     assert is_vercel_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is True
-    assert is_private_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is True
+    assert is_private_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is False
     assert is_object_store_url("https://abc.r2.cloudflarestorage.com/b/a.jpg") is True
     assert is_stored_media_url("https://x.private.blob.vercel-storage.com/avatars/a.jpg") is False
     assert is_stored_media_url("/uploads/avatars/a.jpg") is True

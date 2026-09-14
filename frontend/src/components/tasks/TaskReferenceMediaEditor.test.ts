@@ -46,7 +46,7 @@ describe("referenceAudioPlaybackSrc", () => {
   it("prefers the local blob preview over the remote blob URL", () => {
     expect(
       referenceAudioPlaybackSrc({
-        reference_audio_url: "https://x.private.blob.vercel-storage.com/task_audio/a.webm",
+        reference_audio_url: "https://abc.r2.cloudflarestorage.com/super-media/task_audio/a.webm",
         pending_audio_preview: "blob:http://localhost/audio",
       }),
     ).toBe("blob:http://localhost/audio");

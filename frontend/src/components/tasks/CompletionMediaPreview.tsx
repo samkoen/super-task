@@ -2,8 +2,8 @@ import { Box, Button, Typography } from "@mui/material";
 import CompactAudioPlayer from "../media/CompactAudioPlayer";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import { he } from "../../i18n/he";
+import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
-import { mediaUrl } from "../../utils/mediaUrl";
 import {
   attachmentsFromCompletion,
   mapAttachmentsToSlots,
@@ -126,56 +126,120 @@ function LegacyAttachmentList({
 }) {
   return (
     <>
-      {items.map((item, index) => {
-        const src = mediaUrl(item.url);
-        if (!src) return null;
-        return (
-          <Box key={`${item.kind}-${index}`}>
-            <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-              {kindLabel(item.kind)}
-            </Typography>
-            {item.kind === "photo" && (
-              <Box component="img" src={src} alt={he.taskReferencePhoto} sx={{ maxWidth: "100%", maxHeight: 180, borderRadius: 1, display: "block" }} />
-            )}
-            {item.kind === "video" && videosPending && (
-              <Box sx={{ position: "relative", maxWidth: 240 }}>
-                {item.poster_url ? (
-                  <Box
-                    component="img"
-                    src={mediaUrl(item.poster_url) ?? undefined}
-                    alt={he.taskReferenceVideo}
-                    sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
-                  />
-                ) : (
-                  <Box sx={{ height: 120, bgcolor: "action.hover", borderRadius: 1 }} />
-                )}
-                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                  {he.reviewVideoLoading}
-                </Typography>
-              </Box>
-            )}
-            {item.kind === "video" && !videosPending && (
-              <Box component="video" src={src} controls sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }} />
-            )}
-            {item.kind === "audio" && <CompactAudioPlayer src={src} />}
-            {item.kind === "photo" && onRemovePhoto && (
-              <Button size="small" color="inherit" disabled={disabled} onClick={onRemovePhoto} sx={{ mt: 0.5 }}>
-                {he.removeMedia}
-              </Button>
-            )}
-            {item.kind === "video" && onRemoveVideo && (
-              <Button size="small" color="inherit" disabled={disabled} onClick={onRemoveVideo} sx={{ mt: 0.5 }}>
-                {he.removeMedia}
-              </Button>
-            )}
-            {item.kind === "audio" && onRemoveAudio && (
-              <Button size="small" color="inherit" disabled={disabled} onClick={onRemoveAudio} sx={{ mt: 0.5 }}>
-                {he.removeMedia}
-              </Button>
-            )}
-          </Box>
-        );
-      })}
+      {items.map((item, index) => (
+        <LeftoverMediaItem
+          key={`${item.kind}-${index}`}
+          item={item}
+          disabled={disabled}
+          videosPending={videosPending}
+          onRemovePhoto={onRemovePhoto}
+          onRemoveVideo={onRemoveVideo}
+          onRemoveAudio={onRemoveAudio}
+        />
+      ))}
     </>
   );
+}
+
+function LeftoverMediaItem({
+  item,
+  disabled,
+  videosPending,
+  onRemovePhoto,
+  onRemoveVideo,
+  onRemoveAudio,
+}: {
+  item: CompletionAttachment;
+  disabled: boolean;
+  videosPending: boolean;
+  onRemovePhoto?: () => void;
+  onRemoveVideo?: () => void;
+  onRemoveAudio?: () => void;
+}) {
+  const remote = Boolean(item.url && !item.url.startsWith("blob:"));
+  const resolved = useResolvedMediaSrc(item.url, remote);
+  const poster = useResolvedMediaSrc(
+    item.poster_url,
+    Boolean(item.poster_url && !item.poster_url.startsWith("blob:")),
+  );
+  if (!resolved.src) return null;
+  const onRemove = leftoverRemoveHandler(item.kind, onRemovePhoto, onRemoveVideo, onRemoveAudio);
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+        {kindLabel(item.kind)}
+      </Typography>
+      <LeftoverMediaBody item={item} src={resolved.src} posterSrc={poster.src} videosPending={videosPending} />
+      {onRemove && (
+        <Button size="small" color="inherit" disabled={disabled} onClick={onRemove} sx={{ mt: 0.5 }}>
+          {he.removeMedia}
+        </Button>
+      )}
+    </Box>
+  );
+}
+
+function leftoverRemoveHandler(
+  kind: string,
+  onRemovePhoto?: () => void,
+  onRemoveVideo?: () => void,
+  onRemoveAudio?: () => void,
+) {
+  if (kind === "photo") return onRemovePhoto;
+  if (kind === "video") return onRemoveVideo;
+  if (kind === "audio") return onRemoveAudio;
+  return undefined;
+}
+
+function LeftoverMediaBody({
+  item,
+  src,
+  posterSrc,
+  videosPending,
+}: {
+  item: CompletionAttachment;
+  src: string;
+  posterSrc: string | null;
+  videosPending: boolean;
+}) {
+  if (item.kind === "photo") {
+    return (
+      <Box
+        component="img"
+        src={src}
+        alt={he.taskReferencePhoto}
+        sx={{ maxWidth: "100%", maxHeight: 180, borderRadius: 1, display: "block" }}
+      />
+    );
+  }
+  if (item.kind === "video" && videosPending) {
+    return (
+      <Box sx={{ position: "relative", maxWidth: 240 }}>
+        {posterSrc ? (
+          <Box
+            component="img"
+            src={posterSrc}
+            alt={he.taskReferenceVideo}
+            sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
+          />
+        ) : (
+          <Box sx={{ height: 120, bgcolor: "action.hover", borderRadius: 1 }} />
+        )}
+        <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+          {he.reviewVideoLoading}
+        </Typography>
+      </Box>
+    );
+  }
+  if (item.kind === "video") {
+    return (
+      <Box
+        component="video"
+        src={src}
+        controls
+        sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
+      />
+    );
+  }
+  return <CompactAudioPlayer src={src} />;
 }

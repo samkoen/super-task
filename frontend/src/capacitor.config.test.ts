@@ -14,7 +14,7 @@ describe("capacitor.config", () => {
     expect(config.server && "url" in config.server ? config.server.url : undefined).toBeUndefined();
   });
 
-  it("allows mixed content for the Vercel API from the WebView", () => {
+  it("allows mixed content for the Render API from the WebView", () => {
     expect(config.android?.allowMixedContent).toBe(true);
   });
 });

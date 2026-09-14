@@ -37,7 +37,10 @@ VERCEL_BLOB_HOST_MARKERS = (
     ".public.blob.vercel-storage.com",
     ".private.blob.vercel-storage.com",
 )
-R2_HOST_SUFFIX = ".r2.cloudflarestorage.com"
+R2_HOST_SUFFIXES = (
+    ".r2.cloudflarestorage.com",
+    ".r2.dev",
+)
 
 
 def is_remote_http_url(url: str | None) -> bool:
@@ -61,18 +64,14 @@ def is_r2_media_url(url: str | None, *, endpoint_host: str = "") -> bool:
     if not is_remote_http_url(url):
         return False
     host = hostname_of(url or "")
-    if host.endswith(R2_HOST_SUFFIX):
+    if any(host.endswith(suffix) for suffix in R2_HOST_SUFFIXES):
         return True
     expected = (endpoint_host or "").lower().strip()
     return bool(expected) and host == expected
 
 
 def is_private_object_url(url: str | None, *, endpoint_host: str = "") -> bool:
-    if is_r2_media_url(url, endpoint_host=endpoint_host):
-        return True
-    if not is_remote_http_url(url):
-        return False
-    return ".private.blob.vercel-storage.com" in hostname_of(url or "")
+    return is_r2_media_url(url, endpoint_host=endpoint_host)
 
 
 def is_local_upload_path(url: str | None) -> bool:

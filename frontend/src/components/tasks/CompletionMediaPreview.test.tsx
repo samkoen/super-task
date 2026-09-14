@@ -3,6 +3,15 @@ import { render, screen } from "@testing-library/react";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import { he } from "../../i18n/he";
 
+vi.mock("../../hooks/useResolvedMediaSrc", () => ({
+  useResolvedMediaSrc: (path: string | null) => ({
+    src: path,
+    loading: false,
+    failed: false,
+    onError: () => {},
+  }),
+}));
+
 vi.mock("../../utils/mediaUrl", () => ({
   mediaUrl: (path: string | null) => path,
 }));

@@ -23,18 +23,21 @@ export function mediaUrl(path: string | null | undefined): string | null {
 }
 
 export function isVercelBlobMediaUrl(url: string): boolean {
-  try {
-    return new URL(url).hostname.toLowerCase().includes("blob.vercel-storage.com");
-  } catch {
-    return false;
-  }
+  const host = hostnameOf(url);
+  return Boolean(host?.includes("blob.vercel-storage.com"));
 }
 
 export function isRemoteObjectMediaUrl(url: string): boolean {
+  const host = hostnameOf(url);
+  if (!host) return false;
+  return host.endsWith(".r2.cloudflarestorage.com") || host.endsWith(".r2.dev");
+}
+
+function hostnameOf(url: string): string | null {
   try {
-    return new URL(url).hostname.toLowerCase().endsWith(".r2.cloudflarestorage.com");
+    return new URL(url).hostname.toLowerCase();
   } catch {
-    return false;
+    return null;
   }
 }
 

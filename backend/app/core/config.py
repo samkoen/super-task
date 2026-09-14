@@ -46,10 +46,17 @@ LOG_LEVEL = os.environ.get(
     "DEBUG" if ENVIRONMENT == "development" and not IS_VERCEL else "INFO",
 ).strip().upper()
 
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true" if IS_VERCEL else "false").lower() in (
-    "1",
-    "true",
-    "yes",
+
+def resolve_cookie_secure(raw: str | None, *, is_production: bool) -> bool:
+    """Prod (Render/Vercel) : cookies Secure + SameSite=None pour l'APK https://localhost."""
+    if raw is None:
+        return is_production
+    return raw.lower() in ("1", "true", "yes")
+
+
+COOKIE_SECURE = resolve_cookie_secure(
+    os.environ.get("COOKIE_SECURE"),
+    is_production=IS_PRODUCTION,
 )
 
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")

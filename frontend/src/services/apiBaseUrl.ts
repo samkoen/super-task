@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 /**
  * Résout l'URL de base Axios.
  * - Chrome / Vite localhost : `/api` → proxy vers backend local (:5001)
- * - APK bundlé : `VITE_API_URL` (Vercel en prod)
+ * - APK bundlé : `VITE_API_URL` (API Render en prod, comme le site)
  * - APK live-reload LAN : `/api`
  * - Émulateur sans VITE_API_URL : `10.0.2.2:5001`
  */

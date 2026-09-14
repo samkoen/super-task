@@ -9,8 +9,8 @@ public class BlobPutJsonTest {
     @Test
     public void readsTheBlobUrl() {
         assertEquals(
-                "https://store.blob.vercel-storage.com/a.mp4",
-                BlobPutJson.urlFromBody("{\"url\":\"https://store.blob.vercel-storage.com/a.mp4\"}"));
+                "https://abc.r2.cloudflarestorage.com/super-media/a.mp4",
+                BlobPutJson.urlFromBody("{\"url\":\"https://abc.r2.cloudflarestorage.com/super-media/a.mp4\"}"));
     }
 
     @Test

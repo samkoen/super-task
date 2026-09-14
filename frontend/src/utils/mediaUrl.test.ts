@@ -27,6 +27,12 @@ describe("mediaUrl", () => {
     expect(isRemoteObjectMediaUrl("/uploads/v.mp4")).toBe(false);
   });
 
+  it("proxies Cloudflare r2.dev URLs", () => {
+    const publicUrl = "https://pub-abc.r2.dev/super-media/task_videos/a.mp4";
+    expect(mediaUrl(publicUrl)).toBe(`/api/media/proxy?src=${encodeURIComponent(publicUrl)}`);
+    expect(isRemoteObjectMediaUrl(publicUrl)).toBe(true);
+  });
+
   it("does not proxy retired Vercel Blob URLs", () => {
     const blob = "https://store.private.blob.vercel-storage.com/avatars/a.jpg";
     expect(mediaUrl(blob)).toBeNull();

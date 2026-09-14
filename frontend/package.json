@@ -24,7 +24,6 @@
     "@emotion/styled": "^11.13.5",
     "@mui/icons-material": "^6.1.9",
     "@mui/material": "^6.1.9",
-    "@vercel/blob": "^2.6.1",
     "axios": "^1.7.9",
     "html-to-image": "^1.11.13",
     "react": "^18.3.1",

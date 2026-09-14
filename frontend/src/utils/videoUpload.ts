@@ -186,11 +186,11 @@ export async function uploadVideoFile(
   }
   try {
     const uploaded = await putDirectVideo(intent, uploadFile, doFetch);
-    siyumTrace("video-upload-blob-ok");
+    siyumTrace("video-upload-r2-ok");
     return uploaded;
   } catch (error) {
     if (!isRetryableDirectPutError(error)) throw error;
-    siyumTrace("video-upload-proxy", { reason: "blob-put-failed-fetch" });
+    siyumTrace("video-upload-proxy", { reason: "r2-put-failed-fetch" });
     return proxyUpload(uploadFile);
   }
 }

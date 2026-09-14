@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * APK bundlé (webDir=dist) — ne PAS utiliser server.url vers Vercel :
- * charger le site distant dans le WebView provoque des freezes totaux (ANR).
- * L’API pointe via VITE_API_URL au build (https://super-nihul.vercel.app/api).
+ * APK bundlé (webDir=dist) — ne PAS utiliser server.url vers le site distant :
+ * charger le front Render dans le WebView provoque des freezes totaux (ANR).
+ * L’API pointe via VITE_API_URL au build (même URL que le site Render).
  */
 const config: CapacitorConfig = {
   appId: "com.supershift.app",
@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
-    // Requis pour cookies de session vers l’API Vercel (origine https://localhost).
+    // Requis pour cookies de session vers l’API Render (origine https://localhost).
     CapacitorCookies: {
       enabled: true,
     },

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { resolveApiBaseUrl } from "./apiBaseUrl";
 
 describe("resolveApiBaseUrl", () => {
-  it("forces /api on localhost even if VITE_API_URL points to Vercel", () => {
+  it("forces /api on localhost even if VITE_API_URL points to Render", () => {
     expect(
-      resolveApiBaseUrl("https://super-nihul.vercel.app/api", {
+      resolveApiBaseUrl("https://super-api-eh64.onrender.com/api", {
         isNative: false,
         origin: "http://localhost:5173",
       })
@@ -13,11 +13,11 @@ describe("resolveApiBaseUrl", () => {
 
   it("uses VITE_API_URL on native APK (bundled)", () => {
     expect(
-      resolveApiBaseUrl("https://super-nihul.vercel.app/api", {
+      resolveApiBaseUrl("https://super-api-eh64.onrender.com/api", {
         isNative: true,
         origin: "https://localhost",
       })
-    ).toBe("https://super-nihul.vercel.app/api");
+    ).toBe("https://super-api-eh64.onrender.com/api");
   });
 
   it("uses /api in the browser when env is unset", () => {
