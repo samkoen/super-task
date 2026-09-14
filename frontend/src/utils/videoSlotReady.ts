@@ -64,7 +64,9 @@ export async function waitUntilPendingVideosReady<T extends { file: File | null;
   const videos = pendingVideoSlots(slots);
   if (!videos.length) return;
   await waitForCaptureUiIdle(opts?.idleMs, opts?.wait);
-  await Promise.all(videos.map((item) => readFileBytes(item.file)));
+  await Promise.all(
+    videos.map((item) => (item.file ? readFileBytes(item.file) : Promise.resolve())),
+  );
 }
 
 function sleepMs(ms: number): Promise<void> {
