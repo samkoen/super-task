@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskQueues, TimelineTask } from "../services/dashboardService";
 import {
   buildActionQueue,
+  buildCompletedTasks,
   buildPendingReviewQueue,
   buildPendingTasks,
   buildQuestionsQueue,
@@ -26,7 +27,15 @@ function task(partial: Partial<TimelineTask> & Pick<TimelineTask, "id" | "status
 }
 
 const queues: TaskQueues = {
-  completed: [],
+  completed: [
+    task({
+      id: "done1",
+      status: "completed",
+      segment: "completed",
+      completed_at: "2026-07-14T09:00:00+03:00",
+      assignee_name: "יוסי",
+    }),
+  ],
   in_progress: [
     task({
       id: "ip1",
@@ -193,5 +202,33 @@ describe("buildPendingTasks + filters", () => {
     const pending = buildPendingTasks(queues);
     expect(uniqueDepartments(pending)).toEqual(["ירקות", "קירור"]);
     expect(uniqueAssignees(pending)).toEqual(["דנה", "יוסי"]);
+  });
+});
+
+describe("buildCompletedTasks", () => {
+  it("lists completed tasks newest first and ignores other queues", () => {
+    const withOlder: TaskQueues = {
+      ...queues,
+      completed: [
+        task({
+          id: "done-old",
+          status: "completed",
+          segment: "completed",
+          completed_at: "2026-07-14T08:00:00+03:00",
+        }),
+        task({
+          id: "done-new",
+          status: "completed",
+          segment: "completed",
+          completed_at: "2026-07-14T12:00:00+03:00",
+        }),
+      ],
+    };
+    expect(buildCompletedTasks(withOlder).map((t) => t.id)).toEqual(["done-new", "done-old"]);
+  });
+
+  it("returns empty when there are no completed tasks", () => {
+    expect(buildCompletedTasks(null)).toEqual([]);
+    expect(buildCompletedTasks({ ...queues, completed: [] })).toEqual([]);
   });
 });

@@ -50,6 +50,12 @@ def parse_json_list(value) -> list | None:
     return None
 
 
+def _stored_avatar_url(value: str | None) -> str | None:
+    from app.domain.avatar_url import stored_avatar_url
+
+    return stored_avatar_url(value)
+
+
 def user_orm_to_domain(row: orm.User | None) -> User | None:
     if row is None:
         return None
@@ -66,7 +72,7 @@ def user_orm_to_domain(row: orm.User | None) -> User | None:
         is_active=row.is_active,
         email_verified=row.email_verified,
         preferred_language=getattr(row, "preferred_language", None) or "he",
-        avatar_url=getattr(row, "avatar_url", None),
+        avatar_url=_stored_avatar_url(getattr(row, "avatar_url", None)),
         excellence_slogan=getattr(row, "excellence_slogan", None),
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
@@ -88,7 +94,7 @@ def user_domain_to_api(user: User) -> dict:
         "is_active": user.is_active,
         "email_verified": user.email_verified,
         "preferred_language": user.preferred_language,
-        "avatar_url": user.avatar_url,
+        "avatar_url": _stored_avatar_url(user.avatar_url),
         "excellence_slogan": user.excellence_slogan,
     }
     data["can_view_system_bug_inbox"] = _system_bug_inbox_flag(user)

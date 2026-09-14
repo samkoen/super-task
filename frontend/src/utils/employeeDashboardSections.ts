@@ -23,6 +23,14 @@ export function collectUniqueTasks<T extends { id: string }>(groups: T[][]): T[]
   return out;
 }
 
+/** Ichour (bleu) d'abord, puis tâches terminées — même accordéon oved. */
+export function mergeEmployeeFinishedTasks<T extends { id: string }>(
+  pendingReview: T[],
+  completed: T[],
+): T[] {
+  return collectUniqueTasks([pendingReview, completed]);
+}
+
 export function splitEmployeeWorkLists<
   T extends { id: string; task_kind?: string | null; status: string; due_at: string },
 >(tasks: T[]): { dynamic: T[]; routine: T[] } {

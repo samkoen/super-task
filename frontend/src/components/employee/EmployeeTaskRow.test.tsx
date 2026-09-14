@@ -63,4 +63,16 @@ describe("EmployeeTaskRow", () => {
     expect(screen.queryByLabelText(he.taskPhotoEnlarge)).toBeNull();
     expect(screen.getByText("ניקיון מדף")).toBeTruthy();
   });
+
+  it("uses the blue info chip for pending manager approval", () => {
+    render(
+      <EmployeeTaskRow
+        task={card({ status: "pending_review" })}
+        onOpen={vi.fn()}
+        layout="list"
+      />,
+    );
+    const chip = screen.getByText(he.taskStatusLabels.pending_review);
+    expect(chip.closest(".MuiChip-colorInfo")).toBeTruthy();
+  });
 });

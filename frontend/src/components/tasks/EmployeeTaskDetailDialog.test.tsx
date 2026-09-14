@@ -9,8 +9,8 @@ vi.mock("./TaskChatPanel", () => ({
   default: () => <div data-testid="task-chat-panel">{he.taskChatTitle}</div>,
 }));
 
-vi.mock("./TaskReferenceMediaDisplay", () => ({
-  default: () => null,
+vi.mock("../../utils/mediaUrl", () => ({
+  mediaUrl: (path: string | null) => path,
 }));
 
 vi.mock("../../services/aiService", () => ({
@@ -315,5 +315,65 @@ describe("EmployeeTaskDetailDialog", () => {
     const chat = screen.getByTestId("task-chat-panel");
     const media = screen.getByText(he.taskNoReferenceMedia);
     expect(chat.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows submitted photo, video and audio when the oved reopens a finished task", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("completed"),
+          reference_photo_url: "/ref.jpg",
+          reference_video_url: "/ref.mp4",
+          reference_audio_url: "/ref.webm",
+          completion: {
+            id: "c1",
+            occurrence_id: "t1",
+            status: "completed",
+            note: null,
+            photo_path: "/p.jpg",
+            video_path: "/v.mp4",
+            audio_path: "/a.webm",
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "approved",
+          },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(document.querySelector("img[src='/ref.jpg']")).toBeTruthy();
+    expect(document.querySelector("video[src='/ref.mp4']")).toBeTruthy();
+    expect(document.querySelector("audio[src='/ref.webm']")).toBeTruthy();
+    expect(screen.getByText(he.completionMediaAdded)).toBeTruthy();
+    expect(document.querySelector("img[src='/p.jpg']")).toBeTruthy();
+    expect(document.querySelector("video[src='/v.mp4']")).toBeTruthy();
+    expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
+  });
+
+  it("shows submitted media while waiting for menahel ichour", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("pending_review"),
+          completion: {
+            id: "c1",
+            occurrence_id: "t1",
+            status: "completed",
+            note: null,
+            photo_path: "/oved.jpg",
+            video_path: null,
+            audio_path: "/oved.webm",
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "pending",
+          },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
+    expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
   });
 });

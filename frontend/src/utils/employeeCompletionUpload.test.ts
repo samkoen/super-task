@@ -134,6 +134,17 @@ describe("employeeCompletionUpload", () => {
     expect(slots[0]?.posterUrl).toBe("/p.jpg");
   });
 
+  it("prefills photo even if attachments arrive in a different order", () => {
+    const slots = slotsFromKeptAttachments(
+      [{ kind: "photo", title: "מדף" }, { kind: "video", min_seconds: 10 }],
+      [
+        { kind: "video", url: "/v.mp4", duration_seconds: 11 },
+        { kind: "photo", url: "/p.jpg" },
+      ],
+    );
+    expect(slots.map((item) => item?.keptUrl)).toEqual(["/p.jpg", "/v.mp4"]);
+  });
+
   it("does not treat a zero-byte video as ready", () => {
     const empty = createPendingMedia(new File([], "empty.webm", { type: "video/webm" }), 12);
     expect(slotsMeetTaskRequirements([{ kind: "video", min_seconds: 10 }], [empty])).toBe(false);

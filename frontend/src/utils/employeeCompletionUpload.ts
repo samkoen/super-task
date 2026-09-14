@@ -1,7 +1,7 @@
 import { he } from "../i18n/he";
 import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
 import { meetsCompletionRequirements } from "./completionMedia";
-import { attachmentsFromCompletion } from "./completionSlotView";
+import { attachmentsFromCompletion, mapAttachmentsToSlots } from "./completionSlotView";
 import {
   type PendingMedia,
   completionAttachmentFromPending,
@@ -30,11 +30,9 @@ export function slotsFromKeptAttachments(
   requirements: CompletionRequirement[],
   attachments: CompletionAttachment[] | null | undefined,
 ): Array<PendingMedia | null> {
-  return requirements.map((req, i) => {
-    const item = attachments?.[i];
-    if (!item?.url || item.kind !== req.kind) return null;
-    return createKeptMedia(item.url, item.duration_seconds, item.poster_url);
-  });
+  return mapAttachmentsToSlots(requirements, attachments).fills.map((fill) =>
+    fill?.url ? createKeptMedia(fill.url, fill.durationSeconds, fill.posterUrl) : null,
+  );
 }
 
 export function slotsFromTaskCompletion(

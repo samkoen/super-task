@@ -27,9 +27,9 @@ describe("mediaUrl", () => {
     expect(isRemoteObjectMediaUrl("/uploads/v.mp4")).toBe(false);
   });
 
-  it("proxies leftover private Vercel Blob URLs", () => {
-    const blob = "https://store.private.blob.vercel-storage.com/task_photos/a.jpg";
-    expect(mediaUrl(blob)).toBe(`/api/media/proxy?src=${encodeURIComponent(blob)}`);
+  it("does not proxy retired Vercel Blob URLs", () => {
+    const blob = "https://store.private.blob.vercel-storage.com/avatars/a.jpg";
+    expect(mediaUrl(blob)).toBeNull();
   });
 
   it("proxies local /uploads paths via authenticated API", () => {

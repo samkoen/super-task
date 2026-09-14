@@ -66,7 +66,8 @@ def test_media_is_ready_uses_object_store(monkeypatch):
 
 
 def test_is_remote_media_url():
-    from app.services.blob_storage import is_object_store_url, is_private_blob_url, is_remote_media_url, is_vercel_blob_url
+    from app.domain.object_media_url import is_vercel_blob_url
+    from app.services.blob_storage import is_object_store_url, is_private_blob_url, is_remote_media_url, is_stored_media_url
 
     assert is_remote_media_url("https://abc.r2.cloudflarestorage.com/b/a.jpg") is True
     assert is_remote_media_url("/uploads/task_photos/a.jpg") is False
@@ -74,6 +75,8 @@ def test_is_remote_media_url():
     assert is_vercel_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is True
     assert is_private_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is True
     assert is_object_store_url("https://abc.r2.cloudflarestorage.com/b/a.jpg") is True
+    assert is_stored_media_url("https://x.private.blob.vercel-storage.com/avatars/a.jpg") is False
+    assert is_stored_media_url("/uploads/avatars/a.jpg") is True
 
 
 def test_presign_get_ignores_legacy_vercel_blob(monkeypatch):

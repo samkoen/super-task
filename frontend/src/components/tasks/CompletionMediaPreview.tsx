@@ -6,7 +6,7 @@ import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
 import { mediaUrl } from "../../utils/mediaUrl";
 import {
   attachmentsFromCompletion,
-  fillsFromAttachments,
+  mapAttachmentsToSlots,
   visualSlotCount,
 } from "../../utils/completionSlotView";
 import { normalizeRequirements, type CompletionAttachment, type CompletionRequirement } from "../../utils/completionMedia";
@@ -59,6 +59,7 @@ export default function CompletionMediaPreview({
   });
   const reqs = normalizeRequirements(requirements);
   const hasVisualGuides = visualSlotCount(reqs) > 0;
+  const mapped = mapAttachmentsToSlots(reqs, items, { videosPending });
   const hasAudio = items.some((item) => item.kind === "audio") || reqs.some((r) => r.kind === "audio");
   const resolvedTranscript = displayedAudioTranscript(
     viewer === "employee"
@@ -67,16 +68,17 @@ export default function CompletionMediaPreview({
     { hasAudio, allowFallback: transcriptFallback },
   );
   if (!items.length && !resolvedTranscript && !hasVisualGuides) return null;
+  const leftover = hasVisualGuides ? mapped.leftover : [];
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Typography variant="subtitle2" color="text.secondary">
-        {he.completionMediaAdded}
+        {viewer === "employee" ? he.completionMediaAdded : he.completionMediaFromEmployee}
       </Typography>
       {hasVisualGuides ? (
         <CompletionSlotGrid
           requirements={reqs}
-          fills={fillsFromAttachments(reqs, items, { videosPending })}
+          fills={mapped.fills}
         />
       ) : (
         <LegacyAttachmentList
@@ -86,6 +88,13 @@ export default function CompletionMediaPreview({
           onRemovePhoto={onRemovePhoto}
           onRemoveVideo={onRemoveVideo}
           onRemoveAudio={onRemoveAudio}
+        />
+      )}
+      {leftover.length > 0 && (
+        <LegacyAttachmentList
+          items={leftover}
+          disabled={disabled}
+          videosPending={videosPending}
         />
       )}
       {resolvedTranscript && (

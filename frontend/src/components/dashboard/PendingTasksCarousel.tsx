@@ -9,27 +9,42 @@ import {
 import AnalyticsIcon from "@mui/icons-material/Analytics";
 import type { TaskQueues, TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
-import { buildPendingTasks } from "../../utils/dashboardCarousels";
+import { buildCompletedTasks, buildPendingTasks } from "../../utils/dashboardCarousels";
 import {
   groupPendingTasks,
   type PendingGroupMode,
 } from "../../utils/storeStatusAnalysis";
 import PendingTaskMediaCard from "./PendingTaskMediaCard";
 
+export type ManagerTaskCarouselKind = "pending" | "completed";
+
 interface PendingTasksCarouselProps {
   queues: TaskQueues | null | undefined;
+  kind?: ManagerTaskCarouselKind;
   onOpenTask?: (task: TimelineTask) => void;
   onOpenStatusAnalysis?: () => void;
   stageLabels?: Map<string, string>;
 }
 
+function carouselCopy(kind: ManagerTaskCarouselKind) {
+  if (kind === "completed") {
+    return { title: he.dashboardCompletedCarousel, empty: he.dashboardCompletedCarouselEmpty };
+  }
+  return { title: he.dashboardPendingCarousel, empty: he.dashboardPendingCarouselEmpty };
+}
+
 export default function PendingTasksCarousel({
   queues,
+  kind = "pending",
   onOpenTask,
   onOpenStatusAnalysis,
   stageLabels,
 }: PendingTasksCarouselProps) {
-  const all = useMemo(() => buildPendingTasks(queues), [queues]);
+  const all = useMemo(
+    () => (kind === "completed" ? buildCompletedTasks(queues) : buildPendingTasks(queues)),
+    [queues, kind],
+  );
+  const { title, empty } = carouselCopy(kind);
   const [groupMode, setGroupMode] = useState<PendingGroupMode>("assignee");
 
   const groups = useMemo(
@@ -58,7 +73,7 @@ export default function PendingTasksCarousel({
       >
         <Box display="flex" alignItems="baseline" gap={1}>
           <Typography variant="subtitle1" fontWeight={700}>
-            {he.dashboardPendingCarousel}
+            {title}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             ({all.length})
@@ -92,7 +107,7 @@ export default function PendingTasksCarousel({
 
       {all.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          {he.dashboardPendingCarouselEmpty}
+          {empty}
         </Typography>
       ) : (
         <Box

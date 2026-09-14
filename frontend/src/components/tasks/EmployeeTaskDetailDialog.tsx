@@ -13,7 +13,6 @@ import {
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionRequirementSlots from "./CompletionRequirementSlots";
-import CompletionSlotGrid from "./CompletionSlotGrid";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import TaskChatPanel from "./TaskChatPanel";
@@ -30,8 +29,6 @@ import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import {
   attachmentsFromCompletion,
-  fillsFromAttachments,
-  visualSlotCount,
 } from "../../utils/completionSlotView";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
@@ -208,11 +205,10 @@ function TaskDetailMedia({
 }) {
   const requirements = effectiveRequirements(task);
   const attachments = attachmentsFromCompletion(task.completion);
-  const hasVisual = visualSlotCount(requirements) > 0;
   const hasRef = Boolean(
     task.reference_photo_url || task.reference_video_url || task.reference_audio_url,
   );
-  const hasLegacyCompletion = attachments.length > 0 && !hasVisual;
+  const hasCompletionMedia = attachments.length > 0;
 
   return (
     <>
@@ -224,34 +220,23 @@ function TaskDetailMedia({
       {capture ? (
         <TaskLiveCapture requirements={requirements} capture={capture} language={language} />
       ) : (
-        <TaskPreviewSlots
+        <CompletionMediaPreview
+          viewer="employee"
+          photo_path={task.completion?.photo_path}
+          video_path={task.completion?.video_path}
+          audio_path={task.completion?.audio_path}
+          attachments={task.completion?.completion_attachments}
           requirements={requirements}
-          attachments={attachments}
-          language={language}
-          hasVisual={hasVisual}
+          audio_transcript={task.completion?.audio_transcript}
+          audio_transcript_employee={task.completion?.audio_transcript_employee}
         />
       )}
-      {hasLegacyCompletion && <TaskLegacyCompletion task={task} />}
-      {!hasRef && !hasVisual && !hasLegacyCompletion && !capture && (
+      {!hasRef && !hasCompletionMedia && !capture && requirements.length === 0 && (
         <Typography variant="body2" color="text.secondary">
           {he.taskNoReferenceMedia}
         </Typography>
       )}
     </>
-  );
-}
-
-function TaskLegacyCompletion({ task }: { task: EmployeeTaskDetailTask }) {
-  return (
-    <CompletionMediaPreview
-      viewer="employee"
-      photo_path={task.completion?.photo_path}
-      video_path={task.completion?.video_path}
-      audio_path={task.completion?.audio_path}
-      attachments={task.completion?.completion_attachments}
-      audio_transcript={task.completion?.audio_transcript}
-      audio_transcript_employee={task.completion?.audio_transcript_employee}
-    />
   );
 }
 
@@ -289,27 +274,6 @@ function TaskLiveCapture({
         </Typography>
       )}
     </>
-  );
-}
-
-function TaskPreviewSlots({
-  requirements,
-  attachments,
-  language,
-  hasVisual,
-}: {
-  requirements: CompletionRequirement[];
-  attachments: ReturnType<typeof attachmentsFromCompletion>;
-  language: EmployeeLanguage;
-  hasVisual: boolean;
-}) {
-  if (!hasVisual) return null;
-  return (
-    <CompletionSlotGrid
-      requirements={requirements}
-      fills={fillsFromAttachments(requirements, attachments)}
-      language={language}
-    />
   );
 }
 
