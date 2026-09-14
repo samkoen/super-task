@@ -9,6 +9,7 @@ import {
   hasExternalStartUrl,
   needsTaskStart,
   revertStartedOnDashboard,
+  employeeTaskAutoCompleteEligible,
   completeAfterEnsuringStart,
   employeeSubmitLocked,
   isAlreadyStartedError,
@@ -165,17 +166,22 @@ describe("employeeDoTask", () => {
     vi.useRealTimers();
   });
 
-  it("auto-completes only after every required slot is filled", () => {
-    expect(shouldAutoCompleteEmployeeTask(0, true, "in_progress", null)).toBe(false);
-    expect(shouldAutoCompleteEmployeeTask(2, false, "in_progress", null)).toBe(false);
-    expect(shouldAutoCompleteEmployeeTask(2, true, "in_progress", null)).toBe(true);
-    expect(shouldAutoCompleteEmployeeTask(1, true, "pending", "https://example.com")).toBe(false);
-    expect(shouldAutoCompleteEmployeeTask(1, true, "in_progress", "https://example.com", false)).toBe(
+  it("never auto-completes — oved must click סיום משימה", () => {
+    expect(shouldAutoCompleteEmployeeTask(2, true, "in_progress", null)).toBe(false);
+    expect(shouldAutoCompleteEmployeeTask(1, true, "pending", null)).toBe(false);
+  });
+
+  it("auto-complete eligibility still encodes the old slot rules", () => {
+    expect(employeeTaskAutoCompleteEligible(0, true, "in_progress", null)).toBe(false);
+    expect(employeeTaskAutoCompleteEligible(2, false, "in_progress", null)).toBe(false);
+    expect(employeeTaskAutoCompleteEligible(2, true, "in_progress", null)).toBe(true);
+    expect(employeeTaskAutoCompleteEligible(1, true, "pending", "https://example.com")).toBe(false);
+    expect(employeeTaskAutoCompleteEligible(1, true, "in_progress", "https://example.com", false)).toBe(
       false,
     );
-    expect(shouldAutoCompleteEmployeeTask(1, true, "pending", null)).toBe(true);
-    expect(shouldAutoCompleteEmployeeTask(1, false, "in_progress", null)).toBe(false);
-    expect(shouldAutoCompleteEmployeeTask(2, true, "in_progress", null, true, true)).toBe(false);
+    expect(employeeTaskAutoCompleteEligible(1, true, "pending", null)).toBe(true);
+    expect(employeeTaskAutoCompleteEligible(1, false, "in_progress", null)).toBe(false);
+    expect(employeeTaskAutoCompleteEligible(2, true, "in_progress", null, true, true)).toBe(false);
   });
 
   it("locks submit while the annotation window is preparing or open", () => {

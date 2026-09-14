@@ -1,4 +1,6 @@
 import { isFetchInterruptedError } from "./apiErrorMessage";
+import { isNativeApp } from "./isNativeApp";
+import { siyumTrace } from "./siyumTrace";
 import api from "../services/api";
 import {
   canUseNativeBlobUpload,
@@ -145,24 +147,44 @@ export function shouldUseLocalVideoProxy(isDev: boolean): boolean {
   return isDev;
 }
 
+/** Chrome web : le PUT vers vercel.com/api/blob est bloqué CORS (Failed to fetch). */
+export function shouldUseSameOriginVideoProxy(isDev: boolean, native: boolean): boolean {
+  return isDev || !native;
+}
+
 export async function uploadVideoFile(
   file: File,
   purpose: VideoUploadPurpose,
   proxyUpload: (file: File) => Promise<{ url: string }>,
   doFetch?: typeof fetch,
   isDev = Boolean(import.meta.env.DEV),
+  native = isNativeApp(),
 ): Promise<{ url: string }> {
   const uploadFile = await snapshotMediaFile(fileForBlobVideoUpload(file));
+  siyumTrace("video-upload-start", {
+    bytes: uploadFile.size,
+    purpose,
+    isDev,
+    native,
+  });
+  if (!doFetch && shouldUseSameOriginVideoProxy(isDev, native)) {
+    siyumTrace("video-upload-proxy", { reason: "skip-browser-blob-put" });
+    return proxyUpload(uploadFile);
+  }
   const intent = await requestVideoIntent(purpose, uploadFile.type).catch(
     (): VideoUploadIntent => ({ mode: "proxy" }),
   );
-  if (intent.mode !== "direct" || (!doFetch && shouldUseLocalVideoProxy(isDev))) {
+  if (intent.mode !== "direct") {
+    siyumTrace("video-upload-proxy", { reason: "intent-proxy" });
     return proxyUpload(uploadFile);
   }
   try {
-    return await putBlobWithClientToken(intent, uploadFile, doFetch);
+    const uploaded = await putBlobWithClientToken(intent, uploadFile, doFetch);
+    siyumTrace("video-upload-blob-ok");
+    return uploaded;
   } catch (error) {
     if (!isRetryableBlobPutError(error)) throw error;
+    siyumTrace("video-upload-proxy", { reason: "blob-put-failed-fetch" });
     return proxyUpload(uploadFile);
   }
 }

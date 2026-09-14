@@ -1,4 +1,5 @@
 from typing import Any
+import logging
 
 from fastapi import APIRouter, Body, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -33,6 +34,7 @@ from app.services.task_translation_service import TaskTranslationService
 from app.services.task_template_service import TaskTemplateService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _TASK_FOLDERS = {
     "photo": "task_photos",
@@ -576,6 +578,13 @@ async def complete_occurrence(
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
+    attachments = payload.get("completion_attachments") or payload.get("attachments") or []
+    logger.info(
+        "complete start occurrence=%s status=%s attachment_n=%s",
+        occurrence_id,
+        payload.get("status") or "completed",
+        len(attachments) if isinstance(attachments, list) else 0,
+    )
     item = await service.complete_occurrence(
         actor,
         occurrence_id,

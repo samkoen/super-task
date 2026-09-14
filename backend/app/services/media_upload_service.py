@@ -1,6 +1,7 @@
 """Upload média tâche / issue — compression photo + Blob ou disque local."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
@@ -8,6 +9,8 @@ from fastapi import HTTPException, UploadFile
 from app.domain.chat_file import clip_file_name
 from app.domain.media_compression import compress_photo_bytes
 from app.services import blob_storage
+
+logger = logging.getLogger(__name__)
 
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
 VIDEO_MAX_BYTES = 50 * 1024 * 1024
@@ -78,6 +81,7 @@ async def upload_attachment(*, kind: str, folder: str, file: UploadFile) -> dict
     if ext not in allowed_ext:
         raise HTTPException(status_code=400, detail="סוג קובץ לא נתמך")
     data = await file.read()
+    logger.info("upload-attachment kind=%s bytes=%s", kind, len(data))
     if len(data) > max_bytes:
         limit_mb = max_bytes // (1024 * 1024)
         raise HTTPException(status_code=400, detail=f"הקובץ גדול מדי (מקסימום {limit_mb}MB)")

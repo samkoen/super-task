@@ -71,6 +71,7 @@ import {
 } from "../../utils/employeeDoTask";
 import { openExternalUrl } from "../../utils/startUrl";
 import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
+import { siyumTrace } from "../../utils/siyumTrace";
 import { scheduleConfirmCompletionMedia } from "../../utils/confirmCompletionMedia";
 import { mediaService } from "../../services/mediaService";
 import {
@@ -142,6 +143,12 @@ async function submitEmployeeCompletion(opts: {
   slots: Array<PendingMedia | null>;
   incompleteReason?: string;
 }) {
+  siyumTrace("submit-start", {
+    taskId: opts.taskId,
+    slotsFilled: opts.slotsFilled,
+    slotCount: opts.slots.filter(Boolean).length,
+  });
+  await waitUntilPendingVideosReady(opts.slots);
   const attachments = await uploadRequirementSlots(
     opts.requirements,
     opts.slots,
@@ -157,6 +164,10 @@ async function submitEmployeeCompletion(opts: {
     note: opts.note,
     attachments,
     incompleteReason: opts.incompleteReason,
+  });
+  siyumTrace("complete-post", {
+    taskId: opts.taskId,
+    attachmentCount: attachments.length,
   });
   await completeAfterEnsuringStart(
     () => taskService.complete(opts.taskId, payload).then(() => undefined),
@@ -490,6 +501,9 @@ export default function EmployeeTasksPage() {
       showSuccess(he.taskSubmitSuccess);
       await load();
     } catch (e) {
+      siyumTrace("submit-failed", {
+        message: e instanceof Error ? e.message : String(e ?? ""),
+      });
       showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       setSaving(false);
