@@ -32,3 +32,11 @@ export function isSystemBugOpen(status?: string | null): boolean {
 export function canSubmitSystemBugComment(body: string): boolean {
   return Boolean(body.trim());
 }
+
+export function sortSystemBugsByOpenedAt<T extends { created_at?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const left = Date.parse(a.created_at || "") || 0;
+    const right = Date.parse(b.created_at || "") || 0;
+    return right - left;
+  });
+}

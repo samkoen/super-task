@@ -9,6 +9,7 @@ from app.domain.system_bug import (
     has_system_bug_explanation,
     mail_safe_audio_attachment,
     mail_safe_audio_filename,
+    order_system_bugs_by_opened_at,
     parse_system_bug_comments,
     parse_system_bug_emails,
     parse_system_bug_status,
@@ -130,6 +131,22 @@ def test_parse_system_bug_status_open_or_closed():
     assert parse_system_bug_status("closed") == SYSTEM_BUG_STATUS_CLOSED
     with pytest.raises(ValueError, match="סטטוס"):
         parse_system_bug_status("done")
+
+
+def test_order_system_bugs_by_opened_at_keeps_closed_in_date_place():
+    from types import SimpleNamespace
+
+    older_open = SimpleNamespace(
+        id="old", status=SYSTEM_BUG_STATUS_OPEN, created_at="2026-09-01T10:00:00+03:00"
+    )
+    closed = SimpleNamespace(
+        id="mid", status=SYSTEM_BUG_STATUS_CLOSED, created_at="2026-09-10T10:00:00+03:00"
+    )
+    newer_open = SimpleNamespace(
+        id="new", status=SYSTEM_BUG_STATUS_OPEN, created_at="2026-09-14T10:00:00+03:00"
+    )
+    ordered = order_system_bugs_by_opened_at([older_open, closed, newer_open])
+    assert [item.id for item in ordered] == ["new", "mid", "old"]
 
 
 def test_append_system_bug_comment_keeps_author_and_clips():

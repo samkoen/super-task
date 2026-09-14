@@ -3,7 +3,11 @@ from sqlalchemy.orm import Session
 
 import app.db.models as orm
 from app.db import mappers as mp
-from app.domain.system_bug import SYSTEM_BUG_STATUS_OPEN, parse_system_bug_status
+from app.domain.system_bug import (
+    SYSTEM_BUG_STATUS_OPEN,
+    order_system_bugs_by_opened_at,
+    parse_system_bug_status,
+)
 from app.models.system_bug_report import (
     SystemBugReport,
     comments_from_json,
@@ -69,9 +73,7 @@ class SystemBugReportRepository:
         q = select(orm.SystemBugReport).order_by(orm.SystemBugReport.created_at.desc())
         rows = self._db.execute(q).scalars().all()
         items = [r for row in rows if (r := self._to_domain(row))]
-        open_items = [item for item in items if item.status == SYSTEM_BUG_STATUS_OPEN]
-        closed_items = [item for item in items if item.status != SYSTEM_BUG_STATUS_OPEN]
-        return open_items + closed_items
+        return order_system_bugs_by_opened_at(items)
 
     def patch(
         self,

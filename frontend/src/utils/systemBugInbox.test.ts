@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSubmitSystemBugComment, canViewSystemBugInbox, isSystemBugOpen, normalizePersonName } from "./systemBugInbox";
+import { canSubmitSystemBugComment, canViewSystemBugInbox, isSystemBugOpen, normalizePersonName, sortSystemBugsByOpenedAt } from "./systemBugInbox";
 
 describe("canViewSystemBugInbox", () => {
   it("allows יצחק with or without geresh", () => {
@@ -30,5 +30,16 @@ describe("canSubmitSystemBugComment", () => {
     expect(canSubmitSystemBugComment("")).toBe(false);
     expect(canSubmitSystemBugComment("   ")).toBe(false);
     expect(canSubmitSystemBugComment("תוקן")).toBe(true);
+  });
+});
+
+describe("sortSystemBugsByOpenedAt", () => {
+  it("keeps a closed takala in opening-date order", () => {
+    const ordered = sortSystemBugsByOpenedAt([
+      { id: "old", status: "open", created_at: "2026-09-01T10:00:00+03:00" },
+      { id: "mid", status: "closed", created_at: "2026-09-10T10:00:00+03:00" },
+      { id: "new", status: "open", created_at: "2026-09-14T10:00:00+03:00" },
+    ]);
+    expect(ordered.map((item) => item.id)).toEqual(["new", "mid", "old"]);
   });
 });

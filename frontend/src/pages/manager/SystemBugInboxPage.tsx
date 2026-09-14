@@ -32,7 +32,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { formatDueAt } from "../../utils/dateView";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { canViewSystemBugInbox, isSystemBugOpen } from "../../utils/systemBugInbox";
+import { canViewSystemBugInbox, isSystemBugOpen, sortSystemBugsByOpenedAt } from "../../utils/systemBugInbox";
 import { he } from "../../i18n/he";
 
 export default function SystemBugInboxPage() {
@@ -48,7 +48,7 @@ export default function SystemBugInboxPage() {
     if (!canViewSystemBugInbox(user)) return;
     setLoading(true);
     try {
-      setItems(await listSystemBugs());
+      setItems(sortSystemBugsByOpenedAt(await listSystemBugs()));
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
@@ -79,7 +79,7 @@ export default function SystemBugInboxPage() {
   const handleSetStatus = async (item: SystemBugInboxItem, status: "open" | "closed") => {
     try {
       await setSystemBugStatus(item.id, status);
-      setItems(await listSystemBugs());
+      setItems(sortSystemBugsByOpenedAt(await listSystemBugs()));
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
     }
@@ -110,7 +110,11 @@ export default function SystemBugInboxPage() {
         onClose={() => setSelectedId(null)}
         onAskDelete={setDeleteTarget}
         onUpdated={(report) => {
-          setItems((prev) => prev.map((item) => (item.id === report.id ? { ...item, ...report } : item)));
+          setItems((prev) =>
+            sortSystemBugsByOpenedAt(
+              prev.map((item) => (item.id === report.id ? { ...item, ...report } : item)),
+            ),
+          );
         }}
       />
       <DeleteConfirmDialog

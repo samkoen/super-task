@@ -203,6 +203,11 @@ MAX_COMMENT_LEN = 2000
 MAX_COMMENTS = 50
 
 
+def order_system_bugs_by_opened_at(items: list) -> list:
+    """Date d'ouverture seulement — une takala fermée ne saute pas en bas."""
+    return sorted(items, key=lambda item: getattr(item, "created_at", "") or "", reverse=True)
+
+
 def parse_system_bug_status(raw: str | None) -> str:
     value = (raw or SYSTEM_BUG_STATUS_OPEN).strip().lower()
     if value not in SYSTEM_BUG_STATUSES:
