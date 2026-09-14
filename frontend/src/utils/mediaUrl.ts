@@ -4,6 +4,7 @@ import { resolveApiBaseUrl } from "../services/apiBaseUrl";
 export function mediaUrl(path: string | null | undefined): string | null {
   if (!path) return null;
   if (path.startsWith("blob:")) return path;
+  if (isVercelBlobMediaUrl(path)) return null;
 
   const base = resolveApiBaseUrl().replace(/\/api$/, "");
 
@@ -21,25 +22,25 @@ export function mediaUrl(path: string | null | undefined): string | null {
   return `${base}${path}`;
 }
 
+export function isVercelBlobMediaUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase().includes("blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export function isRemoteObjectMediaUrl(url: string): boolean {
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host.endsWith(".r2.cloudflarestorage.com") || host.includes("blob.vercel-storage.com");
+    return new URL(url).hostname.toLowerCase().endsWith(".r2.cloudflarestorage.com");
   } catch {
     return false;
   }
 }
 
 export function isPrivateObjectMediaUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    if (host.endsWith(".r2.cloudflarestorage.com")) return true;
-    return host.includes(".private.blob.vercel-storage.com");
-  } catch {
-    return false;
-  }
+  return isRemoteObjectMediaUrl(url);
 }
 
-/** @deprecated alias — R2 + Blob héritage */
-export const isVercelBlobMediaUrl = isRemoteObjectMediaUrl;
+/** @deprecated alias — R2 only */
 export const isPrivateVercelBlobUrl = isPrivateObjectMediaUrl;

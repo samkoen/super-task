@@ -6,7 +6,11 @@ import type { ManagerDashboard } from "../../services/dashboardService";
 
 vi.mock("./StoreStatusKpiRow", () => ({ default: () => <div>kpi</div> }));
 vi.mock("./ActionRequiredCarousel", () => ({ default: () => null }));
-vi.mock("./PendingTasksCarousel", () => ({ default: () => null }));
+vi.mock("./PendingTasksCarousel", () => ({
+  default: ({ kind }: { kind?: string }) => (
+    <div>{kind === "completed" ? "completed-carousel" : "pending-carousel"}</div>
+  ),
+}));
 vi.mock("./StaffProgressOverview", () => ({ default: () => <div>staff</div> }));
 vi.mock("./StoreStatusAnalysisTable", () => ({ default: () => null }));
 
@@ -55,5 +59,23 @@ describe("ManagerTodayBoard", () => {
     expect(screen.getByText(he.dashboardAllWorkers)).toBeTruthy();
     expect(screen.getByText(he.dashboardAllWorkersHint)).toBeTruthy();
     expect(screen.getByText(he.newTask)).toBeTruthy();
+  });
+
+  it("shows pending work and completed task carousels", () => {
+    render(
+      <ManagerTodayBoard
+        data={dash()}
+        showAnalysis={false}
+        onToggleAnalysis={vi.fn()}
+        onReviewTask={vi.fn()}
+        onOpenTask={vi.fn()}
+        onChanged={vi.fn()}
+        onNewTask={vi.fn()}
+        onGalleryTask={vi.fn()}
+        onViewTasks={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("pending-carousel")).toBeTruthy();
+    expect(screen.getByText("completed-carousel")).toBeTruthy();
   });
 });

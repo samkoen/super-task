@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectUniqueTasks,
   isDynamicEmployeeTask,
+  mergeEmployeeFinishedTasks,
   shouldHighlightEmployeeTask,
   splitEmployeeWorkLists,
 } from "./employeeDashboardSections";
@@ -42,5 +43,13 @@ describe("employeeDashboardSections", () => {
     );
     expect(routine.map((t) => t.id)).toEqual(["c", "a"]);
     expect(dynamic.map((t) => t.id)).toEqual(["b"]);
+  });
+
+  it("puts pending review before completed in the finished accordion", () => {
+    const pending = task("p", { status: "pending_review" });
+    const done = task("c", { status: "completed" });
+    expect(mergeEmployeeFinishedTasks([pending], [done]).map((t) => t.id)).toEqual(["p", "c"]);
+    expect(mergeEmployeeFinishedTasks([], [done]).map((t) => t.id)).toEqual(["c"]);
+    expect(mergeEmployeeFinishedTasks([pending], [])).toEqual([pending]);
   });
 });

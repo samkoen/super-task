@@ -27,6 +27,7 @@ import { defaultApplyAdHocEditToNetwork, isNetworkAdHocOccurrence } from "../../
 import TaskChatPanel from "./TaskChatPanel";
 import TaskReferenceMediaEditor from "./TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
+import CompletionMediaPreview from "./CompletionMediaPreview";
 import EditDialogSaveActions from "../ui/EditDialogSaveActions";
 import {
   emptyOccurrenceEditForm,
@@ -156,6 +157,7 @@ export default function TaskOccurrenceEditDialog({
                 }
               }}
             />
+            <SubmittedCompletionMedia task={target} />
             <CoreEditFields form={form} setForm={setForm} />
             <AssigneeField
               target={target}
@@ -261,6 +263,21 @@ async function loadEditTarget(
   } catch (e) {
     done({ ok: false, error: e instanceof ApiError ? e.message : he.errorGeneric });
   }
+}
+
+function SubmittedCompletionMedia({ task }: { task: TaskOccurrence }) {
+  const completion = task.completion;
+  if (!completion) return null;
+  return (
+    <CompletionMediaPreview
+      photo_path={completion.photo_path}
+      video_path={completion.video_path}
+      audio_path={completion.audio_path}
+      attachments={completion.completion_attachments}
+      requirements={task.completion_requirements}
+      audio_transcript={completion.audio_transcript}
+    />
+  );
 }
 
 function CoreEditFields({

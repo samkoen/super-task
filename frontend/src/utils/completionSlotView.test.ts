@@ -3,6 +3,7 @@ import {
   attachmentsFromCompletion,
   filledVisualCount,
   fillsFromAttachments,
+  mapAttachmentsToSlots,
   slotDisplayTitle,
   slotFillSrc,
   slotGuideText,
@@ -78,5 +79,19 @@ describe("completionSlotView", () => {
     expect(
       filledVisualCount(reqs, [null, { url: "/a.webm", kind: "audio" }]),
     ).toBe(0);
+  });
+
+  it("matches files by kind when attachment order differs", () => {
+    const reqs: CompletionRequirement[] = [
+      { kind: "photo", title: "מדף" },
+      { kind: "video", min_seconds: 10 },
+    ];
+    const mapped = mapAttachmentsToSlots(reqs, [
+      { kind: "video", url: "/v.mp4" },
+      { kind: "photo", url: "/p.jpg" },
+      { kind: "audio", url: "/a.webm" },
+    ]);
+    expect(mapped.fills.map((item) => item?.url)).toEqual(["/p.jpg", "/v.mp4"]);
+    expect(mapped.leftover).toEqual([{ kind: "audio", url: "/a.webm" }]);
   });
 });

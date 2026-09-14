@@ -1,7 +1,7 @@
 import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
 import type { ReactNode } from "react";
 import TaskPhotoThumb from "../tasks/TaskPhotoThumb";
-import { taskStatusVisual } from "../../constants/taskStatusVisual";
+import { taskStatusChipColor, taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { shouldHighlightEmployeeTask } from "../../utils/employeeDashboardSections";
@@ -35,9 +35,11 @@ function StatusChip({ status }: { status: TaskStatus }) {
   if (shouldHighlightEmployeeTask(status) && status === "overdue") {
     return <Chip size="small" color="error" label={he.alertOverdue} sx={chipLabelSx} />;
   }
+  const color = taskStatusChipColor(status);
   return (
     <Chip
       size="small"
+      color={color === "default" ? undefined : color}
       label={he.taskStatusLabels[status] ?? status}
       sx={chipLabelSx}
     />

@@ -2,9 +2,8 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Typography } from "
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { he } from "../../i18n/he";
 import type { EmployeeTaskCard } from "../../services/dashboardService";
-import { excludeAttendancePunch } from "../../utils/punchDoor";
+import { mergeEmployeeFinishedTasks } from "../../utils/employeeDashboardSections";
 import EmployeeTaskRow from "./EmployeeTaskRow";
-import EmployeeTaskSection from "./EmployeeTaskSection";
 
 export default function EmployeeFinishedTaskSections({
   pendingReviewTasks,
@@ -19,23 +18,15 @@ export default function EmployeeFinishedTaskSections({
   onToggleCompleted: () => void;
   onOpen: (task: EmployeeTaskCard) => void;
 }) {
+  const tasks = mergeEmployeeFinishedTasks(pendingReviewTasks, completedTasks);
+  if (tasks.length === 0) return null;
   return (
-    <>
-      <EmployeeTaskSection
-        title={he.taskPendingReview}
-        tasks={excludeAttendancePunch(pendingReviewTasks)}
-        onOpen={onOpen}
-        layout="list"
-      />
-      {completedTasks.length > 0 ? (
-        <CompletedTasksAccordion
-          tasks={completedTasks}
-          expanded={showCompleted}
-          onToggle={onToggleCompleted}
-          onOpen={onOpen}
-        />
-      ) : null}
-    </>
+    <CompletedTasksAccordion
+      tasks={tasks}
+      expanded={showCompleted}
+      onToggle={onToggleCompleted}
+      onOpen={onOpen}
+    />
   );
 }
 
@@ -62,9 +53,9 @@ function CompletedTasksAccordion({
         </Typography>
       </AccordionSummary>
       <AccordionDetails sx={{ pt: 1, px: 1.5 }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
           {tasks.map((task) => (
-            <EmployeeTaskRow key={task.id} task={task} onOpen={onOpen} />
+            <EmployeeTaskRow key={task.id} task={task} onOpen={onOpen} layout="list" />
           ))}
         </Box>
       </AccordionDetails>

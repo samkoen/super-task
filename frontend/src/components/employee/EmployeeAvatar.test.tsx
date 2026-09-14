@@ -57,4 +57,14 @@ describe("EmployeeAvatar", () => {
     fireEvent.click(screen.getByRole("button", { name: he.employeeChangePhoto }));
     expect(screen.queryByRole("menuitem", { name: he.employeeDeletePhoto })).toBeNull();
   });
+
+  it("does not load a retired Vercel Blob avatar", () => {
+    render(
+      <EmployeeAvatar
+        name="דנה לוי"
+        photoUrl="https://x.private.blob.vercel-storage.com/avatars/a.jpg"
+      />,
+    );
+    expect(screen.queryByAltText("דנה לוי")?.getAttribute("src")).toBeFalsy();
+  });
 });

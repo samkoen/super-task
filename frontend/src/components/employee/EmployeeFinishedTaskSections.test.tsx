@@ -18,7 +18,7 @@ function card(over: Partial<EmployeeTaskCard> & Pick<EmployeeTaskCard, "id" | "t
 }
 
 describe("EmployeeFinishedTaskSections", () => {
-  it("lists tasks waiting for menahel approval", () => {
+  it("puts pending-review tasks in the completed accordion", () => {
     const onOpen = vi.fn();
     const task = card({ id: "p", title: "מילוי מדף", status: "pending_review" });
     render(
@@ -30,9 +30,9 @@ describe("EmployeeFinishedTaskSections", () => {
         onOpen={onOpen}
       />,
     );
-    expect(screen.getByText(`${he.taskPendingReview} (1)`)).toBeTruthy();
-    fireEvent.click(screen.getByText("מילוי מדף"));
-    expect(onOpen).toHaveBeenCalledWith(task);
+    expect(screen.queryByText(he.taskPendingReview)).toBeNull();
+    expect(screen.getByText(`${he.employeeShowCompleted} (1)`)).toBeTruthy();
+    expect(screen.getByText(he.taskStatusLabels.pending_review).closest(".MuiChip-colorInfo")).toBeTruthy();
   });
 
   it("keeps the completed accordion visible even with no open work", () => {
@@ -51,6 +51,26 @@ describe("EmployeeFinishedTaskSections", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  it("lists ichour then completed in the same accordion", () => {
+    const onOpen = vi.fn();
+    const pending = card({ id: "p", title: "מילוי מדף", status: "pending_review" });
+    const done = card({ id: "c", title: "ניקוי רצפה", status: "completed" });
+    render(
+      <EmployeeFinishedTaskSections
+        pendingReviewTasks={[pending]}
+        completedTasks={[done]}
+        showCompleted
+        onToggleCompleted={vi.fn()}
+        onOpen={onOpen}
+      />,
+    );
+    expect(screen.getByText(`${he.employeeHideCompleted} (2)`)).toBeTruthy();
+    expect(screen.getByText("מילוי מדף")).toBeTruthy();
+    expect(screen.getByText("ניקוי רצפה")).toBeTruthy();
+    fireEvent.click(screen.getByText("מילוי מדף"));
+    expect(onOpen).toHaveBeenCalledWith(pending);
+  });
+
   it("opens a completed task from the accordion", () => {
     const onOpen = vi.fn();
     const task = card({ id: "c", title: "ניקוי רצפה", status: "completed" });
@@ -65,5 +85,30 @@ describe("EmployeeFinishedTaskSections", () => {
     );
     fireEvent.click(screen.getByText("ניקוי רצפה"));
     expect(onOpen).toHaveBeenCalledWith(task);
+  });
+
+  it("lists the clock-in punch like other finished tasks", () => {
+    const onOpen = vi.fn();
+    const start = card({
+      id: "s",
+      title: "פתיחת משמרת",
+      status: "pending_review",
+      is_work_start: true,
+    });
+    render(
+      <EmployeeFinishedTaskSections
+        pendingReviewTasks={[start]}
+        completedTasks={[
+          card({ id: "e", title: "סיום משמרת", status: "completed", is_work_end: true }),
+        ]}
+        showCompleted
+        onToggleCompleted={vi.fn()}
+        onOpen={onOpen}
+      />,
+    );
+    expect(screen.getByText(`${he.employeeHideCompleted} (2)`)).toBeTruthy();
+    fireEvent.click(screen.getByText("פתיחת משמרת"));
+    expect(onOpen).toHaveBeenCalledWith(start);
+    expect(screen.getByText("סיום משמרת")).toBeTruthy();
   });
 });

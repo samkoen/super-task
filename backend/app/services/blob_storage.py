@@ -15,7 +15,6 @@ from app.domain.object_media_url import (
     is_private_object_url,
     is_r2_media_url,
     is_remote_http_url,
-    is_vercel_blob_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ def is_stored_media_url(url: str | None) -> bool:
     cleaned = (url or "").strip()
     if is_local_upload_path(cleaned):
         return True
-    return is_object_store_url(cleaned) or is_vercel_blob_url(cleaned)
+    return is_object_store_url(cleaned)
 
 
 def put_bytes(*, folder: str, data: bytes, ext: str, content_type: str) -> str:

@@ -589,6 +589,7 @@ export const he = {
   chatTaskNeedFollowUp: "בחרו מועד מעקב עתידי",
   employeeAwaitingResponseTasks: "ממתין לתגובת מנהל",
   completionMediaAdded: "קבצים שהוספת",
+  completionMediaFromEmployee: "קבצים שצורפו על ידי העובד",
   /** Indique média vidéo/audio/clôture sans le charger dans la liste */
   taskExtraMediaHint: "יש מדיה נוספת — נפתח עם המשימה",
   openTask: "פתח משימה",
@@ -650,6 +651,8 @@ export const he = {
   dashboardReviewRowEmpty: "אין משימות ממתינות לאישור",
   dashboardPendingCarousel: "משימות ממתינות לביצוע",
   dashboardPendingCarouselEmpty: "אין משימות פתוחות להיום",
+  dashboardCompletedCarousel: "משימות שהושלמו",
+  dashboardCompletedCarouselEmpty: "אין משימות שהושלמו היום",
   dashboardPendingCarouselNoMatch: "אין משימות התואמות לסינון",
   dashboardGroupBy: "סינון תצוגה",
   dashboardGroupByAssignee: "לפי עובדים",

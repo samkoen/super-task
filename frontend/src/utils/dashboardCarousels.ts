@@ -118,3 +118,13 @@ export function uniqueAssignees(tasks: TimelineTask[]): string[] {
   }
   return [...set].sort((a, b) => a.localeCompare(b, "he"));
 }
+
+/** Tâches déjà ichour / terminées — carrousel dashboard menahel. */
+export function buildCompletedTasks(queues: TaskQueues | null | undefined): TimelineTask[] {
+  if (!queues) return [];
+  return [...(queues.completed ?? [])].sort((a, b) => {
+    const aAt = a.completed_at ?? a.due_at;
+    const bAt = b.completed_at ?? b.due_at;
+    return new Date(bAt).getTime() - new Date(aAt).getTime();
+  });
+}

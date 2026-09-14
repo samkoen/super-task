@@ -3,13 +3,8 @@ import type { TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { isPendingFollowUpTask } from "../../utils/chatTaskFollowUp";
+import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import TaskPhotoThumb from "../tasks/TaskPhotoThumb";
-
-function statusAccent(status: string): string {
-  if (status === "overdue") return "#d32f2f";
-  if (status === "in_progress") return "#ed6c02";
-  return "#757575";
-}
 
 interface PendingTaskMediaCardProps {
   task: TimelineTask;
@@ -18,7 +13,7 @@ interface PendingTaskMediaCardProps {
 
 /** Carte carrousel : moitié photo (zoom) + infos ; clic infos → ouvrir/éditer. */
 export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaCardProps) {
-  const border = statusAccent(task.status);
+  const border = taskStatusVisual(task.status).bar;
   return (
     <Paper
       variant="outlined"
@@ -102,6 +97,14 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
               size="small"
               color="warning"
               label={he.timelineSegmentInProgress}
+              sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
+            />
+          )}
+          {task.status === "completed" && (
+            <Chip
+              size="small"
+              color="success"
+              label={he.taskStatusLabels.completed}
               sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } }}
             />
           )}

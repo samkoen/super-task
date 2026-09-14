@@ -8,6 +8,7 @@ export type SlotFill = {
   posterUrl?: string | null;
   pending?: boolean;
   kind?: CompletionRequirement["kind"];
+  durationSeconds?: number | null;
 };
 
 export function slotGuideText(req: CompletionRequirement): string {
@@ -52,21 +53,54 @@ export function attachmentsFromCompletion(completion?: {
   ).filter((item): item is CompletionAttachment => Boolean(item));
 }
 
+function toSlotFill(
+  item: CompletionAttachment,
+  req: CompletionRequirement,
+  opts?: { videosPending?: boolean },
+): SlotFill {
+  return {
+    url: item.url,
+    kind: item.kind,
+    posterUrl: item.poster_url,
+    durationSeconds: item.duration_seconds,
+    pending: req.kind === "video" && Boolean(opts?.videosPending),
+  };
+}
+
+function pickAttachmentIndex(
+  req: CompletionRequirement,
+  items: CompletionAttachment[],
+  used: Set<number>,
+  index: number,
+): number {
+  const direct = items[index];
+  if (direct?.url && direct.kind === req.kind && !used.has(index)) return index;
+  return items.findIndex((item, i) => !used.has(i) && item.kind === req.kind && Boolean(item.url));
+}
+
+/** Associe chaque case à un fichier, même si l’ordre des attachments diffère. */
+export function mapAttachmentsToSlots(
+  requirements: CompletionRequirement[],
+  attachments: CompletionAttachment[] | null | undefined,
+  opts?: { videosPending?: boolean },
+): { fills: Array<SlotFill | null>; leftover: CompletionAttachment[] } {
+  const items = attachments ?? [];
+  const used = new Set<number>();
+  const fills = requirements.map((req, index) => {
+    const pick = pickAttachmentIndex(req, items, used, index);
+    if (pick < 0) return null;
+    used.add(pick);
+    return toSlotFill(items[pick], req, opts);
+  });
+  return { fills, leftover: items.filter((item, i) => !used.has(i) && Boolean(item.url)) };
+}
+
 export function fillsFromAttachments(
   requirements: CompletionRequirement[],
   attachments: CompletionAttachment[] | null | undefined,
   opts?: { videosPending?: boolean },
 ): Array<SlotFill | null> {
-  return requirements.map((req, index) => {
-    const item = attachments?.[index];
-    if (!item?.url || item.kind !== req.kind) return null;
-    return {
-      url: item.url,
-      kind: item.kind,
-      posterUrl: item.poster_url,
-      pending: req.kind === "video" && Boolean(opts?.videosPending),
-    };
-  });
+  return mapAttachmentsToSlots(requirements, attachments, opts).fills;
 }
 
 export function filledVisualCount(

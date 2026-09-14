@@ -185,7 +185,7 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
-    expect(screen.getByText(`${he.taskPendingReview} (1)`)).toBeTruthy();
+    fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (1)`));
     fireEvent.click(screen.getByText("מילוי מדף"));
     expect(screen.getByText("detail:מילוי מדף")).toBeTruthy();
   });
@@ -207,5 +207,23 @@ describe("EmployeeTasksPage punch doors", () => {
     fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (1)`));
     fireEvent.click(screen.getByText("ניקוי רצפה"));
     expect(screen.getByText("detail:ניקוי רצפה")).toBeTruthy();
+  });
+
+  it("shows a submitted clock-in in the finished list, not as a door", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        pending_review_tasks: [
+          card({ id: "s", title: "פתיחת משמרת", status: "pending_review", is_work_start: true }),
+        ],
+        completed_tasks: [card({ id: "c", title: "ניקוי רצפה", status: "completed" })],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText(`${he.employeeShowCompleted} (2)`)).toBeTruthy();
+    expect(screen.queryByText(he.punchClockIn)).toBeNull();
+    fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (2)`));
+    fireEvent.click(screen.getByText("פתיחת משמרת"));
+    expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
   });
 });

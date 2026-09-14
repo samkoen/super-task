@@ -19,4 +19,19 @@ describe("CompletionMediaPreview", () => {
     expect(screen.getByLabelText(he.chatAudioPlay)).toBeTruthy();
     expect(document.querySelector("audio")).toBeNull();
   });
+
+  it("shows photo, video and leftover audio together", () => {
+    render(
+      <CompletionMediaPreview
+        photo_path="/p.jpg"
+        video_path="/v.mp4"
+        audio_path="/a.webm"
+        requirements={[{ kind: "photo", title: "מדף" }, { kind: "video", min_seconds: 10 }]}
+        transcriptFallback={false}
+      />,
+    );
+    expect(screen.getByText(he.completionMediaFromEmployee)).toBeTruthy();
+    expect(screen.getByText(he.completionSlotsProgress(2, 2))).toBeTruthy();
+    expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
+  });
 });

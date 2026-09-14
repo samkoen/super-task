@@ -75,6 +75,11 @@ export default function ManagerTodayBoard({
         mode="reviews"
         onReviewTask={onReviewTask}
       />
+      <PendingTasksCarousel
+        kind="completed"
+        queues={data.task_queues}
+        onOpenTask={(task) => onOpenTask(task.id)}
+      />
       {SHOW_STAFF_PROGRESS && (
         <StaffProgressOverview team={data.team ?? []} onChanged={onChanged} />
       )}
