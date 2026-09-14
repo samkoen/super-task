@@ -26,20 +26,18 @@ describe("videoSlotReady", () => {
     expect(pendingVideoSlots([photo, video, null])).toEqual([video]);
   });
 
-  it("waits for capture UI idle and preview canplay before completing", async () => {
+  it("waits for capture UI idle and readable file bytes before completing", async () => {
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
       return 1;
     });
     const wait = vi.fn(async () => undefined);
-    const canPlay = vi.fn(async () => undefined);
     const video = {
       file: new File(["x"], "a.mp4", { type: "video/mp4" }),
       previewUrl: "blob:ready",
     };
-    await waitUntilPendingVideosReady([video], { idleMs: 50, wait, canPlay });
+    await waitUntilPendingVideosReady([video], { idleMs: 50, wait });
     expect(wait).toHaveBeenCalledWith(50);
-    expect(canPlay).toHaveBeenCalledWith("blob:ready");
   });
 
   it("releases a probe video without load() so the blob stays readable", () => {
@@ -57,20 +55,14 @@ describe("videoSlotReady", () => {
   });
 
   it("skips a kept video that has no local file", async () => {
-    const canPlay = vi.fn();
     await waitUntilPendingVideosReady(
       [{ file: null, previewUrl: "", keptUrl: "/uploads/v1.mp4" }],
-      { canPlay },
     );
-    expect(canPlay).not.toHaveBeenCalled();
   });
 
   it("does not wait when there is no video slot", async () => {
-    const canPlay = vi.fn();
     await waitUntilPendingVideosReady(
       [{ file: new File(["x"], "a.jpg", { type: "image/jpeg" }), previewUrl: "blob:p" }],
-      { canPlay },
     );
-    expect(canPlay).not.toHaveBeenCalled();
   });
 });

@@ -11,7 +11,7 @@ export function isFetchScopeShutdown(text: string): boolean {
 }
 
 export function isFailedToFetch(text: string): boolean {
-  return /failed to fetch/i.test(text);
+  return /failed to fetch|network error/i.test(text);
 }
 
 export function isFetchInterruptedText(text: string): boolean {

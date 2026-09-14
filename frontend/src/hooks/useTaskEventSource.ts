@@ -40,13 +40,21 @@ export async function hasActiveSession(): Promise<boolean> {
 }
 
 /**
- * SSE app-wide. Désactivé sur Capacitor natif : le WebView + Vercel serverless
- * se reconnectent en boucle et figent משימות. L'app s'appuie alors sur le poll.
+ * SSE app-wide. Désactivé sur Capacitor et en build prod (Vercel) : le stream
+ * tient une invocation 120s puis Vercel la tue — ça ressemble à un restart et
+ * coupe סיום משימה. En local (Vite) le poll + SSE restent. Prod : poll seul.
  */
+export function shouldOpenTaskEventSource(
+  native = isNativeApp(),
+  production = import.meta.env.PROD,
+): boolean {
+  return !native && !production;
+}
+
 export function useTaskEventSource(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
-    if (isNativeApp()) return;
+    if (!shouldOpenTaskEventSource()) return;
 
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;

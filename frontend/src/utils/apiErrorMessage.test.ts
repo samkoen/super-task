@@ -45,6 +45,9 @@ describe("apiErrorMessage", () => {
     expect(apiErrorMessage(new Error("Failed to fetch"), he.errorGeneric)).toBe(
       he.errorFetchInterrupted,
     );
+    expect(apiErrorMessage(new Error("Network Error"), he.errorGeneric)).toBe(
+      he.errorFetchInterrupted,
+    );
   });
 
   it("detects interrupt errors used for upload retries", () => {

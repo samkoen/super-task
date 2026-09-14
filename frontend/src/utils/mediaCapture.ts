@@ -14,7 +14,7 @@ export function classifyMediaError(error: unknown): MediaCaptureErrorCode {
   return "unknown";
 }
 
-const BUSY_DEVICE_RETRY_MS = [0, 200, 500];
+const BUSY_DEVICE_RETRY_MS = [0, 500, 1500, 3000, 5000];
 
 function isPermissionError(error: unknown): boolean {
   return error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
@@ -39,6 +39,16 @@ export function detachCaptureVideo(video: HTMLVideoElement | null | undefined): 
   } catch {
     // jsdom implements load() as "not implemented" and may throw
   }
+}
+
+/** Playing a recorded webm can keep the Windows webcam driver busy. */
+export function pauseAllMediaElements(): void {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll("video, audio").forEach((node) => {
+    const media = node as HTMLMediaElement;
+    media.pause();
+    if (media.srcObject) media.srcObject = null;
+  });
 }
 
 function waitForLiveTracksToEnd(stream: MediaStream): Promise<void> {
@@ -84,6 +94,11 @@ export async function getUserMediaWithFallback(
   });
   if (!granted) {
     throw new DOMException("Permission denied", "NotAllowedError");
+  }
+
+  pauseAllMediaElements();
+  if (typeof document !== "undefined" && document.querySelector("video, audio")) {
+    await delay(300);
   }
 
   let lastError: unknown;

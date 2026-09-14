@@ -8,6 +8,7 @@ import {
   getUserMediaWithFallback,
   normalizePhotoOrientation,
   oppositeCameraFacing,
+  pauseAllMediaElements,
   PHOTO_UPLOAD_MAX_EDGE,
   photoPreviewSize,
   photoUploadFilename,
@@ -121,6 +122,15 @@ describe("mediaCapture", () => {
 
     expect(order).toEqual(["pause", "stop"]);
     expect(removeTrack).toHaveBeenCalledWith(track);
+  });
+
+  it("pauseAllMediaElements pauses leftover recorded previews", () => {
+    const video = document.createElement("video");
+    document.body.append(video);
+    const pause = vi.spyOn(video, "pause").mockImplementation(() => undefined);
+    pauseAllMediaElements();
+    expect(pause).toHaveBeenCalled();
+    video.remove();
   });
 
   it("capturePhotoFromVideo returns null when video has no dimensions", async () => {

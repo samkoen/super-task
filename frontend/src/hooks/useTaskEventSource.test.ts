@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { TASK_CHANGE_EVENT, NOTIFICATION_EVENT } from "../constants/events";
-import { dispatchTaskEventFromPayload, hasActiveSession } from "./useTaskEventSource";
+import {
+  dispatchTaskEventFromPayload,
+  hasActiveSession,
+  shouldOpenTaskEventSource,
+} from "./useTaskEventSource";
 
 describe("dispatchTaskEventFromPayload", () => {
   it("dispatches task change for task SSE events", () => {
@@ -23,6 +27,20 @@ describe("dispatchTaskEventFromPayload", () => {
     expect(taskHandler).toHaveBeenCalledTimes(1);
     window.removeEventListener(TASK_CHANGE_EVENT, taskHandler);
     window.removeEventListener(NOTIFICATION_EVENT, notifHandler);
+  });
+});
+
+describe("shouldOpenTaskEventSource", () => {
+  it("opens SSE only in local non-native browsers", () => {
+    expect(shouldOpenTaskEventSource(false, false)).toBe(true);
+  });
+
+  it("skips SSE on native even in local Vite", () => {
+    expect(shouldOpenTaskEventSource(true, false)).toBe(false);
+  });
+
+  it("skips SSE on production web so Vercel does not hold a 120s stream", () => {
+    expect(shouldOpenTaskEventSource(false, true)).toBe(false);
   });
 });
 

@@ -323,7 +323,9 @@ function VideoCaptureDialog({
 
   const handleRetry = () => {
     reset();
-    void startPreview();
+    scheduleAfterDialogPaint(() => {
+      void startPreview();
+    });
   };
 
   return (
