@@ -1,3 +1,4 @@
+import { he } from "../i18n/he";
 import { isFetchInterruptedError } from "./apiErrorMessage";
 import { isNativeApp } from "./isNativeApp";
 import { siyumTrace } from "./siyumTrace";
@@ -10,6 +11,9 @@ import {
 import { nativeMediaPath } from "./nativeMediaPath";
 
 export type VideoUploadPurpose = "task" | "chat" | "issue";
+
+/** Aligné sur backend VIDEO_MAX_BYTES — le PUT R2 signe aussi ContentLength. */
+export const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
 
 export type VideoUploadIntent =
   | { mode: "proxy" }
@@ -63,12 +67,20 @@ function delay(ms: number): Promise<void> {
 export async function requestVideoIntent(
   purpose: VideoUploadPurpose,
   contentType: string,
+  size: number,
 ): Promise<VideoUploadIntent> {
   const { data } = await api.post<VideoUploadIntent>("/media/video-intent", {
     purpose,
     content_type: bareVideoContentType(contentType, "video/mp4"),
+    size,
   });
   return data;
+}
+
+export function assertVideoWithinMaxBytes(size: number, maxBytes = VIDEO_MAX_BYTES): void {
+  if (size < 1 || size > maxBytes) {
+    throw new Error(he.errorRequestTooLarge);
+  }
 }
 
 export function directPutHeaders(
@@ -153,6 +165,7 @@ export async function uploadVideoFile(
   isDev = Boolean(import.meta.env.DEV),
   native = isNativeApp(),
 ): Promise<{ url: string }> {
+  assertVideoWithinMaxBytes(file.size);
   const uploadFile = await snapshotMediaFile(fileForBlobVideoUpload(file));
   siyumTrace("video-upload-start", {
     bytes: uploadFile.size,
@@ -164,7 +177,7 @@ export async function uploadVideoFile(
     siyumTrace("video-upload-proxy", { reason: "skip-browser-blob-put" });
     return proxyUpload(uploadFile);
   }
-  const intent = await requestVideoIntent(purpose, uploadFile.type).catch(
+  const intent = await requestVideoIntent(purpose, uploadFile.type, uploadFile.size).catch(
     (): VideoUploadIntent => ({ mode: "proxy" }),
   );
   if (intent.mode !== "direct") {

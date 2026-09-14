@@ -110,10 +110,10 @@ def media_is_readable(url: str | None) -> bool:
     return False
 
 
-def presign_put_url(key: str, content_type: str) -> str:
+def presign_put_url(key: str, content_type: str, content_length: int) -> str:
     from app.services import object_store
 
-    return object_store.presign_put(key, content_type)
+    return object_store.presign_put(key, content_type, content_length)
 
 
 def presign_get_url(url: str) -> str | None:

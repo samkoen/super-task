@@ -1,3 +1,5 @@
+from pytest import raises
+
 from app.services.video_direct_upload_service import create_video_upload_intent
 
 
@@ -26,17 +28,32 @@ def test_create_video_upload_intent_direct_on_render_prod(monkeypatch):
     monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_PRODUCTION", True)
     monkeypatch.setattr(
         "app.services.blob_storage.presign_put_url",
-        lambda key, mime: f"https://signed.example/put/{key}?ct={mime}",
+        lambda key, mime, size: f"https://signed.example/put/{key}?ct={mime}&n={size}",
     )
     monkeypatch.setattr(
         "app.services.blob_storage.object_url_for_key",
         lambda key: f"https://abc.r2.cloudflarestorage.com/super-media/{key}",
     )
-    intent = create_video_upload_intent("task", "video/webm")
+    intent = create_video_upload_intent("task", "video/webm", 12)
     assert intent["mode"] == "direct"
     assert intent["pathname"].startswith("task_videos/")
     assert intent["pathname"].endswith(".webm")
     assert intent["putUrl"].startswith("https://signed.example/put/")
+    assert "n=12" in intent["putUrl"]
     assert intent["headers"] == {"Content-Type": "video/webm"}
     assert intent["url"].startswith("https://abc.r2.cloudflarestorage.com/super-media/")
     assert intent["kind"] == "video"
+    assert intent["maxBytes"] == 50 * 1024 * 1024
+
+
+def test_create_video_upload_intent_rejects_oversized_direct(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.video_direct_upload_service.config.object_storage_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_PRODUCTION", True)
+
+    with raises(ValueError, match="גדול"):
+        create_video_upload_intent("task", "video/mp4", 50 * 1024 * 1024 + 1)
+    with raises(ValueError, match="חסר"):
+        create_video_upload_intent("task", "video/mp4")

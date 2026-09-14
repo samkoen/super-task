@@ -70,7 +70,7 @@ def video_upload_intent(
     load_actor(request, UserRepository(db))
     purpose = str(payload.get("purpose") or "")
     content_type = str(payload.get("content_type") or "video/mp4")
-    return create_video_upload_intent(purpose, content_type)
+    return create_video_upload_intent(purpose, content_type, payload.get("size"))
 
 
 @router.get("/ready")

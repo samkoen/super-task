@@ -5,7 +5,11 @@ import logging
 import uuid
 
 from app.core import config
-from app.domain.video_upload_intent import video_extension, video_folder_for_purpose
+from app.domain.video_upload_intent import (
+    require_video_byte_size,
+    video_extension,
+    video_folder_for_purpose,
+)
 from app.services import blob_storage
 from app.services.media_upload_service import VIDEO_MAX_BYTES
 
@@ -17,15 +21,18 @@ def should_use_direct_put_intent() -> bool:
     return config.object_storage_enabled() and config.IS_PRODUCTION
 
 
-def create_video_upload_intent(purpose: str, content_type: str) -> dict:
+def create_video_upload_intent(
+    purpose: str, content_type: str, size_bytes: object = None
+) -> dict:
     folder = video_folder_for_purpose(purpose)
     mime = (content_type or "").split(";")[0].strip().lower() or "video/mp4"
     if not should_use_direct_put_intent():
         logger.info("video-intent purpose=%s mode=proxy", purpose)
         return {"mode": "proxy"}
+    size = require_video_byte_size(size_bytes, VIDEO_MAX_BYTES)
     key = f"{folder}/{uuid.uuid4().hex}{video_extension(mime)}"
-    put_url = blob_storage.presign_put_url(key, mime)
-    logger.info("video-intent purpose=%s mode=direct", purpose)
+    put_url = blob_storage.presign_put_url(key, mime, size)
+    logger.info("video-intent purpose=%s mode=direct size=%s", purpose, size)
     return {
         "mode": "direct",
         "putUrl": put_url,

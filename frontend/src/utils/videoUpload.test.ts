@@ -19,12 +19,14 @@ vi.mock("../plugins/nativeBlobUpload", () => ({
 
 import { attachNativeMediaPath } from "./nativeMediaPath";
 import {
+  assertVideoWithinMaxBytes,
   directPutHeaders,
   fileForBlobVideoUpload,
   putDirectVideo,
   shouldUseLocalVideoProxy,
   shouldUseSameOriginVideoProxy,
   uploadVideoFile,
+  VIDEO_MAX_BYTES,
 } from "./videoUpload";
 
 const directIntent = {
@@ -55,6 +57,12 @@ describe("videoUpload", () => {
       new File(["clip"], "clip.webm", { type: "video/webm" }),
     );
     expect(headers).toEqual({ "Content-Type": "video/webm" });
+  });
+
+  it("rejects a video larger than the signed max", () => {
+    expect(() => assertVideoWithinMaxBytes(VIDEO_MAX_BYTES + 1)).toThrow();
+    expect(() => assertVideoWithinMaxBytes(0)).toThrow();
+    expect(() => assertVideoWithinMaxBytes(12)).not.toThrow();
   });
 
   it("strips MediaRecorder codec suffixes so R2 accepts the webm", () => {
@@ -106,6 +114,19 @@ describe("videoUpload", () => {
       fetchMock,
     );
     expect(out.url).toBe(directIntent.url);
+    expect(proxy).not.toHaveBeenCalled();
+    expect(mockPost).toHaveBeenCalledWith(
+      "/media/video-intent",
+      expect.objectContaining({ size: 1, content_type: "video/mp4" }),
+    );
+  });
+
+  it("does not request a signed PUT for an oversized file", async () => {
+    const huge = new File(["x"], "a.mp4", { type: "video/mp4" });
+    Object.defineProperty(huge, "size", { value: VIDEO_MAX_BYTES + 1 });
+    const proxy = vi.fn();
+    await expect(uploadVideoFile(huge, "task", proxy, vi.fn())).rejects.toThrow();
+    expect(mockPost).not.toHaveBeenCalled();
     expect(proxy).not.toHaveBeenCalled();
   });
 

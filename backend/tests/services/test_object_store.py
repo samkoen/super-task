@@ -65,8 +65,10 @@ def test_put_copy_delete_and_presign(monkeypatch):
     copied = object_store.copy_key(url, "task_videos/b.webm")
     assert copied.endswith("/super-media/task_videos/b.webm")
     assert object_store.object_is_readable(url) is True
-    put = object_store.presign_put("task_videos/c.webm", "video/webm")
+    put = object_store.presign_put("task_videos/c.webm", "video/webm", 42)
     assert "put_object" in put
+    assert fake.presigned[0][1]["ContentLength"] == 42
+    assert fake.presigned[0][1]["ContentType"] == "video/webm"
     get = object_store.presign_get(url)
     assert "get_object" in get
     object_store.delete_key_url(url)

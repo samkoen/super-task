@@ -113,13 +113,14 @@ def object_is_readable(url: str) -> bool:
         return False
 
 
-def presign_put(key: str, content_type: str) -> str:
+def presign_put(key: str, content_type: str, content_length: int) -> str:
     return s3_client().generate_presigned_url(
         "put_object",
         Params={
             "Bucket": config.R2_BUCKET,
             "Key": key,
             "ContentType": content_type,
+            "ContentLength": content_length,
         },
         ExpiresIn=PUT_EXPIRES_S,
     )
