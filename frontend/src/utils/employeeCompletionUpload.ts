@@ -31,7 +31,7 @@ export function slotsFromKeptAttachments(
   attachments: CompletionAttachment[] | null | undefined,
 ): Array<PendingMedia | null> {
   return mapAttachmentsToSlots(requirements, attachments).fills.map((fill) =>
-    fill?.url ? createKeptMedia(fill.url, fill.durationSeconds, fill.posterUrl) : null,
+    fill?.url ? createKeptMedia(fill.url, fill.durationSeconds, fill.posterUrl ?? undefined) : null,
   );
 }
 
