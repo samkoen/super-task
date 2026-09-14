@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.auth.actor import load_actor
+from app.core.config import IS_VERCEL
 from app.db import session as db_session
 from app.realtime.sse_hub import sse_hub
+from app.realtime.sse_stream_limits import stream_max_seconds, stream_time_is_up
 from app.realtime.task_events import channels_for_actor
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.user_repository import UserRepository
@@ -52,11 +55,16 @@ async def stream_events(request: Request):
 
     async def generate():
         queues: list[asyncio.Queue[str]] = []
+        started = time.monotonic()
+        max_seconds = stream_max_seconds(is_vercel=IS_VERCEL)
         for channel in channels:
             queues.append(await sse_hub.subscribe(channel))
         try:
             yield "event: connected\ndata: {}\n\n"
             while True:
+                if stream_time_is_up(started, time.monotonic(), max_seconds):
+                    yield "event: shutdown\ndata: {}\n\n"
+                    break
                 if await request.is_disconnected():
                     break
                 try:

@@ -69,12 +69,26 @@ def test_upgrade_to_head_runs_alembic_under_lock(monkeypatch):
     engine.begin.return_value.__enter__.return_value = conn
     engine.begin.return_value.__exit__.return_value = False
     monkeypatch.setattr("app.db.auto_migrate.db_session.get_engine", lambda: engine)
+    monkeypatch.setattr("app.db.auto_migrate._schema_is_at_head", lambda: False)
     monkeypatch.setattr("app.db.auto_migrate._run_alembic_upgrade", lambda: None)
 
     upgrade_to_head()
 
     sql = str(conn.execute.call_args.args[0])
     assert "pg_advisory_xact_lock" in sql
+
+
+def test_upgrade_to_head_skips_when_already_at_head(monkeypatch):
+    called = []
+    monkeypatch.setattr("app.db.auto_migrate._schema_is_at_head", lambda: True)
+    monkeypatch.setattr(
+        "app.db.auto_migrate._run_alembic_upgrade", lambda: called.append(1)
+    )
+    monkeypatch.setattr("app.db.auto_migrate.db_session.get_engine", lambda: called.append("engine"))
+
+    upgrade_to_head()
+
+    assert called == []
 
 
 def test_upgrade_to_head_propagates_alembic_failure(monkeypatch):
@@ -84,6 +98,7 @@ def test_upgrade_to_head_propagates_alembic_failure(monkeypatch):
     engine.begin.return_value.__enter__.return_value = conn
     engine.begin.return_value.__exit__.return_value = False
     monkeypatch.setattr("app.db.auto_migrate.db_session.get_engine", lambda: engine)
+    monkeypatch.setattr("app.db.auto_migrate._schema_is_at_head", lambda: False)
 
     def boom() -> None:
         raise RuntimeError("alembic failed")

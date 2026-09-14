@@ -1,3 +1,5 @@
+import { readFileBytes } from "./videoUpload";
+
 export const VIDEO_SLOT_IDLE_MS = 300;
 
 export function isVideoPending(media: { file: File | null }): boolean {
@@ -56,15 +58,13 @@ export async function waitUntilPendingVideosReady<T extends { file: File | null;
   slots: Array<T | null>,
   opts?: {
     idleMs?: number;
-    canPlay?: (url: string) => Promise<void>;
     wait?: (ms: number) => Promise<void>;
   },
 ): Promise<void> {
   const videos = pendingVideoSlots(slots);
   if (!videos.length) return;
   await waitForCaptureUiIdle(opts?.idleMs, opts?.wait);
-  const canPlay = opts?.canPlay ?? waitUntilVideoCanPlay;
-  await Promise.all(videos.map((item) => canPlay(item.previewUrl)));
+  await Promise.all(videos.map((item) => readFileBytes(item.file)));
 }
 
 function sleepMs(ms: number): Promise<void> {

@@ -123,6 +123,23 @@ describe("videoUpload", () => {
     expect(proxy).not.toHaveBeenCalled();
   });
 
+  it("falls back to the same-origin proxy when Chrome CORS-blocks the Blob PUT", async () => {
+    vi.useFakeTimers();
+    mockPost.mockResolvedValue({ data: directIntent });
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const proxy = vi.fn().mockResolvedValue({ url: "/uploads/v.mp4" });
+    const pending = uploadVideoFile(
+      new File(["x"], "a.mp4", { type: "video/mp4" }),
+      "task",
+      proxy,
+      fetchMock,
+    );
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toEqual({ url: "/uploads/v.mp4" });
+    expect(proxy).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it("streams an Android cache file through OkHttp instead of fetch", async () => {
     mockNativeAvailable.mockReturnValue(true);
     mockNativePut.mockResolvedValue({ url: "https://blob.example/native.mp4" });

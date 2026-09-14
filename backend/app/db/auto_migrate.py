@@ -30,11 +30,39 @@ def run_startup_migrations(*, is_production: bool, is_vercel: bool, database_url
 
 
 def upgrade_to_head() -> None:
+    if _schema_is_at_head():
+        logger.debug("Schema already at head")
+        return
     engine = db_session.get_engine()
     with engine.begin() as conn:
         _acquire_lock(conn)
         _run_alembic_upgrade()
     logger.info("Auto-migrate upgrade head done")
+
+
+def _alembic_config():
+    from alembic.config import Config
+
+    cfg = Config(str(_BACKEND_DIR / "alembic.ini"))
+    cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
+    cfg.set_main_option("prepend_sys_path", str(_BACKEND_DIR))
+    return cfg
+
+
+def _schema_is_at_head() -> bool:
+    """Évite Alembic (et ses logs de boot) sur chaque cold start déjà à jour."""
+    try:
+        from alembic.script import ScriptDirectory
+
+        head = ScriptDirectory.from_config(_alembic_config()).get_current_head()
+        engine = db_session.get_engine()
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT version_num FROM alembic_version")).first()
+        current = row[0] if row else None
+        return bool(head) and current == head
+    except Exception:
+        logger.warning("Could not check alembic head, running upgrade")
+        return False
 
 
 def _acquire_lock(conn) -> None:
@@ -46,9 +74,5 @@ def _acquire_lock(conn) -> None:
 
 def _run_alembic_upgrade() -> None:
     from alembic import command
-    from alembic.config import Config
 
-    cfg = Config(str(_BACKEND_DIR / "alembic.ini"))
-    cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
-    cfg.set_main_option("prepend_sys_path", str(_BACKEND_DIR))
-    command.upgrade(cfg, "head")
+    command.upgrade(_alembic_config(), "head")

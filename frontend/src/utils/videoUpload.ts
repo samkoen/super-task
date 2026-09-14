@@ -38,6 +38,29 @@ export function fileForBlobVideoUpload(file: File): File {
   return new File([file], file.name, { type, lastModified: file.lastModified });
 }
 
+export async function snapshotMediaFile(file: File): Promise<File> {
+  const buffer = await readFileBytes(file);
+  return new File([buffer], file.name, { type: file.type, lastModified: file.lastModified });
+}
+
+export async function readFileBytes(file: Blob): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === "function") return file.arrayBuffer();
+  return readFileBytesWithReader(file);
+}
+
+function readFileBytesWithReader(file: Blob): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error("file"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function isRetryableBlobPutError(error: unknown): boolean {
+  return isFetchInterruptedError(error);
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -129,12 +152,17 @@ export async function uploadVideoFile(
   doFetch?: typeof fetch,
   isDev = Boolean(import.meta.env.DEV),
 ): Promise<{ url: string }> {
-  const uploadFile = fileForBlobVideoUpload(file);
+  const uploadFile = await snapshotMediaFile(fileForBlobVideoUpload(file));
   const intent = await requestVideoIntent(purpose, uploadFile.type).catch(
     (): VideoUploadIntent => ({ mode: "proxy" }),
   );
   if (intent.mode !== "direct" || (!doFetch && shouldUseLocalVideoProxy(isDev))) {
     return proxyUpload(uploadFile);
   }
-  return putBlobWithClientToken(intent, uploadFile, doFetch);
+  try {
+    return await putBlobWithClientToken(intent, uploadFile, doFetch);
+  } catch (error) {
+    if (!isRetryableBlobPutError(error)) throw error;
+    return proxyUpload(uploadFile);
+  }
 }
