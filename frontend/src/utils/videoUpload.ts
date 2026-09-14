@@ -78,6 +78,7 @@ export async function requestVideoIntent(
   return data;
 }
 
+/** Headers PUT Blob : uniquement ceux listés par le preflight CORS de vercel.com/api/blob. */
 export function blobPutHeaders(
   intent: Extract<VideoUploadIntent, { mode: "direct" }>,
   file: File,
@@ -86,7 +87,6 @@ export function blobPutHeaders(
     authorization: `Bearer ${intent.token}`,
     "x-api-version": intent.apiVersion,
     "x-content-type": bareVideoContentType(file.type, "video/mp4"),
-    "x-add-random-suffix": "0",
     "x-vercel-blob-access": intent.access,
   };
 }
