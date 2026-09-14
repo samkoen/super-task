@@ -84,4 +84,11 @@ describe("useResolvedMediaSrc", () => {
     await waitFor(() => expect(result.current.failed).toBe(true));
     expect(result.current.src).toBe("/proxy?src=/uploads/p.jpg");
   });
+
+  it("falls back to the proxy url when eager fetch fails", async () => {
+    vi.mocked(fetchMediaBlobWithRetry).mockRejectedValue(new Error("media fetch failed: 404"));
+    const { result } = renderHook(() => useResolvedMediaSrc("/uploads/v2.mp4", true));
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    expect(result.current.src).toBe("/proxy?src=/uploads/v2.mp4");
+  });
 });

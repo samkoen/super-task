@@ -1,4 +1,4 @@
-"""Intention d'upload vidéo — proxy local ou PUT direct Blob."""
+"""Intention d'upload vidéo — proxy local ou PUT présigné objet."""
 from __future__ import annotations
 
 VIDEO_PURPOSES = {
@@ -24,3 +24,14 @@ def video_folder_for_purpose(purpose: str) -> str:
 def video_extension(content_type: str) -> str:
     mime = (content_type or "").split(";")[0].strip().lower()
     return VIDEO_CONTENT_TYPES.get(mime, ".mp4")
+
+
+def require_video_byte_size(size_bytes: object, max_bytes: int) -> int:
+    try:
+        size = int(size_bytes)
+    except (TypeError, ValueError):
+        raise ValueError("חסר גודל קובץ") from None
+    if size < 1 or size > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        raise ValueError(f"הקובץ גדול מדי (מקסימום {limit_mb}MB)")
+    return size

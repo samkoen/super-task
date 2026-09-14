@@ -25,10 +25,10 @@ final class BlobFilePutter {
                 throw new IOException("upload failed");
             }
             String blobUrl = BlobPutJson.urlFromBody(body);
-            if (blobUrl == null) {
-                throw new IOException("upload failed");
+            if (blobUrl != null) {
+                return blobUrl;
             }
-            return blobUrl;
+            return "";
         }
     }
 

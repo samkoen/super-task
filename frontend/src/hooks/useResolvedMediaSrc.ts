@@ -23,11 +23,22 @@ export function useResolvedMediaSrc(path: string | null | undefined, eager = fal
   }, [path, eager, preview]);
 
   return {
-    src: resolvedMediaSrc(path, preview, retrySrc, eager),
-    loading: retryRef.current.busy && !retrySrc && !preview,
+    src: resolvedMediaSrc(path, preview, retrySrc, eager, failed),
+    loading: isEagerLoading(path, preview, retrySrc, eager, failed),
     failed,
     onError: () => startProxyRetry(path, preview, retryRef, setRetrySrc, setFailed),
   };
+}
+
+function isEagerLoading(
+  path: string | null | undefined,
+  preview: string | null,
+  retrySrc: string | null,
+  eager: boolean,
+  failed: boolean,
+): boolean {
+  if (!eager || !path || preview || retrySrc || failed || path.startsWith("blob:")) return false;
+  return true;
 }
 
 function resolvedMediaSrc(
@@ -35,11 +46,13 @@ function resolvedMediaSrc(
   preview: string | null,
   retrySrc: string | null,
   eager: boolean,
+  failed: boolean,
 ): string | null {
   if (preview) return preview;
   if (path?.startsWith("blob:")) return path;
   if (retrySrc) return retrySrc;
-  return eager ? null : mediaUrl(path);
+  if (eager && !failed) return null;
+  return mediaUrl(path);
 }
 
 function revokeIfBlob(src: string | null) {

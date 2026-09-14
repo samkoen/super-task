@@ -11,7 +11,33 @@ describe("fetchMediaBlob", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: async () => blob });
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchMediaBlob("/uploads/p.jpg")).resolves.toBe(blob);
-    expect(fetchMock).toHaveBeenCalledWith("/proxy?src=/uploads/p.jpg", { credentials: "include" });
+    expect(fetchMock).toHaveBeenCalledWith("/proxy?src=/uploads/p.jpg", {
+      credentials: "include",
+      redirect: "follow",
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it("follows a same-origin 302 to a presigned object URL", async () => {
+    const blob = new Blob(["vid"], { type: "video/webm" });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 302,
+        headers: { get: (name: string) => (name === "Location" ? "https://signed.example/v.webm" : null) },
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: async () => blob });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchMediaBlob("https://abc.r2.cloudflarestorage.com/super-media/v.webm")).resolves.toBe(
+      blob,
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/proxy?src=https://abc.r2.cloudflarestorage.com/super-media/v.webm",
+      { credentials: "include", redirect: "manual" },
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "https://signed.example/v.webm");
     vi.unstubAllGlobals();
   });
 

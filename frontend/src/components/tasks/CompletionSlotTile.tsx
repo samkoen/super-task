@@ -74,7 +74,7 @@ export default function CompletionSlotTile({
         filled={filled}
         filledSrc={filledSrc}
         posterSrc={posterSrc}
-        pending={Boolean(fill?.pending)}
+        pending={Boolean(fill?.pending) || resolved.loading}
         exampleSrc={exampleSrc}
         kind={req.kind}
         title={title}

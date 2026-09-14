@@ -139,8 +139,7 @@ export function employeeTaskAutoCompleteEligible(
 
 /**
  * Toujours false. L'auto-siyum lançait l'upload pendant le teardown caméra :
- * PUT CORS vers vercel.com/api/blob → Failed to fetch, complete jamais appelé
- * (logs Vercel : video-intent 200, zéro complete / upload-video).
+ * PUT CORS bloqué, complete jamais appelé (video-intent 200, zéro complete).
  */
 export function shouldAutoCompleteEmployeeTask(
   _requirementCount: number,
