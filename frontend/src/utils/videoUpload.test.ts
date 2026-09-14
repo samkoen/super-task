@@ -175,7 +175,7 @@ describe("videoUpload", () => {
   it("uses the local API proxy in Vite instead of a CORS PUT to Blob", async () => {
     expect(shouldUseLocalVideoProxy(true)).toBe(true);
     expect(shouldUseLocalVideoProxy(false)).toBe(false);
-    expect(shouldUseSameOriginVideoProxy(false, false)).toBe(true);
+    expect(shouldUseSameOriginVideoProxy(false, false)).toBe(false);
     expect(shouldUseSameOriginVideoProxy(false, true)).toBe(false);
     mockPost.mockResolvedValue({ data: directIntent });
     const proxy = vi.fn().mockResolvedValue({ url: "/uploads/local.webm" });
@@ -190,10 +190,14 @@ describe("videoUpload", () => {
     expect(proxy).toHaveBeenCalled();
   });
 
-  it("skips the browser Blob PUT on Chrome prod and uses the same-origin proxy", async () => {
+  it("uses a direct Blob PUT on Chrome prod instead of proxying through the API", async () => {
     mockPost.mockResolvedValue({ data: directIntent });
-    const fetchMock = vi.fn();
-    const proxy = vi.fn().mockResolvedValue({ url: "/uploads/v.webm" });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ url: "https://blob.example/v.webm" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const proxy = vi.fn();
     const out = await uploadVideoFile(
       new File(["x"], "a.webm", { type: "video/webm" }),
       "task",
@@ -202,10 +206,10 @@ describe("videoUpload", () => {
       false,
       false,
     );
-    expect(out.url).toBe("/uploads/v.webm");
-    expect(proxy).toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(mockPost).not.toHaveBeenCalled();
+    expect(out.url).toBe("https://blob.example/v.webm");
+    expect(proxy).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
+    expect(mockPost).toHaveBeenCalled();
   });
 
   it("falls back to the proxy multipart when Blob is off", async () => {

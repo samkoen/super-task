@@ -147,9 +147,9 @@ export function shouldUseLocalVideoProxy(isDev: boolean): boolean {
   return isDev;
 }
 
-/** Chrome web : le PUT vers vercel.com/api/blob est bloqué CORS (Failed to fetch). */
-export function shouldUseSameOriginVideoProxy(isDev: boolean, native: boolean): boolean {
-  return isDev || !native;
+/** Proxy multipart seulement en Vite. Prod web (Render) : PUT Blob, proxy en repli. */
+export function shouldUseSameOriginVideoProxy(isDev: boolean, _native = false): boolean {
+  return isDev;
 }
 
 export async function uploadVideoFile(

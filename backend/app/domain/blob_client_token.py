@@ -22,6 +22,7 @@ def generate_blob_client_token(
     valid_until_ms: int | None = None,
     allowed_content_types: list[str] | None = None,
     maximum_size_in_bytes: int | None = None,
+    allowed_origins: list[str] | None = None,
 ) -> str:
     store_id = store_id_from_rw_token(read_write_token)
     if not store_id:
@@ -31,6 +32,7 @@ def generate_blob_client_token(
         valid_until_ms=valid_until_ms or int(time.time() * 1000) + DEFAULT_TTL_MS,
         allowed_content_types=allowed_content_types,
         maximum_size_in_bytes=maximum_size_in_bytes,
+        allowed_origins=allowed_origins,
     )
     encoded_payload = base64.b64encode(payload.encode("utf-8")).decode("ascii")
     signature = hmac.new(
@@ -48,6 +50,7 @@ def _token_payload(
     valid_until_ms: int,
     allowed_content_types: list[str] | None,
     maximum_size_in_bytes: int | None,
+    allowed_origins: list[str] | None = None,
 ) -> str:
     data: dict[str, object] = {
         "pathname": pathname,
@@ -58,4 +61,6 @@ def _token_payload(
         data["allowedContentTypes"] = allowed_content_types
     if maximum_size_in_bytes is not None:
         data["maximumSizeInBytes"] = maximum_size_in_bytes
+    if allowed_origins:
+        data["allowedOrigins"] = allowed_origins
     return json.dumps(data, separators=(",", ":"))
