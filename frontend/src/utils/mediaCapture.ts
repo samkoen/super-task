@@ -14,6 +14,64 @@ export function classifyMediaError(error: unknown): MediaCaptureErrorCode {
   return "unknown";
 }
 
+const BUSY_DEVICE_RETRY_MS = [0, 200, 500];
+
+function isPermissionError(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
+}
+
+function isBusyDeviceError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "NotReadableError";
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+/** Chrome/Windows keeps the camera locked until the <video> is paused and unloaded. */
+export function detachCaptureVideo(video: HTMLVideoElement | null | undefined): void {
+  if (!video) return;
+  video.pause();
+  video.srcObject = null;
+  video.removeAttribute("src");
+  try {
+    video.load();
+  } catch {
+    // jsdom implements load() as "not implemented" and may throw
+  }
+}
+
+function waitForLiveTracksToEnd(stream: MediaStream): Promise<void> {
+  const live = stream.getTracks().filter((track) => track.readyState === "live");
+  if (live.length === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    let remaining = live.length;
+    const timer = window.setTimeout(resolve, 1500);
+    const onEnded = () => {
+      remaining -= 1;
+      if (remaining > 0) return;
+      window.clearTimeout(timer);
+      resolve();
+    };
+    live.forEach((track) => track.addEventListener("ended", onEnded, { once: true }));
+  });
+}
+
+/** Detach the preview first, then stop tracks — otherwise Chrome/Windows never frees the camera. */
+export async function releaseMediaStream(
+  stream: MediaStream | null | undefined,
+  video?: HTMLVideoElement | null,
+): Promise<void> {
+  detachCaptureVideo(video);
+  if (!stream) return;
+  const ended = waitForLiveTracksToEnd(stream);
+  for (const track of stream.getTracks()) {
+    track.stop();
+    if (typeof stream.removeTrack === "function") stream.removeTrack(track);
+  }
+  await ended;
+}
+
 export async function getUserMediaWithFallback(
   constraintsList: MediaStreamConstraints[]
 ): Promise<MediaStream> {
@@ -31,15 +89,27 @@ export async function getUserMediaWithFallback(
   let lastError: unknown;
   for (const constraints of constraintsList) {
     try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
+      return await getUserMediaAllowingBusy(constraints);
     } catch (error) {
       lastError = error;
-      if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
-        throw error;
-      }
+      if (isPermissionError(error)) throw error;
     }
   }
   throw lastError ?? new DOMException("No device", "NotFoundError");
+}
+
+async function getUserMediaAllowingBusy(constraints: MediaStreamConstraints): Promise<MediaStream> {
+  let lastError: unknown;
+  for (const waitMs of BUSY_DEVICE_RETRY_MS) {
+    if (waitMs > 0) await delay(waitMs);
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      lastError = error;
+      if (!isBusyDeviceError(error)) throw error;
+    }
+  }
+  throw lastError ?? new DOMException("Device busy", "NotReadableError");
 }
 
 export type CameraFacing = "user" | "environment";

@@ -5,6 +5,7 @@ export function pickSystemBugPortalHost(root: ParentNode): HTMLElement {
     const el = modals[i] as HTMLElement;
     if (el.hasAttribute("data-system-bug-dialog")) continue;
     if (el.querySelector("[data-system-bug-dialog]")) continue;
+    if (el.getAttribute("aria-hidden") === "true" || el.hasAttribute("hidden")) continue;
     return el;
   }
   return root as HTMLElement;

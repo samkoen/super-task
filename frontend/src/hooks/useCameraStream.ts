@@ -3,9 +3,11 @@ import {
   attachStreamToVideo,
   cameraConstraints,
   classifyMediaError,
+  detachCaptureVideo,
   getUserMediaWithFallback,
   isMediaCaptureSupported,
   oppositeCameraFacing,
+  releaseMediaStream,
   type CameraFacing,
 } from "../utils/mediaCapture";
 
@@ -26,26 +28,31 @@ export function useCameraStream(options?: UseCameraStreamOptions) {
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef(0);
   const facingRef = useRef<CameraFacing>(initialFacing);
+  const releasingRef = useRef(Promise.resolve());
 
   const supported = isMediaCaptureSupported();
 
-  const releaseStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+  const discardStream = useCallback(() => {
+    const currentStream = streamRef.current;
+    const video = videoRef.current;
     streamRef.current = null;
     setStream(null);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    const next = releasingRef.current.then(() => releaseMediaStream(currentStream, video));
+    releasingRef.current = next.then(() => undefined, () => undefined);
+    return next;
   }, []);
 
   const stop = useCallback(() => {
     sessionRef.current += 1;
-    releaseStream();
+    void discardStream();
     setActive(false);
     setStarting(false);
-  }, [releaseStream]);
+  }, [discardStream]);
 
   const onVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    if (videoRef.current && videoRef.current !== node) {
+      detachCaptureVideo(videoRef.current);
+    }
     videoRef.current = node;
     const currentStream = streamRef.current;
     if (node && currentStream) {
@@ -63,13 +70,14 @@ export function useCameraStream(options?: UseCameraStreamOptions) {
     setError("");
     setStarting(true);
     setActive(false);
-    releaseStream();
+    await discardStream();
+    if (session !== sessionRef.current) return "cancelled";
     try {
       const nextStream = await getUserMediaWithFallback(
         cameraConstraints(facingRef.current, false),
       );
       if (session !== sessionRef.current) {
-        nextStream.getTracks().forEach((track) => track.stop());
+        await releaseMediaStream(nextStream);
         return "cancelled";
       }
       streamRef.current = nextStream;
@@ -81,7 +89,7 @@ export function useCameraStream(options?: UseCameraStreamOptions) {
       return "ready";
     } catch (caught) {
       if (session !== sessionRef.current) return "cancelled";
-      releaseStream();
+      await discardStream();
       setActive(false);
       setError(classifyMediaError(caught));
       return "failed";
@@ -90,7 +98,7 @@ export function useCameraStream(options?: UseCameraStreamOptions) {
         setStarting(false);
       }
     }
-  }, [releaseStream, supported]);
+  }, [discardStream, supported]);
 
   const flip = useCallback(async () => {
     const previous = facingRef.current;

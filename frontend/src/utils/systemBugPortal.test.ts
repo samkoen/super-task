@@ -18,6 +18,15 @@ describe("pickSystemBugPortalHost", () => {
     expect(pickSystemBugPortalHost(root)).toBe(task);
   });
 
+  it("skips a closed keepMounted modal", () => {
+    const root = document.createElement("div");
+    const hidden = document.createElement("div");
+    hidden.className = "MuiModal-root";
+    hidden.setAttribute("aria-hidden", "true");
+    root.append(hidden);
+    expect(pickSystemBugPortalHost(root)).toBe(root);
+  });
+
   it("skips the report modal when the marker is on a child", () => {
     const root = document.createElement("div");
     const task = document.createElement("div");

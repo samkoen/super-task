@@ -12,6 +12,7 @@ import {
   photoPreviewSize,
   photoUploadFilename,
   pickVideoRecorderMimeType,
+  releaseMediaStream,
   VIDEO_RECORD_BITRATE,
   videoRecorderOptions,
 } from "./mediaCapture";
@@ -72,6 +73,54 @@ describe("mediaCapture", () => {
     expect(getUserMedia).toHaveBeenCalledTimes(1);
 
     vi.unstubAllGlobals();
+  });
+
+  it("getUserMediaWithFallback retries when Chrome still reports the camera busy", async () => {
+    vi.useFakeTimers();
+    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const getUserMedia = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException("busy", "NotReadableError"))
+      .mockResolvedValueOnce(stream);
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+
+    const pending = getUserMediaWithFallback([{ video: true }]);
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toBe(stream);
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("releaseMediaStream pauses the video before stopping tracks", async () => {
+    const video = document.createElement("video");
+    const order: string[] = [];
+    vi.spyOn(video, "pause").mockImplementation(() => {
+      order.push("pause");
+    });
+    vi.spyOn(video, "load").mockImplementation(() => undefined);
+    const listeners: Array<() => void> = [];
+    const track = {
+      readyState: "live" as MediaStreamTrackState,
+      stop: vi.fn(() => {
+        expect(video.srcObject).toBeNull();
+        order.push("stop");
+        track.readyState = "ended";
+        listeners.forEach((cb) => cb());
+      }),
+      addEventListener: vi.fn((type: string, cb: () => void) => {
+        if (type === "ended") listeners.push(cb);
+      }),
+    };
+    const removeTrack = vi.fn();
+    const stream = { getTracks: () => [track], removeTrack } as unknown as MediaStream;
+    video.srcObject = stream;
+
+    await releaseMediaStream(stream, video);
+
+    expect(order).toEqual(["pause", "stop"]);
+    expect(removeTrack).toHaveBeenCalledWith(track);
   });
 
   it("capturePhotoFromVideo returns null when video has no dimensions", async () => {

@@ -14,6 +14,15 @@ export function isFailedToFetch(text: string): boolean {
   return /failed to fetch/i.test(text);
 }
 
+export function isFetchInterruptedText(text: string): boolean {
+  return isFetchScopeShutdown(text) || isFailedToFetch(text);
+}
+
+export function isFetchInterruptedError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error ?? "");
+  return isFetchInterruptedText(text);
+}
+
 const OBJECT_STRING = "[object Object]";
 
 export function humanizeApiError(payload: unknown, depth = 0): string {
@@ -29,7 +38,7 @@ export function humanizeApiError(payload: unknown, depth = 0): string {
       }
     }
     if (isRequestEntityTooLarge(text)) return he.errorRequestTooLarge;
-    if (isFetchScopeShutdown(text) || isFailedToFetch(text)) return he.errorFetchInterrupted;
+    if (isFetchInterruptedText(text)) return he.errorFetchInterrupted;
     return text;
   }
   if (typeof payload === "number" || typeof payload === "boolean") return String(payload);

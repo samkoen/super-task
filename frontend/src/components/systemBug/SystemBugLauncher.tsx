@@ -109,7 +109,12 @@ export default function SystemBugLauncher() {
   const managerChrome = shouldShowManagerChrome(user?.role, location.pathname);
 
   const startReport = async () => {
-    const shot = await captureViewportPng();
+    let shot: Blob | null = null;
+    try {
+      shot = await captureViewportPng();
+    } catch {
+      shot = null;
+    }
     setScreenshot(shot);
     setOpen(true);
   };

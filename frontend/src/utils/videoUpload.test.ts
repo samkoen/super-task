@@ -18,7 +18,7 @@ vi.mock("../plugins/nativeBlobUpload", () => ({
 }));
 
 import { attachNativeMediaPath } from "./nativeMediaPath";
-import { blobPutUrl, putBlobWithClientToken, shouldUseLocalVideoProxy, uploadVideoFile } from "./videoUpload";
+import { blobPutUrl, fileForBlobVideoUpload, putBlobWithClientToken, shouldUseLocalVideoProxy, uploadVideoFile } from "./videoUpload";
 
 const directIntent = {
   mode: "direct" as const,
@@ -40,12 +40,43 @@ describe("videoUpload", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("builds the Blob PUT url with the pathname query", () => {
     expect(blobPutUrl("https://vercel.com/api/blob", "task_videos/a.mp4")).toBe(
       "https://vercel.com/api/blob?pathname=task_videos%2Fa.mp4",
     );
+  });
+
+  it("strips MediaRecorder codec suffixes so Blob accepts the webm", () => {
+    const recorded = new File(["clip"], "clip.webm", { type: "video/webm;codecs=vp9,opus" });
+    const upload = fileForBlobVideoUpload(recorded);
+    expect(upload.type).toBe("video/webm");
+    expect(upload.size).toBe(recorded.size);
+  });
+
+  it("retries a Failed to fetch Blob PUT then succeeds", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ url: "https://blob.example/v.webm" }),
+      });
+    const file = new File(["clip"], "clip.webm", { type: "video/webm;codecs=vp8,opus" });
+    const pending = putBlobWithClientToken(directIntent, file, fetchMock);
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    expect(result.url).toBe("https://blob.example/v.webm");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        headers: expect.objectContaining({ "x-content-type": "video/webm" }),
+      }),
+    );
+    vi.useRealTimers();
   });
 
   it("uploads the video bytes straight to Blob with the client token", async () => {

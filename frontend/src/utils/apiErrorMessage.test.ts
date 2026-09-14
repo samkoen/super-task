@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { he } from "../i18n/he";
-import { apiErrorMessage, humanizeApiError } from "./apiErrorMessage";
+import { apiErrorMessage, humanizeApiError, isFetchInterruptedError } from "./apiErrorMessage";
 
 describe("apiErrorMessage", () => {
   it("reads a Hebrew error string from the API body", () => {
@@ -45,6 +45,11 @@ describe("apiErrorMessage", () => {
     expect(apiErrorMessage(new Error("Failed to fetch"), he.errorGeneric)).toBe(
       he.errorFetchInterrupted,
     );
+  });
+
+  it("detects interrupt errors used for upload retries", () => {
+    expect(isFetchInterruptedError(new TypeError("Failed to fetch"))).toBe(true);
+    expect(isFetchInterruptedError(new Error("upload failed"))).toBe(false);
   });
 
   it("falls back when the payload is not readable", () => {
