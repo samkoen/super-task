@@ -18,20 +18,20 @@ from app.domain import roles
 def test_assert_secure_runtime_rejects_default_secret(monkeypatch):
     monkeypatch.setattr("app.core.config.IS_PRODUCTION", True)
     monkeypatch.setattr("app.core.config.SECRET_KEY", "dev-secret-key-change-in-production")
-    monkeypatch.setattr("app.core.config.BLOB_READ_WRITE_TOKEN", "tok")
+    monkeypatch.setattr("app.core.config.object_storage_enabled", lambda: True)
     from app.core import config
 
     with pytest.raises(RuntimeError, match="SECRET_KEY"):
         config.assert_secure_runtime_config()
 
 
-def test_assert_secure_runtime_rejects_missing_blob(monkeypatch):
+def test_assert_secure_runtime_rejects_missing_object_store(monkeypatch):
     monkeypatch.setattr("app.core.config.IS_PRODUCTION", True)
     monkeypatch.setattr("app.core.config.SECRET_KEY", "a" * 32)
-    monkeypatch.setattr("app.core.config.BLOB_READ_WRITE_TOKEN", "")
+    monkeypatch.setattr("app.core.config.object_storage_enabled", lambda: False)
     from app.core import config
 
-    with pytest.raises(RuntimeError, match="BLOB_READ_WRITE_TOKEN"):
+    with pytest.raises(RuntimeError, match="R2_"):
         config.assert_secure_runtime_config()
 
 

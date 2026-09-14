@@ -23,14 +23,12 @@ public class BlobPutRequestFactoryTest {
             out.write("mp4".getBytes(StandardCharsets.UTF_8));
         }
         Map<String, String> headers = new HashMap<>();
-        headers.put("authorization", "Bearer tok");
-        headers.put("x-content-type", "video/mp4");
+        headers.put("Content-Type", "video/mp4");
         Request request =
-                BlobPutRequestFactory.create(video, "https://vercel.com/api/blob?pathname=a.mp4", headers);
+                BlobPutRequestFactory.create(video, "https://signed.example/put/a.mp4", headers);
         assertEquals("PUT", request.method());
-        assertEquals("https://vercel.com/api/blob?pathname=a.mp4", request.url().toString());
-        assertEquals("Bearer tok", request.header("authorization"));
-        assertEquals("video/mp4", request.header("x-content-type"));
+        assertEquals("https://signed.example/put/a.mp4", request.url().toString());
+        assertEquals("video/mp4", request.body().contentType().toString());
         assertNotNull(request.body());
         assertEquals(3L, request.body().contentLength());
     }

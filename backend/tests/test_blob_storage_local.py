@@ -1,11 +1,12 @@
-"""Repli local du stockage média (sans BLOB_READ_WRITE_TOKEN)."""
+"""Repli local du stockage média (sans R2)."""
 from __future__ import annotations
 
 from pathlib import Path
 
 
 def test_put_bytes_writes_local_file(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr("app.services.blob_storage.config.BLOB_READ_WRITE_TOKEN", "")
+    monkeypatch.setattr("app.services.blob_storage.config.object_storage_enabled", lambda: False)
+    monkeypatch.setattr("app.services.blob_storage.config.IS_PRODUCTION", False)
     monkeypatch.setattr("app.services.blob_storage.UPLOADS_DIR", tmp_path)
 
     from app.services import blob_storage
@@ -22,7 +23,7 @@ def test_put_bytes_writes_local_file(monkeypatch, tmp_path: Path):
 
 
 def test_copy_local_duplicates_file(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr("app.services.blob_storage.config.BLOB_READ_WRITE_TOKEN", "")
+    monkeypatch.setattr("app.services.blob_storage.config.object_storage_enabled", lambda: False)
     monkeypatch.setattr("app.services.blob_storage.UPLOADS_DIR", tmp_path)
     src_dir = tmp_path / "task_photos"
     src_dir.mkdir()
@@ -44,28 +45,37 @@ def test_media_is_ready_local_uploads_are_sync():
     assert media_is_ready("/uploads/task_videos/a.mp4") is True
 
 
-def test_media_is_ready_uses_blob_prefix_get(monkeypatch):
-    monkeypatch.setattr("app.services.blob_storage.config.BLOB_READ_WRITE_TOKEN", "tok")
-    monkeypatch.setattr("app.services.blob_storage.config.blob_storage_enabled", lambda: True)
-    monkeypatch.setattr("app.services.blob_storage._blob_prefix_ok", lambda _url: True)
+def test_media_is_ready_uses_object_store(monkeypatch):
+    monkeypatch.setattr("app.services.blob_storage.config.object_storage_enabled", lambda: True)
+    monkeypatch.setattr(
+        "app.services.blob_storage.config.r2_endpoint_host",
+        lambda: "abc.r2.cloudflarestorage.com",
+    )
+    monkeypatch.setattr("app.services.object_store.object_is_readable", lambda _url: True)
     from app.services import blob_storage
 
-    url = "https://x.private.blob.vercel-storage.com/v.mp4"
+    url = "https://abc.r2.cloudflarestorage.com/super-media/v.mp4"
     assert blob_storage.media_is_ready(url) is True
-    assert blob_storage.media_is_readable(url) is True
-    monkeypatch.setattr("app.services.blob_storage._blob_prefix_ok", lambda _url: False)
+    monkeypatch.setattr("app.services.object_store.object_is_readable", lambda _url: False)
     assert blob_storage.media_is_ready(url) is False
 
 
 def test_is_remote_media_url():
-    from app.services.blob_storage import is_private_blob_url, is_remote_media_url, is_vercel_blob_url
+    from app.services.blob_storage import is_object_store_url, is_private_blob_url, is_remote_media_url, is_vercel_blob_url
 
-    assert is_remote_media_url("https://x.public.blob.vercel-storage.com/a.jpg") is True
+    assert is_remote_media_url("https://abc.r2.cloudflarestorage.com/b/a.jpg") is True
     assert is_remote_media_url("/uploads/task_photos/a.jpg") is False
     assert is_remote_media_url(None) is False
     assert is_vercel_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is True
     assert is_private_blob_url("https://x.private.blob.vercel-storage.com/a.jpg") is True
-    assert is_private_blob_url("https://x.public.blob.vercel-storage.com/a.jpg") is False
+    assert is_object_store_url("https://abc.r2.cloudflarestorage.com/b/a.jpg") is True
+
+
+def test_presign_get_ignores_legacy_vercel_blob(monkeypatch):
+    monkeypatch.setattr("app.services.blob_storage.config.object_storage_enabled", lambda: True)
+    from app.services import blob_storage
+
+    assert blob_storage.presign_get_url("https://x.private.blob.vercel-storage.com/a.jpg") is None
 
 
 def test_fetch_media_reads_local_uploads(monkeypatch, tmp_path):

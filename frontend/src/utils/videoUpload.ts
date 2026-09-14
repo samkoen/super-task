@@ -15,21 +15,14 @@ export type VideoUploadIntent =
   | { mode: "proxy" }
   | {
       mode: "direct";
+      putUrl: string;
+      headers: Record<string, string>;
+      url: string;
       pathname: string;
-      token: string;
-      access: "private" | "public";
-      apiUrl: string;
-      apiVersion: string;
       kind: "video";
     };
 
-export function blobPutUrl(apiUrl: string, pathname: string): string {
-  const url = new URL(apiUrl);
-  url.searchParams.set("pathname", pathname);
-  return url.toString();
-}
-
-/** Chrome MediaRecorder sends video/webm;codecs=vp9,opus — Blob only allows video/webm. */
+/** Chrome MediaRecorder sends video/webm;codecs=vp9,opus — R2 signe video/webm. */
 export function bareVideoContentType(type: string, fallback = "video/webm"): string {
   return (type || "").split(";")[0].trim().toLowerCase() || fallback;
 }
@@ -59,7 +52,7 @@ function readFileBytesWithReader(file: Blob): Promise<ArrayBuffer> {
   });
 }
 
-function isRetryableBlobPutError(error: unknown): boolean {
+function isRetryableDirectPutError(error: unknown): boolean {
   return isFetchInterruptedError(error);
 }
 
@@ -78,54 +71,55 @@ export async function requestVideoIntent(
   return data;
 }
 
-/** Headers PUT Blob : uniquement ceux listés par le preflight CORS de vercel.com/api/blob. */
-export function blobPutHeaders(
+export function directPutHeaders(
   intent: Extract<VideoUploadIntent, { mode: "direct" }>,
   file: File,
 ): Record<string, string> {
   return {
-    authorization: `Bearer ${intent.token}`,
-    "x-api-version": intent.apiVersion,
-    "x-content-type": bareVideoContentType(file.type, "video/mp4"),
-    "x-vercel-blob-access": intent.access,
+    ...intent.headers,
+    "Content-Type": bareVideoContentType(file.type, intent.headers["Content-Type"] || "video/mp4"),
   };
 }
 
-async function readBlobPutResponse(response: Response): Promise<{ url: string; kind: string }> {
+async function readDirectPutResponse(
+  response: Response,
+  objectUrl: string,
+): Promise<{ url: string; kind: string }> {
   if (!response.ok) {
     throw new Error("upload failed");
   }
-  const data = (await response.json()) as { url?: string };
-  if (!data.url) {
-    throw new Error("upload failed");
-  }
-  return { url: data.url, kind: "video" };
+  return { url: objectUrl, kind: "video" };
 }
 
-async function putViaAndroid(url: string, headers: Record<string, string>, file: File) {
+async function putViaAndroid(
+  url: string,
+  headers: Record<string, string>,
+  file: File,
+  objectUrl: string,
+) {
   const path = nativeMediaPath(file) ?? (await writeFileToNativeCache(file));
-  const uploaded = await putBlobFromNativePath(path, url, headers);
-  return { url: uploaded.url, kind: "video" as const };
+  await putBlobFromNativePath(path, url, headers);
+  return { url: objectUrl, kind: "video" as const };
 }
 
-export async function putBlobWithClientToken(
+export async function putDirectVideo(
   intent: Extract<VideoUploadIntent, { mode: "direct" }>,
   file: File,
   doFetch?: typeof fetch,
 ): Promise<{ url: string; kind: string }> {
   const uploadFile = fileForBlobVideoUpload(file);
-  const url = blobPutUrl(intent.apiUrl, intent.pathname);
-  const headers = blobPutHeaders(intent, uploadFile);
+  const headers = directPutHeaders(intent, uploadFile);
   if (!doFetch && canUseNativeBlobUpload()) {
-    return putViaAndroid(url, headers, uploadFile);
+    return putViaAndroid(intent.putUrl, headers, uploadFile, intent.url);
   }
-  return putBlobViaFetch(url, headers, uploadFile, doFetch ?? fetch);
+  return putDirectViaFetch(intent.putUrl, headers, uploadFile, intent.url, doFetch ?? fetch);
 }
 
-async function putBlobViaFetch(
+async function putDirectViaFetch(
   url: string,
   headers: Record<string, string>,
   file: File,
+  objectUrl: string,
   doFetch: typeof fetch,
 ): Promise<{ url: string; kind: string }> {
   let lastError: unknown;
@@ -133,21 +127,20 @@ async function putBlobViaFetch(
     if (waitMs > 0) await delay(waitMs);
     try {
       const response = await doFetch(url, { method: "PUT", headers, body: file });
-      return await readBlobPutResponse(response);
+      return await readDirectPutResponse(response, objectUrl);
     } catch (error) {
       lastError = error;
-      if (!isFetchInterruptedError(error)) throw error;
+      if (!isRetryableDirectPutError(error)) throw error;
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Failed to fetch");
 }
 
-/** Vite / uvicorn local : pas de PUT navigateur vers vercel.com (CORS). L'APK prod n'est pas DEV. */
+/** Vite / uvicorn local : pas de PUT navigateur vers R2. */
 export function shouldUseLocalVideoProxy(isDev: boolean): boolean {
   return isDev;
 }
 
-/** Proxy multipart seulement en Vite. Prod web (Render) : PUT Blob, proxy en repli. */
 export function shouldUseSameOriginVideoProxy(isDev: boolean, _native = false): boolean {
   return isDev;
 }
@@ -179,12 +172,16 @@ export async function uploadVideoFile(
     return proxyUpload(uploadFile);
   }
   try {
-    const uploaded = await putBlobWithClientToken(intent, uploadFile, doFetch);
+    const uploaded = await putDirectVideo(intent, uploadFile, doFetch);
     siyumTrace("video-upload-blob-ok");
     return uploaded;
   } catch (error) {
-    if (!isRetryableBlobPutError(error)) throw error;
+    if (!isRetryableDirectPutError(error)) throw error;
     siyumTrace("video-upload-proxy", { reason: "blob-put-failed-fetch" });
     return proxyUpload(uploadFile);
   }
 }
+
+/** @deprecated alias tests / APK */
+export const putBlobWithClientToken = putDirectVideo;
+export const blobPutHeaders = directPutHeaders;

@@ -1,4 +1,4 @@
-"""Intention d'upload vidéo — proxy local ou PUT direct Blob."""
+"""Intention d'upload vidéo — proxy local ou PUT présigné objet."""
 from __future__ import annotations
 
 VIDEO_PURPOSES = {

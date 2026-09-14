@@ -38,15 +38,16 @@ describe("nativeBlobUpload", () => {
   });
 
   it("streams the cache file through the native plugin", async () => {
-    putFromFile.mockResolvedValue({ url: "https://blob.example/a.mp4" });
-    const result = await putBlobFromNativePath("/cache/a.mp4", "https://vercel.com/api/blob", {
-      authorization: "Bearer x",
+    putFromFile.mockResolvedValue({ url: "" });
+    const putUrl = "https://abc.r2.cloudflarestorage.com/super-media/a.mp4?X-Amz-Signature=sig";
+    const result = await putBlobFromNativePath("/cache/a.mp4", putUrl, {
+      "Content-Type": "video/mp4",
     });
-    expect(result.url).toContain("blob.example");
+    expect(result.url).toBe("");
     expect(putFromFile).toHaveBeenCalledWith({
       path: "/cache/a.mp4",
-      url: "https://vercel.com/api/blob",
-      headers: { authorization: "Bearer x" },
+      url: putUrl,
+      headers: { "Content-Type": "video/mp4" },
     });
   });
 
@@ -59,10 +60,10 @@ describe("nativeBlobUpload", () => {
     expect(appendChunk).toHaveBeenCalled();
   });
 
-  it("fails when the native PUT does not return a url", async () => {
+  it("accepts an empty native PUT body when the object URL is already known", async () => {
     putFromFile.mockResolvedValue({});
-    await expect(putBlobFromNativePath("/cache/a.mp4", "https://vercel.com/api/blob", {})).rejects.toThrow(
-      "upload failed",
-    );
+    await expect(putBlobFromNativePath("/cache/a.mp4", "https://signed.example/put", {})).resolves.toEqual({
+      url: "",
+    });
   });
 });

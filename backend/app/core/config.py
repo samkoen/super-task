@@ -97,19 +97,36 @@ def uploads_dir() -> Path:
 
 UPLOADS_DIR = uploads_dir()
 
-# --- Médias (Vercel Blob + rétention) ---
+# --- Médias (Cloudflare R2 + rétention) ---
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "").strip()
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET = os.environ.get("R2_BUCKET", "").strip()
+_R2_ENDPOINT_RAW = os.environ.get("R2_ENDPOINT", "").strip().rstrip("/")
+R2_ENDPOINT = _R2_ENDPOINT_RAW or (
+    f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else ""
+)
+# Token Blob Vercel ignoré (env / tests hérités).
 BLOB_READ_WRITE_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN", "").strip()
-# Doit correspondre au store Vercel : "private" (défaut) ou "public"
-_BLOB_ACCESS_RAW = os.environ.get("BLOB_ACCESS", "private").strip().lower()
-BLOB_ACCESS = _BLOB_ACCESS_RAW if _BLOB_ACCESS_RAW in {"private", "public"} else "private"
 MEDIA_RETENTION_HOURS = int(os.environ.get("MEDIA_RETENTION_HOURS", "24"))
 MEDIA_PHOTO_MAX_EDGE_PX = int(os.environ.get("MEDIA_PHOTO_MAX_EDGE_PX", "1280"))
 MEDIA_PHOTO_QUALITY = int(os.environ.get("MEDIA_PHOTO_QUALITY", "65"))
 CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
 
 
+def object_storage_enabled() -> bool:
+    return bool(R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET and R2_ENDPOINT)
+
+
 def blob_storage_enabled() -> bool:
-    return bool(BLOB_READ_WRITE_TOKEN)
+    """Alias : stockage objet distant (R2)."""
+    return object_storage_enabled()
+
+
+def r2_endpoint_host() -> str:
+    from urllib.parse import urlparse
+
+    return (urlparse(R2_ENDPOINT).hostname or "").lower()
 
 
 def assert_secure_runtime_config() -> None:
@@ -121,10 +138,10 @@ def assert_secure_runtime_config() -> None:
             "SECRET_KEY must be set to a strong value in production/Vercel "
             "(min 24 chars, not the default)."
         )
-    if not blob_storage_enabled():
+    if not object_storage_enabled():
         raise RuntimeError(
-            "BLOB_READ_WRITE_TOKEN is required on Vercel/production "
-            "(ephemeral /tmp uploads are not allowed)."
+            "R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET and "
+            "R2_ACCOUNT_ID or R2_ENDPOINT are required in production."
         )
 
 

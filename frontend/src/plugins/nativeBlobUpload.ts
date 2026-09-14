@@ -29,10 +29,7 @@ export async function putBlobFromNativePath(
   headers: Record<string, string>,
 ): Promise<{ url: string }> {
   const result = await NativeBlobUpload.putFromFile({ path, url, headers });
-  if (!result?.url) {
-    throw new Error("upload failed");
-  }
-  return result;
+  return { url: result?.url || "" };
 }
 
 export async function writeFileToNativeCache(file: File): Promise<string> {

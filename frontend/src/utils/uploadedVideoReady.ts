@@ -1,12 +1,12 @@
 import { he } from "../i18n/he";
-import { isVercelBlobMediaUrl } from "./mediaUrl";
+import { isRemoteObjectMediaUrl } from "./mediaUrl";
 import { nextMediaRetryDelayMs, sleepMs } from "./mediaRetry";
 
 export function remoteVideoUrls(
   attachments: Array<{ kind: string; url?: string | null }>,
 ): string[] {
   return attachments
-    .filter((item) => item.kind === "video" && isVercelBlobMediaUrl(item.url || ""))
+    .filter((item) => item.kind === "video" && isRemoteObjectMediaUrl(item.url || ""))
     .map((item) => item.url as string);
 }
 
