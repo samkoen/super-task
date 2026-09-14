@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { classifyMediaError } from "../utils/mediaCapture";
+import { classifyMediaError, releaseMediaStream } from "../utils/mediaCapture";
 
 function assembleAudioBlob(chunks: Blob[], mimeType: string) {
   return new Blob(chunks, { type: mimeType || "audio/webm" });
@@ -48,8 +48,9 @@ export function useAudioRecorder() {
     typeof MediaRecorder !== "undefined";
 
   const cleanupStream = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    const stream = streamRef.current;
     streamRef.current = null;
+    void releaseMediaStream(stream);
   }, []);
 
   const setBlobAndRef = useCallback((next: Blob | null) => {

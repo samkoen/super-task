@@ -1,4 +1,4 @@
-from app.services.video_direct_upload_service import create_video_upload_intent
+from app.services.video_direct_upload_service import ALLOWED_VIDEO_TYPES, create_video_upload_intent
 
 
 def test_create_video_upload_intent_proxy_without_blob(monkeypatch):
@@ -37,3 +37,4 @@ def test_create_video_upload_intent_direct_when_blob_enabled(monkeypatch):
     assert intent["token"].startswith("vercel_blob_client_STORE99_")
     assert intent["access"] == "private"
     assert intent["kind"] == "video"
+    assert "video/*" in ALLOWED_VIDEO_TYPES

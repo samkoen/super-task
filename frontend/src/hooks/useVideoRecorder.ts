@@ -3,10 +3,12 @@ import {
   attachStreamToVideo,
   cameraConstraints,
   classifyMediaError,
+  detachCaptureVideo,
   getUserMediaWithFallback,
   isMediaCaptureSupported,
   oppositeCameraFacing,
   pickVideoRecorderMimeType,
+  releaseMediaStream,
   videoRecorderOptions,
   type CameraFacing,
 } from "../utils/mediaCapture";
@@ -30,24 +32,26 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
   const tickRef = useRef<number | null>(null);
   const facingRef = useRef<CameraFacing>(initialFacing);
   const waitersRef = useRef<Array<(blob: Blob | null) => void>>([]);
+  const releasingRef = useRef(Promise.resolve());
 
   const supported = isMediaCaptureSupported();
 
-  const detachLivePreview = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+  const discardLivePreview = useCallback(() => {
+    const currentStream = streamRef.current;
+    const video = videoRef.current;
     streamRef.current = null;
     setStream(null);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
     setPreviewReady(false);
+    const next = releasingRef.current.then(() => releaseMediaStream(currentStream, video));
+    releasingRef.current = next.then(() => undefined, () => undefined);
+    return next;
   }, []);
 
   const stopStream = useCallback(() => {
     sessionRef.current += 1;
-    detachLivePreview();
+    void discardLivePreview();
     setStarting(false);
-  }, [detachLivePreview]);
+  }, [discardLivePreview]);
 
   const reset = useCallback(() => {
     setBlob(null);
@@ -57,6 +61,9 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
   }, []);
 
   const onVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    if (videoRef.current && videoRef.current !== node) {
+      detachCaptureVideo(videoRef.current);
+    }
     videoRef.current = node;
     const currentStream = streamRef.current;
     if (node && currentStream) {
@@ -74,19 +81,14 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
     setError("");
     setBlob(null);
     setStarting(true);
-    setPreviewReady(false);
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setStream(null);
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    await discardLivePreview();
+    if (session !== sessionRef.current) return "cancelled";
     try {
       const nextStream = await getUserMediaWithFallback(
         cameraConstraints(facingRef.current, true),
       );
       if (session !== sessionRef.current) {
-        nextStream.getTracks().forEach((track) => track.stop());
+        await releaseMediaStream(nextStream);
         return "cancelled";
       }
       streamRef.current = nextStream;
@@ -98,10 +100,7 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
       return "ready";
     } catch (caught) {
       if (session !== sessionRef.current) return "cancelled";
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      setStream(null);
-      setPreviewReady(false);
+      await discardLivePreview();
       setError(classifyMediaError(caught));
       return "failed";
     } finally {
@@ -109,7 +108,7 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
         setStarting(false);
       }
     }
-  }, [supported]);
+  }, [discardLivePreview, supported]);
 
   const flip = useCallback(async () => {
     if (recording) return;
@@ -133,19 +132,18 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
       if (event.data.size > 0) chunksRef.current.push(event.data);
     };
     recorder.onstop = () => {
-      if (tickRef.current) {
-        window.clearInterval(tickRef.current);
-        tickRef.current = null;
-      }
+      clearRecordingClock(tickRef);
       if (startedAtRef.current) {
         setElapsedSeconds(Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)));
       }
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+      mediaRecorderRef.current = null;
       const next = new Blob(chunksRef.current, { type: recorder.mimeType || "video/webm" });
       setBlob(next);
       setRecording(false);
-      detachLivePreview();
-      const result = next.size > 0 ? next : null;
-      waitersRef.current.splice(0).forEach((resolve) => resolve(result));
+      void discardLivePreview();
+      waitersRef.current.splice(0).forEach((resolve) => resolve(next.size > 0 ? next : null));
     };
     mediaRecorderRef.current = recorder;
     recorder.start();
@@ -157,31 +155,52 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
       }
     }, 250);
     setRecording(true);
-  }, [detachLivePreview, recording]);
+  }, [discardLivePreview, recording]);
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
-      recorder.stop();
+      try {
+        recorder.stop();
+      } catch {
+        mediaRecorderRef.current = null;
+        void discardLivePreview();
+      }
       return;
     }
+    mediaRecorderRef.current = null;
     setRecording(false);
-  }, []);
+  }, [discardLivePreview]);
 
   const stopAndWait = useCallback((): Promise<Blob | null> => {
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === "inactive") return Promise.resolve(null);
     return new Promise((resolve) => {
       waitersRef.current.push(resolve);
-      recorder.stop();
+      try {
+        recorder.stop();
+      } catch {
+        waitersRef.current.pop();
+        resolve(null);
+      }
     });
   }, []);
 
   const cleanup = useCallback(() => {
-    stopRecording();
-    stopStream();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        mediaRecorderRef.current = null;
+        stopStream();
+      }
+    } else {
+      mediaRecorderRef.current = null;
+      stopStream();
+    }
     reset();
-  }, [reset, stopRecording, stopStream]);
+  }, [reset, stopStream]);
 
   useEffect(() => {
     if (!stream || !videoRef.current) return;
@@ -210,4 +229,10 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
     reset,
     flip,
   };
+}
+
+function clearRecordingClock(tickRef: { current: number | null }) {
+  if (!tickRef.current) return;
+  window.clearInterval(tickRef.current);
+  tickRef.current = null;
 }

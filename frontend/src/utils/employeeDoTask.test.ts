@@ -137,6 +137,34 @@ describe("employeeDoTask", () => {
     expect(complete).toHaveBeenCalledTimes(2);
   });
 
+  it("retries complete when Chrome reports Failed to fetch", async () => {
+    vi.useFakeTimers();
+    const start = vi.fn(async () => undefined);
+    const complete = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Failed to fetch"))
+      .mockResolvedValueOnce(undefined);
+    const pending = completeAfterEnsuringStart(complete, start);
+    await vi.runAllTimersAsync();
+    await pending;
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(start).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("treats a lost complete response as success if the task was already submitted", async () => {
+    vi.useFakeTimers();
+    const start = vi.fn(async () => undefined);
+    const complete = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Failed to fetch"))
+      .mockRejectedValueOnce(new Error("המשימה כבר נשלחה לבדיקה"));
+    const pending = completeAfterEnsuringStart(complete, start);
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toBeUndefined();
+    vi.useRealTimers();
+  });
+
   it("auto-completes only after every required slot is filled", () => {
     expect(shouldAutoCompleteEmployeeTask(0, true, "in_progress", null)).toBe(false);
     expect(shouldAutoCompleteEmployeeTask(2, false, "in_progress", null)).toBe(false);

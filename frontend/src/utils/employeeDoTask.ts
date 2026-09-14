@@ -1,5 +1,6 @@
 import { he } from "../i18n/he";
 import type { TaskStatus } from "../services/taskService";
+import { isFetchInterruptedError } from "./apiErrorMessage";
 import { normalizeStartUrl } from "./startUrl";
 
 const STARTABLE: ReadonlySet<string> = new Set(["pending", "overdue"]);
@@ -75,16 +76,48 @@ export function isCompleteBlockedUntilStart(error: unknown): boolean {
   return message.includes("יש להתחיל את המשימה");
 }
 
+export function isTaskAlreadySubmittedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return (
+    message.includes("המשימה כבר נשלחה") ||
+    message.includes("המשימה ממתינה לאישור") ||
+    message.includes("המשימה כבר נסגרה")
+  );
+}
+
 export async function completeAfterEnsuringStart(
   complete: () => Promise<void>,
   start: () => Promise<void>,
 ): Promise<void> {
+  await completeOnceWithStartRetry(complete, start);
+}
+
+async function completeOnceWithStartRetry(
+  complete: () => Promise<void>,
+  start: () => Promise<void>,
+): Promise<void> {
   try {
-    await complete();
+    await completeWithLostResponseRetry(complete);
   } catch (error) {
     if (!isCompleteBlockedUntilStart(error)) throw error;
     await start();
+    await completeWithLostResponseRetry(complete);
+  }
+}
+
+async function completeWithLostResponseRetry(complete: () => Promise<void>): Promise<void> {
+  try {
     await complete();
+  } catch (error) {
+    if (isTaskAlreadySubmittedError(error)) return;
+    if (!isFetchInterruptedError(error)) throw error;
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    try {
+      await complete();
+    } catch (retryError) {
+      if (isTaskAlreadySubmittedError(retryError)) return;
+      throw retryError;
+    }
   }
 }
 

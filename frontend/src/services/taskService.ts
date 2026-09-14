@@ -383,7 +383,8 @@ export const taskService = {
   complete: async (occurrenceId: string, payload: CompleteTaskPayload) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/complete`,
-      payload
+      payload,
+      { timeout: 120_000 },
     );
     return response.data;
   },

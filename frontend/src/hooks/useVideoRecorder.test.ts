@@ -10,13 +10,16 @@ describe("useVideoRecorder", () => {
       class MockMediaRecorder {
         static isTypeSupported = () => true;
         mimeType = "video/webm";
+        state = "inactive";
         ondataavailable: ((event: { data: Blob }) => void) | null = null;
         onstop: (() => void) | null = null;
         constructor(_stream: MediaStream) {}
         start() {
+          this.state = "recording";
           this.ondataavailable?.({ data: new Blob(["video"], { type: "video/webm" }) });
         }
         stop() {
+          this.state = "inactive";
           this.onstop?.();
         }
       }
@@ -57,6 +60,81 @@ describe("useVideoRecorder", () => {
     expect(trackStop).toHaveBeenCalled();
     expect(result.current.stream).toBeNull();
     expect(result.current.previewReady).toBe(false);
+  });
+
+  it("opens the camera again after a recording is stopped", async () => {
+    const firstStop = vi.fn();
+    const getUserMedia = vi
+      .fn()
+      .mockResolvedValueOnce({ getTracks: () => [{ stop: firstStop }] })
+      .mockResolvedValueOnce({ getTracks: () => [{ stop: vi.fn() }] });
+    vi.stubGlobal("navigator", {
+      mediaDevices: { getUserMedia },
+    });
+
+    const { result } = renderHook(() => useVideoRecorder());
+
+    await act(async () => {
+      await result.current.startPreview();
+    });
+    act(() => {
+      result.current.startRecording();
+    });
+    act(() => {
+      result.current.stopRecording();
+    });
+    await waitFor(() => {
+      expect(result.current.blob).not.toBeNull();
+    });
+    expect(firstStop).toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.startPreview();
+    });
+
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(result.current.previewReady).toBe(true);
+  });
+
+  it("pauses the live video before stopping camera tracks", async () => {
+    const video = document.createElement("video");
+    Object.defineProperty(video, "readyState", { value: HTMLMediaElement.HAVE_CURRENT_DATA });
+    vi.spyOn(video, "play").mockResolvedValue();
+    vi.spyOn(video, "load").mockImplementation(() => undefined);
+    const order: string[] = [];
+    vi.spyOn(video, "pause").mockImplementation(() => {
+      order.push("pause");
+    });
+    const trackStop = vi.fn(() => {
+      expect(video.srcObject).toBeNull();
+      order.push("stop");
+    });
+    const stream = {
+      getTracks: () => [{ stop: trackStop }],
+      removeTrack: vi.fn(),
+    } as unknown as MediaStream;
+    vi.stubGlobal("navigator", {
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+    });
+
+    const { result } = renderHook(() => useVideoRecorder());
+    act(() => {
+      result.current.onVideoRef(video);
+    });
+    await act(async () => {
+      await result.current.startPreview();
+    });
+    act(() => {
+      result.current.startRecording();
+    });
+    await act(async () => {
+      result.current.stopRecording();
+    });
+    await waitFor(() => {
+      expect(trackStop).toHaveBeenCalled();
+    });
+    expect(order[0]).toBe("pause");
+    expect(order.indexOf("pause")).toBeLessThan(order.indexOf("stop"));
   });
 
   it("flips the live preview to the selfie camera", async () => {

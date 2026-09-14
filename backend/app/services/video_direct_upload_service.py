@@ -10,7 +10,7 @@ from app.services.media_upload_service import VIDEO_MAX_BYTES
 
 BLOB_API_URL = "https://vercel.com/api/blob"
 BLOB_API_VERSION = "11"
-ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
+ALLOWED_VIDEO_TYPES = ["video/*", "video/mp4", "video/webm", "video/quicktime"]
 
 
 def create_video_upload_intent(purpose: str, content_type: str) -> dict:

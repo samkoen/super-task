@@ -27,6 +27,7 @@ vi.mock("../../hooks/useVideoRecorder", () => ({
     startPreview: vi.fn().mockResolvedValue("failed"),
     startRecording: vi.fn(),
     stopAndWait: vi.fn().mockResolvedValue(null),
+    cleanup: vi.fn(),
     onVideoRef: vi.fn(),
   }),
 }));

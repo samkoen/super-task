@@ -308,12 +308,15 @@ function VideoCaptureDialog({
     if (!blob || blob.size === 0 || uploading || confirming || tooShort) return;
     setConfirming(true);
     try {
-      await onCapture(
-        blobToFile(blob, `task-video-${Date.now()}.webm`, blob.type || "video/webm"),
-        elapsedSeconds,
+      const file = blobToFile(
+        blob,
+        `task-video-${Date.now()}.webm`,
+        (blob.type || "video/webm").split(";")[0].trim() || "video/webm",
       );
-    } finally {
+      const durationSeconds = elapsedSeconds;
       onClose();
+      await onCapture(file, durationSeconds);
+    } finally {
       setConfirming(false);
     }
   };

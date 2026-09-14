@@ -1,3 +1,4 @@
+import { isFetchInterruptedError } from "./apiErrorMessage";
 import api from "../services/api";
 import {
   canUseNativeBlobUpload,
@@ -26,13 +27,28 @@ export function blobPutUrl(apiUrl: string, pathname: string): string {
   return url.toString();
 }
 
+/** Chrome MediaRecorder sends video/webm;codecs=vp9,opus — Blob only allows video/webm. */
+export function bareVideoContentType(type: string, fallback = "video/webm"): string {
+  return (type || "").split(";")[0].trim().toLowerCase() || fallback;
+}
+
+export function fileForBlobVideoUpload(file: File): File {
+  const type = bareVideoContentType(file.type);
+  if (file.type === type) return file;
+  return new File([file], file.name, { type, lastModified: file.lastModified });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export async function requestVideoIntent(
   purpose: VideoUploadPurpose,
   contentType: string,
 ): Promise<VideoUploadIntent> {
   const { data } = await api.post<VideoUploadIntent>("/media/video-intent", {
     purpose,
-    content_type: contentType || "video/mp4",
+    content_type: bareVideoContentType(contentType, "video/mp4"),
   });
   return data;
 }
@@ -44,7 +60,7 @@ export function blobPutHeaders(
   return {
     authorization: `Bearer ${intent.token}`,
     "x-api-version": intent.apiVersion,
-    "x-content-type": file.type || "video/mp4",
+    "x-content-type": bareVideoContentType(file.type, "video/mp4"),
     "x-add-random-suffix": "0",
     "x-vercel-blob-access": intent.access,
   };
@@ -72,13 +88,33 @@ export async function putBlobWithClientToken(
   file: File,
   doFetch?: typeof fetch,
 ): Promise<{ url: string; kind: string }> {
+  const uploadFile = fileForBlobVideoUpload(file);
   const url = blobPutUrl(intent.apiUrl, intent.pathname);
-  const headers = blobPutHeaders(intent, file);
+  const headers = blobPutHeaders(intent, uploadFile);
   if (!doFetch && canUseNativeBlobUpload()) {
-    return putViaAndroid(url, headers, file);
+    return putViaAndroid(url, headers, uploadFile);
   }
-  const response = await (doFetch ?? fetch)(url, { method: "PUT", headers, body: file });
-  return readBlobPutResponse(response);
+  return putBlobViaFetch(url, headers, uploadFile, doFetch ?? fetch);
+}
+
+async function putBlobViaFetch(
+  url: string,
+  headers: Record<string, string>,
+  file: File,
+  doFetch: typeof fetch,
+): Promise<{ url: string; kind: string }> {
+  let lastError: unknown;
+  for (const waitMs of [0, 400, 1200]) {
+    if (waitMs > 0) await delay(waitMs);
+    try {
+      const response = await doFetch(url, { method: "PUT", headers, body: file });
+      return await readBlobPutResponse(response);
+    } catch (error) {
+      lastError = error;
+      if (!isFetchInterruptedError(error)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Failed to fetch");
 }
 
 /** Vite / uvicorn local : pas de PUT navigateur vers vercel.com (CORS). L'APK prod n'est pas DEV. */
@@ -93,11 +129,12 @@ export async function uploadVideoFile(
   doFetch?: typeof fetch,
   isDev = Boolean(import.meta.env.DEV),
 ): Promise<{ url: string }> {
-  const intent = await requestVideoIntent(purpose, file.type).catch(
+  const uploadFile = fileForBlobVideoUpload(file);
+  const intent = await requestVideoIntent(purpose, uploadFile.type).catch(
     (): VideoUploadIntent => ({ mode: "proxy" }),
   );
   if (intent.mode !== "direct" || (!doFetch && shouldUseLocalVideoProxy(isDev))) {
-    return proxyUpload(file);
+    return proxyUpload(uploadFile);
   }
-  return putBlobWithClientToken(intent, file, doFetch);
+  return putBlobWithClientToken(intent, uploadFile, doFetch);
 }

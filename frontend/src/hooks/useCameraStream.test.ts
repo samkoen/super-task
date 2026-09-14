@@ -69,6 +69,33 @@ describe("useCameraStream", () => {
     expect(facingOf(getUserMedia.mock.calls.at(-1)?.[0])).toBe("user");
   });
 
+  it("can open the camera again after it was stopped", async () => {
+    const firstStop = vi.fn();
+    const getUserMedia = vi
+      .fn()
+      .mockResolvedValueOnce({ getTracks: () => [{ stop: firstStop }] })
+      .mockResolvedValueOnce({ getTracks: () => [{ stop: vi.fn() }] });
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+    const { result } = renderHook(() => useCameraStream());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    act(() => {
+      result.current.stop();
+    });
+    await waitFor(() => {
+      expect(firstStop).toHaveBeenCalled();
+    });
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(result.current.active).toBe(true);
+  });
+
   it("restores the previous camera when the other side is unavailable", async () => {
     const rear = { getTracks: () => [{ stop: vi.fn() }] };
     const getUserMedia = vi

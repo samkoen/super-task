@@ -444,6 +444,7 @@ async function finishHoldVideo(
     const blob = await video.stopAndWait();
     if (blob) await onSend(blobToFile(blob, `chat-video-${Date.now()}.webm`, blob.type || "video/webm"), "video");
   } finally {
+    video.cleanup();
     done();
   }
 }
