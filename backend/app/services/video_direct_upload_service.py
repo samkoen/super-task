@@ -16,9 +16,24 @@ BLOB_API_VERSION = "11"
 ALLOWED_VIDEO_TYPES = ["video/*", "video/mp4", "video/webm", "video/quicktime"]
 
 
+def should_use_direct_blob_intent() -> bool:
+    """PUT navigateur → Blob en prod (Render ou Vercel). En local : proxy (CORS)."""
+    return config.blob_storage_enabled() and config.IS_PRODUCTION
+
+
+def blob_client_allowed_origins() -> list[str]:
+    return list(
+        dict.fromkeys(
+            origin.rstrip("/")
+            for origin in config.CORS_ALLOW_ORIGINS
+            if origin.startswith("https://")
+        )
+    )
+
+
 def create_video_upload_intent(purpose: str, content_type: str) -> dict:
     folder = video_folder_for_purpose(purpose)
-    if not config.blob_storage_enabled() or not config.IS_VERCEL:
+    if not should_use_direct_blob_intent():
         logger.info("video-intent purpose=%s mode=proxy", purpose)
         return {"mode": "proxy"}
     pathname = f"{folder}/{uuid.uuid4().hex}{video_extension(content_type)}"
@@ -27,6 +42,7 @@ def create_video_upload_intent(purpose: str, content_type: str) -> dict:
         pathname=pathname,
         allowed_content_types=ALLOWED_VIDEO_TYPES,
         maximum_size_in_bytes=VIDEO_MAX_BYTES,
+        allowed_origins=blob_client_allowed_origins() or None,
     )
     logger.info("video-intent purpose=%s mode=direct", purpose)
     return {

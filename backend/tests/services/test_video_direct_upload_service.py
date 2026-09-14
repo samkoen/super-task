@@ -15,11 +15,11 @@ def test_create_video_upload_intent_proxy_on_local_uvicorn(monkeypatch):
         "app.services.video_direct_upload_service.config.blob_storage_enabled",
         lambda: True,
     )
-    monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_VERCEL", False)
+    monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_PRODUCTION", False)
     assert create_video_upload_intent("task", "video/webm") == {"mode": "proxy"}
 
 
-def test_create_video_upload_intent_direct_when_blob_enabled(monkeypatch):
+def test_create_video_upload_intent_direct_on_render_prod(monkeypatch):
     monkeypatch.setattr(
         "app.services.video_direct_upload_service.config.BLOB_READ_WRITE_TOKEN",
         "vercel_blob_rw_STORE99_secret",
@@ -28,8 +28,13 @@ def test_create_video_upload_intent_direct_when_blob_enabled(monkeypatch):
         "app.services.video_direct_upload_service.config.blob_storage_enabled",
         lambda: True,
     )
-    monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_VERCEL", True)
+    monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_PRODUCTION", True)
+    monkeypatch.setattr("app.services.video_direct_upload_service.config.IS_VERCEL", False)
     monkeypatch.setattr("app.services.video_direct_upload_service.config.BLOB_ACCESS", "private")
+    monkeypatch.setattr(
+        "app.services.video_direct_upload_service.config.CORS_ALLOW_ORIGINS",
+        ["https://super-web-7jwh.onrender.com"],
+    )
     intent = create_video_upload_intent("task", "video/webm")
     assert intent["mode"] == "direct"
     assert intent["pathname"].startswith("task_videos/")

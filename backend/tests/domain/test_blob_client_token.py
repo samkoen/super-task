@@ -1,3 +1,6 @@
+import base64
+import json
+
 from app.domain.blob_client_token import generate_blob_client_token, store_id_from_rw_token
 
 
@@ -16,6 +19,20 @@ def test_generate_blob_client_token_shape():
     )
     assert token.startswith("vercel_blob_client_STORE99_")
     assert len(token) > 40
+
+
+def test_generate_blob_client_token_includes_allowed_origins():
+    token = generate_blob_client_token(
+        read_write_token="vercel_blob_rw_STORE99_secret",
+        pathname="task_videos/a.webm",
+        valid_until_ms=1_700_000_000_000,
+        allowed_origins=["https://super-web-7jwh.onrender.com"],
+    )
+    inner = token.rsplit("_", 1)[-1]
+    signed = base64.b64decode(inner).decode("utf-8")
+    encoded = signed.split(".", 1)[1]
+    payload = json.loads(base64.b64decode(encoded))
+    assert payload["allowedOrigins"] == ["https://super-web-7jwh.onrender.com"]
 
 
 def test_generate_blob_client_token_rejects_invalid_secret():
