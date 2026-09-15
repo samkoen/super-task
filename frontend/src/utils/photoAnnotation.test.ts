@@ -9,6 +9,7 @@ import {
   dataUrlToBlob,
   dataUrlToFile,
   hitTestAnnotation,
+  loadAnnotationImage,
   loadImageElement,
   resolveAnnotationImageSrc,
   moveAnnotation,
@@ -16,6 +17,10 @@ import {
   scaleAnnotations,
 } from "./photoAnnotation";
 import { PHOTO_UPLOAD_MAX_EDGE } from "./mediaCapture";
+
+vi.mock("./fetchMediaBlob", () => ({
+  fetchMediaBlobWithRetry: vi.fn(async () => new Blob(["x"], { type: "image/jpeg" })),
+}));
 
 describe("annotationStrokeForRole", () => {
   it("uses red for menahel and blue for oved", () => {
@@ -154,6 +159,28 @@ describe("resolveAnnotationImageSrc", () => {
     const resolved = resolveAnnotationImageSrc("/uploads/p.jpg");
     expect(resolved.src).toContain("/api/media/proxy");
     expect(resolved.src).toContain("stream=1");
+  });
+});
+
+describe("loadAnnotationImage", () => {
+  it("loads stored photos through authenticated fetch instead of cross-origin img", async () => {
+    const { fetchMediaBlobWithRetry } = await import("./fetchMediaBlob");
+    class FakeImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+    vi.stubGlobal("Image", FakeImage);
+    URL.createObjectURL = vi.fn(() => "blob:mock");
+    URL.revokeObjectURL = vi.fn();
+
+    await loadAnnotationImage("/uploads/p.jpg");
+
+    expect(fetchMediaBlobWithRetry).toHaveBeenCalledWith("/uploads/p.jpg", undefined, { stream: true });
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 

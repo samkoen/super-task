@@ -1,4 +1,5 @@
 import { PHOTO_JPEG_QUALITY, photoPreviewSize } from "./mediaCapture";
+import { fetchMediaBlobWithRetry } from "./fetchMediaBlob";
 import { mediaStreamUrl, mediaUrl } from "./mediaUrl";
 
 export type AnnotationTool = "ellipse" | "arrow" | "select";
@@ -245,23 +246,22 @@ export async function loadAnnotationImage(image: Blob | string): Promise<{
   image: HTMLImageElement;
   revoke: () => void;
 }> {
-  const resolved = resolveAnnotationImageSrc(image);
+  if (typeof image === "string" && image.startsWith("blob:")) {
+    return { image: await loadImageElement(image), revoke: () => undefined };
+  }
+  const blob = typeof image === "string"
+    ? await fetchMediaBlobWithRetry(image, undefined, { stream: true })
+    : image;
+  const src = URL.createObjectURL(blob);
   try {
-    return { image: await loadImageElement(resolved.src), revoke: resolved.revoke };
+    return {
+      image: await loadImageElement(src),
+      revoke: () => URL.revokeObjectURL(src),
+    };
   } catch (error) {
-    resolved.revoke();
-    if (typeof image === "string") return loadAnnotationImageFallback(image);
+    URL.revokeObjectURL(src);
     throw error;
   }
-}
-
-async function loadAnnotationImageFallback(path: string): Promise<{
-  image: HTMLImageElement;
-  revoke: () => void;
-}> {
-  const fallback = mediaUrl(path);
-  if (!fallback) throw new Error("image load failed");
-  return { image: await loadImageElement(fallback), revoke: () => undefined };
 }
 
 export function computePhotoDisplaySize(

@@ -27,7 +27,7 @@ vi.mock("./TaskChatPanel", () => ({
       {he.taskChatTitle}
       <button
         type="button"
-        onClick={() => onOccurrenceUpdated?.("awaiting_response", he.taskChatSent)}
+        onClick={() => onOccurrenceUpdated?.("in_progress", he.taskChatSent)}
       >
         send-chat
       </button>
@@ -148,6 +148,16 @@ describe("TaskCompletionReviewDialog", () => {
       <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
     );
     expect(screen.getByTestId("task-chat-panel").getAttribute("data-compose")).toBe("true");
+  });
+
+  it("drops review actions when chat moves the task back in progress", () => {
+    render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: he.taskApproveClose })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
+    expect(screen.queryByRole("button", { name: he.taskApproveClose })).toBeNull();
+    expect(screen.queryByRole("button", { name: he.taskReopen })).toBeNull();
   });
 
   it("keeps the task chat read-only after the task is closed", () => {
