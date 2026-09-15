@@ -165,7 +165,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
 
     useEffect(() => {
       let cancelled = false;
-      let revoke = () => undefined;
+      let revoke: () => void = () => {};
       setReady(false);
       setLoadError(false);
       shapesRef.current = [];
