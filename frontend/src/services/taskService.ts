@@ -1,5 +1,6 @@
 import api, { EMPTY_JSON_BODY } from "./api";
 import type { CompletionAttachment, CompletionRequirement } from "../utils/completionMedia";
+import { asList } from "../utils/asList";
 
 export type { CompletionAttachment, CompletionRequirement };
 import { compressPhotoForUpload } from "../utils/mediaCapture";
@@ -260,7 +261,7 @@ export const taskService = {
   listTemplates: async (branchId?: string) => {
     const params = branchId ? { branch_id: branchId } : undefined;
     const response = await api.get<TaskTemplate[]>("/tasks/templates", { params });
-    return response.data;
+    return asList<TaskTemplate>(response.data);
   },
 
   createTemplate: async (payload: CreateTaskTemplatePayload) => {

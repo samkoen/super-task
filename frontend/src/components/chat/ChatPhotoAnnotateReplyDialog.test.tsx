@@ -5,16 +5,20 @@ import { he } from "../../i18n/he";
 
 vi.mock("../../utils/fetchMediaBlob", () => ({
   fetchMediaBlob: vi.fn().mockResolvedValue(new Blob(["img"], { type: "image/jpeg" })),
+  fetchMediaBlobWithRetry: vi.fn().mockResolvedValue(new Blob(["img"], { type: "image/jpeg" })),
 }));
 
 vi.mock("../media/PhotoAnnotationCanvas", async () => {
-  const { forwardRef, useImperativeHandle } = await import("react");
+  const { forwardRef, useEffect, useImperativeHandle } = await import("react");
   const { he: labels } = await import("../../i18n/he");
   return {
     default: forwardRef(function MockPhotoAnnotationCanvas(
-      _props: unknown,
+      props: { onReady?: () => void },
       ref: React.ForwardedRef<{ exportFile: () => Promise<File> }>,
     ) {
+      useEffect(() => {
+        props.onReady?.();
+      }, [props]);
       useImperativeHandle(ref, () => ({
         exportFile: async () => new File(["marked"], "reply.jpg", { type: "image/jpeg" }),
       }));
@@ -82,6 +86,28 @@ describe("ChatPhotoAnnotateReplyDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: he.taskChatSend }));
     await waitFor(() => {
       expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }), "זה המדף");
+    });
+  });
+
+  it("saves without caption when used from review", async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ChatPhotoAnnotateReplyDialog
+        photoUrl="/uploads/p.jpg"
+        sending={false}
+        hideCaption
+        submitLabel={he.reviewMarkPhotoSave}
+        onClose={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(he.photoAnnotateEllipse)).toBeTruthy();
+    });
+    expect(screen.queryByLabelText(he.chatAnnotateReplyCaption)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: he.reviewMarkPhotoSave }));
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }), undefined);
     });
   });
 });

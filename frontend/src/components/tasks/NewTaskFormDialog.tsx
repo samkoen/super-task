@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import type { User } from "../../services/api";
 import type { Branch } from "../../services/branchService";
+import { asList } from "../../utils/asList";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
 import BranchChecklist from "./BranchChecklist";
 import TaskReferenceMediaEditor, {
@@ -95,8 +96,8 @@ export default function NewTaskFormDialog({
   open,
   onClose,
   onSubmit,
-  branches,
-  employees,
+  branches: branchesProp,
+  employees: employeesProp,
   isBranchManager,
   canPickBranch,
   defaultBranchId,
@@ -109,6 +110,8 @@ export default function NewTaskFormDialog({
   saving = false,
   onError,
 }: NewTaskFormDialogProps) {
+  const branches = asList<Branch>(branchesProp);
+  const employees = asList<User>(employeesProp);
   const [taskKind, setTaskKind] = useState<NewTaskKind>(forcedTaskKind ?? "ad_hoc");
   const [branchId, setBranchId] = useState("");
   const [title, setTitle] = useState("");

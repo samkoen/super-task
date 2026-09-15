@@ -62,3 +62,19 @@ def test_serve_media_rejects_evil_url(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         ctrl._serve_media(MagicMock(), "https://evil.example/secret", MagicMock())
     assert exc.value.status_code == 400
+
+
+def test_serve_media_streams_r2_bytes_when_requested(monkeypatch):
+    monkeypatch.setattr(ctrl, "load_actor", lambda *_a, **_k: MagicMock(user_id="u1"))
+    monkeypatch.setattr(ctrl, "UserRepository", lambda _db: MagicMock())
+    monkeypatch.setattr(ctrl.blob_storage, "is_stored_media_url", lambda _url: True)
+    monkeypatch.setattr(ctrl, "actor_can_access_media_url", lambda *_a, **_k: True)
+    monkeypatch.setattr(
+        ctrl.blob_storage,
+        "fetch_media",
+        lambda _url: MagicMock(content=b"jpeg-bytes", content_type="image/jpeg"),
+    )
+    url = "https://abc.r2.cloudflarestorage.com/super-media/task_photos/p.jpg"
+    response = ctrl._serve_media(MagicMock(), url, MagicMock(), stream=True)
+    assert response.body == b"jpeg-bytes"
+    assert response.media_type == "image/jpeg"

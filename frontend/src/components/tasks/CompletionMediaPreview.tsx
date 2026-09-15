@@ -1,6 +1,7 @@
 import { Box, Button, Typography } from "@mui/material";
 import CompactAudioPlayer from "../media/CompactAudioPlayer";
 import CompletionSlotGrid from "./CompletionSlotGrid";
+import MarkCompletionPhotoButton from "./MarkCompletionPhotoButton";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
@@ -27,6 +28,8 @@ interface CompletionMediaPreviewProps {
   /** false = capture en cours, pas encore transcrit. */
   transcriptFallback?: boolean;
   videosPending?: boolean;
+  onMarkPhoto?: (url: string) => void;
+  markedPhotoUrls?: string[];
 }
 
 function kindLabel(kind: string): string {
@@ -50,6 +53,8 @@ export default function CompletionMediaPreview({
   disabled = false,
   transcriptFallback = true,
   videosPending = false,
+  onMarkPhoto,
+  markedPhotoUrls = [],
 }: CompletionMediaPreviewProps) {
   const items = attachmentsFromCompletion({
     completion_attachments: attachments,
@@ -79,6 +84,8 @@ export default function CompletionMediaPreview({
         <CompletionSlotGrid
           requirements={reqs}
           fills={mapped.fills}
+          onMarkPhoto={onMarkPhoto}
+          markedPhotoUrls={markedPhotoUrls}
         />
       ) : (
         <LegacyAttachmentList
@@ -88,6 +95,8 @@ export default function CompletionMediaPreview({
           onRemovePhoto={onRemovePhoto}
           onRemoveVideo={onRemoveVideo}
           onRemoveAudio={onRemoveAudio}
+          onMarkPhoto={onMarkPhoto}
+          markedPhotoUrls={markedPhotoUrls}
         />
       )}
       {leftover.length > 0 && (
@@ -95,6 +104,8 @@ export default function CompletionMediaPreview({
           items={leftover}
           disabled={disabled}
           videosPending={videosPending}
+          onMarkPhoto={onMarkPhoto}
+          markedPhotoUrls={markedPhotoUrls}
         />
       )}
       {resolvedTranscript && (
@@ -116,6 +127,8 @@ function LegacyAttachmentList({
   onRemovePhoto,
   onRemoveVideo,
   onRemoveAudio,
+  onMarkPhoto,
+  markedPhotoUrls,
 }: {
   items: CompletionAttachment[];
   disabled: boolean;
@@ -123,6 +136,8 @@ function LegacyAttachmentList({
   onRemovePhoto?: () => void;
   onRemoveVideo?: () => void;
   onRemoveAudio?: () => void;
+  onMarkPhoto?: (url: string) => void;
+  markedPhotoUrls?: string[];
 }) {
   return (
     <>
@@ -135,6 +150,8 @@ function LegacyAttachmentList({
           onRemovePhoto={onRemovePhoto}
           onRemoveVideo={onRemoveVideo}
           onRemoveAudio={onRemoveAudio}
+          onMarkPhoto={onMarkPhoto}
+          marked={Boolean(item.url && markedPhotoUrls?.includes(item.url))}
         />
       ))}
     </>
@@ -148,6 +165,8 @@ function LeftoverMediaItem({
   onRemovePhoto,
   onRemoveVideo,
   onRemoveAudio,
+  onMarkPhoto,
+  marked,
 }: {
   item: CompletionAttachment;
   disabled: boolean;
@@ -155,6 +174,8 @@ function LeftoverMediaItem({
   onRemovePhoto?: () => void;
   onRemoveVideo?: () => void;
   onRemoveAudio?: () => void;
+  onMarkPhoto?: (url: string) => void;
+  marked: boolean;
 }) {
   const remote = Boolean(item.url && !item.url.startsWith("blob:"));
   const resolved = useResolvedMediaSrc(item.url, remote);
@@ -170,6 +191,13 @@ function LeftoverMediaItem({
         {kindLabel(item.kind)}
       </Typography>
       <LeftoverMediaBody item={item} src={resolved.src} posterSrc={poster.src} videosPending={videosPending} />
+      {item.kind === "photo" && onMarkPhoto && item.url ? (
+        <MarkCompletionPhotoButton
+          marked={marked}
+          disabled={disabled}
+          onClick={() => onMarkPhoto(item.url)}
+        />
+      ) : null}
       {onRemove && (
         <Button size="small" color="inherit" disabled={disabled} onClick={onRemove} sx={{ mt: 0.5 }}>
           {he.removeMedia}

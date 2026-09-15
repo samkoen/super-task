@@ -94,9 +94,10 @@
 - UI: `TaskReferenceMediaEditor` + `MediaCaptureActions`
 - תמונה / וידאו: קבצים מקומיים (`pending_*`) → העלאה ב-**שליחה**
 - שמע: העלאה מיד בצילום + תמלול → תיאור
-- העלאה: `POST /api/tasks/upload-photo|video|audio`
+- העלאת תמונה / שמע: `POST /api/tasks/upload-photo|audio` → R2 (או `/uploads` במקומי)
+- העלאת וידאו (פרוד): `POST /api/media/video-intent` ואז **PUT חתום מראש** ישירות ל-R2
 - שדות: `reference_photo_url`, `reference_video_url`, `reference_audio_url` (תבנית + מופע)
-- תבנית → מופע: **העתקה** דרך `blob_storage.copy_media_url` (מדיה מבודדת)
+- תבנית → מופע: **העתקה** דרך `blob_storage.copy_media_url` (אובייקטי R2 מבודדים)
 
 ### 4.4 סימון על תמונה
 
@@ -127,7 +128,7 @@
 4. `POST .../complete` → לעובד מוצלח: סטטוס **`pending_review`**
 5. מנהל: `approve` → `completed` ; `reopen` → `in_progress` + `rejection_note`
 
-העלאת סיום: אותם `/api/tasks/upload-*`.  
+העלאת סיום: תמונה/שמע דרך `/api/tasks/upload-*` ; וידאו דרך intent + PUT ל-R2.  
 ביקורת: `TaskCompletionReviewDialog` · תור בדשבורד « ממתין לאישור ».
 
 ### 4.8 שמע בסיום — דו-לשוני
@@ -148,7 +149,8 @@
 | רשימת תבניות | `GET /templates` | סינון `branch_id` אופציונלי |
 | יצירת קבועה | `POST /templates` | `assignee_user_id` חובה ; חזרה `daily` / `weekly` / `biweekly` / `monthly` ; יוצר מופע להיום אם רלוונטי |
 | יצירת מזדמנת | `POST /ad-hoc` | `assignee_user_id` + `due_at` חובה ; `photo_required` ברירת מחדל `true` |
-| העלאת מדיה | `POST /upload-photo\|video\|audio` | תיקיות `task_photos` / `task_videos` / `task_audio` |
+| העלאת תמונה / שמע | `POST /upload-photo\|audio` | תיקיות `task_photos` / `task_audio` → R2 |
+| כוונת וידאו | `POST /api/media/video-intent` | PUT חתום מראש ל-R2 (פרוד) ; פרוקסי API במקומי |
 | מופעים למנהל | `GET /occurrences` | + גלגול משימות פתוחות להיום |
 | המשימות שלי | `GET /mine` | תרגום אוטומטי ; `due_on` ברירת מחדל = היום |
 | התחלה / סיום | `POST /occurrences/{id}/start\|complete` | |
@@ -161,15 +163,18 @@
 
 ## 6. אחסון מדיה
 
+**Vercel Blob כבר לא בשימוש.** כתובות ישנות `*.blob.vercel-storage.com` נזרקות (אין פרוקסי, אין אווטאר).
+
 | סביבה | התנהגות |
 |-------|----------|
-| מוגדר `BLOB_READ_WRITE_TOKEN` | **Vercel Blob** (`blob_storage.put_bytes`) |
-| מקומי בלי טוקן | דיסק `/uploads/{folder}/{uuid}{ext}` |
-| פרוד בלי טוקן | העלאה נדחית |
+| מוגדרים מפתחות `R2_*` | **Cloudflare R2** (`object_store` + `blob_storage.put_bytes`) |
+| מקומי בלי R2 | דיסק `/uploads/{folder}/{uuid}{ext}` |
+| פרוד בלי R2 | העלאה נדחית (השרת לא עולה) |
 
 - תמונה: דחיסה לפני העלאה (`media_compression.py`)
 - מגבלות: תמונה 10MB · וידאו 50MB · שמע 20MB
-- קריאה בפרוד: פרוקסי מאומת `GET /api/media/proxy?src=...` (אין static ציבורי)
+- קריאה: פרוקסי מאומת `GET /api/media/proxy?src=...` → קובץ מקומי או **הפניה GET חתומה ל-R2**
+- וידאו בפרוד: הדפדפן / Android שולחים PUT ישירות לכתובת החתומה (לא דרך ה-API)
 - שמירה/מחיקה: `MediaRetentionService` + cron `GET/POST /api/cron/purge-media`
 
 ---
@@ -215,7 +220,8 @@
 | `services/task_template_service.py` | יצירת תבניות קבועות |
 | `services/task_occurrence_service.py` | מזדמנת, complete, approve, reopen, list_mine |
 | `services/task_scheduler_service.py` | יצירה + גלגול |
-| `services/blob_storage.py` | Blob Vercel / `/uploads` מקומי |
+| `services/blob_storage.py` | חזית R2 / `/uploads` מקומי |
+| `services/object_store.py` | PUT/GET/COPY חתומים מראש ל-Cloudflare R2 |
 | `services/media_upload_service.py` | אימות + העלאה |
 | `services/reference_audio_transcription_service.py` | שמע להמחשה → טקסט |
 | `services/completion_audio_transcription_service.py` | שמע בסיום דו-לשוני |
@@ -241,7 +247,7 @@
 | שמע בסיום → טקסט מנהל + עובד | ✅ |
 | ביקורת מנהל approve / reopen | ✅ |
 | מילוי מזדמנת מדיווח תקלה | ✅ |
-| אחסון Blob (+ מקומי בפיתוח) | ✅ |
+| אחסון R2 (+ `/uploads` מקומי בפיתוח) | ✅ |
 | גלגול משימות שלא הושלמו | ✅ |
 | SSE / רענון אוטומטי | ✅ |
 | האצלה « ממתין להעברה » (יצירה / UI) | ❌ הוסר (רק backend legacy) |
@@ -258,9 +264,12 @@ GEMINI_API_KEY=
 GOOGLE_CLOUD_API_KEY=
 GOOGLE_TRANSLATE_SOURCE=he
 
-# אחסון מדיה (חובה בפרוד / Vercel)
-BLOB_READ_WRITE_TOKEN=
-BLOB_ACCESS=private
+# אחסון מדיה — Cloudflare R2 (חובה בפרוד)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=
+# R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 
 # קולות TTS לפי שפה (אופציונלי — ברירות מחדל ב-config.py)
 GOOGLE_TTS_VOICE_FR=fr-FR-Neural2-A
@@ -268,4 +277,4 @@ GOOGLE_TTS_VOICE_FR=fr-FR-Neural2-A
 
 בלי `GEMINI_API_KEY`: אין יצירה בקול ואין תמלולי שמע.  
 בלי `GOOGLE_CLOUD_API_KEY`: תרגום דרך LLM ; TTS של Google לא זמין (נפילה לדפדפן בעברית).  
-בלי `BLOB_READ_WRITE_TOKEN` בפרוד: אי אפשר להעלות קבצים.
+בלי `R2_*` בפרוד: אי אפשר להעלות קבצים. `BLOB_READ_WRITE_TOKEN` לא בשימוש.

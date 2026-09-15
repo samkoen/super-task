@@ -39,6 +39,11 @@ describe("taskRecurrence", () => {
     expect(joinWeeklyDays(["4", "0", "0", "6"])).toBe("6,0,4");
   });
 
+  it("accepts weekday lists from a malformed API payload", () => {
+    expect(parseWeeklyDays(["0", "1"])).toEqual(["0", "1"]);
+    expect(formatWeekdaysPart(["0"])).toContain(he.weekdayMon);
+  });
+
   it("shows all days in the picker when none stored (legacy daily)", () => {
     expect(weekdaysForPicker(null).join(",")).toBe(ALL_WEEKDAYS);
   });

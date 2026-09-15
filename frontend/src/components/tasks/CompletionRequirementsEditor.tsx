@@ -1,19 +1,15 @@
-import { useState } from "react";
-import { Box, Button, Chip, IconButton, Stack, TextField, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
+import type { ReactNode } from "react";
 import VisualRequirementCard from "./VisualRequirementCard";
 import { he } from "../../i18n/he";
 import {
   addRequirement,
-  applyWordPhotoSlots,
-  editorDetailRequirements,
   MAX_COMPLETION_REQUIREMENTS,
-  MAX_SLOT_TITLE,
-  parseRequirementWords,
-  photoWordsFromRequirements,
   removeRequirement,
   setRequirementExample,
   setRequirementHint,
@@ -27,6 +23,7 @@ interface CompletionRequirementsEditorProps {
   value: CompletionRequirement[];
   onChange: (next: CompletionRequirement[]) => void;
   disabled?: boolean;
+  expandSlots?: boolean;
 }
 
 function revokeIfBlob(url: string | undefined): void {
@@ -37,6 +34,7 @@ export default function CompletionRequirementsEditor({
   value,
   onChange,
   disabled = false,
+  expandSlots = true,
 }: CompletionRequirementsEditorProps) {
   const canAdd = value.length < MAX_COMPLETION_REQUIREMENTS && !disabled;
 
@@ -52,142 +50,145 @@ export default function CompletionRequirementsEditor({
         gap: 1.5,
       }}
     >
-      <Box>
-        <Typography variant="subtitle2">{he.completionHowToFinish}</Typography>
-        <Typography variant="caption" color="text.secondary" display="block">
-          {he.completionHowToFinishHint}
-        </Typography>
-      </Box>
-      <RequirementWordList value={value} onChange={onChange} disabled={disabled} />
-      {value.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {he.completionNoRequirements}
-        </Typography>
-      ) : (
-        <Stack spacing={1}>
-          {editorDetailRequirements(value).map(({ req, index }) => (
-            <RequirementItem
-              key={`${req.kind}-${index}`}
-              req={req}
-              index={index}
-              disabled={disabled}
-              onChange={onChange}
-              value={value}
-            />
-          ))}
-        </Stack>
-      )}
-      <Box display="flex" flexWrap="wrap" gap={1}>
-        <Button size="small" variant="outlined" startIcon={<PhotoCameraIcon />} onClick={() => onChange(addRequirement(value, "photo"))} disabled={!canAdd}>
-          {he.completionAddPhotoReq}
-        </Button>
-        <Button size="small" variant="outlined" startIcon={<VideocamIcon />} onClick={() => onChange(addRequirement(value, "video"))} disabled={!canAdd}>
-          {he.completionAddVideoReq}
-        </Button>
-        <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={() => onChange(addRequirement(value, "audio"))} disabled={!canAdd}>
-          {he.completionAddAudioReq}
-        </Button>
-      </Box>
+      <EditorIntro />
+      <RequirementList
+        value={value}
+        disabled={disabled}
+        expandSlots={expandSlots}
+        onChange={onChange}
+      />
+      <AddRequirementButtons canAdd={canAdd} value={value} onChange={onChange} />
     </Box>
   );
 }
 
-function commitWordDraft(value: CompletionRequirement[], extra: string): CompletionRequirement[] {
-  const words = parseRequirementWords([...photoWordsFromRequirements(value), extra].join("\n"));
-  return applyWordPhotoSlots(value, words);
-}
-
-function WordChips({
-  words,
-  disabled,
-  onRemove,
-}: {
-  words: string[];
-  disabled: boolean;
-  onRemove: (word: string) => void;
-}) {
+function EditorIntro() {
   return (
-    <Box display="flex" flexWrap="wrap" gap={0.75}>
-      {words.map((word) => (
-        <Chip
-          key={word}
-          size="small"
-          label={word}
-          disabled={disabled}
-          onDelete={disabled ? undefined : () => onRemove(word)}
-          aria-label={`${he.completionWordRemove} ${word}`}
-        />
-      ))}
+    <Box>
+      <Typography variant="subtitle2">{he.completionHowToFinish}</Typography>
+      <Typography variant="caption" color="text.secondary" display="block">
+        {he.completionHowToFinishHint}
+      </Typography>
     </Box>
   );
 }
 
-function WordDraftField({
-  draft,
-  disabled,
-  onDraft,
-  onCommit,
-}: {
-  draft: string;
-  disabled: boolean;
-  onDraft: (text: string) => void;
-  onCommit: (text: string) => void;
-}) {
-  return (
-    <TextField
-      size="small"
-      fullWidth
-      disabled={disabled}
-      placeholder={he.completionWordListPlaceholder}
-      value={draft}
-      inputProps={{ maxLength: MAX_SLOT_TITLE, "aria-label": he.completionWordList }}
-      onChange={(e) => {
-        const text = e.target.value;
-        if (/[\n,،]/.test(text)) onCommit(text);
-        else onDraft(text);
-      }}
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" || !draft.trim()) return;
-        e.preventDefault();
-        onCommit(draft);
-      }}
-    />
-  );
-}
-
-function RequirementWordList({
+function RequirementList({
   value,
-  onChange,
   disabled,
+  expandSlots,
+  onChange,
 }: {
   value: CompletionRequirement[];
-  onChange: (next: CompletionRequirement[]) => void;
   disabled: boolean;
+  expandSlots: boolean;
+  onChange: (next: CompletionRequirement[]) => void;
 }) {
-  const [draft, setDraft] = useState("");
-  const words = photoWordsFromRequirements(value);
-  const atCap = value.length >= MAX_COMPLETION_REQUIREMENTS;
-
-  const applyDraft = (text: string) => {
-    onChange(commitWordDraft(value, text));
-    setDraft("");
-  };
-
+  if (value.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {he.completionNoRequirements}
+      </Typography>
+    );
+  }
   return (
-    <Box display="flex" flexDirection="column" gap={0.75}>
-      <Typography variant="body2" fontWeight={600}>{he.completionWordList}</Typography>
-      <Typography variant="caption" color="text.secondary">{he.completionWordListHint}</Typography>
-      <WordChips
-        words={words}
-        disabled={disabled}
-        onRemove={(word) => onChange(applyWordPhotoSlots(value, words.filter((item) => item !== word)))}
-      />
-      <WordDraftField
-        draft={draft}
-        disabled={disabled || atCap}
-        onDraft={setDraft}
-        onCommit={applyDraft}
-      />
+    <Stack spacing={1}>
+      {value.map((req, index) => (
+        <RequirementItem
+          key={`${req.kind}-${index}`}
+          req={req}
+          index={index}
+          disabled={disabled}
+          expandSlots={expandSlots}
+          onChange={onChange}
+          value={value}
+        />
+      ))}
+    </Stack>
+  );
+}
+
+function AddRequirementButtons({
+  canAdd,
+  value,
+  onChange,
+}: {
+  canAdd: boolean;
+  value: CompletionRequirement[];
+  onChange: (next: CompletionRequirement[]) => void;
+}) {
+  return (
+    <Box display="flex" flexWrap="wrap" gap={1}>
+      <Button size="small" variant="outlined" startIcon={<PhotoCameraIcon />} onClick={() => onChange(addRequirement(value, "photo"))} disabled={!canAdd}>
+        {he.completionAddPhotoReq}
+      </Button>
+      <Button size="small" variant="outlined" startIcon={<VideocamIcon />} onClick={() => onChange(addRequirement(value, "video"))} disabled={!canAdd}>
+        {he.completionAddVideoReq}
+      </Button>
+      <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={() => onChange(addRequirement(value, "audio"))} disabled={!canAdd}>
+        {he.completionAddAudioReq}
+      </Button>
+    </Box>
+  );
+}
+
+const SLOT_ACCORDION_SX = {
+  bgcolor: "action.hover",
+  borderRadius: 1.5,
+  "&:before": { display: "none" },
+  overflow: "hidden",
+};
+
+function kindLabel(kind: CompletionRequirement["kind"]): string {
+  if (kind === "video") return he.completionReqVideo;
+  if (kind === "audio") return he.completionReqAudio;
+  return he.completionReqPhoto;
+}
+
+function slotHeading(req: CompletionRequirement, index: number): string {
+  const base = `${he.completionRequirementN(index + 1)} · ${kindLabel(req.kind)}`;
+  const title = (req.title || "").trim();
+  return title ? `${base} · ${title}` : base;
+}
+
+function SlotAccordion({
+  heading,
+  defaultExpanded,
+  disabled,
+  onRemove,
+  children,
+}: {
+  heading: string;
+  defaultExpanded: boolean;
+  disabled: boolean;
+  onRemove: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.25 }}>
+      <Accordion
+        defaultExpanded={defaultExpanded}
+        disableGutters
+        elevation={0}
+        sx={{ ...SLOT_ACCORDION_SX, flex: 1 }}
+      >
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 1 } }}
+        >
+          <Typography variant="body2" fontWeight={600}>
+            {heading}
+          </Typography>
+        </AccordionSummary>
+        {children ? (
+          <AccordionDetails sx={{ pt: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+            {children}
+          </AccordionDetails>
+        ) : null}
+      </Accordion>
+      <IconButton size="small" aria-label={he.removeMedia} disabled={disabled} onClick={onRemove} sx={{ mt: 0.75 }}>
+        <DeleteOutlineIcon fontSize="small" />
+      </IconButton>
     </Box>
   );
 }
@@ -196,50 +197,41 @@ function RequirementItem({
   req,
   index,
   disabled,
+  expandSlots,
   value,
   onChange,
 }: {
   req: CompletionRequirement;
   index: number;
   disabled: boolean;
+  expandSlots: boolean;
   value: CompletionRequirement[];
   onChange: (next: CompletionRequirement[]) => void;
 }) {
+  const heading = slotHeading(req, index);
+  const onRemove = () => {
+    revokeIfBlob(req.example_url);
+    onChange(removeRequirement(value, index));
+  };
   if (req.kind === "audio") {
     return (
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: "action.hover", borderRadius: 1, px: 1, py: 0.75 }}>
-        <Typography variant="body2" fontWeight={600}>
-          {he.completionRequirementN(index + 1)} · {he.completionReqAudio}
-        </Typography>
-        <IconButton
-          size="small"
-          aria-label={he.removeMedia}
-          onClick={() => onChange(removeRequirement(value, index))}
-          disabled={disabled}
-          sx={{ mr: "auto" }}
-        >
-          <DeleteOutlineIcon fontSize="small" />
-        </IconButton>
-      </Box>
+      <SlotAccordion heading={heading} defaultExpanded={expandSlots} disabled={disabled} onRemove={onRemove} />
     );
   }
   return (
-    <VisualRequirementCard
-      req={req}
-      index={index}
-      disabled={disabled}
-      onTitle={(title) => onChange(setRequirementTitle(value, index, title))}
-      onHint={(hint) => onChange(setRequirementHint(value, index, hint))}
-      onSeconds={(seconds) => onChange(setVideoSeconds(value, index, seconds))}
-      onSecondsCommit={() => onChange(commitVideoSeconds(value, index))}
-      onRemove={() => {
-        revokeIfBlob(req.example_url);
-        onChange(removeRequirement(value, index));
-      }}
-      onExample={(url, file) => {
-        revokeIfBlob(req.example_url);
-        onChange(setRequirementExample(value, index, url, file));
-      }}
-    />
+    <SlotAccordion heading={heading} defaultExpanded={expandSlots} disabled={disabled} onRemove={onRemove}>
+      <VisualRequirementCard
+        req={req}
+        disabled={disabled}
+        onTitle={(title) => onChange(setRequirementTitle(value, index, title))}
+        onHint={(hint) => onChange(setRequirementHint(value, index, hint))}
+        onSeconds={(seconds) => onChange(setVideoSeconds(value, index, seconds))}
+        onSecondsCommit={() => onChange(commitVideoSeconds(value, index))}
+        onExample={(url, file) => {
+          revokeIfBlob(req.example_url);
+          onChange(setRequirementExample(value, index, url, file));
+        }}
+      />
+    </SlotAccordion>
   );
 }

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
-  Alert,
   Button,
   CircularProgress,
   Dialog,
@@ -11,42 +10,52 @@ import {
 } from "@mui/material";
 import { he } from "../../i18n/he";
 import { CHAT_CAPTION_MAX, clipChatCaption } from "../../utils/chatAnnotateReply";
-import { fetchMediaBlob } from "../../utils/fetchMediaBlob";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 import PhotoAnnotationCanvas, {
   type PhotoAnnotationCanvasHandle,
 } from "../media/PhotoAnnotationCanvas";
-import { exportAnnotatedChatPhoto } from "./ChatPhotoCapture";
 
 export default function ChatPhotoAnnotateReplyDialog({
   photoUrl,
   sending,
   onClose,
   onSend,
+  submitLabel,
+  hideCaption = false,
 }: {
   photoUrl: string | null;
   sending: boolean;
   onClose: () => void;
   onSend: (file: File, caption?: string) => void | Promise<void>;
+  submitLabel?: string;
+  hideCaption?: boolean;
 }) {
-  const image = useReplyImageBlob(photoUrl);
   const annotateRef = useRef<PhotoAnnotationCanvasHandle>(null);
   const [caption, setCaption] = useState("");
   const [confirming, setConfirming] = useState(false);
-  const busy = sending || confirming || image.loading;
+  const [ready, setReady] = useState(false);
+  const busy = sending || confirming;
   const open = Boolean(photoUrl);
 
   useEffect(() => {
     setCaption("");
+    setReady(false);
   }, [photoUrl]);
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" dir="rtl" disableEnforceFocus>
       <DialogTitle>{he.photoAnnotateTitle}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1, overflowY: "auto" }}>
-        <ReplyImageBody image={image} annotateRef={annotateRef} />
+        {photoUrl ? (
+          <PhotoAnnotationCanvas
+            ref={annotateRef}
+            image={photoUrl}
+            hint={he.chatAnnotateReplyHint}
+            onReady={() => setReady(true)}
+          />
+        ) : null}
         <ReplyCaptionField
-          visible={Boolean(image.blob && !image.error)}
+          visible={!hideCaption && ready}
           value={caption}
           disabled={busy}
           onChange={setCaption}
@@ -54,10 +63,11 @@ export default function ChatPhotoAnnotateReplyDialog({
       </DialogContent>
       <ReplyActions
         busy={busy}
-        canSend={Boolean(image.blob)}
+        canSend={ready}
+        submitLabel={submitLabel ?? he.taskChatSend}
         onClose={onClose}
         onSend={() => void confirmReply({
-          image, annotateRef, caption, sending, confirming, setConfirming, onSend,
+          annotateRef, caption: hideCaption ? "" : caption, sending, confirming, setConfirming, onSend,
         })}
       />
     </Dialog>
@@ -94,11 +104,13 @@ function ReplyCaptionField({
 function ReplyActions({
   busy,
   canSend,
+  submitLabel,
   onClose,
   onSend,
 }: {
   busy: boolean;
   canSend: boolean;
+  submitLabel: string;
   onClose: () => void;
   onSend: () => void;
 }) {
@@ -111,82 +123,24 @@ function ReplyActions({
         startIcon={busy ? <CircularProgress size={18} color="inherit" /> : undefined}
         onClick={onSend}
       >
-        {busy ? he.loading : he.taskChatSend}
+        {busy ? he.loading : submitLabel}
       </Button>
     </DialogActions>
   );
 }
 
-function useReplyImageBlob(photoUrl: string | null) {
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!photoUrl) {
-      setBlob(null);
-      setError("");
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError("");
-    setBlob(null);
-    void fetchMediaBlob(photoUrl)
-      .then((next) => {
-        if (!cancelled) setBlob(next);
-      })
-      .catch(() => {
-        if (!cancelled) setError(he.chatAnnotateReplyLoadError);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [photoUrl]);
-
-  return { blob, error, loading };
-}
-
-function ReplyImageBody({
-  image,
-  annotateRef,
-}: {
-  image: ReturnType<typeof useReplyImageBlob>;
-  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
-}) {
-  if (image.loading) {
-    return <CircularProgress size={28} sx={{ alignSelf: "center", my: 2 }} />;
-  }
-  if (image.error) {
-    return <Alert severity="warning">{image.error}</Alert>;
-  }
-  if (!image.blob) return null;
-  return (
-    <PhotoAnnotationCanvas
-      ref={annotateRef}
-      imageBlob={image.blob}
-      hint={he.chatAnnotateReplyHint}
-    />
-  );
-}
-
 async function confirmReply(opts: {
-  image: ReturnType<typeof useReplyImageBlob>;
-  annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
+  annotateRef: RefObject<PhotoAnnotationCanvasHandle | null>;
   caption: string;
   sending: boolean;
   confirming: boolean;
   setConfirming: (value: boolean) => void;
   onSend: (file: File, caption?: string) => void | Promise<void>;
 }) {
-  if (!opts.image.blob || opts.sending || opts.confirming) return;
+  if (opts.sending || opts.confirming || !opts.annotateRef.current) return;
   opts.setConfirming(true);
   try {
-    const file = await exportAnnotatedChatPhoto(opts.image.blob, opts.annotateRef.current);
+    const file = await opts.annotateRef.current.exportFile();
     await opts.onSend(file, clipChatCaption(opts.caption) || undefined);
   } finally {
     opts.setConfirming(false);

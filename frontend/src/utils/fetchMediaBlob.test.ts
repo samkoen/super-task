@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchMediaBlob, fetchMediaBlobWithRetry } from "./fetchMediaBlob";
+import { fetchMediaBlob, fetchMediaBlobWithRetry, withStreamQuery } from "./fetchMediaBlob";
 
 vi.mock("./mediaUrl", () => ({
   mediaUrl: (path: string | null | undefined) => (path ? `/proxy?src=${path}` : null),
+  withStreamQuery: (url: string) => {
+    if (url.startsWith("blob:") || /(?:^|[?&])stream=/.test(url)) return url;
+    if (!url.includes("proxy?")) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}stream=1`;
+  },
 }));
 
 describe("fetchMediaBlob", () => {
@@ -41,6 +46,21 @@ describe("fetchMediaBlob", () => {
     vi.unstubAllGlobals();
   });
 
+  it("streams through the authenticated proxy when asked", async () => {
+    const blob = new Blob(["img"], { type: "image/jpeg" });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, blob: async () => blob });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      fetchMediaBlob("https://abc.r2.cloudflarestorage.com/super-media/p.jpg", { stream: true }),
+    ).resolves.toBe(blob);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/proxy?src=https://abc.r2.cloudflarestorage.com/super-media/p.jpg&stream=1",
+      { credentials: "include", redirect: "follow" },
+    );
+    vi.unstubAllGlobals();
+  });
+
   it("rejects when the path cannot be resolved", async () => {
     await expect(fetchMediaBlob("")).rejects.toThrow("empty media path");
   });
@@ -71,5 +91,13 @@ describe("fetchMediaBlob", () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("withStreamQuery", () => {
+  it("appends stream=1 on the media proxy without re-encoding src", () => {
+    const proxied = "/api/media/proxy?src=https%3A%2F%2Fr2.example%2Fp.jpg";
+    expect(withStreamQuery(proxied)).toBe(`${proxied}&stream=1`);
+    expect(withStreamQuery("blob:http://localhost/abc")).toBe("blob:http://localhost/abc");
   });
 });

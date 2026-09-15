@@ -268,4 +268,22 @@ describe("NewTaskFormDialog", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0].start_url).toBe(url);
   });
+
+  it("does not crash when closed with missing employee or branch lists", () => {
+    expect(() =>
+      render(
+        <NewTaskFormDialog
+          open={false}
+          onClose={vi.fn()}
+          onSubmit={vi.fn()}
+          branches={undefined as never}
+          employees={undefined as never}
+          isBranchManager
+          canPickBranch={false}
+          defaultBranchId="b1"
+          defaultDueAt="2026-07-20T10:00"
+        />,
+      ),
+    ).not.toThrow();
+  });
 });

@@ -4,6 +4,7 @@ import {
   TASK_CHANGE_EVENT,
   type TaskChangeDetail,
 } from "../constants/events";
+import { resolveApiBaseUrl } from "../services/apiBaseUrl";
 import { isNativeApp } from "../utils/isNativeApp";
 
 const RECONNECT_MS_MIN = 5_000;
@@ -32,7 +33,7 @@ export function dispatchTaskEventFromPayload(raw: string) {
 /** true si une session cookie est encore valide. */
 export async function hasActiveSession(): Promise<boolean> {
   try {
-    const res = await fetch("/api/auth/me", { credentials: "include" });
+    const res = await fetch(sessionMeUrl(), { credentials: "include" });
     return res.ok;
   } catch {
     return false;
@@ -40,15 +41,19 @@ export async function hasActiveSession(): Promise<boolean> {
 }
 
 /**
- * SSE app-wide. Désactivé sur Capacitor et en build prod (Vercel) : le stream
- * tient une invocation 120s puis Vercel la tue — ça ressemble à un restart et
- * coupe סיום משימה. En local (Vite) le poll + SSE restent. Prod : poll seul.
+ * SSE app-wide on the web (local + Render). Off on Capacitor: EventSource does
+ * not follow Axios `VITE_API_URL`, so the APK would hit https://localhost.
  */
-export function shouldOpenTaskEventSource(
-  native = isNativeApp(),
-  production = import.meta.env.PROD,
-): boolean {
-  return !native && !production;
+export function shouldOpenTaskEventSource(native = isNativeApp()): boolean {
+  return !native;
+}
+
+export function eventsStreamUrl(apiBase = resolveApiBaseUrl()): string {
+  return `${apiBase.replace(/\/$/, "")}/events/stream`;
+}
+
+export function sessionMeUrl(apiBase = resolveApiBaseUrl()): string {
+  return `${apiBase.replace(/\/$/, "")}/auth/me`;
 }
 
 export function useTaskEventSource(enabled: boolean) {
@@ -110,7 +115,7 @@ export function useTaskEventSource(enabled: boolean) {
         stopped = true;
         return;
       }
-      source = new EventSource("/api/events/stream", { withCredentials: true });
+      source = new EventSource(eventsStreamUrl(), { withCredentials: true });
       attach(source);
     };
 

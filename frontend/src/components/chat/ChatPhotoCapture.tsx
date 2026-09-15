@@ -127,7 +127,7 @@ function ChatPhotoDialogBody({
   busy: boolean;
 }) {
   if (previewing && session.previewBlob) {
-    return <PhotoAnnotationCanvas ref={session.annotateRef} imageBlob={session.previewBlob} />;
+    return <PhotoAnnotationCanvas ref={session.annotateRef} image={session.previewBlob} />;
   }
   return (
     <>

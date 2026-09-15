@@ -12,16 +12,23 @@ import {
   Typography,
 } from "@mui/material";
 import { ApiError } from "../../services/api";
-import { taskService, type TaskOccurrence } from "../../services/taskService";
+import { taskService, type TaskOccurrence, type TaskStatus } from "../../services/taskService";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import TaskChatPanel from "./TaskChatPanel";
+import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
 import { initialReviewMediaReady, reviewActionsBlocked } from "../../utils/reviewMediaGate";
+import {
+  markedPhotoUrls,
+  reopenReviewedTask,
+  upsertReviewPhotoMark,
+  type ReviewPhotoMark,
+} from "../../utils/reviewReopenPhotos";
 import ClosedTaskReopenConfirm from "./ClosedTaskReopenConfirm";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import QualityRatingStars from "./QualityRatingStars";
@@ -43,12 +50,19 @@ export default function TaskCompletionReviewDialog({
   const [rating, setRating] = useState<number | null>(DEFAULT_REVIEW_QUALITY_RATING);
   const [confirmReopenClosed, setConfirmReopenClosed] = useState(false);
   const [mediaReady, setMediaReady] = useState(true);
+  const [marks, setMarks] = useState<ReviewPhotoMark[]>([]);
+  const [annotateUrl, setAnnotateUrl] = useState<string | null>(null);
+  const [taskView, setTaskView] = useState<TaskOccurrence | null>(task);
 
-  const completion = task?.completion;
-  const open = Boolean(task);
-  const isAwaiting = task?.status === "awaiting_response";
-  const isReview = task?.status === "pending_review";
-  const isClosedApproved = canReopenClosedTask(task);
+  useEffect(() => {
+    setTaskView(task);
+  }, [task]);
+
+  const completion = taskView?.completion;
+  const open = Boolean(taskView);
+  const isAwaiting = taskView?.status === "awaiting_response";
+  const isReview = taskView?.status === "pending_review";
+  const isClosedApproved = canReopenClosedTask(taskView);
   const showCompletion = Boolean(completion);
   const actionsBlocked = reviewActionsBlocked({ isReview, mediaReady });
 
@@ -57,11 +71,13 @@ export default function TaskCompletionReviewDialog({
     setError("");
     setConfirmReopenClosed(false);
     setRating(DEFAULT_REVIEW_QUALITY_RATING);
-    setMediaReady(initialReviewMediaReady(task?.completion?.media_ready));
-  }, [task?.id, task?.completion?.media_ready]);
+    setMediaReady(initialReviewMediaReady(taskView?.completion?.media_ready));
+    setMarks([]);
+    setAnnotateUrl(null);
+  }, [taskView?.id, taskView?.completion?.media_ready]);
 
   useEffect(() => {
-    const taskId = task?.id;
+    const taskId = taskView?.id;
     if (!open || !isReview || mediaReady || !taskId) return undefined;
     let stop = false;
     const tick = async () => {
@@ -78,7 +94,17 @@ export default function TaskCompletionReviewDialog({
       stop = true;
       window.clearInterval(timer);
     };
-  }, [open, isReview, mediaReady, task?.id]);
+  }, [open, isReview, mediaReady, taskView?.id]);
+
+  const handleChatUpdated = (status: string, notice?: string) => {
+    setTaskView((prev) => {
+      if (!prev) return prev;
+      return { ...prev, status: status as TaskStatus };
+    });
+    if (notice !== he.taskChatSent) {
+      onDone(notice ?? he.taskChatSent);
+    }
+  };
 
   const handleClose = () => {
     if (saving) return;
@@ -89,7 +115,7 @@ export default function TaskCompletionReviewDialog({
   };
 
   const runAction = async (action: () => Promise<string>) => {
-    if (!task) return;
+    if (!taskView) return;
     setSaving(true);
     setError("");
     try {
@@ -110,15 +136,18 @@ export default function TaskCompletionReviewDialog({
       return;
     }
     void runAction(async () => {
-      await taskService.approve(task!.id, { quality_rating: rating });
+      await taskService.approve(taskView!.id, { quality_rating: rating });
       return he.taskApprovedSuccess;
     });
   };
 
   const handleReopen = () => {
     void runAction(async () => {
-      await taskService.reopen(task!.id, {
-        rejection_note: note.trim() || he.taskReopenNoteFallback,
+      await reopenReviewedTask({
+        occurrenceId: taskView!.id,
+        note,
+        fallbackNote: he.taskReopenNoteFallback,
+        marks,
       });
       return he.taskReopenedSuccess;
     });
@@ -127,44 +156,49 @@ export default function TaskCompletionReviewDialog({
   const handleReopenClosed = () => {
     setConfirmReopenClosed(false);
     void runAction(async () => {
-      await taskService.reopenClosed(task!.id);
+      await taskService.reopenClosed(taskView!.id);
       return he.taskReopenedSuccess;
     });
   };
 
   return (
     <>
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" dir="rtl">
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      fullWidth
+      maxWidth="sm"
+      dir="rtl"
+      disableEnforceFocus
+      disableAutoFocus
+      disableRestoreFocus
+    >
       <DialogTitle>
         {isClosedApproved ? he.taskClosedDetailTitle : isAwaiting ? he.taskChatTitle : he.taskReviewTitle}
       </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-        {task && (
+        {taskView && (
           <Typography variant="subtitle1" fontWeight={700}>
-            {task.title}
+            {taskView.title}
           </Typography>
         )}
-        {task && (
+        {taskView && (
           <TaskChatPanel
-            key={task.id}
-            occurrenceId={task.id}
-            occurrenceStatus={task.status}
-            chatFollowUpAt={task.chat_follow_up_at}
-            chatResolvedAt={task.chat_resolved_at}
+            key={taskView.id}
+            occurrenceId={taskView.id}
+            occurrenceStatus={taskView.status}
+            chatFollowUpAt={taskView.chat_follow_up_at}
+            chatResolvedAt={taskView.chat_resolved_at}
             compact
-            composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
-            onOccurrenceUpdated={(_status, notice) => {
-              if (notice !== he.taskChatSent) {
-                onDone(notice ?? he.taskChatSent);
-              }
-            }}
+            composeEnabled={canComposeTaskChat(taskView.status, false)}
+            onOccurrenceUpdated={handleChatUpdated}
           />
         )}
-        {task && (
+        {taskView && (
           <TaskReferenceMediaDisplay
-            reference_photo_url={task.reference_photo_url}
-            reference_video_url={task.reference_video_url}
-            reference_audio_url={task.reference_audio_url}
+            reference_photo_url={taskView.reference_photo_url}
+            reference_video_url={taskView.reference_video_url}
+            reference_audio_url={taskView.reference_audio_url}
           />
         )}
         {showCompletion && completion && (
@@ -198,10 +232,15 @@ export default function TaskCompletionReviewDialog({
             video_path={completion.video_path}
             audio_path={completion.audio_path}
             attachments={completion.completion_attachments}
-            requirements={task.completion_requirements}
+            requirements={taskView.completion_requirements}
             audio_transcript={completion.audio_transcript}
             videosPending={isReview && !mediaReady}
+            onMarkPhoto={isReview ? setAnnotateUrl : undefined}
+            markedPhotoUrls={markedPhotoUrls(marks)}
           />
+        )}
+        {isReview && marks.length > 0 && (
+          <Alert severity="info">{he.reviewMarkedPhotoCount(marks.length)}</Alert>
         )}
         {actionsBlocked && (
           <Alert severity="info">{he.reviewVideosNotReady}</Alert>
@@ -273,6 +312,18 @@ export default function TaskCompletionReviewDialog({
         )}
       </DialogActions>
     </Dialog>
+    <ChatPhotoAnnotateReplyDialog
+      photoUrl={annotateUrl}
+      sending={saving}
+      hideCaption
+      submitLabel={he.reviewMarkPhotoSave}
+      onClose={() => setAnnotateUrl(null)}
+      onSend={(file) => {
+        if (!annotateUrl) return;
+        setMarks((prev) => upsertReviewPhotoMark(prev, { sourceUrl: annotateUrl, file }));
+        setAnnotateUrl(null);
+      }}
+    />
     <ClosedTaskReopenConfirm
       open={confirmReopenClosed}
       saving={saving}

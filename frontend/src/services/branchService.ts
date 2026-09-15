@@ -1,4 +1,5 @@
 import api from "./api";
+import { asList } from "../utils/asList";
 
 export interface Branch {
   id: string;
@@ -14,7 +15,7 @@ export interface Branch {
 export const branchService = {
   list: async (params?: { network_id?: string; name?: string }) => {
     const response = await api.get<Branch[]>("/branches", { params });
-    return response.data;
+    return asList<Branch>(response.data);
   },
   create: async (payload: Omit<Branch, "id" | "is_active" | "network_name">) => {
     const response = await api.post<{ branch: Branch; message: string }>("/branches", payload);

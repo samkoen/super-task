@@ -169,7 +169,7 @@ export function PhotoCaptureDialog({
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1, overflowY: "auto" }}>
         {hasPreview && previewBlob ? (
           annotate ? (
-            <PhotoAnnotationCanvas ref={annotationRef} imageBlob={previewBlob} />
+            <PhotoAnnotationCanvas ref={annotationRef} image={previewBlob} />
           ) : (
             <Box
               component="img"

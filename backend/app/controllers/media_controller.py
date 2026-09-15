@@ -27,7 +27,13 @@ def _require_stored_src(cleaned: str) -> None:
     raise HTTPException(status_code=400, detail="URL media invalide")
 
 
-def _serve_media(request: Request, media_url: str, db: Session) -> Response:
+def _serve_media(
+    request: Request,
+    media_url: str,
+    db: Session,
+    *,
+    stream: bool = False,
+) -> Response:
     actor = load_actor(request, UserRepository(db))
     cleaned = media_url.strip()
     _require_stored_src(cleaned)
@@ -36,6 +42,8 @@ def _serve_media(request: Request, media_url: str, db: Session) -> Response:
         raise HTTPException(status_code=403, detail="אין הרשאה למדיה זו")
     if cleaned.startswith("/uploads/"):
         return _serve_local(cleaned)
+    if stream:
+        return _stream_object(cleaned)
     return _redirect_object(cleaned)
 
 
@@ -57,6 +65,17 @@ def _redirect_object(cleaned: str) -> RedirectResponse:
     return RedirectResponse(
         url=signed,
         status_code=302,
+        headers={"Cache-Control": "private, max-age=60"},
+    )
+
+
+def _stream_object(cleaned: str) -> Response:
+    payload = blob_storage.fetch_media(cleaned)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Media introuvable")
+    return Response(
+        content=payload.content,
+        media_type=payload.content_type or "application/octet-stream",
         headers={"Cache-Control": "private, max-age=60"},
     )
 
@@ -91,15 +110,17 @@ def media_ready(
 def proxy_media(
     request: Request,
     src: str = Query(..., min_length=8, description="URL objet ou /uploads/..."),
+    stream: bool = Query(False),
     db: Session = Depends(get_db),
 ):
-    return _serve_media(request, src, db)
+    return _serve_media(request, src, db, stream=stream)
 
 
 @router.get("")
 def proxy_media_legacy(
     request: Request,
     url: str = Query(..., min_length=8),
+    stream: bool = Query(False),
     db: Session = Depends(get_db),
 ):
-    return _serve_media(request, url, db)
+    return _serve_media(request, url, db, stream=stream)
