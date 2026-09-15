@@ -25,6 +25,8 @@ export default function CompletionSlotGrid({
   language = "he",
   onCapture,
   onAnnotatingChange,
+  onMarkPhoto,
+  markedPhotoUrls,
 }: {
   requirements: CompletionRequirement[];
   fills: Array<SlotFill | null>;
@@ -33,6 +35,8 @@ export default function CompletionSlotGrid({
   language?: EmployeeLanguage;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
   onAnnotatingChange?: (busy: boolean) => void;
+  onMarkPhoto?: (url: string) => void;
+  markedPhotoUrls?: string[];
 }) {
   const [preview, setPreview] = useState<{ src: string; title: string; kind: "photo" | "video" } | null>(null);
   const hints = useSlotHintPlayback(language);
@@ -52,6 +56,8 @@ export default function CompletionSlotGrid({
           disabled={disabled}
           onCapture={onCapture}
           onAnnotatingChange={onAnnotatingChange}
+          onMarkPhoto={onMarkPhoto}
+          markedPhotoUrls={markedPhotoUrls}
           onEnlarge={(src, title, kind) => setPreview({ src, title, kind: kind ?? "photo" })}
           hints={hints}
         />
@@ -116,6 +122,8 @@ function VisualSlotList({
   onCapture,
   onAnnotatingChange,
   onEnlarge,
+  onMarkPhoto,
+  markedPhotoUrls,
   hints,
 }: {
   requirements: CompletionRequirement[];
@@ -125,6 +133,8 @@ function VisualSlotList({
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
   onAnnotatingChange?: (busy: boolean) => void;
   onEnlarge: (src: string, title: string, kind?: "photo" | "video") => void;
+  onMarkPhoto?: (url: string) => void;
+  markedPhotoUrls?: string[];
   hints: ReturnType<typeof useSlotHintPlayback>;
 }) {
   const visualCount = visualSlotCount(requirements);
@@ -148,6 +158,8 @@ function VisualSlotList({
             onCapture={onCapture ? (file, duration) => onCapture(index, file, duration) : undefined}
             onAnnotatingChange={onAnnotatingChange}
             onEnlarge={(src, kind) => onEnlarge(src, slotDisplayTitle(req, index), kind)}
+            onMarkPhoto={onMarkPhoto}
+            photoMarked={Boolean(fills[index]?.url && markedPhotoUrls?.includes(fills[index]?.url || ""))}
             hintControls={slotHintControls(req, index, hints)}
           />
         ),

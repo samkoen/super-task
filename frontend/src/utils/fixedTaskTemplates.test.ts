@@ -52,6 +52,22 @@ describe("fixedTaskTemplates", () => {
     expect(sorted.map((t) => t.id)).toEqual(["2", "3", "1"]);
   });
 
+  it("does not crash on a missing list or null title", () => {
+    expect(filterFixedTemplates(undefined, "all")).toEqual([]);
+    const sorted = sortFixedTemplates([
+      tpl({ id: "1", title: null as unknown as string, is_active: true }),
+    ]);
+    expect(sorted.map((t) => t.id)).toEqual(["1"]);
+  });
+
+  it("formats a daily schedule even if weekly_days is a list", () => {
+    const text = formatTemplateSchedule(
+      tpl({ id: "1", title: "x", weekly_days: ["0", "1"] as unknown as string }),
+    );
+    expect(text).toContain(he.recurrenceLabels.daily);
+    expect(text).toContain(he.weekdayMon);
+  });
+
   it("formats daily weekdays when not every day", () => {
     const text = formatTemplateSchedule(
       tpl({ id: "1", title: "x", recurrence: "daily", weekly_days: "0,1", due_time: "09:00" }),

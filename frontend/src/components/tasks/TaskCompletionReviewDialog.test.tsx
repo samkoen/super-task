@@ -10,6 +10,8 @@ vi.mock("../../services/taskService", () => ({
     reopen: vi.fn(),
     reopenClosed: vi.fn(),
     confirmMedia: vi.fn(),
+    postMessage: vi.fn(),
+    uploadPhoto: vi.fn(),
   },
 }));
 
@@ -36,7 +38,35 @@ vi.mock("./TaskReferenceMediaDisplay", () => ({
 }));
 
 vi.mock("./CompletionMediaPreview", () => ({
-  default: () => <div data-testid="completion-preview" />,
+  default: ({ onMarkPhoto }: { onMarkPhoto?: (url: string) => void }) => (
+    <div data-testid="completion-preview">
+      {onMarkPhoto ? (
+        <button type="button" onClick={() => onMarkPhoto("/p.jpg")}>
+          mark-photo
+        </button>
+      ) : null}
+    </div>
+  ),
+}));
+
+vi.mock("../chat/ChatPhotoAnnotateReplyDialog", () => ({
+  default: ({
+    photoUrl,
+    onSend,
+    submitLabel,
+  }: {
+    photoUrl: string | null;
+    onSend: (file: File) => void;
+    submitLabel?: string;
+  }) =>
+    photoUrl ? (
+      <button
+        type="button"
+        onClick={() => onSend(new File(["x"], "marked.jpg", { type: "image/jpeg" }))}
+      >
+        {submitLabel ?? "send-mark"}
+      </button>
+    ) : null,
 }));
 
 function reviewTask(over: Partial<TaskOccurrence> = {}): TaskOccurrence {
@@ -78,7 +108,11 @@ beforeEach(() => {
   vi.mocked(taskService.reopen).mockReset();
   vi.mocked(taskService.reopenClosed).mockReset();
   vi.mocked(taskService.confirmMedia).mockReset();
+  vi.mocked(taskService.postMessage).mockReset();
+  vi.mocked(taskService.uploadPhoto).mockReset();
   vi.mocked(taskService.confirmMedia).mockResolvedValue({ media_ready: false });
+  vi.mocked(taskService.uploadPhoto).mockResolvedValue({ url: "/chat.jpg", kind: "photo" });
+  vi.mocked(taskService.postMessage).mockResolvedValue({} as never);
 });
 
 describe("TaskCompletionReviewDialog", () => {
@@ -274,6 +308,36 @@ describe("TaskCompletionReviewDialog", () => {
       expect(onClose).toHaveBeenCalled();
     });
     expect(taskService.approve).not.toHaveBeenCalled();
-    expect(taskService.reopen).not.toHaveBeenCalled();
+  });
+
+  it("sends marked photos in chat when reopening, not on approve", async () => {
+    vi.mocked(taskService.reopen).mockResolvedValue({} as never);
+    vi.mocked(taskService.approve).mockResolvedValue({} as never);
+    const onDone = vi.fn();
+    const { rerender } = render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={onDone} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "mark-photo" }));
+    fireEvent.click(screen.getByText(he.reviewMarkPhotoSave));
+    fireEvent.click(screen.getByRole("button", { name: he.taskReopen }));
+    await waitFor(() => {
+      expect(taskService.postMessage).toHaveBeenCalledWith("occ-1", {
+        photo_url: "/chat.jpg",
+        body: he.taskReopenNoteFallback,
+      });
+      expect(taskService.reopen).not.toHaveBeenCalled();
+      expect(onDone).toHaveBeenCalledWith(he.taskReopenedSuccess);
+    });
+
+    rerender(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "mark-photo" }));
+    fireEvent.click(screen.getByText(he.reviewMarkPhotoSave));
+    fireEvent.click(screen.getByRole("button", { name: he.taskApproveClose }));
+    await waitFor(() => {
+      expect(taskService.approve).toHaveBeenCalled();
+    });
+    expect(taskService.postMessage).toHaveBeenCalledTimes(1);
   });
 });

@@ -16,12 +16,19 @@ import { taskService, type TaskOccurrence } from "../../services/taskService";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import TaskChatPanel from "./TaskChatPanel";
+import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
 import { he } from "../../i18n/he";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
 import { initialReviewMediaReady, reviewActionsBlocked } from "../../utils/reviewMediaGate";
+import {
+  markedPhotoUrls,
+  reopenReviewedTask,
+  upsertReviewPhotoMark,
+  type ReviewPhotoMark,
+} from "../../utils/reviewReopenPhotos";
 import ClosedTaskReopenConfirm from "./ClosedTaskReopenConfirm";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import QualityRatingStars from "./QualityRatingStars";
@@ -43,6 +50,8 @@ export default function TaskCompletionReviewDialog({
   const [rating, setRating] = useState<number | null>(DEFAULT_REVIEW_QUALITY_RATING);
   const [confirmReopenClosed, setConfirmReopenClosed] = useState(false);
   const [mediaReady, setMediaReady] = useState(true);
+  const [marks, setMarks] = useState<ReviewPhotoMark[]>([]);
+  const [annotateUrl, setAnnotateUrl] = useState<string | null>(null);
 
   const completion = task?.completion;
   const open = Boolean(task);
@@ -58,6 +67,8 @@ export default function TaskCompletionReviewDialog({
     setConfirmReopenClosed(false);
     setRating(DEFAULT_REVIEW_QUALITY_RATING);
     setMediaReady(initialReviewMediaReady(task?.completion?.media_ready));
+    setMarks([]);
+    setAnnotateUrl(null);
   }, [task?.id, task?.completion?.media_ready]);
 
   useEffect(() => {
@@ -117,8 +128,11 @@ export default function TaskCompletionReviewDialog({
 
   const handleReopen = () => {
     void runAction(async () => {
-      await taskService.reopen(task!.id, {
-        rejection_note: note.trim() || he.taskReopenNoteFallback,
+      await reopenReviewedTask({
+        occurrenceId: task!.id,
+        note,
+        fallbackNote: he.taskReopenNoteFallback,
+        marks,
       });
       return he.taskReopenedSuccess;
     });
@@ -201,7 +215,12 @@ export default function TaskCompletionReviewDialog({
             requirements={task.completion_requirements}
             audio_transcript={completion.audio_transcript}
             videosPending={isReview && !mediaReady}
+            onMarkPhoto={isReview ? setAnnotateUrl : undefined}
+            markedPhotoUrls={markedPhotoUrls(marks)}
           />
+        )}
+        {isReview && marks.length > 0 && (
+          <Alert severity="info">{he.reviewMarkedPhotoCount(marks.length)}</Alert>
         )}
         {actionsBlocked && (
           <Alert severity="info">{he.reviewVideosNotReady}</Alert>
@@ -273,6 +292,18 @@ export default function TaskCompletionReviewDialog({
         )}
       </DialogActions>
     </Dialog>
+    <ChatPhotoAnnotateReplyDialog
+      photoUrl={annotateUrl}
+      sending={saving}
+      hideCaption
+      submitLabel={he.reviewMarkPhotoSave}
+      onClose={() => setAnnotateUrl(null)}
+      onSend={(file) => {
+        if (!annotateUrl) return;
+        setMarks((prev) => upsertReviewPhotoMark(prev, { sourceUrl: annotateUrl, file }));
+        setAnnotateUrl(null);
+      }}
+    />
     <ClosedTaskReopenConfirm
       open={confirmReopenClosed}
       saving={saving}

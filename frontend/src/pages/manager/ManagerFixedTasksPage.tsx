@@ -12,6 +12,7 @@ import {
   IconButton,
   MenuItem,
   Paper,
+  Alert,
   Switch,
   Table,
   TableBody,
@@ -54,7 +55,9 @@ import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { datetimeLocalForNewTask, todayIso } from "../../utils/dateView";
+import { asList, asText } from "../../utils/asList";
 import {
+  asTaskTemplates,
   filterFixedTemplates,
   formatTemplateSchedule,
   opsCategoryLabel,
@@ -115,6 +118,7 @@ export default function ManagerFixedTasksPage() {
   const [deleting, setDeleting] = useState<TaskTemplate | null>(null);
   const [deleteAllBranches, setDeleteAllBranches] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const canPickBranch = user?.role === "network_manager" || user?.role === "admin";
   const isBranchManager = user?.role === "branch_manager";
@@ -128,11 +132,14 @@ export default function ManagerFixedTasksPage() {
         userService.listTeam("employee"),
         canPickBranch ? branchService.list() : Promise.resolve([] as Branch[]),
       ]);
-      setTemplates(tpl);
-      setEmployees(emps);
-      setBranches(branchList);
+      setTemplates(asTaskTemplates(tpl));
+      setEmployees(asList<User>(emps));
+      setBranches(asList<Branch>(branchList));
+      setLoadError("");
     } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      const msg = e instanceof ApiError ? e.message : he.errorGeneric;
+      setLoadError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
@@ -323,13 +330,10 @@ export default function ManagerFixedTasksPage() {
   };
 
   const editEmployees = useMemo(() => {
-    if (!editing) return employees;
-    return employees.filter((u) => userBelongsToBranch(u, editing.branch_id));
+    const staff = asList<User>(employees);
+    if (!editing) return staff;
+    return staff.filter((u) => userBelongsToBranch(u, editing.branch_id));
   }, [employees, editing]);
-
-  if (loading && templates.length === 0) {
-    return <ListSkeleton variant="table" />;
-  }
 
   return (
     <Box>
@@ -373,7 +377,11 @@ export default function ManagerFixedTasksPage() {
         </Box>
       </Paper>
 
-      {rows.length === 0 ? (
+      {loading && templates.length === 0 ? (
+        <ListSkeleton variant="table" />
+      ) : loadError ? (
+        <Alert severity="error">{loadError}</Alert>
+      ) : rows.length === 0 ? (
         <EmptyState
           title={he.managerFixedTasksEmpty}
           description={he.managerFixedTasksEmptyHint}
@@ -398,7 +406,7 @@ export default function ManagerFixedTasksPage() {
                 <TableRow key={tpl.id} hover>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                      <Typography fontWeight={700}>{tpl.title}</Typography>
+                      <Typography fontWeight={700}>{asText(tpl.title)}</Typography>
                       {isNetworkFixedTemplate(tpl, networkIds) && (
                         <Chip
                           size="small"
@@ -407,9 +415,9 @@ export default function ManagerFixedTasksPage() {
                         />
                       )}
                     </Box>
-                    {tpl.branch_name && (
+                    {asText(tpl.branch_name) && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {tpl.branch_name}
+                        {asText(tpl.branch_name)}
                       </Typography>
                     )}
                   </TableCell>
@@ -419,7 +427,7 @@ export default function ManagerFixedTasksPage() {
                       <Typography variant="body2">{formatTemplateSchedule(tpl)}</Typography>
                     </Box>
                   </TableCell>
-                  <TableCell>{tpl.assignee_name || "—"}</TableCell>
+                  <TableCell>{asText(tpl.assignee_name) || "—"}</TableCell>
                   <TableCell>{opsCategoryLabel(tpl.ops_category)}</TableCell>
                   <TableCell>
                     <Chip
@@ -440,11 +448,13 @@ export default function ManagerFixedTasksPage() {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title={he.managerFixedTasksToggleActive}>
-                      <Switch
-                        size="small"
-                        checked={tpl.is_active}
-                        onChange={() => void handleToggleActive(tpl)}
-                      />
+                      <span>
+                        <Switch
+                          size="small"
+                          checked={Boolean(tpl.is_active)}
+                          onChange={() => void handleToggleActive(tpl)}
+                        />
+                      </span>
                     </Tooltip>
                   </TableCell>
                 </TableRow>
@@ -454,20 +464,22 @@ export default function ManagerFixedTasksPage() {
         </TableContainer>
       )}
 
-      <NewTaskFormDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={handleCreate}
-        branches={branches}
-        employees={employees}
-        isBranchManager={isBranchManager}
-        canPickBranch={canPickBranch}
-        defaultBranchId={user?.branch_id ?? branches[0]?.id ?? ""}
-        defaultDueAt={datetimeLocalForNewTask(todayIso())}
-        forcedTaskKind="fixed"
-        saving={createSaving}
-        onError={showError}
-      />
+      {createOpen && (
+        <NewTaskFormDialog
+          open
+          onClose={() => setCreateOpen(false)}
+          onSubmit={handleCreate}
+          branches={branches}
+          employees={employees}
+          isBranchManager={isBranchManager}
+          canPickBranch={canPickBranch}
+          defaultBranchId={user?.branch_id ?? branches[0]?.id ?? ""}
+          defaultDueAt={datetimeLocalForNewTask(todayIso())}
+          forcedTaskKind="fixed"
+          saving={createSaving}
+          onError={showError}
+        />
+      )}
 
       <Dialog
         open={Boolean(editing && editForm)}

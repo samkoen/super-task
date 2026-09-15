@@ -23,11 +23,15 @@ export default function ChatPhotoAnnotateReplyDialog({
   sending,
   onClose,
   onSend,
+  submitLabel,
+  hideCaption = false,
 }: {
   photoUrl: string | null;
   sending: boolean;
   onClose: () => void;
   onSend: (file: File, caption?: string) => void | Promise<void>;
+  submitLabel?: string;
+  hideCaption?: boolean;
 }) {
   const image = useReplyImageBlob(photoUrl);
   const annotateRef = useRef<PhotoAnnotationCanvasHandle>(null);
@@ -46,7 +50,7 @@ export default function ChatPhotoAnnotateReplyDialog({
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1, overflowY: "auto" }}>
         <ReplyImageBody image={image} annotateRef={annotateRef} />
         <ReplyCaptionField
-          visible={Boolean(image.blob && !image.error)}
+          visible={!hideCaption && Boolean(image.blob && !image.error)}
           value={caption}
           disabled={busy}
           onChange={setCaption}
@@ -55,9 +59,10 @@ export default function ChatPhotoAnnotateReplyDialog({
       <ReplyActions
         busy={busy}
         canSend={Boolean(image.blob)}
+        submitLabel={submitLabel ?? he.taskChatSend}
         onClose={onClose}
         onSend={() => void confirmReply({
-          image, annotateRef, caption, sending, confirming, setConfirming, onSend,
+          image, annotateRef, caption: hideCaption ? "" : caption, sending, confirming, setConfirming, onSend,
         })}
       />
     </Dialog>
@@ -94,11 +99,13 @@ function ReplyCaptionField({
 function ReplyActions({
   busy,
   canSend,
+  submitLabel,
   onClose,
   onSend,
 }: {
   busy: boolean;
   canSend: boolean;
+  submitLabel: string;
   onClose: () => void;
   onSend: () => void;
 }) {
@@ -111,7 +118,7 @@ function ReplyActions({
         startIcon={busy ? <CircularProgress size={18} color="inherit" /> : undefined}
         onClick={onSend}
       >
-        {busy ? he.loading : he.taskChatSend}
+        {busy ? he.loading : submitLabel}
       </Button>
     </DialogActions>
   );

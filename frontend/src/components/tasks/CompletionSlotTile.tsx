@@ -4,6 +4,7 @@ import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import CompletionSlotHintButtons from "./CompletionSlotHintButtons";
+import MarkCompletionPhotoButton from "./MarkCompletionPhotoButton";
 import MediaCaptureActions from "../media/MediaCaptureActions";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { useVideoPoster } from "../../hooks/useVideoPoster";
@@ -33,6 +34,8 @@ export default function CompletionSlotTile({
   onCapture,
   onAnnotatingChange,
   onEnlarge,
+  onMarkPhoto,
+  photoMarked = false,
   hintControls,
 }: {
   req: CompletionRequirement;
@@ -43,6 +46,8 @@ export default function CompletionSlotTile({
   onCapture?: (file: File, durationSeconds?: number) => void;
   onAnnotatingChange?: (busy: boolean) => void;
   onEnlarge?: (src: string, kind?: "photo" | "video") => void;
+  onMarkPhoto?: (url: string) => void;
+  photoMarked?: boolean;
   hintControls?: HintControls;
 }) {
   const rawFill = fill?.previewUrl || fill?.url || null;
@@ -93,6 +98,34 @@ export default function CompletionSlotTile({
           onAnnotatingChange={onAnnotatingChange}
         />
       )}
+      <SlotMarkPhoto
+        kind={req.kind}
+        url={fill?.url || fill?.previewUrl || null}
+        marked={photoMarked}
+        disabled={disabled}
+        onMarkPhoto={onMarkPhoto}
+      />
+    </Box>
+  );
+}
+
+function SlotMarkPhoto({
+  kind,
+  url,
+  marked,
+  disabled,
+  onMarkPhoto,
+}: {
+  kind: CompletionRequirement["kind"];
+  url: string | null;
+  marked: boolean;
+  disabled?: boolean;
+  onMarkPhoto?: (url: string) => void;
+}) {
+  if (kind !== "photo" || !url || !onMarkPhoto) return null;
+  return (
+    <Box sx={{ position: "absolute", bottom: 8, left: 8, right: 8, zIndex: 3 }}>
+      <MarkCompletionPhotoButton marked={marked} disabled={disabled} onClick={() => onMarkPhoto(url)} />
     </Box>
   );
 }

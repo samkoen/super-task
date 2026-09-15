@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import { he } from "../../i18n/he";
 
@@ -42,5 +42,24 @@ describe("CompletionMediaPreview", () => {
     expect(screen.getByText(he.completionMediaFromEmployee)).toBeTruthy();
     expect(screen.getByText(he.completionSlotsProgress(2, 2))).toBeTruthy();
     expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
+  });
+
+  it("offers to mark a completion photo for reopen", () => {
+    const onMarkPhoto = vi.fn();
+    render(
+      <CompletionMediaPreview
+        photo_path="/p.jpg"
+        onMarkPhoto={onMarkPhoto}
+        markedPhotoUrls={["/p.jpg"]}
+        transcriptFallback={false}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.reviewPhotoMarked }));
+    expect(onMarkPhoto).toHaveBeenCalledWith("/p.jpg");
+  });
+
+  it("hides the mark action when the manager is not reviewing", () => {
+    render(<CompletionMediaPreview photo_path="/p.jpg" transcriptFallback={false} />);
+    expect(screen.queryByRole("button", { name: he.reviewMarkPhoto })).toBeNull();
   });
 });

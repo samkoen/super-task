@@ -1,14 +1,19 @@
 import type { OpsCategory, TaskRecurrence, TaskTemplate } from "../services/taskService";
 import { he } from "../i18n/he";
+import { asList } from "./asList";
 import { formatWeekdaysPart } from "./taskRecurrence";
 
 export type FixedTemplateFilter = "all" | "active" | "inactive";
 
+export function asTaskTemplates(value: unknown): TaskTemplate[] {
+  return asList<TaskTemplate>(value).filter((t) => t && typeof t === "object");
+}
+
 export function filterFixedTemplates(
-  templates: TaskTemplate[],
+  templates: TaskTemplate[] | unknown,
   filter: FixedTemplateFilter,
 ): TaskTemplate[] {
-  const fixed = templates.filter((t) => t.task_kind === "fixed");
+  const fixed = asTaskTemplates(templates).filter((t) => t.task_kind === "fixed");
   if (filter === "active") return fixed.filter((t) => t.is_active);
   if (filter === "inactive") return fixed.filter((t) => !t.is_active);
   return fixed;
@@ -16,22 +21,28 @@ export function filterFixedTemplates(
 
 export function sortFixedTemplates(templates: TaskTemplate[]): TaskTemplate[] {
   return [...templates].sort((a, b) => {
-    if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
-    return a.title.localeCompare(b.title, "he");
+    if (Boolean(a.is_active) !== Boolean(b.is_active)) return a.is_active ? -1 : 1;
+    return String(a.title ?? "").localeCompare(String(b.title ?? ""), "he");
   });
 }
 
 export function formatTemplateSchedule(template: TaskTemplate): string {
-  const recurrence = he.recurrenceLabels[template.recurrence as TaskRecurrence] ?? template.recurrence;
-  const time = template.due_time || "—";
-  const days = formatWeekdaysPart(template.weekly_days);
-  if (template.recurrence === "weekly" || template.recurrence === "daily") {
-    return days ? `${recurrence} · ${days} · ${time}` : `${recurrence} · ${time}`;
+  try {
+    const recurrence =
+      he.recurrenceLabels[template.recurrence as TaskRecurrence] ??
+      String(template.recurrence ?? "");
+    const time = template.due_time || "—";
+    const days = formatWeekdaysPart(template.weekly_days);
+    if (template.recurrence === "weekly" || template.recurrence === "daily") {
+      return days ? `${recurrence} · ${days} · ${time}` : `${recurrence} · ${time}`;
+    }
+    if (template.recurrence === "monthly" && template.monthly_day) {
+      return `${recurrence} · ${he.monthlyDay} ${template.monthly_day} · ${time}`;
+    }
+    return `${recurrence} · ${time}`;
+  } catch {
+    return String(template.due_time || "—");
   }
-  if (template.recurrence === "monthly" && template.monthly_day) {
-    return `${recurrence} · ${he.monthlyDay} ${template.monthly_day} · ${time}`;
-  }
-  return `${recurrence} · ${time}`;
 }
 
 export function opsCategoryLabel(category: OpsCategory | null | undefined): string {
@@ -55,10 +66,10 @@ export function isNetworkFixedTemplate(
   return Boolean(template.id && networkIds?.has(template.id));
 }
 
-export function networkFixedTemplateIds(templates: TaskTemplate[]): Set<string> {
+export function networkFixedTemplateIds(templates: TaskTemplate[] | unknown): Set<string> {
   const ids = new Set<string>();
   const byKey = new Map<string, TaskTemplate[]>();
-  for (const t of templates) {
+  for (const t of asTaskTemplates(templates)) {
     if (t.network_group_id || t.is_network_task) ids.add(t.id);
     const key = templateContentKey(t);
     const list = byKey.get(key) ?? [];

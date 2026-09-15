@@ -27,9 +27,10 @@ const LABELS: Record<string, string> = Object.fromEntries(
 
 const WEEKDAY_ORDER: string[] = WEEKDAY_OPTIONS.map((d) => d.value);
 
-export function parseWeeklyDays(value: string | null | undefined): string[] {
-  if (!value) return [];
-  return value
+export function parseWeeklyDays(value: unknown): string[] {
+  const raw = Array.isArray(value) ? value.join(",") : value;
+  if (raw == null || raw === "") return [];
+  return String(raw)
     .split(",")
     .map((part) => part.trim())
     .filter((part) => LABELS[part]);
@@ -86,7 +87,7 @@ export function weeklyDaysPayload(
   return weeklyDays.trim() || undefined;
 }
 
-export function formatWeekdaysPart(weeklyDays: string | null | undefined): string {
+export function formatWeekdaysPart(weeklyDays: unknown): string {
   const days = parseWeeklyDays(weeklyDays);
   if (!days.length || days.length === WEEKDAY_OPTIONS.length) return "";
   return joinWeeklyDays(days)

@@ -57,6 +57,14 @@ const sseProxy = {
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: [
+      "@mui/icons-material/EditOutlined",
+      "@mui/icons-material/DeleteOutline",
+      "@mui/icons-material/Add",
+      "@mui/icons-material/Repeat",
+    ],
+  },
   test: {
     environment: "jsdom",
     globals: true,
@@ -64,6 +72,9 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    warmup: {
+      clientFiles: ["./src/pages/manager/ManagerFixedTasksPage.tsx"],
+    },
     proxy: {
       "/api/events/stream": sseProxy,
       "/api": {

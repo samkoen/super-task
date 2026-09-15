@@ -13,6 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import ListSkeleton from "../ui/ListSkeleton";
+import { LivePullToRefresh } from "../ui/PullToRefresh";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
@@ -339,6 +340,7 @@ function Layout() {
 
   if (isEmployee) {
     return (
+      <LivePullToRefresh>
       <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
         <Box
           sx={{
@@ -396,6 +398,7 @@ function Layout() {
         />
         <SystemBugLauncher />
       </Box>
+      </LivePullToRefresh>
     );
   }
 
@@ -459,6 +462,7 @@ function Layout() {
           pb: showManagerChrome ? { xs: 0, sm: overlayNav ? 0 : 3.5 } : { xs: 10, sm: 3.5 },
         }}
       >
+        <LivePullToRefresh>
         <Box sx={{ maxWidth: 1280, mx: "auto", width: "100%" }}>
           <MobileMenuTopBar
             showBack={showBack}
@@ -483,6 +487,7 @@ function Layout() {
             />
           )}
         </Box>
+        </LivePullToRefresh>
       </Box>
 
       {showManagerChrome && (

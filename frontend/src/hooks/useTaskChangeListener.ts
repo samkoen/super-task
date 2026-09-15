@@ -1,15 +1,13 @@
 import { useEffect, useRef } from "react";
 import { TASK_CHANGE_EVENT, type TaskChangeDetail } from "../constants/events";
-import { isNativeApp } from "../utils/isNativeApp";
 
 const REFETCH_DEBOUNCE_MS = 300;
-const POLL_MS = 25_000;
+export const TASK_LIVE_POLL_MS = 25_000;
 
 /**
- * Refetch handler for pages that display tasks (debounced SSE + focus + poll).
- * Ignore `sse_connected` — on Vercel/WebView the stream reconnects often and
- * a full list reload each time freezes the UI.
- * Sur l’APK : pas de poll ni visibility refetch (évite freeze WebView).
+ * Refetch handler for pages that display tasks (debounced SSE + resume + poll).
+ * Ignore `sse_connected` — reconnect storms must not freeze the list.
+ * Poll + visibility also run on the APK (SSE stays off in the WebView).
  */
 export function useTaskChangeListener(
   onChange: () => void,
@@ -17,46 +15,52 @@ export function useTaskChangeListener(
 ) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
-  const nativeDefault = isNativeApp() ? false : POLL_MS;
-  const pollMs = options?.pollMs === false ? 0 : (options?.pollMs ?? nativeDefault);
+  const pollMs = resolveTaskLivePollMs(options?.pollMs);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const native = isNativeApp();
-
-    const schedule = (ev?: Event) => {
-      const detail = (ev as CustomEvent<TaskChangeDetail> | undefined)?.detail;
-      if (detail?.type === "sse_connected") return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => onChangeRef.current(), REFETCH_DEBOUNCE_MS);
-    };
-
-    const onVisible = () => {
-      if (native) return;
-      if (document.visibilityState === "visible") {
-        schedule();
-      }
-    };
-
-    window.addEventListener(TASK_CHANGE_EVENT, schedule);
-    document.addEventListener("visibilitychange", onVisible);
-
-    let pollTimer: ReturnType<typeof setInterval> | undefined;
-    if (typeof pollMs === "number" && pollMs > 0) {
-      pollTimer = setInterval(() => {
-        if (document.visibilityState === "visible") {
-          onChangeRef.current();
-        }
-      }, pollMs);
-    }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      if (pollTimer) clearInterval(pollTimer);
-      window.removeEventListener(TASK_CHANGE_EVENT, schedule);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+    return subscribeTaskLiveRefresh(() => onChangeRef.current(), pollMs);
   }, [pollMs]);
+}
+
+export function resolveTaskLivePollMs(override?: number | false): number {
+  if (override === false) return 0;
+  if (typeof override === "number" && Number.isFinite(override) && override >= 0) {
+    return override;
+  }
+  return TASK_LIVE_POLL_MS;
+}
+
+export function shouldIgnoreTaskLiveEvent(detail?: TaskChangeDetail): boolean {
+  return detail?.type === "sse_connected";
+}
+
+export function subscribeTaskLiveRefresh(onChange: () => void, pollMs: number): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const schedule = (ev?: Event) => {
+    const detail = (ev as CustomEvent<TaskChangeDetail> | undefined)?.detail;
+    if (shouldIgnoreTaskLiveEvent(detail)) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(onChange, REFETCH_DEBOUNCE_MS);
+  };
+  const onVisible = () => {
+    if (document.visibilityState === "visible") schedule();
+  };
+
+  window.addEventListener(TASK_CHANGE_EVENT, schedule);
+  document.addEventListener("visibilitychange", onVisible);
+  const pollTimer =
+    pollMs > 0
+      ? setInterval(() => {
+          if (document.visibilityState === "visible") onChange();
+        }, pollMs)
+      : undefined;
+
+  return () => {
+    if (timer) clearTimeout(timer);
+    if (pollTimer) clearInterval(pollTimer);
+    window.removeEventListener(TASK_CHANGE_EVENT, schedule);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
 }
 
 export type { TaskChangeDetail };

@@ -5,7 +5,7 @@ import {
   type TaskChangeDetail,
 } from "../constants/events";
 
-/** Poll de secours chat (APK sans SSE / Vercel multi-instance). */
+/** Poll de secours chat (APK sans SSE / Render SSE hors WebView). */
 export const DEFAULT_TASK_CHAT_POLL_MS = 10_000;
 
 const REFETCH_DEBOUNCE_MS = 250;

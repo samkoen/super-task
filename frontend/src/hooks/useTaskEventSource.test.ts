@@ -2,7 +2,9 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { TASK_CHANGE_EVENT, NOTIFICATION_EVENT } from "../constants/events";
 import {
   dispatchTaskEventFromPayload,
+  eventsStreamUrl,
   hasActiveSession,
+  sessionMeUrl,
   shouldOpenTaskEventSource,
 } from "./useTaskEventSource";
 
@@ -31,16 +33,25 @@ describe("dispatchTaskEventFromPayload", () => {
 });
 
 describe("shouldOpenTaskEventSource", () => {
-  it("opens SSE only in local non-native browsers", () => {
-    expect(shouldOpenTaskEventSource(false, false)).toBe(true);
+  it("opens SSE in the browser, including production Render", () => {
+    expect(shouldOpenTaskEventSource(false)).toBe(true);
   });
 
   it("skips SSE on native even in local Vite", () => {
-    expect(shouldOpenTaskEventSource(true, false)).toBe(false);
+    expect(shouldOpenTaskEventSource(true)).toBe(false);
+  });
+});
+
+describe("SSE URLs", () => {
+  it("keeps a same-origin stream on Vite", () => {
+    expect(eventsStreamUrl("/api")).toBe("/api/events/stream");
+    expect(sessionMeUrl("/api")).toBe("/api/auth/me");
   });
 
-  it("skips SSE on production web so Vercel does not hold a 120s stream", () => {
-    expect(shouldOpenTaskEventSource(false, true)).toBe(false);
+  it("points EventSource at the Render API when VITE_API_URL is set", () => {
+    expect(eventsStreamUrl("https://super-api-eh64.onrender.com/api")).toBe(
+      "https://super-api-eh64.onrender.com/api/events/stream",
+    );
   });
 });
 

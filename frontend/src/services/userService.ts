@@ -1,5 +1,6 @@
 import api, { type EmployeeLanguage, type User, type UserRole } from "./api";
 import { compressPhotoForUpload } from "../utils/mediaCapture";
+import { asList } from "../utils/asList";
 
 export interface CreateUserPayload {
   email: string;
@@ -33,7 +34,7 @@ export const userService = {
   listTeam: async (role?: UserRole) => {
     const params = role ? { role } : undefined;
     const response = await api.get<User[]>("/users/team", { params });
-    return response.data;
+    return asList<User>(response.data);
   },
 
   create: async (payload: CreateUserPayload) => {

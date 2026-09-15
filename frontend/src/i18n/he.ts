@@ -16,7 +16,12 @@ export const he = {
   submit: "שליחה",
   confirm: "אישור",
   loading: "טוען…",
+  pullToRefreshHint: "משוך לרענון",
+  pullToRefreshRelease: "שחרר לרענון",
   errorGeneric: "אירעה שגיאה",
+  pageCrashTitle: "לא ניתן להציג את העמוד",
+  pageCrashStaleChunk: "העמוד לא נטען אחרי עדכון. לחצו על טעינה מחדש.",
+  pageCrashRetry: "טעינה מחדש",
   errorServerUnreachable: "לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.",
   errorRequestTooLarge: "הקובץ גדול מדי לשליחה. הקליטו סרטון קצר יותר ונסו שוב.",
   errorFetchInterrupted: "השליחה נקטעה. נסו שוב.",
@@ -609,6 +614,13 @@ export const he = {
   taskReopenNoteHint: "מה צריך לתקן — אם ריק, נשלח נוסח ברירת מחדל",
   taskReopenNoteRequired: "נא לכתוב מה צריך לתקן",
   taskReopenNoteFallback: "נא לתקן לפי ההודעה",
+  reviewMarkPhoto: "סמן מה לתקן",
+  reviewPhotoMarked: "סומן לתיקון",
+  reviewMarkPhotoSave: "שמירה לתיקון",
+  reviewMarkedPhotoCount: (n: number) =>
+    n === 1
+      ? "תמונה אחת תישלח בצ׳אט בלחיצה על פתיחה מחדש"
+      : `${n} תמונות יישלחו בצ׳אט בלחיצה על פתיחה מחדש`,
   completionAudioTranscript: "תמלול ההודעה הקולית",
   audioTranscriptionFailed: "לא ניתן היה לתמלל את ההקלטה. אפשר להאזין להודעה המוקלטת.",
   taskSubmitSuccess: "המשימה נשלחה לאישור המנהל",

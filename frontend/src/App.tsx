@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ListSkeleton from "./components/ui/ListSkeleton";
+import PageErrorBoundary from "./components/ui/PageErrorBoundary";
 import { getHomePath } from "./config/routes";
 import { useAuth } from "./context/AuthContext";
 
@@ -40,7 +41,11 @@ function PageLoader() {
 }
 
 function LazyPage({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+  return (
+    <PageErrorBoundary>
+      <Suspense fallback={<PageLoader />}>{children}</Suspense>
+    </PageErrorBoundary>
+  );
 }
 
 function HomeRedirect() {

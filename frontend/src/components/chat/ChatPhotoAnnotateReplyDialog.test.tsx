@@ -84,4 +84,26 @@ describe("ChatPhotoAnnotateReplyDialog", () => {
       expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }), "זה המדף");
     });
   });
+
+  it("saves without caption when used from review", async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ChatPhotoAnnotateReplyDialog
+        photoUrl="/uploads/p.jpg"
+        sending={false}
+        hideCaption
+        submitLabel={he.reviewMarkPhotoSave}
+        onClose={vi.fn()}
+        onSend={onSend}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(he.photoAnnotateEllipse)).toBeTruthy();
+    });
+    expect(screen.queryByLabelText(he.chatAnnotateReplyCaption)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: he.reviewMarkPhotoSave }));
+    await waitFor(() => {
+      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "reply.jpg" }), undefined);
+    });
+  });
 });
