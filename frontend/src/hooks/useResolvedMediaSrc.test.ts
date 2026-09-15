@@ -91,4 +91,20 @@ describe("useResolvedMediaSrc", () => {
     await waitFor(() => expect(result.current.failed).toBe(true));
     expect(result.current.src).toBe("/proxy?src=/uploads/v2.mp4");
   });
+
+  it("ignores late fetch results after unmount", async () => {
+    let resolveFetch: ((blob: Blob) => void) | undefined;
+    vi.mocked(fetchMediaBlobWithRetry).mockImplementation(
+      () => new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    stubObjectUrl("blob:late");
+    const { unmount } = renderHook(() => useResolvedMediaSrc("/uploads/v2.mp4", true));
+    unmount();
+    await act(async () => {
+      resolveFetch?.(new Blob(["vid"], { type: "video/mp4" }));
+      await Promise.resolve();
+    });
+  });
 });

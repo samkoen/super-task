@@ -1,13 +1,31 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { peekChatMediaPreview } from "../utils/chatMediaPreview";
 import { fetchMediaBlobWithRetry } from "../utils/fetchMediaBlob";
 import { mediaUrl } from "../utils/mediaUrl";
+
+type MediaSetter<T> = (value: T) => void;
 
 export function useResolvedMediaSrc(path: string | null | undefined, eager = false) {
   const preview = peekChatMediaPreview(path);
   const [retrySrc, setRetrySrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const retryRef = useRef({ src: null as string | null, busy: false });
+  const aliveRef = useRef(true);
+
+  const setRetrySrcSafe = useCallback<MediaSetter<string | null>>((value) => {
+    if (aliveRef.current) setRetrySrc(value);
+  }, []);
+
+  const setFailedSafe = useCallback<MediaSetter<boolean>>((value) => {
+    if (aliveRef.current) setFailed(value);
+  }, []);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     retryRef.current = { src: null, busy: false };
@@ -19,14 +37,18 @@ export function useResolvedMediaSrc(path: string | null | undefined, eager = fal
 
   useEffect(() => {
     if (!eager || !path || preview || path.startsWith("blob:")) return;
-    startProxyRetry(path, preview, retryRef, setRetrySrc, setFailed);
-  }, [path, eager, preview]);
+    startProxyRetry(path, preview, retryRef, setRetrySrcSafe, setFailedSafe);
+  }, [path, eager, preview, setRetrySrcSafe, setFailedSafe]);
+
+  const onError = useCallback(() => {
+    startProxyRetry(path, preview, retryRef, setRetrySrcSafe, setFailedSafe);
+  }, [path, preview, setRetrySrcSafe, setFailedSafe]);
 
   return {
     src: resolvedMediaSrc(path, preview, retrySrc, eager, failed),
     loading: isEagerLoading(path, preview, retrySrc, eager, failed),
     failed,
-    onError: () => startProxyRetry(path, preview, retryRef, setRetrySrc, setFailed),
+    onError,
   };
 }
 
@@ -68,8 +90,8 @@ function startProxyRetry(
   path: string | null | undefined,
   preview: string | null,
   retryRef: { current: { src: string | null; busy: boolean } },
-  setRetrySrc: (src: string | null) => void,
-  setFailed: (value: boolean) => void,
+  setRetrySrc: MediaSetter<string | null>,
+  setFailed: MediaSetter<boolean>,
 ) {
   if (retryRef.current.busy) return;
   if (!path || preview || retryRef.current.src || path.startsWith("blob:")) {

@@ -13,6 +13,15 @@ vi.mock("../../utils/mediaUrl", () => ({
   mediaUrl: (path: string | null) => path,
 }));
 
+vi.mock("../../hooks/useResolvedMediaSrc", () => ({
+  useResolvedMediaSrc: (path: string | null) => ({
+    src: path,
+    loading: false,
+    failed: false,
+    onError: () => {},
+  }),
+}));
+
 vi.mock("../../services/aiService", () => ({
   aiService: {
     getStatus: vi.fn(async () => ({ tts_available: false })),
