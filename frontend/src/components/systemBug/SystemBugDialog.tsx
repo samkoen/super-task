@@ -172,7 +172,7 @@ function SystemBugScreenshot({
     <Box mb={1.5}>
       <PhotoAnnotationCanvas
         ref={annotateRef}
-        imageBlob={screenshot}
+        image={screenshot}
         hint={he.systemBugAnnotateHint}
       />
     </Box>

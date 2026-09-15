@@ -5,16 +5,20 @@ import { he } from "../../i18n/he";
 
 vi.mock("../../utils/fetchMediaBlob", () => ({
   fetchMediaBlob: vi.fn().mockResolvedValue(new Blob(["img"], { type: "image/jpeg" })),
+  fetchMediaBlobWithRetry: vi.fn().mockResolvedValue(new Blob(["img"], { type: "image/jpeg" })),
 }));
 
 vi.mock("../media/PhotoAnnotationCanvas", async () => {
-  const { forwardRef, useImperativeHandle } = await import("react");
+  const { forwardRef, useEffect, useImperativeHandle } = await import("react");
   const { he: labels } = await import("../../i18n/he");
   return {
     default: forwardRef(function MockPhotoAnnotationCanvas(
-      _props: unknown,
+      props: { onReady?: () => void },
       ref: React.ForwardedRef<{ exportFile: () => Promise<File> }>,
     ) {
+      useEffect(() => {
+        props.onReady?.();
+      }, [props]);
       useImperativeHandle(ref, () => ({
         exportFile: async () => new File(["marked"], "reply.jpg", { type: "image/jpeg" }),
       }));

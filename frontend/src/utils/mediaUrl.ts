@@ -45,5 +45,18 @@ export function isPrivateObjectMediaUrl(url: string): boolean {
   return isRemoteObjectMediaUrl(url);
 }
 
+export function withStreamQuery(url: string): string {
+  if (url.startsWith("blob:") || /(?:^|[?&])stream=/.test(url)) return url;
+  if (!url.includes("proxy?")) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}stream=1`;
+}
+
+/** Same-origin bytes for canvas annotation — avoids a CORS 302 to R2. */
+export function mediaStreamUrl(path: string | null | undefined): string | null {
+  const url = mediaUrl(path);
+  if (!url) return null;
+  return withStreamQuery(url);
+}
+
 /** @deprecated alias — R2 only */
 export const isPrivateVercelBlobUrl = isPrivateObjectMediaUrl;

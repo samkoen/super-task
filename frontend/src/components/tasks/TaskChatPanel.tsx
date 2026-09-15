@@ -6,12 +6,10 @@ import { he } from "../../i18n/he";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
 import { useChatThread } from "../../hooks/useChatThread";
 import { createTaskChatTransport } from "../../utils/taskChatTransport";
-import { lastEmployeeChatMessage, type ChatMessageView } from "../../utils/chatMessageView";
 import { isOpenChatTask } from "../../utils/chatTaskFollowUp";
 import ChatFollowUpDialog from "../chat/ChatFollowUpDialog";
 import ChatTaskActions from "../chat/ChatTaskActions";
 import ChatThread from "../chat/ChatThread";
-import TaskChatQuestionBanner from "../chat/TaskChatQuestionBanner";
 
 interface TaskChatPanelProps {
   occurrenceId: string;
@@ -60,10 +58,6 @@ export default function TaskChatPanel({
     onOccurrenceUpdated,
     runBusy: thread.runBusy,
   });
-  const lastQuestion = user?.role === "employee"
-    ? undefined
-    : lastEmployeeChatMessage(thread.messages);
-
   return (
     <Box display="flex" flexDirection="column" gap={1.5}>
       <ChatThread
@@ -79,11 +73,8 @@ export default function TaskChatPanel({
           <TaskChatHeader
             showActions={manager.showActions}
             sending={thread.sending}
-            lastQuestion={lastQuestion}
-            composeEnabled={composeEnabled}
             onComplete={manager.complete}
             onRemind={() => manager.setRemindOpen(true)}
-            onAnnotateReply={thread.annotateReply.start}
           />
         )}
       />
@@ -101,32 +92,19 @@ export default function TaskChatPanel({
 function TaskChatHeader({
   showActions,
   sending,
-  lastQuestion,
-  composeEnabled,
   onComplete,
   onRemind,
-  onAnnotateReply,
 }: {
   showActions: boolean;
   sending: boolean;
-  lastQuestion?: ChatMessageView;
-  composeEnabled: boolean;
   onComplete: () => void;
   onRemind: () => void;
-  onAnnotateReply: (photoUrl: string) => void;
 }) {
   return (
     <>
       <Typography variant="subtitle2" fontWeight={700}>{he.taskChatTitle}</Typography>
       {showActions && (
         <ChatTaskActions disabled={sending} onComplete={onComplete} onRemind={onRemind} />
-      )}
-      {lastQuestion && (
-        <TaskChatQuestionBanner
-          message={lastQuestion}
-          composeEnabled={composeEnabled}
-          onAnnotateReply={onAnnotateReply}
-        />
       )}
     </>
   );

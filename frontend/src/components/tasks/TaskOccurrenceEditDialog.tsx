@@ -167,6 +167,7 @@ export default function TaskOccurrenceEditDialog({
               isBranchManager={isBranchManager}
             />
             <CompletionRequirementsEditor
+              expandSlots={false}
               value={form.completion_requirements}
               onChange={(completion_requirements) =>
                 setForm({ ...form, completion_requirements })

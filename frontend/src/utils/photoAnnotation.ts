@@ -1,4 +1,5 @@
 import { PHOTO_JPEG_QUALITY, photoPreviewSize } from "./mediaCapture";
+import { mediaStreamUrl, mediaUrl } from "./mediaUrl";
 
 export type AnnotationTool = "ellipse" | "arrow" | "select";
 
@@ -207,13 +208,60 @@ export function renderAnnotatedImage(
 export function loadImageElement(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    if (src.startsWith("http://") || src.startsWith("https://")) {
+    if (needsAnonymousCors(src)) {
       img.crossOrigin = "anonymous";
     }
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("image load failed"));
     img.src = src;
   });
+}
+
+function needsAnonymousCors(src: string): boolean {
+  if (!src.startsWith("http://") && !src.startsWith("https://")) return false;
+  try {
+    return new URL(src).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveAnnotationImageSrc(image: Blob | string): {
+  src: string;
+  revoke: () => void;
+} {
+  if (typeof image !== "string") {
+    const src = URL.createObjectURL(image);
+    return { src, revoke: () => URL.revokeObjectURL(src) };
+  }
+  if (image.startsWith("blob:")) {
+    return { src: image, revoke: () => undefined };
+  }
+  const src = mediaStreamUrl(image) || mediaUrl(image) || image;
+  return { src, revoke: () => undefined };
+}
+
+export async function loadAnnotationImage(image: Blob | string): Promise<{
+  image: HTMLImageElement;
+  revoke: () => void;
+}> {
+  const resolved = resolveAnnotationImageSrc(image);
+  try {
+    return { image: await loadImageElement(resolved.src), revoke: resolved.revoke };
+  } catch (error) {
+    resolved.revoke();
+    if (typeof image === "string") return loadAnnotationImageFallback(image);
+    throw error;
+  }
+}
+
+async function loadAnnotationImageFallback(path: string): Promise<{
+  image: HTMLImageElement;
+  revoke: () => void;
+}> {
+  const fallback = mediaUrl(path);
+  if (!fallback) throw new Error("image load failed");
+  return { image: await loadImageElement(fallback), revoke: () => undefined };
 }
 
 export function computePhotoDisplaySize(

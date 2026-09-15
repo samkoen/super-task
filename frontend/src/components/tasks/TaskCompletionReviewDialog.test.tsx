@@ -17,11 +17,13 @@ vi.mock("../../services/taskService", () => ({
 
 vi.mock("./TaskChatPanel", () => ({
   default: ({
+    composeEnabled,
     onOccurrenceUpdated,
   }: {
+    composeEnabled?: boolean;
     onOccurrenceUpdated?: (status: string, notice?: string) => void;
   }) => (
-    <div data-testid="task-chat-panel">
+    <div data-testid="task-chat-panel" data-compose={String(composeEnabled)}>
       {he.taskChatTitle}
       <button
         type="button"
@@ -139,6 +141,25 @@ describe("TaskCompletionReviewDialog", () => {
     const chat = screen.getByTestId("task-chat-panel");
     const preview = screen.getByTestId("completion-preview");
     expect(chat.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("lets the menahel write in the task chat during review", () => {
+    render(
+      <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
+    );
+    expect(screen.getByTestId("task-chat-panel").getAttribute("data-compose")).toBe("true");
+  });
+
+  it("keeps the task chat read-only after the task is closed", () => {
+    render(
+      <TaskCompletionReviewDialog
+        task={reviewTask({ status: "completed" })}
+        onClose={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
+    expect(screen.getByTestId("task-chat-panel").getAttribute("data-compose")).toBe("false");
   });
 
   it("approves with the default four-star rating", async () => {

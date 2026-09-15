@@ -209,6 +209,11 @@ def test_normalize_keeps_visual_slot_title_and_example():
     assert reqs[2] == {"kind": "audio"}
 
 
+def test_normalize_keeps_plus_photo_slot_flag():
+    reqs = normalize_requirements([{"kind": "photo", "title": "מדף", "slot": True}])
+    assert reqs[0] == {"kind": "photo", "title": "מדף", "slot": True}
+
+
 def test_requirement_example_urls_skips_audio_and_empty():
     assert requirement_example_urls(None) == []
     assert requirement_example_urls(

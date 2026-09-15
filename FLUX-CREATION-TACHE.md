@@ -94,9 +94,10 @@ Fichiers : `ManagerTasksPage.tsx`, `TaskCreationModeDialog.tsx`, `TaskVoiceCreat
 - UI : `TaskReferenceMediaEditor` + `MediaCaptureActions`
 - Photo / vidéo : fichiers locaux (`pending_*`) → upload à la **שליחה**
 - Audio : upload dès capture + transcription → description
-- Upload : `POST /api/tasks/upload-photo|video|audio`
+- Upload photo / audio : `POST /api/tasks/upload-photo|audio` → R2 (ou `/uploads` en local)
+- Upload vidéo (prod) : `POST /api/media/video-intent` puis **PUT présigné** directement sur R2
 - Champs : `reference_photo_url`, `reference_video_url`, `reference_audio_url` (template + occurrence)
-- Template → occurrence : **copie** via `blob_storage.copy_media_url` (médias isolés)
+- Template → occurrence : **copie** via `blob_storage.copy_media_url` (objets R2 isolés)
 
 ### 4.4 Annotation photo
 
@@ -127,7 +128,7 @@ Fichiers : `ManagerTasksPage.tsx`, `TaskCreationModeDialog.tsx`, `TaskVoiceCreat
 4. `POST .../complete` → pour un employé réussi : statut **`pending_review`**
 5. Manager : `approve` → `completed` ; `reopen` → `in_progress` + `rejection_note`
 
-Upload completion : mêmes `/api/tasks/upload-*`.  
+Upload completion : photo/audio via `/api/tasks/upload-*` ; vidéo via intent + PUT R2.  
 Revue : `TaskCompletionReviewDialog` · file dashboard « ממתין לאישור ».
 
 ### 4.8 Audio clôture bilingue
@@ -148,7 +149,8 @@ Préfixe : `/api/tasks`
 | Liste templates | `GET /templates` | filtre `branch_id` optionnel |
 | Créer fixe | `POST /templates` | `assignee_user_id` obligatoire ; récurrence `daily` / `weekly` / `biweekly` / `monthly` ; génère l’occurrence du jour si applicable |
 | Créer ad hoc | `POST /ad-hoc` | `assignee_user_id` + `due_at` obligatoires ; `photo_required` défaut `true` |
-| Upload média | `POST /upload-photo\|video\|audio` | dossiers `task_photos` / `task_videos` / `task_audio` |
+| Upload photo / audio | `POST /upload-photo\|audio` | dossiers `task_photos` / `task_audio` → R2 |
+| Intent vidéo | `POST /api/media/video-intent` | PUT présigné R2 (prod) ; proxy API en local |
 | Occurrences manager | `GET /occurrences` | + rollover ouvertures du jour |
 | Mes tâches | `GET /mine` | traduction auto ; `due_on` défaut = aujourd’hui |
 | Start / complete | `POST /occurrences/{id}/start\|complete` | |
@@ -161,15 +163,18 @@ Issues : `POST /api/issue-reports`, uploads `issue_photos|videos|audio`.
 
 ## 6. Stockage médias
 
+**Vercel Blob n’est plus utilisé.** Anciennes URLs `*.blob.vercel-storage.com` : ignorées (pas de proxy, pas d’avatar).
+
 | Environnement | Comportement |
 |---------------|--------------|
-| `BLOB_READ_WRITE_TOKEN` défini | **Vercel Blob** (`blob_storage.put_bytes`) |
-| Local sans token | Disque `/uploads/{folder}/{uuid}{ext}` |
-| Prod sans token | Upload refusé |
+| Clés `R2_*` définies | **Cloudflare R2** (`object_store` + `blob_storage.put_bytes`) |
+| Local sans R2 | Disque `/uploads/{folder}/{uuid}{ext}` |
+| Prod sans R2 | Upload refusé (démarrage refusé) |
 
 - Photo : compression avant upload (`media_compression.py`)
 - Limites : photo 10 Mo · vidéo 50 Mo · audio 20 Mo
-- Lecture prod : proxy auth `GET /api/media/proxy?src=...` (pas de static public)
+- Lecture : proxy auth `GET /api/media/proxy?src=...` → fichier local ou **redirect GET présigné R2**
+- Vidéo prod : le navigateur / Android envoie le fichier en PUT sur l’URL présignée (pas via l’API)
 - Rétention : `MediaRetentionService` + cron `GET/POST /api/cron/purge-media`
 
 ---
@@ -215,7 +220,8 @@ Issues : `POST /api/issue-reports`, uploads `issue_photos|videos|audio`.
 | `services/task_template_service.py` | Création templates fixes |
 | `services/task_occurrence_service.py` | Ad hoc, complete, approve, reopen, list_mine |
 | `services/task_scheduler_service.py` | Génération + rollover |
-| `services/blob_storage.py` | Blob Vercel / `/uploads` local |
+| `services/blob_storage.py` | Facade R2 / `/uploads` local |
+| `services/object_store.py` | PUT/GET/COPY présignés Cloudflare R2 |
 | `services/media_upload_service.py` | Validation + upload |
 | `services/reference_audio_transcription_service.py` | Audio référence → texte |
 | `services/completion_audio_transcription_service.py` | Audio clôture bilingue |
@@ -241,7 +247,7 @@ Issues : `POST /api/issue-reports`, uploads `issue_photos|videos|audio`.
 | Audio clôture → texte manager + employé | ✅ |
 | Revue manager approve / reopen | ✅ |
 | Prefill ad hoc depuis דיווח תקלה | ✅ |
-| Stockage Blob (+ local dev) | ✅ |
+| Stockage R2 (+ local `/uploads` en dev) | ✅ |
 | Rollover tâches non terminées | ✅ |
 | SSE / refresh auto | ✅ |
 | Délégation « ממתין להעברה » (création / UI) | ❌ retiré (backend legacy seulement) |
@@ -258,9 +264,12 @@ GEMINI_API_KEY=
 GOOGLE_CLOUD_API_KEY=
 GOOGLE_TRANSLATE_SOURCE=he
 
-# Stockage médias (requis en prod / Vercel)
-BLOB_READ_WRITE_TOKEN=
-BLOB_ACCESS=private
+# Stockage médias — Cloudflare R2 (requis en prod)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=
+# R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 
 # TTS voix par langue (optionnel — défauts dans config.py)
 GOOGLE_TTS_VOICE_FR=fr-FR-Neural2-A
@@ -268,4 +277,4 @@ GOOGLE_TTS_VOICE_FR=fr-FR-Neural2-A
 
 Sans `GEMINI_API_KEY` : pas de création par voix ni transcriptions audio.  
 Sans `GOOGLE_CLOUD_API_KEY` : traduction via LLM ; TTS Google indisponible (repli navigateur hébreu).  
-Sans `BLOB_READ_WRITE_TOKEN` en prod : uploads impossibles.
+Sans `R2_*` en prod : uploads impossibles. `BLOB_READ_WRITE_TOKEN` est ignoré.

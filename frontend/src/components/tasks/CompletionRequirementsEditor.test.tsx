@@ -20,7 +20,7 @@ describe("completion requirements editor helpers", () => {
     const withPhoto = addRequirement([], "photo");
     const withTwoVideos = addRequirement(addRequirement(withPhoto, "video"), "video");
     expect(withTwoVideos).toEqual([
-      { kind: "photo" },
+      { kind: "photo", slot: true },
       { kind: "video", min_seconds: 10 },
       { kind: "video", min_seconds: 10 },
     ]);
@@ -46,6 +46,25 @@ describe("completion requirements editor helpers", () => {
 });
 
 describe("CompletionRequirementsEditor", () => {
+  it("keeps the +photo card after naming it instead of adding a word chip", () => {
+    const onChange = vi.fn();
+    const start = addRequirement([], "photo");
+    const { rerender } = render(
+      <CompletionRequirementsEditor value={start} onChange={onChange} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(he.completionSlotTitleHint), {
+      target: { value: "מדף חלב" },
+    });
+    const named = setRequirementTitle(start, 0, "מדף חלב");
+    expect(onChange).toHaveBeenCalledWith(named);
+    rerender(<CompletionRequirementsEditor value={named} onChange={onChange} />);
+    expect(screen.getByPlaceholderText(he.completionSlotTitleHint)).toBeTruthy();
+    expect(screen.getByDisplayValue("מדף חלב")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: `${he.completionWordRemove} מדף חלב` }),
+    ).toBeNull();
+  });
+
   it("lets the menahel name a visual slot", () => {
     const onChange = vi.fn();
     render(
@@ -78,21 +97,44 @@ describe("CompletionRequirementsEditor", () => {
     );
   });
 
-  it("does not open a photo card for each word", () => {
+  it("shows a titled photo as a card like video", () => {
     render(
       <CompletionRequirementsEditor
         value={[
           { kind: "photo", title: "חלב" },
-          { kind: "photo", title: "לחם" },
+          { kind: "video", min_seconds: 10 },
         ]}
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByText("חלב")).toBeTruthy();
-    expect(screen.getByText("לחם")).toBeTruthy();
-    expect(screen.queryByPlaceholderText(he.completionSlotTitleHint)).toBeNull();
-    expect(screen.queryByPlaceholderText(he.completionSlotHintHint)).toBeNull();
-    expect(screen.queryByText(he.completionSlotExample)).toBeNull();
+    expect(screen.getByDisplayValue("חלב")).toBeTruthy();
+    expect(screen.getAllByPlaceholderText(he.completionSlotTitleHint)).toHaveLength(2);
+    expect(screen.getByLabelText(he.completionVideoMinSeconds)).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: `${he.completionWordRemove} חלב` }),
+    ).toBeNull();
+  });
+
+  it("opens file accordions by default on create", () => {
+    render(
+      <CompletionRequirementsEditor value={[{ kind: "photo" }]} onChange={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { expanded: true })).toBeTruthy();
+    expect(screen.getByPlaceholderText(he.completionSlotTitleHint)).toBeTruthy();
+  });
+
+  it("keeps file accordions closed on edit until opened", () => {
+    render(
+      <CompletionRequirementsEditor
+        expandSlots={false}
+        value={[{ kind: "photo", title: "חלב" }]}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { expanded: true })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.getByRole("button", { expanded: true })).toBeTruthy();
+    expect(screen.getByDisplayValue("חלב")).toBeTruthy();
   });
 
   it("lets the menahel replace min seconds by clearing the field", () => {
@@ -135,32 +177,6 @@ describe("CompletionRequirementsEditor", () => {
     ]);
   });
 
-  it("turns entered words into named photo slots", () => {
-    const onChange = vi.fn();
-    render(<CompletionRequirementsEditor value={[]} onChange={onChange} />);
-    const input = screen.getByLabelText(he.completionWordList);
-    fireEvent.change(input, { target: { value: "חלב" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(onChange).toHaveBeenCalledWith([{ kind: "photo", title: "חלב" }]);
-  });
-
-  it("adds several words from a pasted list and keeps video", () => {
-    const onChange = vi.fn();
-    render(
-      <CompletionRequirementsEditor
-        value={[{ kind: "video", min_seconds: 10 }]}
-        onChange={onChange}
-      />,
-    );
-    fireEvent.change(screen.getByLabelText(he.completionWordList), {
-      target: { value: "חלב,לחם" },
-    });
-    expect(onChange).toHaveBeenCalledWith([
-      { kind: "photo", title: "חלב" },
-      { kind: "photo", title: "לחם" },
-      { kind: "video", min_seconds: 10 },
-    ]);
-  });
 });
 
 describe("effectiveRequirements", () => {

@@ -357,7 +357,7 @@ export const he = {
   minVideoSecondsHint: "ריק = תמונה או וידאו. מספר = וידאו חובה באורך זה",
   completionHowToFinish: "איך מסיימים את המשימה?",
   completionHowToFinishHint:
-    "רשימת מילים — תמונה לכל מילה. אפשר גם וידאו או שמע.",
+    "הוסיפו תמונה, וידאו או שמע שהעובד יצטרך לצרף בסיום.",
   completionWordList: "רשימת פריטים",
   completionWordListHint: "מילה לכל תמונה — שורה חדשה, פסיק או Enter",
   completionWordListPlaceholder: "חלב",

@@ -383,6 +383,8 @@ def _slot_guide_fields(item: dict) -> dict:
         extra["hint"] = hint
     if example_url:
         extra["example_url"] = example_url
+    if item.get("slot") is True:
+        extra["slot"] = True
     return extra
 
 

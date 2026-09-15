@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isPrivateObjectMediaUrl,
   isRemoteObjectMediaUrl,
+  mediaStreamUrl,
   mediaUrl,
 } from "./mediaUrl";
 
@@ -41,6 +42,13 @@ describe("mediaUrl", () => {
   it("proxies local /uploads paths via authenticated API", () => {
     expect(mediaUrl("/uploads/task_photos/a.jpg")).toBe(
       `/api/media/proxy?src=${encodeURIComponent("/uploads/task_photos/a.jpg")}`,
+    );
+  });
+
+  it("adds stream=1 for canvas-safe photo bytes", () => {
+    const objectUrl = "https://abc.r2.cloudflarestorage.com/super-media/task_photos/a.jpg";
+    expect(mediaStreamUrl(objectUrl)).toBe(
+      `/api/media/proxy?src=${encodeURIComponent(objectUrl)}&stream=1`,
     );
   });
 });

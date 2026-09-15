@@ -6,6 +6,8 @@ export type CompletionRequirement = {
   title?: string;
   hint?: string;
   example_url?: string;
+  /** Carte +תמונה : ne pas replier en puce de רשימת פריטים. */
+  slot?: boolean;
   /** Fichier local — upload seulement à la soumission. */
   pending_example?: File | null;
 };
@@ -49,8 +51,8 @@ function readSlotHint(item: { hint?: unknown }): string | undefined {
 }
 
 function withVisualGuide(
-  item: { title?: unknown; hint?: unknown; example_url?: unknown },
-): Pick<CompletionRequirement, "title" | "hint" | "example_url"> {
+  item: { title?: unknown; hint?: unknown; example_url?: unknown; slot?: unknown },
+): Pick<CompletionRequirement, "title" | "hint" | "example_url" | "slot"> {
   const title = readSlotTitle(item);
   const hint = readSlotHint(item);
   const example_url = readExampleUrl(item);
@@ -58,6 +60,7 @@ function withVisualGuide(
     ...(title ? { title } : {}),
     ...(hint ? { hint } : {}),
     ...(example_url ? { example_url } : {}),
+    ...(item.slot === true ? { slot: true } : {}),
   };
 }
 
@@ -73,7 +76,7 @@ export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
       continue;
     }
     const guide = withVisualGuide(
-      item as { title?: unknown; hint?: unknown; example_url?: unknown },
+      item as { title?: unknown; hint?: unknown; example_url?: unknown; slot?: unknown },
     );
     if (kind !== "video") {
       out.push({ kind, ...guide });
@@ -144,7 +147,7 @@ export function wordsToPhotoRequirements(words: string[]): CompletionRequirement
 
 export function photoWordsFromRequirements(list: CompletionRequirement[]): string[] {
   return list
-    .filter((item) => item.kind === "photo")
+    .filter(isWordPhotoSlot)
     .map((item) => (item.title || "").trim())
     .filter(Boolean);
 }
@@ -157,30 +160,31 @@ function photoSlotForWord(
   return prev ? { ...prev, title } : { kind: "photo", title };
 }
 
+export function isDetailedPhotoSlot(req: CompletionRequirement): boolean {
+  return req.kind === "photo" && req.slot === true;
+}
+
 export function isWordPhotoSlot(req: CompletionRequirement): boolean {
-  return req.kind === "photo" && Boolean((req.title || "").trim());
+  return req.kind === "photo" && Boolean((req.title || "").trim()) && !isDetailedPhotoSlot(req);
 }
 
 export function editorDetailRequirements(
   list: CompletionRequirement[],
 ): Array<{ req: CompletionRequirement; index: number }> {
-  return list
-    .map((req, index) => ({ req, index }))
-    .filter(({ req }) => !isWordPhotoSlot(req));
+  return list.map((req, index) => ({ req, index }));
 }
 
 export function applyWordPhotoSlots(
   list: CompletionRequirement[],
   words: string[],
 ): CompletionRequirement[] {
-  const others = list.filter((item) => item.kind !== "photo");
-  const previous = list.filter((item) => item.kind === "photo");
-  const limited = words.slice(0, Math.max(0, MAX_COMPLETION_REQUIREMENTS - others.length));
-  if (limited.length === 0) {
-    const untitled = previous.filter((item) => !(item.title || "").trim());
-    return [...untitled, ...others].slice(0, MAX_COMPLETION_REQUIREMENTS);
-  }
-  return [...limited.map((title) => photoSlotForWord(title, previous)), ...others];
+  const wordPhotos = list.filter((item) => item.kind === "photo" && !isDetailedPhotoSlot(item));
+  const kept = list.filter(
+    (item) => item.kind !== "photo" || isDetailedPhotoSlot(item) || !(item.title || "").trim(),
+  );
+  const limited = words.slice(0, Math.max(0, MAX_COMPLETION_REQUIREMENTS - kept.length));
+  const nextWords = limited.map((title) => photoSlotForWord(title, wordPhotos));
+  return [...nextWords, ...kept].slice(0, MAX_COMPLETION_REQUIREMENTS);
 }
 
 export function addRequirement(
@@ -191,6 +195,7 @@ export function addRequirement(
   if (kind === "video") {
     return [...list, { kind: "video", min_seconds: DEFAULT_VIDEO_SECONDS }];
   }
+  if (kind === "photo") return [...list, { kind: "photo", slot: true }];
   return [...list, { kind }];
 }
 

@@ -150,12 +150,30 @@ describe("completionMedia", () => {
     expect(applyWordPhotoSlots(current, [])).toEqual([{ kind: "video", min_seconds: 10 }]);
     expect(isWordPhotoSlot({ kind: "photo", title: "חלב" })).toBe(true);
     expect(isWordPhotoSlot({ kind: "photo" })).toBe(false);
+    expect(isWordPhotoSlot({ kind: "photo", title: "מדף", slot: true })).toBe(false);
     expect(
       editorDetailRequirements([
         { kind: "photo", title: "חלב" },
+        { kind: "photo", title: "מדף", slot: true },
         { kind: "video", min_seconds: 10 },
       ]),
-    ).toEqual([{ req: { kind: "video", min_seconds: 10 }, index: 1 }]);
+    ).toEqual([
+      { req: { kind: "photo", title: "חלב" }, index: 0 },
+      { req: { kind: "photo", title: "מדף", slot: true }, index: 1 },
+      { req: { kind: "video", min_seconds: 10 }, index: 2 },
+    ]);
+  });
+
+  it("keeps a +photo card when the word list changes", () => {
+    const current = [
+      { kind: "photo" as const, title: "מדף", slot: true },
+      { kind: "video" as const, min_seconds: 10 },
+    ];
+    expect(applyWordPhotoSlots(current, ["חלב"])).toEqual([
+      { kind: "photo", title: "חלב" },
+      { kind: "photo", title: "מדף", slot: true },
+      { kind: "video", min_seconds: 10 },
+    ]);
   });
 
   it("blocks finish until every word has a photo", () => {

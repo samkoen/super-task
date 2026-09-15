@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Box, IconButton, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, CircularProgress, IconButton, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import NearMeIcon from "@mui/icons-material/NearMe";
 import AdjustIcon from "@mui/icons-material/Adjust";
@@ -10,10 +10,10 @@ import {
   blobToFile,
   drawAnnotation,
   hitTestAnnotation,
-  loadImageElement,
   moveAnnotation,
   renderAnnotatedImage,
   computePhotoDisplaySize,
+  loadAnnotationImage,
   type AnnotationTool,
   type PhotoAnnotation,
 } from "../../utils/photoAnnotation";
@@ -26,8 +26,10 @@ export interface PhotoAnnotationCanvasHandle {
 }
 
 interface PhotoAnnotationCanvasProps {
-  imageBlob: Blob;
+  image: Blob | string;
   hint?: string;
+  onReady?: () => void;
+  onError?: () => void;
 }
 
 type DrawState =
@@ -79,7 +81,7 @@ function pointerToCanvas(
 }
 
 const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnotationCanvasProps>(
-  function PhotoAnnotationCanvas({ imageBlob, hint }, ref) {
+  function PhotoAnnotationCanvas({ image, hint, onReady, onError }, ref) {
     const { user } = useAuth();
     const stroke = annotationStrokeForRole(user?.role, Boolean(user?.is_preview));
     const strokeRef = useRef(stroke);
@@ -95,6 +97,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
     const [tool, setTool] = useState<AnnotationTool>("ellipse");
     const [ready, setReady] = useState(false);
     const [hasSelection, setHasSelection] = useState(false);
+    const [loadError, setLoadError] = useState(false);
     const [displayBounds, setDisplayBounds] = useState(() => readDisplayBounds(null));
 
     useEffect(() => {
@@ -162,35 +165,38 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
 
     useEffect(() => {
       let cancelled = false;
-      const url = URL.createObjectURL(imageBlob);
+      let revoke = () => undefined;
       setReady(false);
+      setLoadError(false);
       shapesRef.current = [];
       selectedRef.current = null;
       draftRef.current = null;
       setHasSelection(false);
-
-      void loadImageElement(url)
-        .then((image) => {
+      void loadAnnotationImage(image)
+        .then((loaded) => {
+          revoke = loaded.revoke;
           if (cancelled || !canvasRef.current) return;
-          imageRef.current = image;
-          sizeCanvas(image, canvasRef.current, displayBounds);
+          imageRef.current = loaded.image;
+          sizeCanvas(loaded.image, canvasRef.current, displayBounds);
           paint();
           setReady(true);
+          onReady?.();
         })
         .catch(() => {
-          if (!cancelled) setReady(false);
+          if (cancelled) return;
+          setLoadError(true);
+          onError?.();
         });
-
       return () => {
         cancelled = true;
-        URL.revokeObjectURL(url);
+        revoke();
         imageRef.current = null;
         drawStateRef.current = null;
         draftRef.current = null;
       };
-      // Reload only when the blob changes — bounds are applied in the next effect.
+      // Reload only when the source changes — bounds are applied in the next effect.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [imageBlob]);
+    }, [image]);
 
     useEffect(() => {
       const image = imageRef.current;
@@ -361,12 +367,16 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
         <Typography variant="body2" color="text.secondary">
           {hint ?? he.mediaCapturePhotoAnnotateHint}
         </Typography>
+        {loadError ? <Alert severity="warning">{he.chatAnnotateReplyLoadError}</Alert> : null}
         <Box
           ref={containerRef}
           sx={{
             width: "100%",
-            display: "flex",
+            display: loadError ? "none" : "flex",
             justifyContent: "center",
+            alignItems: "center",
+            minHeight: ready ? undefined : 180,
+            position: "relative",
             borderRadius: 1,
             border: "1px solid",
             borderColor: "divider",
@@ -374,6 +384,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
             bgcolor: "grey.100",
           }}
         >
+          {ready ? null : <CircularProgress size={28} sx={{ position: "absolute" }} />}
           <canvas
             ref={canvasRef}
             onPointerDown={onPointerDown}

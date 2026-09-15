@@ -493,6 +493,8 @@ export default function ManagerTaskGalleryPage() {
             }
           />
           <CompletionRequirementsEditor
+            key={editing ? `edit-${editing.id}` : "create"}
+            expandSlots={!editing}
             value={completionRequirements}
             onChange={setCompletionRequirements}
           />

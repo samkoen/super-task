@@ -10,6 +10,7 @@ import {
   dataUrlToFile,
   hitTestAnnotation,
   loadImageElement,
+  resolveAnnotationImageSrc,
   moveAnnotation,
   renderAnnotatedImage,
   scaleAnnotations,
@@ -128,6 +129,31 @@ describe("loadImageElement", () => {
     await loadImageElement("blob:http://localhost/shot");
     expect(seen[0]).toBe("");
     vi.unstubAllGlobals();
+  });
+
+  it("does not set cors on same-origin proxy urls", async () => {
+    const seen: string[] = [];
+    class FakeImage {
+      crossOrigin = "";
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        seen.push(this.crossOrigin);
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+    vi.stubGlobal("Image", FakeImage);
+    await loadImageElement("/api/media/proxy?src=%2Fuploads%2Fp.jpg&stream=1");
+    expect(seen[0]).toBe("");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("resolveAnnotationImageSrc", () => {
+  it("uses the streamed proxy for a stored photo so the canvas matches capture", () => {
+    const resolved = resolveAnnotationImageSrc("/uploads/p.jpg");
+    expect(resolved.src).toContain("/api/media/proxy");
+    expect(resolved.src).toContain("stream=1");
   });
 });
 

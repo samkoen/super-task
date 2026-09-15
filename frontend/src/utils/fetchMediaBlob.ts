@@ -1,16 +1,24 @@
-import { mediaUrl } from "./mediaUrl";
+import { mediaUrl, withStreamQuery } from "./mediaUrl";
 import {
   isRetryableMediaError,
   nextMediaRetryDelayMs,
   sleepMs,
 } from "./mediaRetry";
 
-export async function fetchMediaBlob(path: string): Promise<Blob> {
+export { withStreamQuery } from "./mediaUrl";
+
+export type FetchMediaBlobOptions = { stream?: boolean };
+
+export async function fetchMediaBlob(
+  path: string,
+  options?: FetchMediaBlobOptions,
+): Promise<Blob> {
   const url = mediaUrl(path);
   if (!url) throw new Error("empty media path");
-  const response = await fetch(url, {
+  const requestUrl = options?.stream ? withStreamQuery(url) : url;
+  const response = await fetch(requestUrl, {
     credentials: "include",
-    redirect: shouldFollowRedirect(path) ? "follow" : "manual",
+    redirect: options?.stream || shouldFollowRedirect(path) ? "follow" : "manual",
   });
   if (isRedirect(response.status)) {
     return fetchRedirectedBlob(response);
@@ -38,11 +46,12 @@ async function fetchRedirectedBlob(response: Response): Promise<Blob> {
 export async function fetchMediaBlobWithRetry(
   path: string,
   wait: (ms: number) => Promise<void> = sleepMs,
+  options?: FetchMediaBlobOptions,
 ): Promise<Blob> {
   let attempt = 0;
   for (;;) {
     try {
-      return await fetchMediaBlob(path);
+      return await fetchMediaBlob(path, options);
     } catch (error) {
       const delay = nextMediaRetryDelayMs(attempt);
       if (delay == null || !isRetryableMediaError(error)) throw error;

@@ -148,7 +148,16 @@ export default function TaskCompletionReviewDialog({
 
   return (
     <>
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" dir="rtl">
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      fullWidth
+      maxWidth="sm"
+      dir="rtl"
+      disableEnforceFocus
+      disableAutoFocus
+      disableRestoreFocus
+    >
       <DialogTitle>
         {isClosedApproved ? he.taskClosedDetailTitle : isAwaiting ? he.taskChatTitle : he.taskReviewTitle}
       </DialogTitle>
@@ -166,7 +175,7 @@ export default function TaskCompletionReviewDialog({
             chatFollowUpAt={task.chat_follow_up_at}
             chatResolvedAt={task.chat_resolved_at}
             compact
-            composeEnabled={canComposeTaskChat(task.status, false) && !isReview}
+            composeEnabled={canComposeTaskChat(task.status, false)}
             onOccurrenceUpdated={(_status, notice) => {
               if (notice !== he.taskChatSent) {
                 onDone(notice ?? he.taskChatSent);
