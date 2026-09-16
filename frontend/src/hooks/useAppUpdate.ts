@@ -10,7 +10,8 @@ import {
   isApkInstallPermissionError,
   openApkInstallPermissionSettings,
 } from "../plugins/apkUpdate";
-import { isNewerAppVersion, resolveApkDownloadUrl } from "../utils/appRelease";
+import { hasNewerAppRelease, resolveApkDownloadUrl } from "../utils/appRelease";
+import { launchedApkUpdateName, markApkUpdateLaunched, shouldBlockApkUpdate } from "../utils/apkUpdateMemory";
 import { he } from "../i18n/he";
 
 export type InstalledAppInfo = { versionCode: number; versionName: string };
@@ -22,6 +23,7 @@ export function useAppUpdate() {
   const [loading, setLoading] = useState(enabled);
   const [downloading, setDownloading] = useState(false);
   const [message, setMessage] = useState("");
+  const [launchedName, setLaunchedName] = useState(launchedApkUpdateName);
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
@@ -42,6 +44,15 @@ export function useAppUpdate() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!enabled) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [enabled, refresh]);
+
   const downloadLatest = useCallback(async () => {
     setDownloading(true);
     setMessage("");
@@ -49,6 +60,8 @@ export function useAppUpdate() {
       const remote = await fetchLatestRelease();
       setLatest(remote);
       await installFromUrl(remote.download_url);
+      markApkUpdateLaunched(remote.version_name);
+      setLaunchedName(remote.version_name);
     } catch (error) {
       setMessage(installErrorMessage(error));
     } finally {
@@ -56,6 +69,7 @@ export function useAppUpdate() {
     }
   }, []);
 
+  const newer = hasNewerAppRelease(installed, latest);
   return {
     enabled,
     installed,
@@ -63,7 +77,8 @@ export function useAppUpdate() {
     loading,
     downloading,
     message,
-    updateAvailable: hasNewerRelease(installed, latest),
+    updateAvailable: newer,
+    blockingUpdate: newer && shouldBlockApkUpdate(latest?.version_name || "", launchedName),
     refresh,
     downloadLatest,
   };
@@ -74,17 +89,12 @@ async function loadInstalledAndLatest() {
   return { info, remote };
 }
 
-async function fetchLatestRelease(): Promise<AppReleaseLatest & { download_url: string }> {
+async function fetchLatestRelease(): Promise<AppReleaseLatest & { download_url: string; version_name: string }> {
   const remote = await appReleaseService.latest();
-  if (!remote.available || !remote.download_url) {
+  if (!remote.available || !remote.download_url || !remote.version_name) {
     throw new Error(he.appUpdateFailed);
   }
-  return { ...remote, download_url: remote.download_url };
-}
-
-function hasNewerRelease(installed: InstalledAppInfo | null, latest: AppReleaseLatest | null): boolean {
-  if (!installed || !latest?.available || !latest.version_name) return false;
-  return isNewerAppVersion(installed.versionName, latest.version_name);
+  return { ...remote, download_url: remote.download_url, version_name: remote.version_name };
 }
 
 async function installFromUrl(downloadUrl: string): Promise<void> {

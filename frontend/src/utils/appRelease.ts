@@ -26,6 +26,26 @@ export function isNewerAppVersion(installedName: string, latestName: string): bo
   return false;
 }
 
+export function hasNewerAppRelease(
+  installed: { versionCode: number; versionName: string } | null,
+  latest: { available?: boolean; version_name?: string; version_code?: number } | null,
+): boolean {
+  if (!installed || !latest?.available || !latest.version_name) return false;
+  if (installed.versionName.trim() === latest.version_name.trim()) return false;
+  const remoteCode = Number(latest.version_code);
+  const localCode = Number(installed.versionCode);
+  if (remoteCode > 0 && localCode > 0 && remoteCode <= localCode) return false;
+  return isNewerAppVersion(installed.versionName, latest.version_name);
+}
+
+export function fillVersionPlaceholders(
+  template: string,
+  latest: string,
+  current = "",
+): string {
+  return template.replaceAll("{latest}", latest).replaceAll("{current}", current);
+}
+
 export function resolveApkDownloadUrl(downloadUrl: string, apiBaseUrl: string): string {
   const trimmed = downloadUrl.trim();
   if (/^https?:\/\//i.test(trimmed)) return trimmed;

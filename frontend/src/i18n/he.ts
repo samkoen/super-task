@@ -269,6 +269,11 @@ export const he = {
   appUpdateUpToDate: "זו הגרסה העדכנית",
   appUpdatePermission: "יש לאשר התקנת אפליקציות ממקור זה בהגדרות, ואז ללחוץ שוב",
   appUpdateFailed: "ההורדה או ההתקנה נכשלה",
+  appUpdateRequiredTitle: "יש לעדכן את האפליקציה",
+  appUpdateRequiredBody:
+    "גרסה {latest} זמינה. הגרסה המותקנת ({current}) אינה עדכנית — עדכנו עכשיו.",
+  appUpdateBanner: "גרסה חדשה {latest} — יש לעדכן עכשיו",
+  appUpdateLater: "מאוחר יותר",
   managerTasks: "משימות",
   managerTasksSubtitle: "יצירה ומעקב אחר משימות הסניף",
   managerFixedTasks: "משימות קבועות",
