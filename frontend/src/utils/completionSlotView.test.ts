@@ -20,6 +20,8 @@ describe("completionSlotView", () => {
     expect(slotGuideText({ kind: "photo", title: "מדף", hint: "כל השורה" })).toBe("כל השורה");
     expect(slotGuideText({ kind: "photo", title: "מדף" })).toBe("מדף");
     expect(slotGuideText({ kind: "photo" })).toBe("");
+    expect(slotGuideText({ kind: "audio", title: "הקלטה", hint: "תאר מה שומעים" })).toBe("תאר מה שומעים");
+    expect(slotGuideText({ kind: "audio", hint: "תאר מה שומעים" })).toBe("תאר מה שומעים");
   });
 
   it("maps three videos to the same slot index", () => {

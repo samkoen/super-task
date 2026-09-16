@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box, Typography } from "@mui/material";
 import CompletionExampleDialog from "./CompletionExampleDialog";
 import CompletionHintDialog from "./CompletionHintDialog";
+import CompletionSlotHintButtons from "./CompletionSlotHintButtons";
 import CompletionSlotTile from "./CompletionSlotTile";
 import MediaCaptureActions from "../media/MediaCaptureActions";
 import { he } from "../../i18n/he";
@@ -72,6 +73,7 @@ export default function CompletionSlotGrid({
             interactive={interactive}
             disabled={disabled}
             onCapture={onCapture}
+            hintControls={slotHintControls(req, index, hints)}
           />
         ) : null,
       )}
@@ -196,6 +198,7 @@ function AudioSlot({
   interactive,
   disabled,
   onCapture,
+  hintControls,
 }: {
   req: CompletionRequirement;
   index: number;
@@ -203,13 +206,15 @@ function AudioSlot({
   interactive: boolean;
   disabled?: boolean;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
+  hintControls: ReturnType<typeof slotHintControls>;
 }) {
   const src = slotFillSrc(fill);
   return (
     <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, p: 1.25 }}>
-      <Typography variant="subtitle2" sx={{ mb: 1 }}>
-        {slotDisplayTitle(req, index)}
-      </Typography>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 1 }}>
+        <Typography variant="subtitle2">{slotDisplayTitle(req, index)}</Typography>
+        {hintControls ? <CompletionSlotHintButtons {...hintControls} inline /> : null}
+      </Box>
       {interactive && onCapture && (
         <MediaCaptureActions
           photoAdded={false}

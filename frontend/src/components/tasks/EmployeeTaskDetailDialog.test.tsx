@@ -210,6 +210,22 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
   });
 
+  it("shows hint icons on an audio slot", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task(),
+          completion_requirements: [{ kind: "audio", title: "הקלטה", hint: "תאר מה שומעים" }],
+        }}
+        capture={capture()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("הקלטה")).toBeTruthy();
+    expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
+    expect(screen.getByLabelText(he.completionListenHint)).toBeTruthy();
+  });
+
   it("keeps the three previous videos when the oved opens a reopened task", () => {
     render(
       <EmployeeTaskDetailDialog
