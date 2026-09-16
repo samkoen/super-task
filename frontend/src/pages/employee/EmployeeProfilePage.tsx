@@ -21,6 +21,7 @@ import { EMPLOYEE_LANGUAGES, EMPLOYEE_LANGUAGE_LABELS } from "../../domain/emplo
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
 import { employeeProfileFormFromUser, type EmployeeProfileForm } from "./employeeProfileForm";
+import AppUpdateCard from "../../components/appUpdate/AppUpdateCard";
 
 export default function EmployeeProfilePage() {
   const { user, refresh } = useAuth();
@@ -253,6 +254,8 @@ export default function EmployeeProfilePage() {
           </Box>
         </Box>
       </Paper>
+
+      <AppUpdateCard />
 
       <EmployeeAvatarCapture
         open={avatarOpen}

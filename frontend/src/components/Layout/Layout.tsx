@@ -30,6 +30,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import NotificationBell from "../notifications/NotificationBell";
 import ChatAlertBanner from "../notifications/ChatAlertBanner";
 import { useAuth } from "../../context/AuthContext";
@@ -145,6 +146,7 @@ function Layout() {
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/admin/gallery" },
         { text: he.adminUsers, icon: <PeopleIcon />, path: "/admin/users" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/admin/invitations" },
+        { text: he.adminAppReleases, icon: <SystemUpdateAltIcon />, path: "/admin/app-releases" },
       ]);
     }
     if (user.role === "network_manager" || user.role === "branch_manager") {
