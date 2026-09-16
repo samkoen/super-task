@@ -14,6 +14,7 @@ import {
   setRequirementHint,
   setRequirementTitle,
 } from "../../utils/completionMedia";
+import { requirementRowLabel } from "../../utils/completionRequirementList";
 
 describe("completion requirements editor helpers", () => {
   it("adds two videos with independent durations", () => {
@@ -46,11 +47,47 @@ describe("completion requirements editor helpers", () => {
 });
 
 describe("CompletionRequirementsEditor", () => {
-  it("keeps the +photo card after naming it instead of adding a word chip", () => {
+  it("lists name and required kind without opening the square", () => {
+    render(
+      <CompletionRequirementsEditor
+        value={[
+          { kind: "photo", title: "חלב" },
+          { kind: "video", title: "עגבניה", min_seconds: 10 },
+          { kind: "photo", title: "מלפפון" },
+        ]}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: requirementRowLabel({ kind: "photo", title: "חלב" }) })).toBeTruthy();
+    expect(screen.getByRole("button", { name: requirementRowLabel({ kind: "video", title: "עגבניה" }) })).toBeTruthy();
+    expect(screen.getByRole("button", { name: requirementRowLabel({ kind: "photo", title: "מלפפון" }) })).toBeTruthy();
+    expect(screen.queryByPlaceholderText(he.completionSlotTitleHint)).toBeNull();
+  });
+
+  it("opens the square on a list row to edit that item", () => {
+    render(
+      <CompletionRequirementsEditor
+        value={[
+          { kind: "photo", title: "חלב" },
+          { kind: "video", title: "עגבניה", min_seconds: 10 },
+        ]}
+        onChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: requirementRowLabel({ kind: "photo", title: "חלב" }) }));
+    expect(screen.getByDisplayValue("חלב")).toBeTruthy();
+    expect(screen.getByPlaceholderText(he.completionSlotHintHint)).toBeTruthy();
+    expect(screen.queryByDisplayValue("עגבניה")).toBeNull();
+  });
+
+  it("keeps the +photo square after naming it instead of adding a word chip", () => {
     const onChange = vi.fn();
     const start = addRequirement([], "photo");
     const { rerender } = render(
       <CompletionRequirementsEditor value={start} onChange={onChange} />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: requirementRowLabel({ kind: "photo" }) }),
     );
     fireEvent.change(screen.getByPlaceholderText(he.completionSlotTitleHint), {
       target: { value: "מדף חלב" },
@@ -58,14 +95,13 @@ describe("CompletionRequirementsEditor", () => {
     const named = setRequirementTitle(start, 0, "מדף חלב");
     expect(onChange).toHaveBeenCalledWith(named);
     rerender(<CompletionRequirementsEditor value={named} onChange={onChange} />);
-    expect(screen.getByPlaceholderText(he.completionSlotTitleHint)).toBeTruthy();
     expect(screen.getByDisplayValue("מדף חלב")).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: `${he.completionWordRemove} מדף חלב` }),
     ).toBeNull();
   });
 
-  it("lets the menahel name a visual slot", () => {
+  it("lets the menahel name a visual slot from the open square", () => {
     const onChange = vi.fn();
     render(
       <CompletionRequirementsEditor
@@ -73,6 +109,7 @@ describe("CompletionRequirementsEditor", () => {
         onChange={onChange}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: requirementRowLabel({ kind: "photo" }) }));
     fireEvent.change(screen.getByPlaceholderText(he.completionSlotTitleHint), {
       target: { value: "מדף חלב" },
     });
@@ -89,6 +126,7 @@ describe("CompletionRequirementsEditor", () => {
         onChange={onChange}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: requirementRowLabel({ kind: "photo" }) }));
     fireEvent.change(screen.getByPlaceholderText(he.completionSlotHintHint), {
       target: { value: "לצלם את כל השורה" },
     });
@@ -97,44 +135,29 @@ describe("CompletionRequirementsEditor", () => {
     );
   });
 
-  it("shows a titled photo as a card like video", () => {
-    render(
+  it("opens a newly added item square and keeps others closed", () => {
+    const onChange = vi.fn();
+    const existing = [{ kind: "photo" as const, title: "חלב" }];
+    const { rerender } = render(
+      <CompletionRequirementsEditor value={existing} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.completionAddVideoReq }));
+    expect(onChange).toHaveBeenCalledWith([
+      { kind: "photo", title: "חלב" },
+      { kind: "video", min_seconds: 10 },
+    ]);
+    rerender(
       <CompletionRequirementsEditor
         value={[
           { kind: "photo", title: "חלב" },
           { kind: "video", min_seconds: 10 },
         ]}
-        onChange={vi.fn()}
+        onChange={onChange}
       />,
     );
-    expect(screen.getByDisplayValue("חלב")).toBeTruthy();
-    expect(screen.getAllByPlaceholderText(he.completionSlotTitleHint)).toHaveLength(2);
-    expect(screen.getByLabelText(he.completionVideoMinSeconds)).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: `${he.completionWordRemove} חלב` }),
-    ).toBeNull();
-  });
-
-  it("opens file accordions by default on create", () => {
-    render(
-      <CompletionRequirementsEditor value={[{ kind: "photo" }]} onChange={vi.fn()} />,
-    );
-    expect(screen.getByRole("button", { expanded: true })).toBeTruthy();
     expect(screen.getByPlaceholderText(he.completionSlotTitleHint)).toBeTruthy();
-  });
-
-  it("keeps file accordions closed on edit until opened", () => {
-    render(
-      <CompletionRequirementsEditor
-        expandSlots={false}
-        value={[{ kind: "photo", title: "חלב" }]}
-        onChange={vi.fn()}
-      />,
-    );
-    expect(screen.queryByRole("button", { expanded: true })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
-    expect(screen.getByRole("button", { expanded: true })).toBeTruthy();
-    expect(screen.getByDisplayValue("חלב")).toBeTruthy();
+    expect(screen.getByLabelText(he.completionVideoMinSeconds)).toBeTruthy();
+    expect(screen.queryByDisplayValue("חלב")).toBeNull();
   });
 
   it("lets the menahel replace min seconds by clearing the field", () => {
@@ -145,6 +168,7 @@ describe("CompletionRequirementsEditor", () => {
         onChange={onChange}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: requirementRowLabel({ kind: "video" }) }));
     const field = screen.getByLabelText(he.completionVideoMinSeconds);
     fireEvent.change(field, { target: { value: "" } });
     expect(onChange).toHaveBeenCalledWith([
@@ -154,6 +178,44 @@ describe("CompletionRequirementsEditor", () => {
     expect(onChange).toHaveBeenLastCalledWith([
       { kind: "video", min_seconds: 36 },
     ]);
+  });
+
+  it("closes the square when the open row is clicked again", () => {
+    render(
+      <CompletionRequirementsEditor
+        value={[{ kind: "photo", title: "חלב" }]}
+        onChange={vi.fn()}
+      />,
+    );
+    const row = screen.getByRole("button", { name: requirementRowLabel({ kind: "photo", title: "חלב" }) });
+    fireEvent.click(row);
+    expect(screen.getByDisplayValue("חלב")).toBeTruthy();
+    fireEvent.click(row);
+    expect(screen.queryByPlaceholderText(he.completionSlotTitleHint)).toBeNull();
+  });
+
+  it("removes a row from the list", () => {
+    const onChange = vi.fn();
+    render(
+      <CompletionRequirementsEditor
+        value={[
+          { kind: "photo", title: "חלב" },
+          { kind: "video", min_seconds: 10 },
+        ]}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: he.removeMedia })[0]);
+    expect(onChange).toHaveBeenCalledWith([{ kind: "video", min_seconds: 10 }]);
+  });
+
+  it("shows audio title fields without an example photo", () => {
+    render(
+      <CompletionRequirementsEditor value={[{ kind: "audio" }]} onChange={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: requirementRowLabel({ kind: "audio" }) }));
+    expect(screen.getByPlaceholderText(he.completionSlotTitleHint)).toBeTruthy();
+    expect(screen.queryByText(he.completionSlotExample)).toBeNull();
   });
 
   it("lets the menahel add a second video", () => {
@@ -176,7 +238,6 @@ describe("CompletionRequirementsEditor", () => {
       { kind: "video", min_seconds: 10 },
     ]);
   });
-
 });
 
 describe("effectiveRequirements", () => {

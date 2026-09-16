@@ -286,22 +286,28 @@ def _is_bare_photo_list(requirements: list[dict]) -> bool:
     return not any(str(item.get(key) or "").strip() for key in _GUIDE_KEYS)
 
 
+def _guide_keys_for(kind: object) -> tuple[str, ...]:
+    if kind == "audio":
+        return ("title", "hint")
+    return _GUIDE_KEYS
+
+
 def _has_slot_guides(requirements: list | None) -> bool:
     if not isinstance(requirements, list):
         return False
     for item in requirements:
-        if not isinstance(item, dict) or item.get("kind") == "audio":
+        if not isinstance(item, dict):
             continue
-        if any(str(item.get(key) or "").strip() for key in _GUIDE_KEYS):
+        keys = _guide_keys_for(item.get("kind"))
+        if any(str(item.get(key) or "").strip() for key in keys):
             return True
     return False
 
 
 def _fill_missing_guides(item: dict, extra: dict) -> dict:
-    if item.get("kind") == "audio" or extra.get("kind") == "audio":
-        return item
+    keys = _guide_keys_for(item.get("kind") or extra.get("kind"))
     next_item = dict(item)
-    for key in _GUIDE_KEYS:
+    for key in keys:
         if str(next_item.get(key) or "").strip():
             continue
         value = extra.get(key)
@@ -394,9 +400,10 @@ def _normalize_requirement(item: object) -> dict:
     kind = str(item.get("kind") or "").strip()
     if kind not in VALID_KINDS:
         raise ValueError("סוג מדיה לא תקין")
+    guides = _slot_guide_fields(item)
     if kind == "audio":
-        return {"kind": "audio"}
-    entry = {"kind": kind, **_slot_guide_fields(item)}
+        return {"kind": "audio", **{key: guides[key] for key in ("title", "hint") if key in guides}}
+    entry = {"kind": kind, **guides}
     if kind != "video":
         return entry
     seconds = normalize_min_video_seconds(item.get("min_seconds"))

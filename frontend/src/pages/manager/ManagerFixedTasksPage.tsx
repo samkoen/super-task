@@ -555,7 +555,6 @@ export default function ManagerFixedTasksPage() {
               ))}
             </TextField>
             <CompletionRequirementsEditor
-              expandSlots={false}
               value={editForm.completion_requirements}
               onChange={(completion_requirements) =>
                 setEditForm({ ...editForm, completion_requirements })

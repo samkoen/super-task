@@ -193,7 +193,8 @@ def test_normalize_keeps_visual_slot_title_and_example():
             },
             {
                 "kind": "audio",
-                "title": "ignored",
+                "title": "הקלטה",
+                "hint": "תאר מה שומעים",
                 "example_url": "/uploads/task_photos/no.jpg",
             },
         ]
@@ -206,7 +207,7 @@ def test_normalize_keeps_visual_slot_title_and_example():
     }
     assert reqs[1]["title"] == "ניקוי קופה"
     assert reqs[1]["example_url"] == "/uploads/task_photos/till.jpg"
-    assert reqs[2] == {"kind": "audio"}
+    assert reqs[2] == {"kind": "audio", "title": "הקלטה", "hint": "תאר מה שומעים"}
 
 
 def test_normalize_keeps_plus_photo_slot_flag():

@@ -362,6 +362,7 @@ export const he = {
   completionWordListHint: "מילה לכל תמונה — שורה חדשה, פסיק או Enter",
   completionWordListPlaceholder: "חלב",
   completionWordRemove: "הסר פריט",
+  completionUntitledSlot: "ללא כותרת",
   completionNoRequirements: "בלי דרישת מדיה — אפשר לסיים בלי קובץ",
   completionAddPhotoReq: "+ תמונה",
   completionAddVideoReq: "+ וידאו",

@@ -72,7 +72,13 @@ export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
     const kind = (item as { kind?: string }).kind;
     if (kind !== "photo" && kind !== "video" && kind !== "audio") continue;
     if (kind === "audio") {
-      out.push({ kind });
+      const title = readSlotTitle(item as { title?: unknown });
+      const hint = readSlotHint(item as { hint?: unknown });
+      out.push({
+        kind,
+        ...(title ? { title } : {}),
+        ...(hint ? { hint } : {}),
+      });
       continue;
     }
     const guide = withVisualGuide(
@@ -239,9 +245,7 @@ export function setRequirementTitle(
   title: string,
 ): CompletionRequirement[] {
   const next = title.slice(0, MAX_SLOT_TITLE);
-  return list.map((item, i) =>
-    i === index && item.kind !== "audio" ? { ...item, title: next } : item,
-  );
+  return list.map((item, i) => (i === index ? { ...item, title: next } : item));
 }
 
 export function setRequirementHint(
@@ -250,9 +254,7 @@ export function setRequirementHint(
   hint: string,
 ): CompletionRequirement[] {
   const next = hint.slice(0, MAX_SLOT_HINT);
-  return list.map((item, i) =>
-    i === index && item.kind !== "audio" ? { ...item, hint: next } : item,
-  );
+  return list.map((item, i) => (i === index ? { ...item, hint: next } : item));
 }
 
 export function setRequirementExample(
@@ -278,11 +280,11 @@ export function toApiRequirement(item: CompletionRequirement): CompletionRequire
   if (item.kind === "video") {
     next.min_seconds = item.min_seconds ?? DEFAULT_VIDEO_SECONDS;
   }
-  if (item.kind === "audio") return next;
   const title = (item.title || "").trim().slice(0, MAX_SLOT_TITLE);
   if (title) next.title = title;
   const hint = (item.hint || "").trim().slice(0, MAX_SLOT_HINT);
   if (hint) next.hint = hint;
+  if (item.kind === "audio") return next;
   const url = (item.example_url || "").trim();
   if (url && !url.startsWith("blob:")) next.example_url = url;
   return next;
