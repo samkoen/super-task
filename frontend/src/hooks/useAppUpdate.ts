@@ -43,17 +43,18 @@ export function useAppUpdate() {
   }, [refresh]);
 
   const downloadLatest = useCallback(async () => {
-    if (!latest?.download_url) return;
     setDownloading(true);
     setMessage("");
     try {
-      await installFromUrl(latest.download_url);
+      const remote = await fetchLatestRelease();
+      setLatest(remote);
+      await installFromUrl(remote.download_url);
     } catch (error) {
       setMessage(installErrorMessage(error));
     } finally {
       setDownloading(false);
     }
-  }, [latest?.download_url]);
+  }, []);
 
   return {
     enabled,
@@ -71,6 +72,14 @@ export function useAppUpdate() {
 async function loadInstalledAndLatest() {
   const [info, remote] = await Promise.all([getInstalledAppInfo(), appReleaseService.latest()]);
   return { info, remote };
+}
+
+async function fetchLatestRelease(): Promise<AppReleaseLatest & { download_url: string }> {
+  const remote = await appReleaseService.latest();
+  if (!remote.available || !remote.download_url) {
+    throw new Error(he.appUpdateFailed);
+  }
+  return { ...remote, download_url: remote.download_url };
 }
 
 function hasNewerRelease(installed: InstalledAppInfo | null, latest: AppReleaseLatest | null): boolean {

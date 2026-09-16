@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
 const latest = vi.fn();
 const getInstalledAppInfo = vi.fn();
@@ -26,6 +26,15 @@ vi.mock("../services/apiBaseUrl", () => ({
 import { useAppUpdate } from "./useAppUpdate";
 
 describe("useAppUpdate", () => {
+  beforeEach(() => {
+    latest.mockReset();
+    getInstalledAppInfo.mockReset();
+    canUseApkUpdate.mockReset();
+    canInstallApkPackages.mockReset();
+    openApkInstallPermissionSettings.mockReset();
+    downloadAndInstallApk.mockReset();
+  });
+
   it("marks an update as available when the server version is newer", async () => {
     canUseApkUpdate.mockReturnValue(true);
     getInstalledAppInfo.mockResolvedValue({ versionCode: 101, versionName: "1.1" });
@@ -38,5 +47,31 @@ describe("useAppUpdate", () => {
     const { result } = renderHook(() => useAppUpdate());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.updateAvailable).toBe(true);
+  });
+
+  it("asks for a fresh download URL at click time", async () => {
+    canUseApkUpdate.mockReturnValue(true);
+    canInstallApkPackages.mockResolvedValue(true);
+    getInstalledAppInfo.mockResolvedValue({ versionCode: 101, versionName: "1.1" });
+    latest
+      .mockResolvedValueOnce({
+        available: true,
+        version_code: 102,
+        version_name: "1.2",
+        download_url: "https://cdn.example/stale.apk",
+      })
+      .mockResolvedValueOnce({
+        available: true,
+        version_code: 102,
+        version_name: "1.2",
+        download_url: "https://cdn.example/fresh.apk",
+      });
+    downloadAndInstallApk.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAppUpdate());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.downloadLatest();
+    });
+    expect(downloadAndInstallApk).toHaveBeenCalledWith("https://cdn.example/fresh.apk");
   });
 });
