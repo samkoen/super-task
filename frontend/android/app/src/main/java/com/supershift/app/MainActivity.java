@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeVideoRecorderPlugin.class);
         registerPlugin(NativePhotoCapturePlugin.class);
         registerPlugin(NativeBlobUploadPlugin.class);
+        registerPlugin(ApkUpdatePlugin.class);
         super.onCreate(savedInstanceState);
         CookieManager.getInstance().setAcceptCookie(true);
         // Ne pas demander caméra/micro au démarrage : ça peut figer le WebView.

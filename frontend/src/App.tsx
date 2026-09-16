@@ -19,6 +19,7 @@ const AdminNetworkPage = lazy(() => import("./pages/admin/AdminNetworkPage"));
 const AdminBranchPage = lazy(() => import("./pages/admin/AdminBranchPage"));
 const AdminDepartmentsPage = lazy(() => import("./pages/admin/AdminDepartmentsPage"));
 const AdminProductsPage = lazy(() => import("./pages/admin/AdminProductsPage"));
+const AdminAppReleasesPage = lazy(() => import("./pages/admin/AdminAppReleasesPage"));
 const ManagerTasksPage = lazy(() => import("./pages/manager/ManagerTasksPage"));
 const ManagerDirectChatsPage = lazy(() => import("./pages/manager/ManagerDirectChatsPage"));
 const ManagerIssuesPage = lazy(() => import("./pages/manager/ManagerIssuesPage"));
@@ -157,6 +158,14 @@ export default function App() {
             element={
               <LazyPage>
                 <AdminProductsPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/admin/app-releases"
+            element={
+              <LazyPage>
+                <AdminAppReleasesPage />
               </LazyPage>
             }
           />

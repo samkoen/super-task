@@ -18,6 +18,7 @@ from app.models.task_completion import TaskCompletion
 from app.models.task_message import TaskMessage
 from app.models.task_occurrence import TaskOccurrence
 from app.models.task_template import TaskTemplate
+from app.models.app_release import AppRelease
 from app.models.user import User
 
 
@@ -477,3 +478,23 @@ def employee_break_orm_to_domain(
         started_at=parse_datetime_iso(row.started_at),
         ended_at=parse_datetime_iso(row.ended_at) if row.ended_at else None,
     )
+
+
+def app_release_orm_to_domain(row: orm.AppRelease | None) -> AppRelease | None:
+    if row is None:
+        return None
+    published_by = getattr(row, "published_by_user_id", None)
+    return AppRelease(
+        id=str(row.id),
+        version_code=int(row.version_code),
+        version_name=row.version_name,
+        apk_url=row.apk_url,
+        published_by_user_id=str(published_by) if published_by else None,
+        created_at=parse_datetime_iso(row.created_at),
+    )
+
+
+def app_release_domain_to_api(release: AppRelease) -> dict:
+    data = release.to_dict()
+    data.pop("apk_url", None)
+    return data

@@ -32,6 +32,7 @@ from app.controllers import (
     product_controller,
     promotion_stage_controller,
     system_bug_controller,
+    app_release_controller,
     task_controller,
     task_gallery_controller,
     user_controller,
@@ -122,6 +123,7 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "direct_chat_audio").mkdir(exist_ok=True)
     (UPLOADS_DIR / "system_bug_screenshots").mkdir(exist_ok=True)
     (UPLOADS_DIR / "system_bug_audio").mkdir(exist_ok=True)
+    (UPLOADS_DIR / "app_apks").mkdir(exist_ok=True)
     # Prod/Vercel : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
     if not IS_PRODUCTION:
         app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
@@ -149,6 +151,9 @@ def create_app() -> FastAPI:
     )
     app.include_router(issue_report_controller.router, prefix="/api/issue-reports", tags=["issue-reports"])
     app.include_router(system_bug_controller.router, prefix="/api/system-bugs", tags=["system-bugs"])
+    app.include_router(
+        app_release_controller.router, prefix="/api/app-releases", tags=["app-releases"]
+    )
     app.include_router(direct_chat_controller.router, prefix="/api/direct-chats", tags=["direct-chats"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(

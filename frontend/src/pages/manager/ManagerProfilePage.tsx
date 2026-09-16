@@ -16,6 +16,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import PageHeader from "../../components/ui/PageHeader";
 import { he } from "../../i18n/he";
 import ManagerNetworkChatSetting from "../../components/manager/ManagerNetworkChatSetting";
+import AppUpdateCard from "../../components/appUpdate/AppUpdateCard";
 
 export default function ManagerProfilePage() {
   const { user, refresh } = useAuth();
@@ -201,6 +202,7 @@ export default function ManagerProfilePage() {
           </Box>
         </Box>
       </Paper>
+      <AppUpdateCard />
     </Box>
   );
 }

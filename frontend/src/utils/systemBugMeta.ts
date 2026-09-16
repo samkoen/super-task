@@ -1,7 +1,7 @@
 import type { User } from "../services/api";
 
 export function systemBugAppVersion(): string {
-  return "0.1.0";
+  return "1.1";
 }
 
 export function systemBugPreviewLabel(user: User | null | undefined): string {
