@@ -101,15 +101,15 @@ describe("completionMedia", () => {
     expect(effectiveRequirements({ photo_required: true })).toEqual([{ kind: "photo" }]);
   });
 
-  it("keeps title and example on visual slots only", () => {
+  it("keeps title and hint on audio, drops example", () => {
     expect(
       normalizeRequirements([
         { kind: "photo", title: "  מדף  ", hint: "  כל השורה  ", example_url: "/a.jpg" },
-        { kind: "audio", title: "no", hint: "no", example_url: "/x.jpg" },
+        { kind: "audio", title: "הקלטה", hint: "תאר", example_url: "/x.jpg" },
       ]),
     ).toEqual([
       { kind: "photo", title: "מדף", hint: "כל השורה", example_url: "/a.jpg" },
-      { kind: "audio" },
+      { kind: "audio", title: "הקלטה", hint: "תאר" },
     ]);
   });
 

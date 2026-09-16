@@ -1,10 +1,9 @@
-import { Accordion, AccordionDetails, AccordionSummary, Box, Button, IconButton, Stack, Typography } from "@mui/material";
+import { useState } from "react";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
-import type { ReactNode } from "react";
 import VisualRequirementCard from "./VisualRequirementCard";
 import { he } from "../../i18n/he";
 import {
@@ -16,27 +15,59 @@ import {
   setRequirementTitle,
   commitVideoSeconds,
   setVideoSeconds,
+  type CompletionKind,
   type CompletionRequirement,
 } from "../../utils/completionMedia";
+import {
+  nextOpenIndexAfterRemove,
+  requirementKindLabel,
+  requirementRowLabel,
+  requirementRowName,
+} from "../../utils/completionRequirementList";
 
 interface CompletionRequirementsEditorProps {
   value: CompletionRequirement[];
   onChange: (next: CompletionRequirement[]) => void;
   disabled?: boolean;
-  expandSlots?: boolean;
 }
 
 function revokeIfBlob(url: string | undefined): void {
   if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
 }
 
+function useOpenRequirement(
+  value: CompletionRequirement[],
+  onChange: (next: CompletionRequirement[]) => void,
+) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const add = (kind: CompletionKind) => {
+    const next = addRequirement(value, kind);
+    if (next.length === value.length) return;
+    onChange(next);
+    setOpenIndex(next.length - 1);
+  };
+
+  const remove = (index: number) => {
+    revokeIfBlob(value[index]?.example_url);
+    onChange(removeRequirement(value, index));
+    setOpenIndex((current) => nextOpenIndexAfterRemove(current, index));
+  };
+
+  const toggle = (index: number) => {
+    setOpenIndex((current) => (current === index ? null : index));
+  };
+
+  return { openIndex, add, remove, toggle };
+}
+
 export default function CompletionRequirementsEditor({
   value,
   onChange,
   disabled = false,
-  expandSlots = true,
 }: CompletionRequirementsEditorProps) {
   const canAdd = value.length < MAX_COMPLETION_REQUIREMENTS && !disabled;
+  const { openIndex, add, remove, toggle } = useOpenRequirement(value, onChange);
 
   return (
     <Box
@@ -54,10 +85,12 @@ export default function CompletionRequirementsEditor({
       <RequirementList
         value={value}
         disabled={disabled}
-        expandSlots={expandSlots}
+        openIndex={openIndex}
+        onToggle={toggle}
+        onRemove={remove}
         onChange={onChange}
       />
-      <AddRequirementButtons canAdd={canAdd} value={value} onChange={onChange} />
+      <AddRequirementButtons canAdd={canAdd} onAdd={add} />
     </Box>
   );
 }
@@ -76,12 +109,16 @@ function EditorIntro() {
 function RequirementList({
   value,
   disabled,
-  expandSlots,
+  openIndex,
+  onToggle,
+  onRemove,
   onChange,
 }: {
   value: CompletionRequirement[];
   disabled: boolean;
-  expandSlots: boolean;
+  openIndex: number | null;
+  onToggle: (index: number) => void;
+  onRemove: (index: number) => void;
   onChange: (next: CompletionRequirement[]) => void;
 }) {
   if (value.length === 0) {
@@ -98,10 +135,12 @@ function RequirementList({
           key={`${req.kind}-${index}`}
           req={req}
           index={index}
+          open={openIndex === index}
           disabled={disabled}
-          expandSlots={expandSlots}
-          onChange={onChange}
+          onToggle={() => onToggle(index)}
+          onRemove={() => onRemove(index)}
           value={value}
+          onChange={onChange}
         />
       ))}
     </Stack>
@@ -110,85 +149,22 @@ function RequirementList({
 
 function AddRequirementButtons({
   canAdd,
-  value,
-  onChange,
+  onAdd,
 }: {
   canAdd: boolean;
-  value: CompletionRequirement[];
-  onChange: (next: CompletionRequirement[]) => void;
+  onAdd: (kind: CompletionKind) => void;
 }) {
   return (
     <Box display="flex" flexWrap="wrap" gap={1}>
-      <Button size="small" variant="outlined" startIcon={<PhotoCameraIcon />} onClick={() => onChange(addRequirement(value, "photo"))} disabled={!canAdd}>
+      <Button size="small" variant="outlined" startIcon={<PhotoCameraIcon />} onClick={() => onAdd("photo")} disabled={!canAdd}>
         {he.completionAddPhotoReq}
       </Button>
-      <Button size="small" variant="outlined" startIcon={<VideocamIcon />} onClick={() => onChange(addRequirement(value, "video"))} disabled={!canAdd}>
+      <Button size="small" variant="outlined" startIcon={<VideocamIcon />} onClick={() => onAdd("video")} disabled={!canAdd}>
         {he.completionAddVideoReq}
       </Button>
-      <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={() => onChange(addRequirement(value, "audio"))} disabled={!canAdd}>
+      <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={() => onAdd("audio")} disabled={!canAdd}>
         {he.completionAddAudioReq}
       </Button>
-    </Box>
-  );
-}
-
-const SLOT_ACCORDION_SX = {
-  bgcolor: "action.hover",
-  borderRadius: 1.5,
-  "&:before": { display: "none" },
-  overflow: "hidden",
-};
-
-function kindLabel(kind: CompletionRequirement["kind"]): string {
-  if (kind === "video") return he.completionReqVideo;
-  if (kind === "audio") return he.completionReqAudio;
-  return he.completionReqPhoto;
-}
-
-function slotHeading(req: CompletionRequirement, index: number): string {
-  const base = `${he.completionRequirementN(index + 1)} · ${kindLabel(req.kind)}`;
-  const title = (req.title || "").trim();
-  return title ? `${base} · ${title}` : base;
-}
-
-function SlotAccordion({
-  heading,
-  defaultExpanded,
-  disabled,
-  onRemove,
-  children,
-}: {
-  heading: string;
-  defaultExpanded: boolean;
-  disabled: boolean;
-  onRemove: () => void;
-  children?: ReactNode;
-}) {
-  return (
-    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.25 }}>
-      <Accordion
-        defaultExpanded={defaultExpanded}
-        disableGutters
-        elevation={0}
-        sx={{ ...SLOT_ACCORDION_SX, flex: 1 }}
-      >
-        <AccordionSummary
-          expandIcon={<ExpandMoreIcon />}
-          sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 1 } }}
-        >
-          <Typography variant="body2" fontWeight={600}>
-            {heading}
-          </Typography>
-        </AccordionSummary>
-        {children ? (
-          <AccordionDetails sx={{ pt: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-            {children}
-          </AccordionDetails>
-        ) : null}
-      </Accordion>
-      <IconButton size="small" aria-label={he.removeMedia} disabled={disabled} onClick={onRemove} sx={{ mt: 0.75 }}>
-        <DeleteOutlineIcon fontSize="small" />
-      </IconButton>
     </Box>
   );
 }
@@ -196,30 +172,107 @@ function SlotAccordion({
 function RequirementItem({
   req,
   index,
+  open,
   disabled,
-  expandSlots,
+  onToggle,
+  onRemove,
+  value,
+  onChange,
+}: {
+  req: CompletionRequirement;
+  index: number;
+  open: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+  value: CompletionRequirement[];
+  onChange: (next: CompletionRequirement[]) => void;
+}) {
+  return (
+    <Box
+      sx={{
+        bgcolor: open ? "action.selected" : "action.hover",
+        borderRadius: 1.5,
+        overflow: "hidden",
+      }}
+    >
+      <RequirementRow req={req} open={open} disabled={disabled} onToggle={onToggle} onRemove={onRemove} />
+      {open && (
+        <RequirementSquare req={req} index={index} disabled={disabled} value={value} onChange={onChange} />
+      )}
+    </Box>
+  );
+}
+
+const ROW_BUTTON_SX = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 1,
+  flex: 1,
+  minHeight: 48,
+  px: 1,
+  border: 0,
+  bgcolor: "transparent",
+  font: "inherit",
+  color: "inherit",
+  textAlign: "start",
+} as const;
+
+function RequirementRow({
+  req,
+  open,
+  disabled,
+  onToggle,
+  onRemove,
+}: {
+  req: CompletionRequirement;
+  open: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  const label = requirementRowLabel(req);
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 0.5 }}>
+      <Box
+        component="button"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={label}
+        disabled={disabled}
+        sx={{ ...ROW_BUTTON_SX, cursor: disabled ? "default" : "pointer" }}
+      >
+        <Typography variant="body2" fontWeight={600}>
+          {requirementRowName(req)}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {requirementKindLabel(req.kind)}
+        </Typography>
+      </Box>
+      <IconButton size="small" aria-label={he.removeMedia} disabled={disabled} onClick={onRemove}>
+        <DeleteOutlineIcon fontSize="small" />
+      </IconButton>
+    </Box>
+  );
+}
+
+function RequirementSquare({
+  req,
+  index,
+  disabled,
   value,
   onChange,
 }: {
   req: CompletionRequirement;
   index: number;
   disabled: boolean;
-  expandSlots: boolean;
   value: CompletionRequirement[];
   onChange: (next: CompletionRequirement[]) => void;
 }) {
-  const heading = slotHeading(req, index);
-  const onRemove = () => {
-    revokeIfBlob(req.example_url);
-    onChange(removeRequirement(value, index));
-  };
-  if (req.kind === "audio") {
-    return (
-      <SlotAccordion heading={heading} defaultExpanded={expandSlots} disabled={disabled} onRemove={onRemove} />
-    );
-  }
   return (
-    <SlotAccordion heading={heading} defaultExpanded={expandSlots} disabled={disabled} onRemove={onRemove}>
+    <Box sx={{ px: 1.5, pb: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
       <VisualRequirementCard
         req={req}
         disabled={disabled}
@@ -232,6 +285,6 @@ function RequirementItem({
           onChange(setRequirementExample(value, index, url, file));
         }}
       />
-    </SlotAccordion>
+    </Box>
   );
 }

@@ -61,12 +61,14 @@ export default function VisualRequirementCard({
           onCommit={onSecondsCommit}
         />
       )}
-      <ExamplePhotoField
-        title={req.title}
-        exampleSrc={exampleSrc}
-        disabled={disabled}
-        onExample={onExample}
-      />
+      {req.kind !== "audio" && (
+        <ExamplePhotoField
+          title={req.title}
+          exampleSrc={exampleSrc}
+          disabled={disabled}
+          onExample={onExample}
+        />
+      )}
     </>
   );
 }
