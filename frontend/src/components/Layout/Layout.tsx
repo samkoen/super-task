@@ -58,6 +58,7 @@ import EmployeeChromeChatButton from "./EmployeeChromeChatButton";
 import EmployeeChromeMenu from "./EmployeeChromeMenu";
 import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
+import AppUpdateGuard from "../appUpdate/AppUpdateGuard";
 import { canViewSystemBugInbox, SYSTEM_BUG_INBOX_PATH } from "../../utils/systemBugInbox";
 import {
   managerBottomContentPadCss,
@@ -398,6 +399,7 @@ function Layout() {
           onOpen={chatAlerts.open}
           onClose={chatAlerts.dismiss}
         />
+        <AppUpdateGuard />
         <SystemBugLauncher />
       </Box>
       </LivePullToRefresh>
@@ -503,6 +505,7 @@ function Layout() {
         onOpen={chatAlerts.open}
         onClose={chatAlerts.dismiss}
       />
+      <AppUpdateGuard />
       <SystemBugLauncher />
     </Box>
   );

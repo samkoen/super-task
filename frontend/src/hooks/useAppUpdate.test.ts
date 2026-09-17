@@ -27,6 +27,7 @@ import { useAppUpdate } from "./useAppUpdate";
 
 describe("useAppUpdate", () => {
   beforeEach(() => {
+    localStorage.clear();
     latest.mockReset();
     getInstalledAppInfo.mockReset();
     canUseApkUpdate.mockReset();
@@ -47,6 +48,7 @@ describe("useAppUpdate", () => {
     const { result } = renderHook(() => useAppUpdate());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.updateAvailable).toBe(true);
+    expect(result.current.blockingUpdate).toBe(true);
   });
 
   it("asks for a fresh download URL at click time", async () => {
@@ -69,9 +71,26 @@ describe("useAppUpdate", () => {
     downloadAndInstallApk.mockResolvedValue(undefined);
     const { result } = renderHook(() => useAppUpdate());
     await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.blockingUpdate).toBe(true);
     await act(async () => {
       await result.current.downloadLatest();
     });
     expect(downloadAndInstallApk).toHaveBeenCalledWith("https://cdn.example/fresh.apk");
+    expect(result.current.blockingUpdate).toBe(false);
+  });
+
+  it("does not flag an update when the installed version already matches", async () => {
+    canUseApkUpdate.mockReturnValue(true);
+    getInstalledAppInfo.mockResolvedValue({ versionCode: 102, versionName: "1.2" });
+    latest.mockResolvedValue({
+      available: true,
+      version_code: 102,
+      version_name: "1.2",
+      download_url: "https://cdn.example/a.apk",
+    });
+    const { result } = renderHook(() => useAppUpdate());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.updateAvailable).toBe(false);
+    expect(result.current.blockingUpdate).toBe(false);
   });
 });

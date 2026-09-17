@@ -15,6 +15,17 @@ function Assert-Success {
     }
 }
 
+function Read-ApkVersion {
+    $gradle = Join-Path $PSScriptRoot "android\app\build.gradle"
+    $text = Get-Content $gradle -Raw
+    $name = if ($text -match 'versionName\s+"([^"]+)"') { $Matches[1] } else { "?" }
+    $code = if ($text -match '(?m)^\s*versionCode\s+(\d+)') { $Matches[1] } else { "?" }
+    return @{ Name = $name; Code = $code }
+}
+
+$apkVersion = Read-ApkVersion
+Write-Host "APK version : $($apkVersion.Name)" -ForegroundColor Cyan
+
 $envProd = Join-Path $PSScriptRoot ".env.production"
 $envExample = Join-Path $PSScriptRoot "env.production.example"
 if (-not (Test-Path $envProd) -and (Test-Path $envExample)) {
@@ -44,7 +55,7 @@ Set-Location (Join-Path $PSScriptRoot "android")
 Assert-Success "gradlew assembleRelease"
 
 $apkDir = Join-Path $PSScriptRoot "android\app\build\outputs\apk\release"
-Write-Host "`nOK - APK :" -ForegroundColor Green
+Write-Host "`nOK - APK $($apkVersion.Name) :" -ForegroundColor Green
 Get-ChildItem -Path $apkDir -Filter *.apk | ForEach-Object {
     Write-Host $_.FullName -ForegroundColor Green
 }

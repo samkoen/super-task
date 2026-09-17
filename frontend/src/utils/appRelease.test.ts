@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  fillVersionPlaceholders,
+  hasNewerAppRelease,
   isNewerAppRelease,
   isNewerAppVersion,
   nextVersionName,
@@ -19,6 +21,29 @@ describe("appRelease", () => {
     expect(isNewerAppVersion("1.0", "1.1")).toBe(true);
     expect(isNewerAppVersion("1.1", "1.1")).toBe(false);
     expect(isNewerAppRelease(100, 101)).toBe(true);
+  });
+
+  it("hides the update when the installed APK already matches latest", () => {
+    const installed = { versionCode: 102, versionName: "1.2" };
+    expect(
+      hasNewerAppRelease(installed, { available: true, version_code: 102, version_name: "1.2" }),
+    ).toBe(false);
+    expect(
+      hasNewerAppRelease(installed, { available: true, version_code: 103, version_name: "1.3" }),
+    ).toBe(true);
+    expect(
+      hasNewerAppRelease(
+        { versionCode: 103, versionName: "1.2" },
+        { available: true, version_code: 103, version_name: "1.3" },
+      ),
+    ).toBe(false);
+  });
+
+  it("fills version placeholders in warning copy", () => {
+    expect(fillVersionPlaceholders("חדש {latest} / ישן {current}", "1.2", "1.1")).toBe(
+      "חדש 1.2 / ישן 1.1",
+    );
+    expect(fillVersionPlaceholders("רק {latest}", "1.2")).toBe("רק 1.2");
   });
 
   it("keeps absolute download URLs", () => {
