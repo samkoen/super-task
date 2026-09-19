@@ -167,8 +167,9 @@ describe("useVideoRecorder", () => {
     vi.spyOn(videoEl, "play").mockResolvedValue();
     vi.spyOn(videoEl, "pause").mockImplementation(() => undefined);
     vi.spyOn(videoEl, "load").mockImplementation(() => undefined);
-    HTMLCanvasElement.prototype.getContext = () =>
-      ({ drawImage: vi.fn() }) as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
+    );
     const added: MediaStreamTrack[] = [];
     HTMLCanvasElement.prototype.captureStream = function () {
       return {

@@ -13,8 +13,9 @@ describe("startCanvasRecordStream", () => {
 
   it("records the canvas and copies audio tracks", () => {
     const added: MediaStreamTrack[] = [];
-    HTMLCanvasElement.prototype.getContext = () =>
-      ({ drawImage: vi.fn() }) as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
+    );
     HTMLCanvasElement.prototype.captureStream = function () {
       return {
         addTrack: (track: MediaStreamTrack) => added.push(track),

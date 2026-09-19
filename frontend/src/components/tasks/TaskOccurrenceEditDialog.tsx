@@ -260,7 +260,7 @@ async function loadEditTarget(
     done({
       ok: true,
       fresh,
-      employees: team.filter((u) => userBelongsToBranch(u, fresh.branch_id)),
+      employees: assigneesForBranch(team, fresh.branch_id),
     });
   } catch (e) {
     done({ ok: false, error: e instanceof ApiError ? e.message : he.errorGeneric });
