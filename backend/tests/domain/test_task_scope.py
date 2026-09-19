@@ -1,6 +1,7 @@
 from app.domain.scope import ActorContext
 from app.domain.task_scope import (
     can_review_assigned_work,
+    can_start_assigned_work,
     can_use_employee_work_surface,
     employee_can_see_occurrence,
 )
@@ -59,3 +60,9 @@ def test_branch_manager_sees_own_assigned_task_not_oved_tasks():
     assert employee_can_see_occurrence(_bm(), assignee_user_id="m1", branch_id="b1") is True
     assert employee_can_see_occurrence(_bm(), assignee_user_id="e1", branch_id="b1") is False
     assert employee_can_see_occurrence(_bm(), assignee_user_id="m1", branch_id="b2") is False
+
+
+def test_network_manager_can_start_own_assigned_work():
+    actor = ActorContext(user_id="nm", role="network_manager", network_id="n1")
+    assert can_start_assigned_work(actor, assignee_user_id="nm", branch_id="b1") is True
+    assert can_start_assigned_work(actor, assignee_user_id="e1", branch_id="b1") is False

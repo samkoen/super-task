@@ -16,7 +16,7 @@ import type { Branch } from "../../services/branchService";
 import type { TaskGalleryItem } from "../../services/taskGalleryService";
 import { he } from "../../i18n/he";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import { assigneeOptionLabel, assigneesForBranch } from "../../utils/assigneeOptions";
 
 export interface GalleryQuickAssignPayload {
   item: TaskGalleryItem;
@@ -37,6 +37,7 @@ interface GalleryQuickAssignDialogProps {
   saving?: boolean;
   onClose: () => void;
   onSubmit: (payload: GalleryQuickAssignPayload) => Promise<void>;
+  currentUserId?: string;
 }
 
 export default function GalleryQuickAssignDialog({
@@ -51,6 +52,7 @@ export default function GalleryQuickAssignDialog({
   saving = false,
   onClose,
   onSubmit,
+  currentUserId,
 }: GalleryQuickAssignDialogProps) {
   const [branchId, setBranchId] = useState("");
   const [assigneeUserId, setAssigneeUserId] = useState("");
@@ -66,8 +68,8 @@ export default function GalleryQuickAssignDialog({
   }, [open, item, defaultBranchId, defaultDueAt, defaultAssigneeId]);
 
   const branchEmployees = useMemo(
-    () => (branchId ? employees.filter((u) => userBelongsToBranch(u, branchId)) : employees),
-    [employees, branchId],
+    () => (branchId ? assigneesForBranch(employees, branchId, currentUserId) : employees),
+    [employees, branchId, currentUserId],
   );
 
   const thumb = item ? mediaUrl(item.reference_photo_url) : null;
@@ -158,7 +160,7 @@ export default function GalleryQuickAssignDialog({
           error={Boolean(localError && !assigneeUserId)}
         >
           {branchEmployees.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+            <MenuItem key={u.id} value={u.id}>{assigneeOptionLabel(u, currentUserId)}</MenuItem>
           ))}
         </TextField>
 

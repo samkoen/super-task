@@ -28,7 +28,7 @@ import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
 import { OPS_CATEGORIES, type OpsCategory, type TaskRecurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
-import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import { assigneeOptionLabel, assigneesForBranch } from "../../utils/assigneeOptions";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
 import {
@@ -90,6 +90,7 @@ export interface NewTaskFormDialogProps {
   initialPrefill?: Partial<Pick<NewTaskFormSubmitPayload, "title" | "description" | "assignee_user_id">>;
   saving?: boolean;
   onError?: (message: string) => void;
+  currentUserId?: string;
 }
 
 export default function NewTaskFormDialog({
@@ -109,6 +110,7 @@ export default function NewTaskFormDialog({
   initialPrefill,
   saving = false,
   onError,
+  currentUserId,
 }: NewTaskFormDialogProps) {
   const branches = asList<Branch>(branchesProp);
   const employees = asList<User>(employeesProp);
@@ -170,7 +172,7 @@ export default function NewTaskFormDialog({
 
   const branchEmployees = useMemo(() => {
     const base = effectiveBranchId
-      ? employees.filter((u) => userBelongsToBranch(u, effectiveBranchId))
+      ? assigneesForBranch(employees, effectiveBranchId, currentUserId)
       : employees;
     if (
       assigneeUserId &&
@@ -181,7 +183,7 @@ export default function NewTaskFormDialog({
       if (hit) return [hit, ...base];
     }
     return base;
-  }, [employees, effectiveBranchId, assigneeUserId]);
+  }, [employees, effectiveBranchId, assigneeUserId, currentUserId]);
 
   const branchName =
     branches.find((b) => b.id === effectiveBranchId)?.name || "";
@@ -377,7 +379,7 @@ export default function NewTaskFormDialog({
             </MenuItem>
           )}
           {branchEmployees.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+            <MenuItem key={u.id} value={u.id}>{assigneeOptionLabel(u, currentUserId)}</MenuItem>
           ))}
         </TextField>
         )}

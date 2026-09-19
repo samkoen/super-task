@@ -19,7 +19,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import { useAuth } from "../../context/AuthContext";
 import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
 import { he } from "../../i18n/he";
-import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import { assigneeOptionLabel, assigneesForBranch, withSelfAssignee } from "../../utils/assigneeOptions";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
 import { startUrlFieldError } from "../../utils/startUrl";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
@@ -99,9 +99,10 @@ export default function TaskOccurrenceEditDialog({
   }, [occurrenceId, employeesProp, onClose, showError, user?.role]);
 
   const editEmployees = useMemo(() => {
-    if (!target) return employees;
-    return employees.filter((u) => userBelongsToBranch(u, target.branch_id));
-  }, [employees, target]);
+    const staff = withSelfAssignee(employees, user);
+    if (!target) return staff;
+    return assigneesForBranch(staff, target.branch_id, user?.id);
+  }, [employees, target, user]);
 
   const handleSave = async () => {
     if (!target) return;
@@ -165,6 +166,7 @@ export default function TaskOccurrenceEditDialog({
               setForm={setForm}
               editEmployees={editEmployees}
               isBranchManager={isBranchManager}
+              currentUserId={user?.id}
             />
             <CompletionRequirementsEditor
               value={form.completion_requirements}
@@ -332,14 +334,16 @@ function AssigneeField({
   setForm,
   editEmployees,
   isBranchManager,
+  currentUserId,
 }: {
   target: TaskOccurrence;
   form: OccurrenceEditForm;
   setForm: Dispatch<SetStateAction<OccurrenceEditForm>>;
   editEmployees: User[];
   isBranchManager: boolean;
+  currentUserId?: string;
 }) {
-  if (!(isBranchManager || Boolean(form.assignee_user_id))) return null;
+  if (!(isBranchManager || Boolean(form.assignee_user_id) || Boolean(currentUserId))) return null;
   return (
     <TextField
       select
@@ -360,7 +364,7 @@ function AssigneeField({
       <MenuItem value="">{he.noAssignee}</MenuItem>
       {editEmployees.map((u) => (
         <MenuItem key={u.id} value={u.id}>
-          {u.full_name}
+          {assigneeOptionLabel(u, currentUserId)}
         </MenuItem>
       ))}
     </TextField>

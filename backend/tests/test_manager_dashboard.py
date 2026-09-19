@@ -9,6 +9,7 @@ from app.domain.manager_dashboard import (
     build_timeline_item,
     build_unfinished_item,
     duration_minutes,
+    exclude_assignee_tasks,
     hide_from_manager_review_queue,
     sort_timeline_tasks,
     task_queue_bucket,
@@ -217,3 +218,9 @@ def test_build_timeline_item_overdue_before_start():
     )
     assert item["segment"] == "overdue"
     assert item["started_at"] is None
+
+
+def test_exclude_assignee_tasks_drops_own_work():
+    mine = _task(id="mine", assignee_user_id="m1")
+    oved = _task(id="oved", assignee_user_id="e1")
+    assert [t.id for t in exclude_assignee_tasks([mine, oved], "m1")] == ["oved"]

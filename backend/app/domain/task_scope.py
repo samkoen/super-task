@@ -53,3 +53,16 @@ def can_review_assigned_work(actor: ActorContext, *, assignee_user_id: str | Non
     if assignee_user_id and assignee_user_id == actor.user_id:
         return False
     return True
+
+
+def can_start_assigned_work(
+    actor: ActorContext, *, assignee_user_id: str | None, branch_id: str
+) -> bool:
+    """Oved / menahel snif sur leur surface, ou menahel sur une tâche à lui."""
+    if employee_can_see_occurrence(
+        actor, assignee_user_id=assignee_user_id, branch_id=branch_id
+    ):
+        return True
+    return can_manage_tasks(actor) and bool(
+        assignee_user_id and assignee_user_id == actor.user_id
+    )

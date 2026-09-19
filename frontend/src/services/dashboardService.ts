@@ -159,6 +159,17 @@ export interface ManagerDashboard {
   recent_alerts: DashboardAlert[];
   branches: BranchSummary[] | null;
   manages_all_workers?: boolean;
+  my_work?: ManagerMyWork | null;
+}
+
+export interface ManagerMyWork {
+  urgent_tasks: EmployeeTaskCard[];
+  in_progress_tasks: EmployeeTaskCard[];
+  awaiting_response_tasks: EmployeeTaskCard[];
+  pending_review_tasks: EmployeeTaskCard[];
+  today_tasks: EmployeeTaskCard[];
+  completed_tasks: EmployeeTaskCard[];
+  progress_percent: number;
 }
 
 export interface EmployeeTaskCard {

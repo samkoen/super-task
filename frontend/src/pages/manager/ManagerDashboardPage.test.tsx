@@ -78,6 +78,32 @@ vi.mock("../../services/taskService", () => ({
   taskService: { getOccurrence: vi.fn() },
 }));
 
+vi.mock("../../services/directChatService", () => ({
+  directChatService: { inbox: vi.fn().mockResolvedValue({ items: [], up: null, unread_count: 0 }) },
+}));
+
+vi.mock("../../hooks/useOwnTaskWork", () => ({
+  useOwnTaskWork: () => ({
+    language: "he",
+    detailTask: null,
+    incompleteOpen: false,
+    closeIncomplete: vi.fn(),
+    confirmIncomplete: vi.fn(),
+    open: vi.fn(),
+    close: vi.fn(),
+    capture: undefined,
+  }),
+}));
+
+vi.mock("../../components/tasks/EmployeeTaskDetailDialog", () => ({ default: () => null }));
+vi.mock("../../components/tasks/IncompleteTaskSendDialog", () => ({ default: () => null }));
+vi.mock("../../components/chat/DirectChatThread", () => ({ default: () => null }));
+vi.mock("../../components/chat/FullscreenBackAppBar", () => ({
+  default: () => null,
+  fullscreenChatBodySx: {},
+  fullscreenChatDialogPaperSx: {},
+}));
+
 describe("ManagerDashboardPage", () => {
   beforeEach(() => {
     vi.mocked(dashboardService.getManager).mockResolvedValue({

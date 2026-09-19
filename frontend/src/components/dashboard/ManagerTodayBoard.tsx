@@ -1,16 +1,11 @@
 import { type ReactNode } from "react";
-import { Box, Button, Typography } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
-import type { ManagerDashboard } from "../../services/dashboardService";
-import { he } from "../../i18n/he";
-import ActionRequiredCarousel from "./ActionRequiredCarousel";
-import PendingTasksCarousel from "./PendingTasksCarousel";
-import StaffProgressOverview from "./StaffProgressOverview";
-import StoreStatusAnalysisTable from "./StoreStatusAnalysisTable";
-import StoreStatusKpiRow from "./StoreStatusKpiRow";
-
-const SHOW_STAFF_PROGRESS = true;
+import type { EmployeeTaskCard, ManagerDashboard, ManagerMyWork } from "../../services/dashboardService";
+import type { DirectChatCard } from "../../services/directChatService";
+import { emptyManagerMyWork } from "../../utils/managerUnreadChats";
+import { showAllWorkersDashboard } from "../../utils/networkDashboard";
+import ManagerActionsSection from "./ManagerActionsSection";
+import ManagerOwnTasksSection from "./ManagerOwnTasksSection";
+import ManagerTeamSection from "./ManagerTeamSection";
 
 export default function ManagerTodayBoard({
   data,
@@ -18,9 +13,12 @@ export default function ManagerTodayBoard({
   hint,
   showAnalysis,
   analysisExtra,
+  chats,
   onToggleAnalysis,
   onReviewTask,
   onOpenTask,
+  onOpenOwnTask,
+  onOpenChat,
   onChanged,
   onNewTask,
   onGalleryTask,
@@ -31,69 +29,43 @@ export default function ManagerTodayBoard({
   hint?: string;
   showAnalysis: boolean;
   analysisExtra?: ReactNode;
+  chats: DirectChatCard[];
   onToggleAnalysis: () => void;
   onReviewTask: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
+  onOpenOwnTask: (task: EmployeeTaskCard) => void;
+  onOpenChat: (card: DirectChatCard) => void;
   onChanged: () => void;
   onNewTask: () => void;
   onGalleryTask: () => void;
   onViewTasks: () => void;
 }) {
+  const work: ManagerMyWork = data.my_work ?? emptyManagerMyWork();
+  const showTeam = Boolean(data.branch) || showAllWorkersDashboard(data);
   return (
     <>
-      <Typography variant="subtitle1" fontWeight={700} mb={hint ? 0.5 : 1.5}>
-        {title ?? he.dashboardToday}
-      </Typography>
-      {hint ? (
-        <Typography variant="body2" color="text.secondary" mb={1.5}>
-          {hint}
-        </Typography>
+      <ManagerActionsSection
+        queues={data.task_queues}
+        chats={chats}
+        onReviewTask={onReviewTask}
+        onOpenChat={onOpenChat}
+      />
+      <ManagerOwnTasksSection work={work} onOpen={onOpenOwnTask} />
+      {showTeam ? (
+        <ManagerTeamSection
+          data={data}
+          title={title}
+          hint={hint}
+          showAnalysis={showAnalysis}
+          analysisExtra={analysisExtra}
+          onToggleAnalysis={onToggleAnalysis}
+          onOpenTask={onOpenTask}
+          onChanged={onChanged}
+          onNewTask={onNewTask}
+          onGalleryTask={onGalleryTask}
+          onViewTasks={onViewTasks}
+        />
       ) : null}
-      <StoreStatusKpiRow storeKpis={data.store_kpis} />
-      <ActionRequiredCarousel
-        queues={data.task_queues}
-        mode="questions"
-        onReviewTask={onReviewTask}
-      />
-      <PendingTasksCarousel
-        queues={data.task_queues}
-        onOpenTask={(task) => onOpenTask(task.id)}
-        onOpenStatusAnalysis={onToggleAnalysis}
-      />
-      {showAnalysis && (
-        <>
-          <StoreStatusAnalysisTable
-            team={data.team}
-            onOpenTask={(task) => onOpenTask(task.id)}
-            onClose={onToggleAnalysis}
-          />
-          {analysisExtra}
-        </>
-      )}
-      <ActionRequiredCarousel
-        queues={data.task_queues}
-        mode="reviews"
-        onReviewTask={onReviewTask}
-      />
-      <PendingTasksCarousel
-        kind="completed"
-        queues={data.task_queues}
-        onOpenTask={(task) => onOpenTask(task.id)}
-      />
-      {SHOW_STAFF_PROGRESS && (
-        <StaffProgressOverview team={data.team ?? []} onChanged={onChanged} />
-      )}
-      <Box display="flex" gap={2} flexWrap="wrap">
-        <Button variant="contained" startIcon={<AddIcon />} onClick={onNewTask}>
-          {he.newTask}
-        </Button>
-        <Button variant="outlined" startIcon={<AddIcon />} onClick={onGalleryTask}>
-          {he.newTaskFromGallery}
-        </Button>
-        <Button variant="outlined" startIcon={<TaskAltIcon />} onClick={onViewTasks}>
-          {he.dashboardViewTasks}
-        </Button>
-      </Box>
     </>
   );
 }

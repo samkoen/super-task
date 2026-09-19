@@ -56,6 +56,7 @@ import {
 } from "../../utils/managerTaskFilters";
 import { writeManagerScopeBranchId } from "../../utils/managerScopeBranch";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import { withSelfAssignee } from "../../utils/assigneeOptions";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
@@ -129,8 +130,11 @@ export default function ManagerTasksPage() {
   }, [canPickBranch, filterBranch, user?.branch_id]);
 
   const filterEmployees = useMemo(
-    () => (scopeBranchId ? employees.filter((u) => userBelongsToBranch(u, scopeBranchId)) : employees),
-    [employees, scopeBranchId]
+    () =>
+      scopeBranchId
+        ? employees.filter((u) => userBelongsToBranch(u, scopeBranchId) || u.id === user?.id)
+        : employees,
+    [employees, scopeBranchId, user?.id]
   );
 
   const displayedOccurrences = useMemo(
@@ -159,7 +163,7 @@ export default function ManagerTasksPage() {
       void Promise.all([branchService.list(), userService.listTeam("employee")])
         .then(([branchList, team]) => {
           setBranches(branchList);
-          setEmployees(team);
+          setEmployees(withSelfAssignee(team, user));
         })
         .catch(() => {
           /* filtres incomplets — la liste reste utilisable */
@@ -170,7 +174,7 @@ export default function ManagerTasksPage() {
     } finally {
       loadInFlight.current = false;
     }
-  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, showError]);
+  }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, showError, user]);
 
   useEffect(() => {
     load();
@@ -740,6 +744,7 @@ export default function ManagerTasksPage() {
         initialPrefill={formPrefill}
         saving={saving}
         onError={showError}
+        currentUserId={user?.id}
       />
 
       <TaskGalleryPickerDialog
@@ -762,6 +767,7 @@ export default function ManagerTasksPage() {
         saving={saving}
         onClose={() => setGalleryAssignItem(null)}
         onSubmit={handleGalleryQuickAssign}
+        currentUserId={user?.id}
       />
 
       <TaskOccurrenceEditDialog

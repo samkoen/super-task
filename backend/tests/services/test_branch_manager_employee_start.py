@@ -1,4 +1,5 @@
 """Démarrer une tâche assignée : oved et menahel dual-hat."""
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -76,3 +77,21 @@ def test_branch_manager_cannot_start_oved_task():
     )
     with pytest.raises(PermissionError, match="אין הרשאה"):
         _svc(occurrence_repo).start_occurrence(actor, "occ-1")
+
+
+def test_network_manager_can_start_own_assigned_task():
+    started = _occurrence(
+        status=task_status.IN_PROGRESS, assignee_user_id="nm", started_by_id="nm"
+    )
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = _occurrence(assignee_user_id="nm")
+    occurrence_repo.start.return_value = started
+    branch_repo = MagicMock()
+    branch_repo.find_by_id.return_value = SimpleNamespace(id="b1", network_id="n1")
+    branch_repo.list_branches.return_value = [SimpleNamespace(id="b1", network_id="n1")]
+    actor = ActorContext(user_id="nm", role=roles.NETWORK_MANAGER, network_id="n1")
+    svc = TaskOccurrenceService(occurrence_repo, MagicMock(), branch_repo, MagicMock())
+    stub_occurrence_batch_lookups(occurrence_repo, MagicMock())
+    result = svc.start_occurrence(actor, "occ-1")
+    occurrence_repo.start.assert_called_once()
+    assert result["status"] == task_status.IN_PROGRESS
