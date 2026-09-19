@@ -4,6 +4,7 @@ import {
   TASK_CHANGE_EVENT,
   type TaskChangeDetail,
 } from "../constants/events";
+import { isPageVisible, onPageVisible } from "../utils/pageVisible";
 import { resolveTaskChatPollMs } from "./useTaskChatLiveSync";
 
 const REFETCH_DEBOUNCE_MS = 250;
@@ -42,13 +43,17 @@ export function useDirectChatLiveSync(
     };
     window.addEventListener(TASK_CHANGE_EVENT, schedule);
     window.addEventListener(NOTIFICATION_EVENT, schedule);
+    const stopVisible = onPageVisible(() => onRefreshRef.current());
     let pollTimer: ReturnType<typeof setInterval> | undefined;
     if (pollMs > 0) {
-      pollTimer = setInterval(() => onRefreshRef.current(), pollMs);
+      pollTimer = setInterval(() => {
+        if (isPageVisible()) onRefreshRef.current();
+      }, pollMs);
     }
     return () => {
       if (timer) clearTimeout(timer);
       if (pollTimer) clearInterval(pollTimer);
+      stopVisible();
       window.removeEventListener(TASK_CHANGE_EVENT, schedule);
       window.removeEventListener(NOTIFICATION_EVENT, schedule);
     };

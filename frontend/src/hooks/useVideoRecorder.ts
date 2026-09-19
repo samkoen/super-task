@@ -9,9 +9,11 @@ import {
   oppositeCameraFacing,
   pickVideoRecorderMimeType,
   releaseMediaStream,
+  stopMediaTracks,
   videoRecorderOptions,
   type CameraFacing,
 } from "../utils/mediaCapture";
+import { startCanvasRecordStream } from "../utils/canvasRecordStream";
 
 export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
   const initialFacing = options?.defaultFacing ?? "environment";
@@ -33,10 +35,17 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
   const facingRef = useRef<CameraFacing>(initialFacing);
   const waitersRef = useRef<Array<(blob: Blob | null) => void>>([]);
   const releasingRef = useRef(Promise.resolve());
+  const recordingRef = useRef(false);
+  const canvasStopRef = useRef<(() => void) | null>(null);
+  const micTracksRef = useRef<MediaStreamTrack[]>([]);
 
   const supported = isMediaCaptureSupported();
 
   const discardLivePreview = useCallback(() => {
+    canvasStopRef.current?.();
+    canvasStopRef.current = null;
+    for (const track of micTracksRef.current) track.stop();
+    micTracksRef.current = [];
     const currentStream = streamRef.current;
     const video = videoRef.current;
     streamRef.current = null;
@@ -110,52 +119,66 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
     }
   }, [discardLivePreview, supported]);
 
+  const switchLiveVideo = useCallback(async (): Promise<"ready" | "failed" | "cancelled"> => {
+    const session = sessionRef.current + 1;
+    sessionRef.current = session;
+    setError("");
+    setStarting(true);
+    try {
+      const nextStream = await getUserMediaWithFallback(
+        cameraConstraints(facingRef.current, false),
+        { preserveLiveMedia: true },
+      );
+      if (session !== sessionRef.current) {
+        await releaseMediaStream(nextStream);
+        return "cancelled";
+      }
+      const previous = streamRef.current;
+      streamRef.current = nextStream;
+      setStream(nextStream);
+      if (videoRef.current) await attachStreamToVideo(videoRef.current, nextStream);
+      stopMediaTracks(previous, "video");
+      setPreviewReady(true);
+      return "ready";
+    } catch (caught) {
+      if (session !== sessionRef.current) return "cancelled";
+      setError(classifyMediaError(caught));
+      return "failed";
+    } finally {
+      if (session === sessionRef.current) setStarting(false);
+    }
+  }, []);
+
   const flip = useCallback(async () => {
-    if (recording) return;
+    if (recordingRef.current && !canvasStopRef.current) return;
     const previous = facingRef.current;
     facingRef.current = oppositeCameraFacing(previous);
     setFacing(facingRef.current);
-    const result = await startPreview();
+    const result = recordingRef.current ? await switchLiveVideo() : await startPreview();
     if (result !== "failed") return;
     facingRef.current = previous;
     setFacing(previous);
-    await startPreview();
-  }, [recording, startPreview]);
+    if (!recordingRef.current) await startPreview();
+  }, [startPreview, switchLiveVideo]);
 
   const startRecording = useCallback(() => {
     const currentStream = streamRef.current;
-    if (!currentStream || recording) return;
-    const mimeType = pickVideoRecorderMimeType();
-    const recorder = new MediaRecorder(currentStream, videoRecorderOptions(mimeType));
-    chunksRef.current = [];
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunksRef.current.push(event.data);
-    };
-    recorder.onstop = () => {
-      clearRecordingClock(tickRef);
-      if (startedAtRef.current) {
-        setElapsedSeconds(Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)));
-      }
-      recorder.ondataavailable = null;
-      recorder.onstop = null;
-      mediaRecorderRef.current = null;
-      const next = new Blob(chunksRef.current, { type: recorder.mimeType || "video/webm" });
-      setBlob(next);
-      setRecording(false);
-      void discardLivePreview();
-      waitersRef.current.splice(0).forEach((resolve) => resolve(next.size > 0 ? next : null));
-    };
-    mediaRecorderRef.current = recorder;
-    recorder.start();
-    startedAtRef.current = Date.now();
-    setElapsedSeconds(0);
-    tickRef.current = window.setInterval(() => {
-      if (startedAtRef.current) {
-        setElapsedSeconds(Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000)));
-      }
-    }, 250);
-    setRecording(true);
-  }, [discardLivePreview, recording]);
+    if (!currentStream || recordingRef.current) return;
+    const recordStream = openRecordStream(currentStream, videoRef.current, canvasStopRef, micTracksRef);
+    beginMediaRecorder({
+      recordStream,
+      mediaRecorderRef,
+      chunksRef,
+      waitersRef,
+      startedAtRef,
+      tickRef,
+      recordingRef,
+      setRecording,
+      setElapsedSeconds,
+      setBlob,
+      discardLivePreview,
+    });
+  }, [discardLivePreview]);
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -164,11 +187,13 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
         recorder.stop();
       } catch {
         mediaRecorderRef.current = null;
+        recordingRef.current = false;
         void discardLivePreview();
       }
       return;
     }
     mediaRecorderRef.current = null;
+    recordingRef.current = false;
     setRecording(false);
   }, [discardLivePreview]);
 
@@ -193,10 +218,12 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
         recorder.stop();
       } catch {
         mediaRecorderRef.current = null;
+        recordingRef.current = false;
         stopStream();
       }
     } else {
       mediaRecorderRef.current = null;
+      recordingRef.current = false;
       stopStream();
     }
     reset();
@@ -229,6 +256,72 @@ export function useVideoRecorder(options?: { defaultFacing?: CameraFacing }) {
     reset,
     flip,
   };
+}
+
+function openRecordStream(
+  cameraStream: MediaStream,
+  video: HTMLVideoElement | null,
+  canvasStopRef: { current: (() => void) | null },
+  micTracksRef: { current: MediaStreamTrack[] },
+): MediaStream {
+  micTracksRef.current = typeof cameraStream.getAudioTracks === "function"
+    ? cameraStream.getAudioTracks()
+    : [];
+  const canvas = video ? startCanvasRecordStream(video, cameraStream) : null;
+  canvasStopRef.current = canvas?.stop ?? null;
+  return canvas?.stream ?? cameraStream;
+}
+
+function beginMediaRecorder(opts: {
+  recordStream: MediaStream;
+  mediaRecorderRef: { current: MediaRecorder | null };
+  chunksRef: { current: Blob[] };
+  waitersRef: { current: Array<(blob: Blob | null) => void> };
+  startedAtRef: { current: number | null };
+  tickRef: { current: number | null };
+  recordingRef: { current: boolean };
+  setRecording: (value: boolean) => void;
+  setElapsedSeconds: (value: number) => void;
+  setBlob: (blob: Blob) => void;
+  discardLivePreview: () => void;
+}) {
+  const mimeType = pickVideoRecorderMimeType();
+  const recorder = new MediaRecorder(opts.recordStream, videoRecorderOptions(mimeType));
+  opts.chunksRef.current = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data.size > 0) opts.chunksRef.current.push(event.data);
+  };
+  recorder.onstop = () => finishRecorder(recorder, opts);
+  opts.mediaRecorderRef.current = recorder;
+  recorder.start();
+  opts.startedAtRef.current = Date.now();
+  opts.setElapsedSeconds(0);
+  opts.tickRef.current = window.setInterval(() => {
+    if (opts.startedAtRef.current) {
+      opts.setElapsedSeconds(Math.max(0, Math.round((Date.now() - opts.startedAtRef.current) / 1000)));
+    }
+  }, 250);
+  opts.recordingRef.current = true;
+  opts.setRecording(true);
+}
+
+function finishRecorder(
+  recorder: MediaRecorder,
+  opts: Parameters<typeof beginMediaRecorder>[0],
+) {
+  clearRecordingClock(opts.tickRef);
+  if (opts.startedAtRef.current) {
+    opts.setElapsedSeconds(Math.max(1, Math.round((Date.now() - opts.startedAtRef.current) / 1000)));
+  }
+  recorder.ondataavailable = null;
+  recorder.onstop = null;
+  opts.mediaRecorderRef.current = null;
+  const next = new Blob(opts.chunksRef.current, { type: recorder.mimeType || "video/webm" });
+  opts.setBlob(next);
+  opts.recordingRef.current = false;
+  opts.setRecording(false);
+  void opts.discardLivePreview();
+  opts.waitersRef.current.splice(0).forEach((resolve) => resolve(next.size > 0 ? next : null));
 }
 
 function clearRecordingClock(tickRef: { current: number | null }) {

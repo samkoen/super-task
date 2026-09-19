@@ -72,7 +72,7 @@ import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { he } from "../../i18n/he";
 import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
 import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
-import { userBelongsToBranch } from "../../utils/userBranchMembership";
+import { assigneeOptionLabel, assigneesForBranch, withSelfAssignee } from "../../utils/assigneeOptions";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
 import { startUrlFieldError } from "../../utils/startUrl";
 
@@ -133,7 +133,7 @@ export default function ManagerFixedTasksPage() {
         canPickBranch ? branchService.list() : Promise.resolve([] as Branch[]),
       ]);
       setTemplates(asTaskTemplates(tpl));
-      setEmployees(asList<User>(emps));
+      setEmployees(withSelfAssignee(asList<User>(emps), user));
       setBranches(asList<Branch>(branchList));
       setLoadError("");
     } catch (e) {
@@ -143,7 +143,7 @@ export default function ManagerFixedTasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [scopeBranchId, canPickBranch, showError]);
+  }, [scopeBranchId, canPickBranch, showError, user]);
 
   useEffect(() => {
     void load();
@@ -332,7 +332,7 @@ export default function ManagerFixedTasksPage() {
   const editEmployees = useMemo(() => {
     const staff = asList<User>(employees);
     if (!editing) return staff;
-    return staff.filter((u) => userBelongsToBranch(u, editing.branch_id));
+    return assigneesForBranch(staff, editing.branch_id, user?.id);
   }, [employees, editing]);
 
   return (
@@ -478,6 +478,7 @@ export default function ManagerFixedTasksPage() {
           forcedTaskKind="fixed"
           saving={createSaving}
           onError={showError}
+          currentUserId={user?.id}
         />
       )}
 
@@ -533,7 +534,7 @@ export default function ManagerFixedTasksPage() {
               required
             >
               {editEmployees.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
+                <MenuItem key={u.id} value={u.id}>{assigneeOptionLabel(u, user?.id)}</MenuItem>
               ))}
             </TextField>
             <TextField

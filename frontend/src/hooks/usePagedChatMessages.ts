@@ -4,11 +4,13 @@ import { mergeNewerMessages, mergeOlderMessages, type ChatMessagePage } from "..
 interface UsePagedChatMessagesOptions<T extends { id: string }> {
   enabled: boolean;
   fetchPage: (before?: string) => Promise<ChatMessagePage<T>>;
+  onError?: (error: unknown) => void;
 }
 
 export function usePagedChatMessages<T extends { id: string }>({
   enabled,
   fetchPage,
+  onError,
 }: UsePagedChatMessagesOptions<T>) {
   const [messages, setMessages] = useState<T[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -24,12 +26,12 @@ export function usePagedChatMessages<T extends { id: string }>({
       setMessages((prev) => (quiet ? mergeNewerMessages(prev, page.messages) : page.messages));
       if (!quiet) setHasMore(page.has_more);
       if (!quiet) stickToBottom.current = true;
-    } catch {
-      /* fetchPage signale l'erreur */
+    } catch (error) {
+      if (!quiet) onError?.(error);
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, [enabled, fetchPage]);
+  }, [enabled, fetchPage, onError]);
 
   const loadOlder = useCallback(async () => {
     if (!enabled || !hasMore || loadingOlder || messages.length === 0) return;
@@ -39,12 +41,12 @@ export function usePagedChatMessages<T extends { id: string }>({
       const page = await fetchPage(messages[0].id);
       setMessages((prev) => mergeOlderMessages(prev, page.messages));
       setHasMore(page.has_more);
-    } catch {
-      /* garder hasMore */
+    } catch (error) {
+      onError?.(error);
     } finally {
       setLoadingOlder(false);
     }
-  }, [enabled, fetchPage, hasMore, loadingOlder, messages]);
+  }, [enabled, fetchPage, hasMore, loadingOlder, messages, onError]);
 
   useEffect(() => {
     void loadLatest();

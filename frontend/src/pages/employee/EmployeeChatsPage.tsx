@@ -35,6 +35,7 @@ import {
 import {
   buildEmployeeChatRows,
   generalChatSummary,
+  taskChatListTitle,
   type EmployeeChatRow,
 } from "../../utils/employeeTaskChats";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
@@ -150,7 +151,7 @@ export default function EmployeeChatsPage() {
         PaperProps={{ sx: fullscreenChatDialogPaperSx }}
       >
         <FullscreenBackAppBar
-          title={taskChat?.title ?? he.taskChatTitle}
+          title={taskChat ? taskChatListTitle(taskChat.title, taskChat.due_at || taskChat.last_at) : he.taskChatTitle}
           onBack={() => {
             setTaskChat(null);
             void load();

@@ -18,7 +18,12 @@ def test_open_chat_tasks_exclude_closed():
 
 
 def test_card_uses_last_message_preview():
-    occ = SimpleNamespace(id="occ-1", title="מדף חלב", status=task_status.IN_PROGRESS)
+    occ = SimpleNamespace(
+        id="occ-1",
+        title="מדף חלב",
+        status=task_status.IN_PROGRESS,
+        due_at="2026-09-07T08:00:00+03:00",
+    )
     msg = SimpleNamespace(
         body="צריך עזרה",
         photo_url=None,
@@ -32,6 +37,7 @@ def test_card_uses_last_message_preview():
     assert card["title"] == "מדף חלב"
     assert card["last_preview"] == "צריך עזרה"
     assert card["last_at"] == "2026-09-07T10:00:00+03:00"
+    assert card["due_at"] == "2026-09-07T08:00:00+03:00"
 
 
 def test_card_preview_falls_back_to_media_icon():

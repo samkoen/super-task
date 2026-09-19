@@ -27,14 +27,12 @@ from app.repositories.department_repository import DepartmentRepository
 from app.domain.manager_dashboard import (
     build_timeline_item,
     build_unfinished_item,
+    exclude_assignee_tasks,
     hide_from_manager_review_queue,
     sort_timeline_tasks,
     task_queue_bucket,
 )
-from app.domain.employee_task_focus import (
-    sort_employee_open_focus,
-    sort_in_progress_focus_first,
-)
+from app.domain.employee_day_buckets import split_employee_day_tasks
 from app.domain.store_kpis import build_store_kpis
 from app.domain.quality_rating import aggregate_quality_ratings, empty_quality_summary
 from app.repositories.task_completion_repository import TaskCompletionRepository
@@ -48,7 +46,6 @@ from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
 
 TZ = ZoneInfo("Asia/Jerusalem")
-URGENT_EMPLOYEE_WINDOW = timedelta(hours=1)
 
 
 def _parse_due_at(value: str) -> datetime:
@@ -174,48 +171,10 @@ class DashboardService:
 
         user = self._users.find_by_id(actor.user_id)
         branch_name = self._occurrences.get_branch_name(actor.branch_id)
-
-        in_progress = sort_in_progress_focus_first(
-            [t for t in tasks_today if t.status == task_status.IN_PROGRESS]
-        )
-        awaiting_response = [
-            t for t in tasks_today if t.status == task_status.AWAITING_RESPONSE
-        ]
-        pending_review = [t for t in tasks_today if t.status == task_status.PENDING_REVIEW]
-        completed = [t for t in tasks_today if t.status == task_status.COMPLETED]
+        buckets = split_employee_day_tasks(tasks_today, now=now, tz=TZ)
         counts = _count_by_status(tasks_today)
-        has_in_progress = len(in_progress) > 0
-
-        urgent: list[TaskOccurrence] = []
-        seen: set[str] = set()
-        for task in sort_employee_open_focus(
-            [t for t in tasks_today if t.status in {task_status.OVERDUE, task_status.PENDING}],
-            has_in_progress=has_in_progress,
-        ):
-            if task.id in seen:
-                continue
-            due = _parse_due_at(task.due_at)
-            is_urgent = (
-                task.status == task_status.OVERDUE
-                or task.task_kind == "ad_hoc"
-                or bool(task.manager_next_at)
-                or (task.status == task_status.PENDING and due <= now + URGENT_EMPLOYEE_WINDOW)
-            )
-            if is_urgent:
-                urgent.append(task)
-                seen.add(task.id)
-
-        today_open = sort_employee_open_focus(
-            [
-                t
-                for t in tasks_today
-                if t.status in {task_status.PENDING, task_status.OVERDUE} and t.id not in seen
-            ],
-            has_in_progress=has_in_progress,
-        )
-
         progress = int(round(counts["completion_rate"] * 100))
-        on_shift = len(in_progress) > 0 or len(awaiting_response) > 0
+        on_shift = len(buckets.in_progress) > 0 or len(buckets.awaiting_response) > 0
         language = user.preferred_language if user else "he"
         quality = self._quality_summaries([actor.user_id]).get(
             actor.user_id, empty_quality_summary()
@@ -243,12 +202,12 @@ class DashboardService:
             "progress_percent": progress,
             "on_shift": on_shift,
             "counts": counts,
-            "urgent_tasks": await localize_cards(urgent),
-            "in_progress_tasks": await localize_cards(in_progress),
-            "awaiting_response_tasks": await localize_cards(awaiting_response),
-            "pending_review_tasks": await localize_cards(pending_review),
-            "today_tasks": await localize_cards(today_open),
-            "completed_tasks": await localize_cards(completed),
+            "urgent_tasks": await localize_cards(buckets.urgent),
+            "in_progress_tasks": await localize_cards(buckets.in_progress),
+            "awaiting_response_tasks": await localize_cards(buckets.awaiting_response),
+            "pending_review_tasks": await localize_cards(buckets.pending_review),
+            "today_tasks": await localize_cards(buckets.today_open),
+            "completed_tasks": await localize_cards(buckets.completed),
         }
 
     def _resolve_manager_branch(self, actor: ActorContext, branch_id: str | None) -> str | None:
@@ -288,6 +247,43 @@ class DashboardService:
             for_employee_user_id=for_employee_user_id,
             due_on=day,
         )
+
+    def _my_work_payload(self, actor: ActorContext, day: date, now: datetime) -> dict:
+        tasks = self._occurrences.list_occurrences(
+            assignee_user_id=actor.user_id,
+            due_on=day,
+        )
+        buckets = split_employee_day_tasks(tasks, now=now, tz=TZ)
+        counts = _count_by_status(tasks)
+        return {
+            "urgent_tasks": [self._employee_task_card(t) for t in buckets.urgent],
+            "in_progress_tasks": [self._employee_task_card(t) for t in buckets.in_progress],
+            "awaiting_response_tasks": [
+                self._employee_task_card(t) for t in buckets.awaiting_response
+            ],
+            "pending_review_tasks": [self._employee_task_card(t) for t in buckets.pending_review],
+            "today_tasks": [self._employee_task_card(t) for t in buckets.today_open],
+            "completed_tasks": [self._employee_task_card(t) for t in buckets.completed],
+            "progress_percent": int(round(counts["completion_rate"] * 100)),
+        }
+
+    def _attach_action_queues(
+        self,
+        payload: dict,
+        tasks: list[TaskOccurrence],
+        actor_id: str,
+        now: datetime,
+    ) -> None:
+        ovdim = exclude_assignee_tasks(tasks, actor_id)
+        done_ids = [
+            t.id
+            for t in ovdim
+            if t.status in {task_status.COMPLETED, task_status.PENDING_REVIEW}
+        ]
+        completion_map = self._with_promoted_media(
+            self._completions.find_by_occurrence_ids(done_ids)
+        )
+        payload["task_queues"] = self._task_queues(ovdim, completion_map, now)
 
     def _branch_manager_dashboard(
         self,
@@ -345,7 +341,8 @@ class DashboardService:
             day,
             now,
         )
-        task_queues = self._task_queues(tasks_today, completion_map, now)
+        ovdim_tasks = exclude_assignee_tasks(tasks_today, actor.user_id)
+        task_queues = self._task_queues(ovdim_tasks, completion_map, now)
         unfinished = self._unfinished_tasks(overdue_branch, day, now)
         store_kpis = build_store_kpis(tasks_today)
 
@@ -374,6 +371,7 @@ class DashboardService:
             "recent_alerts": alerts[:10],
             "branches": None,
             "manages_all_workers": False,
+            "my_work": self._my_work_payload(actor, day, now),
         }
 
     def _network_overview_dashboard(self, actor: ActorContext, day: date, now: datetime) -> dict:
@@ -386,6 +384,9 @@ class DashboardService:
         payload = self._network_overview_payload(actor, day, collected)
         if self._manages_all_workers(actor):
             self._fill_all_workers_overview(payload, actor, branch_ids, collected, day, now)
+        elif not payload.get("task_queues"):
+            self._attach_action_queues(payload, collected["tasks"], actor.user_id, now)
+        payload["my_work"] = self._my_work_payload(actor, day, now)
         return payload
 
     def _manages_all_workers(self, actor: ActorContext) -> bool:
@@ -514,10 +515,11 @@ class DashboardService:
             ),
             employees,
         )
+        ovdim_tasks = exclude_assignee_tasks(collected["tasks"], actor.user_id)
         payload["manages_all_workers"] = True
         payload["store_kpis"] = build_store_kpis(collected["tasks"])
         payload["team"] = team
-        payload["task_queues"] = self._task_queues(collected["tasks"], completion_map, now)
+        payload["task_queues"] = self._task_queues(ovdim_tasks, completion_map, now)
         payload["unfinished_tasks"] = self._unfinished_tasks(collected["overdue"], day, now)
         payload["counts"] = {
             **payload["counts"],

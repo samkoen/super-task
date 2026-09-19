@@ -14,6 +14,10 @@ export function isFailedToFetch(text: string): boolean {
   return /failed to fetch|network error/i.test(text);
 }
 
+export function isRequestTimeoutText(text: string): boolean {
+  return /timeout of \d+ms exceeded|etimedout|econnaborted/i.test(text);
+}
+
 export function isFetchInterruptedText(text: string): boolean {
   return isFetchScopeShutdown(text) || isFailedToFetch(text);
 }
@@ -38,6 +42,7 @@ export function humanizeApiError(payload: unknown, depth = 0): string {
       }
     }
     if (isRequestEntityTooLarge(text)) return he.errorRequestTooLarge;
+    if (isRequestTimeoutText(text)) return he.errorServerUnreachable;
     if (isFetchInterruptedText(text)) return he.errorFetchInterrupted;
     return text;
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ChatPhotoCapture, { exportAnnotatedChatPhoto } from "./ChatPhotoCapture";
 import { he } from "../../i18n/he";
@@ -15,13 +15,42 @@ const camera = vi.hoisted(() => ({
   videoRef: { current: {} as HTMLVideoElement },
 }));
 
+const video = vi.hoisted(() => ({
+  startPreview: vi.fn().mockResolvedValue("ready"),
+  startRecording: vi.fn(),
+  stopRecording: vi.fn(),
+  cleanup: vi.fn(),
+  reset: vi.fn(),
+  flip: vi.fn(),
+  onVideoRef: vi.fn(),
+  facing: "environment" as const,
+  recording: false,
+  previewReady: false,
+  starting: false,
+  blob: null as Blob | null,
+  elapsedSeconds: 0,
+  error: "",
+}));
+
 vi.mock("../../hooks/useCameraStream", () => ({
   useCameraStream: () => camera,
 }));
 
-vi.mock("../media/CameraFacingPreview", () => ({
-  default: () => <div data-testid="camera-preview" />,
+vi.mock("../../hooks/useVideoRecorder", () => ({
+  useVideoRecorder: () => video,
 }));
+
+vi.mock("../media/CameraFacingPreview", async () => {
+  const { he: labels } = await import("../../i18n/he");
+  return {
+    default: ({ flipDisabled }: { flipDisabled?: boolean }) => (
+      <div>
+        <div data-testid="camera-preview" />
+        <button type="button" aria-label={labels.mediaCaptureFlipCamera} disabled={flipDisabled} />
+      </div>
+    ),
+  };
+});
 
 vi.mock("../../utils/mediaCapture", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../utils/mediaCapture")>();
@@ -54,6 +83,20 @@ vi.mock("../media/PhotoAnnotationCanvas", async () => {
 });
 
 describe("ChatPhotoCapture", () => {
+  beforeEach(() => {
+    camera.start.mockClear();
+    camera.stop.mockClear();
+    video.startPreview.mockClear();
+    video.startRecording.mockClear();
+    video.stopRecording.mockClear();
+    video.cleanup.mockClear();
+    video.recording = false;
+    video.blob = null;
+    video.previewReady = false;
+    video.starting = false;
+    video.error = "";
+  });
+
   it("offers dual-camera capture", () => {
     render(
       <ChatPhotoCapture open uploading={false} onClose={vi.fn()} onSend={vi.fn()} />,
@@ -87,7 +130,7 @@ describe("ChatPhotoCapture", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: he.mediaCaptureUseRecording }));
     await waitFor(() => {
-      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "chat-photo.jpg" }));
+      expect(onSend).toHaveBeenCalledWith(expect.objectContaining({ name: "chat-photo.jpg" }), "photo");
       expect(onClose).toHaveBeenCalled();
     });
   });
@@ -102,5 +145,57 @@ describe("ChatPhotoCapture", () => {
     expect(result.type).toBe("image/jpeg");
     expect(result.size).toBe(original.size);
     expect(result.name).toMatch(/^chat-photo-/);
+  });
+
+  it("shows photo, video, flip and close on the live camera", () => {
+    render(
+      <ChatPhotoCapture open uploading={false} onClose={vi.fn()} onSend={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: he.cancel })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.mediaCaptureTakePhoto })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.chatCaptureVideo })).toBeTruthy();
+    expect(screen.getByLabelText(he.mediaCaptureFlipCamera)).toBeTruthy();
+  });
+
+  it("starts video recording from the video button", async () => {
+    render(
+      <ChatPhotoCapture open uploading={false} onClose={vi.fn()} onSend={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.chatCaptureVideo }));
+    await waitFor(() => {
+      expect(video.startPreview).toHaveBeenCalled();
+      expect(video.startRecording).toHaveBeenCalled();
+    });
+    expect(camera.stop).toHaveBeenCalled();
+  });
+
+  it("shows stop while a chat video is recording", async () => {
+    video.recording = true;
+    render(
+      <ChatPhotoCapture open uploading={false} onClose={vi.fn()} onSend={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.chatCaptureVideo }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: he.mediaCaptureStop })).toBeTruthy();
+    });
+    expect(screen.queryByRole("button", { name: he.mediaCaptureTakePhoto })).toBeNull();
+    expect((screen.getByLabelText(he.mediaCaptureFlipCamera) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("annotates a native seed photo without opening the live camera", () => {
+    render(
+      <ChatPhotoCapture
+        open
+        seedBlob={new Blob(["jpg"], { type: "image/jpeg" })}
+        uploading={false}
+        onClose={vi.fn()}
+        onSend={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("camera-preview")).toBeNull();
+    expect(screen.getByLabelText(he.photoAnnotateEllipse)).toBeTruthy();
+    expect(camera.start).not.toHaveBeenCalled();
   });
 });

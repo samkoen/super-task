@@ -4,17 +4,17 @@ import ManagerTodayBoard from "./ManagerTodayBoard";
 import { he } from "../../i18n/he";
 import type { ManagerDashboard } from "../../services/dashboardService";
 
-vi.mock("./StoreStatusKpiRow", () => ({ default: () => <div>kpi</div> }));
-vi.mock("./ActionRequiredCarousel", () => ({ default: () => null }));
-vi.mock("./PendingTasksCarousel", () => ({
-  default: ({ kind }: { kind?: string }) => (
-    <div>{kind === "completed" ? "completed-carousel" : "pending-carousel"}</div>
-  ),
+vi.mock("./ManagerActionsSection", () => ({
+  default: () => <div>actions-section</div>,
 }));
-vi.mock("./StaffProgressOverview", () => ({ default: () => <div>staff</div> }));
-vi.mock("./StoreStatusAnalysisTable", () => ({ default: () => null }));
+vi.mock("./ManagerOwnTasksSection", () => ({
+  default: () => <div>own-tasks-section</div>,
+}));
+vi.mock("./ManagerTeamSection", () => ({
+  default: ({ title }: { title?: string }) => <div>{title ?? "team-section"}</div>,
+}));
 
-function dash(): ManagerDashboard {
+function dash(partial: Partial<ManagerDashboard> = {}): ManagerDashboard {
   return {
     due_on: "2026-09-03",
     branch: null,
@@ -36,46 +36,43 @@ function dash(): ManagerDashboard {
     recent_alerts: [],
     branches: [],
     manages_all_workers: true,
+    ...partial,
   };
 }
 
+const boardProps = {
+  showAnalysis: false,
+  chats: [],
+  onToggleAnalysis: vi.fn(),
+  onReviewTask: vi.fn(),
+  onOpenTask: vi.fn(),
+  onOpenOwnTask: vi.fn(),
+  onOpenChat: vi.fn(),
+  onChanged: vi.fn(),
+  onNewTask: vi.fn(),
+  onGalleryTask: vi.fn(),
+  onViewTasks: vi.fn(),
+};
+
 describe("ManagerTodayBoard", () => {
-  it("shows the all-workers title and hint", () => {
+  it("shows actions and own tasks before the team section", () => {
     render(
       <ManagerTodayBoard
         data={dash()}
         title={he.dashboardAllWorkers}
         hint={he.dashboardAllWorkersHint}
-        showAnalysis={false}
-        onToggleAnalysis={vi.fn()}
-        onReviewTask={vi.fn()}
-        onOpenTask={vi.fn()}
-        onChanged={vi.fn()}
-        onNewTask={vi.fn()}
-        onGalleryTask={vi.fn()}
-        onViewTasks={vi.fn()}
+        {...boardProps}
       />,
     );
+    expect(screen.getByText("actions-section")).toBeTruthy();
+    expect(screen.getByText("own-tasks-section")).toBeTruthy();
     expect(screen.getByText(he.dashboardAllWorkers)).toBeTruthy();
-    expect(screen.getByText(he.dashboardAllWorkersHint)).toBeTruthy();
-    expect(screen.getByText(he.newTask)).toBeTruthy();
   });
 
-  it("shows pending work and completed task carousels", () => {
-    render(
-      <ManagerTodayBoard
-        data={dash()}
-        showAnalysis={false}
-        onToggleAnalysis={vi.fn()}
-        onReviewTask={vi.fn()}
-        onOpenTask={vi.fn()}
-        onChanged={vi.fn()}
-        onNewTask={vi.fn()}
-        onGalleryTask={vi.fn()}
-        onViewTasks={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("pending-carousel")).toBeTruthy();
-    expect(screen.getByText("completed-carousel")).toBeTruthy();
+  it("hides the team section on a network overview without all-workers", () => {
+    render(<ManagerTodayBoard data={dash({ manages_all_workers: false })} {...boardProps} />);
+    expect(screen.getByText("actions-section")).toBeTruthy();
+    expect(screen.queryByText("team-section")).toBeNull();
+    expect(screen.queryByText(he.dashboardAllWorkers)).toBeNull();
   });
 });

@@ -34,10 +34,12 @@ from app.domain.scope import ActorContext
 from app.domain.start_url import normalize_start_url
 from app.domain.task_chat_followup import parse_future_follow_up, status_after_chat_resolve
 from app.domain.task_kind import AD_HOC
+from app.domain.task_assignment import can_assign_user_to_branch
 from app.domain.task_scope import (
     branch_manager_owns_delegation,
     can_manage_tasks,
     can_review_assigned_work,
+    can_start_assigned_work,
     can_use_employee_work_surface,
     employee_can_see_occurrence,
     visible_branch_ids_for_tasks,
@@ -60,7 +62,6 @@ from app.domain.network_fixed_task import (
     select_network_create_branches,
     siblings_by_occurrence_content,
 )
-from app.domain.user_membership import employee_belongs_to_branch
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.task_gallery_repository import TaskGalleryRepository
 from app.repositories.notification_repository import NotificationRepository
@@ -471,12 +472,14 @@ class TaskOccurrenceService:
         occurrence = self._occurrences.find_by_id(occurrence_id)
         if not occurrence:
             raise ValueError("משימה לא נמצאה")
-        if not can_use_employee_work_surface(actor):
-            raise PermissionError("רק עובדים יכולים להתחיל משימות")
-        if not employee_can_see_occurrence(
-            actor, assignee_user_id=occurrence.assignee_user_id, branch_id=occurrence.branch_id
+        if not can_start_assigned_work(
+            actor,
+            assignee_user_id=occurrence.assignee_user_id,
+            branch_id=occurrence.branch_id,
         ):
             raise PermissionError("אין הרשאה לבצע משימה זו")
+        if not can_use_employee_work_surface(actor):
+            self._assert_branch_access(actor, occurrence.branch_id)
         if occurrence.status == task_status.IN_PROGRESS:
             return self._to_api(occurrence)
         if occurrence.status not in {task_status.PENDING, task_status.OVERDUE}:
@@ -1175,21 +1178,18 @@ class TaskOccurrenceService:
         user = self._users.find_by_id(assignee_user_id)
         if not user:
             raise ValueError("עובד לא שייך לסניף")
-        if user.role == roles.BRANCH_MANAGER:
-            if user.branch_id != branch_id:
-                raise ValueError("עובד לא שייך לסניף")
-            return
-        if user.role != roles.EMPLOYEE:
-            raise ValueError("עובד לא שייך לסניף")
+        branch = self._branch.find_by_id(branch_id) if self._branch else None
         member_ids = UserBranchMembershipRepository(self._users._db).list_branch_ids_for_user(
             user.id
         )
-        if not employee_belongs_to_branch(
-            primary_branch_id=user.branch_id,
-            membership_branch_ids=member_ids,
+        if can_assign_user_to_branch(
+            user,
             branch_id=branch_id,
+            membership_branch_ids=member_ids,
+            branch_network_id=branch.network_id if branch else None,
         ):
-            raise ValueError("עובד לא שייך לסניף")
+            return
+        raise ValueError("עובד לא שייך לסניף")
 
     def _assert_can_complete(self, actor: ActorContext, occurrence) -> None:
         if employee_can_see_occurrence(

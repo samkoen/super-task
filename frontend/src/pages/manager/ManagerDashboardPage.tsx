@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   CircularProgress,
+  Dialog,
   Grid,
   MenuItem,
   Paper,
@@ -26,10 +27,20 @@ import ManagerTodayBoard from "../../components/dashboard/ManagerTodayBoard";
 import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
+import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
+import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
+import IncompleteTaskSendDialog from "../../components/tasks/IncompleteTaskSendDialog";
+import DirectChatThread from "../../components/chat/DirectChatThread";
+import FullscreenBackAppBar, {
+  fullscreenChatBodySx,
+  fullscreenChatDialogPaperSx,
+} from "../../components/chat/FullscreenBackAppBar";
 import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
+import { useOwnTaskWork } from "../../hooks/useOwnTaskWork";
+import { useManagerInboxChats } from "../../hooks/useManagerInboxChats";
 import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
@@ -72,6 +83,7 @@ export default function ManagerDashboardPage() {
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const prevQuestionCountRef = useRef<number | null>(null);
+  const inbox = useManagerInboxChats();
 
   const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
   const scopeBranchId = canPickBranch
@@ -104,9 +116,14 @@ export default function ManagerDashboardPage() {
     }
   }, [canPickBranch, selectedBranch]);
 
+  const ownWork = useOwnTaskWork(() => {
+    void load(true);
+  });
+
   useTaskChangeListener(useCallback(() => {
     load(true);
-  }, [load]));
+    void inbox.reload();
+  }, [load, inbox.reload]));
 
   useEffect(() => bindNotificationAudioUnlock(), []);
 
@@ -247,6 +264,9 @@ export default function ManagerDashboardPage() {
       {loading && !data ? <ListSkeleton variant="dashboard" /> : null}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
+      {inbox.openError ? (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={inbox.clearOpenError}>{inbox.openError}</Alert>
+      ) : null}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
       {reviewLoading && (
         <Box display="flex" justifyContent="center" py={1}>
@@ -254,7 +274,27 @@ export default function ManagerDashboardPage() {
         </Box>
       )}
 
-      {data && !data.branch && data.branches && (
+      {data ? (
+        <ManagerTodayBoard
+          data={data}
+          title={showAllWorkersDashboard(data) ? he.dashboardAllWorkers : undefined}
+          hint={showAllWorkersDashboard(data) ? he.dashboardAllWorkersHint : undefined}
+          showAnalysis={showAnalysis}
+          analysisExtra={data.branch ? <PromotionStagesAnalysisTable stages={stages} /> : undefined}
+          chats={inbox.chats}
+          onToggleAnalysis={() => setShowAnalysis((v) => !v)}
+          onReviewTask={(id) => void handleReviewTask(id)}
+          onOpenTask={(id) => setEditOccurrenceId(id)}
+          onOpenOwnTask={ownWork.open}
+          onOpenChat={(card) => void inbox.openCard(card)}
+          onChanged={() => void load(true)}
+          onNewTask={() => goTasks({ openNewTask: true })}
+          onGalleryTask={() => goTasks({ openGalleryTask: true })}
+          onViewTasks={() => goTasks()}
+        />
+      ) : null}
+
+      {data && !data.branch && data.branches ? (
         <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
           <Typography variant="subtitle1" fontWeight={700} mb={2}>{he.dashboardBranchOverview}</Typography>
           <Grid container spacing={2}>
@@ -277,47 +317,14 @@ export default function ManagerDashboardPage() {
             ))}
           </Grid>
         </Paper>
-      )}
+      ) : null}
 
-      {data && showAllWorkersDashboard(data) && (
-        <Box mb={3}>
-          <ManagerTodayBoard
-            data={data}
-            title={he.dashboardAllWorkers}
-            hint={he.dashboardAllWorkersHint}
-            showAnalysis={showAnalysis}
-            onToggleAnalysis={() => setShowAnalysis((v) => !v)}
-            onReviewTask={(id) => void handleReviewTask(id)}
-            onOpenTask={(id) => setEditOccurrenceId(id)}
-            onChanged={() => void load(true)}
-            onNewTask={() => goTasks({ openNewTask: true })}
-            onGalleryTask={() => goTasks({ openGalleryTask: true })}
-            onViewTasks={() => goTasks()}
-          />
-        </Box>
-      )}
-
-      {data?.branch && (
-        <>
-          <ManagerTodayBoard
-            data={data}
-            showAnalysis={showAnalysis}
-            analysisExtra={<PromotionStagesAnalysisTable stages={stages} />}
-            onToggleAnalysis={() => setShowAnalysis((v) => !v)}
-            onReviewTask={(id) => void handleReviewTask(id)}
-            onOpenTask={(id) => setEditOccurrenceId(id)}
-            onChanged={() => void load(true)}
-            onNewTask={() => goTasks({ openNewTask: true })}
-            onGalleryTask={() => goTasks({ openGalleryTask: true })}
-            onViewTasks={() => goTasks()}
-          />
-          {SHOW_DEPARTMENT_PROGRESS &&
-            data.by_department &&
-            data.by_department.length > 0 && (
-              <DepartmentProgressGrid departments={data.by_department} />
-            )}
-        </>
-      )}
+      {SHOW_DEPARTMENT_PROGRESS &&
+        data?.branch &&
+        data.by_department &&
+        data.by_department.length > 0 && (
+          <DepartmentProgressGrid departments={data.by_department} />
+        )}
 
       <TaskCompletionReviewDialog
         task={reviewTarget}
@@ -335,6 +342,38 @@ export default function ManagerDashboardPage() {
           void load(true);
         }}
       />
+      <EmployeeTaskDetailDialog
+        task={ownWork.detailTask}
+        language={ownWork.language}
+        titleNode={
+          ownWork.detailTask ? <EmployeeTaskTitle task={ownWork.detailTask} variant="h6" /> : null
+        }
+        onClose={ownWork.close}
+        capture={ownWork.capture}
+        onChatUpdated={() => {
+          void load(true);
+        }}
+      />
+      <IncompleteTaskSendDialog
+        open={ownWork.incompleteOpen}
+        saving={Boolean(ownWork.capture?.saving)}
+        onClose={ownWork.closeIncomplete}
+        onConfirm={ownWork.confirmIncomplete}
+      />
+      <Dialog
+        fullScreen
+        open={Boolean(inbox.openChat)}
+        onClose={inbox.closeChat}
+        dir="rtl"
+        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
+      >
+        <FullscreenBackAppBar title={inbox.openChat?.title ?? ""} onBack={inbox.closeChat} />
+        <Box sx={fullscreenChatBodySx}>
+          {inbox.openChat ? (
+            <DirectChatThread conversationId={inbox.openChat.id} onSent={() => void inbox.reload()} />
+          ) : null}
+        </Box>
+      </Dialog>
     </Box>
   );
 }

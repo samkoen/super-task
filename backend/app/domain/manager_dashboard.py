@@ -115,6 +115,11 @@ def sort_timeline_tasks(tasks: list[TaskOccurrence], tz) -> list[TaskOccurrence]
     return sorted(tasks, key=key)
 
 
+def exclude_assignee_tasks(tasks: list[TaskOccurrence], user_id: str) -> list[TaskOccurrence]:
+    """Les tâches du menahel lui-même ne sont pas des actions sur les ovdim."""
+    return [task for task in tasks if task.assignee_user_id != user_id]
+
+
 def hide_from_manager_review_queue(status: str, completion) -> bool:
     """L'oved a envoyé, mais le menahel n'ichour pas tant que Blob n'est pas lu."""
     if status != task_status.PENDING_REVIEW:

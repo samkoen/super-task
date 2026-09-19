@@ -21,7 +21,7 @@ from app.domain.scope import ActorContext
 from app.domain.task_scope import can_manage_tasks, visible_branch_ids_for_tasks
 from app.domain.team_roster import worker_roles_for_roster
 from app.domain.task_title_from_description import resolve_create_title
-from app.domain.user_membership import employee_belongs_to_branch
+from app.domain.task_assignment import can_assign_user_to_branch
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -549,13 +549,15 @@ class TaskTemplateService:
             user = self._users.find_by_id(assignee_user_id)
             if not user:
                 raise ValueError("עובד לא שייך לסניף")
+            branch = self._branch.find_by_id(branch_id)
             member_ids = UserBranchMembershipRepository(self._users._db).list_branch_ids_for_user(
                 user.id
             )
-            if not employee_belongs_to_branch(
-                primary_branch_id=user.branch_id,
-                membership_branch_ids=member_ids,
+            if not can_assign_user_to_branch(
+                user,
                 branch_id=branch_id,
+                membership_branch_ids=member_ids,
+                branch_network_id=branch.network_id if branch else None,
             ):
                 raise ValueError("עובד לא שייך לסניף")
         if department_id:
