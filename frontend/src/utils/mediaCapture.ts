@@ -82,8 +82,21 @@ export async function releaseMediaStream(
   await ended;
 }
 
+export function stopMediaTracks(
+  stream: MediaStream | null | undefined,
+  kind?: "video" | "audio",
+): void {
+  if (!stream) return;
+  for (const track of stream.getTracks()) {
+    if (kind && track.kind !== kind) continue;
+    track.stop();
+    if (typeof stream.removeTrack === "function") stream.removeTrack(track);
+  }
+}
+
 export async function getUserMediaWithFallback(
-  constraintsList: MediaStreamConstraints[]
+  constraintsList: MediaStreamConstraints[],
+  options?: { preserveLiveMedia?: boolean },
 ): Promise<MediaStream> {
   const needCamera = constraintsList.some((c) => Boolean(c.video));
   const needMic = constraintsList.some((c) => Boolean(c.audio));
@@ -96,11 +109,7 @@ export async function getUserMediaWithFallback(
     throw new DOMException("Permission denied", "NotAllowedError");
   }
 
-  pauseAllMediaElements();
-  if (typeof document !== "undefined" && document.querySelector("video, audio")) {
-    await delay(300);
-  }
-
+  await prepareCaptureDevices(options?.preserveLiveMedia);
   let lastError: unknown;
   for (const constraints of constraintsList) {
     try {
@@ -111,6 +120,14 @@ export async function getUserMediaWithFallback(
     }
   }
   throw lastError ?? new DOMException("No device", "NotFoundError");
+}
+
+async function prepareCaptureDevices(preserveLiveMedia?: boolean): Promise<void> {
+  if (preserveLiveMedia) return;
+  pauseAllMediaElements();
+  if (typeof document !== "undefined" && document.querySelector("video, audio")) {
+    await delay(300);
+  }
 }
 
 async function getUserMediaAllowingBusy(constraints: MediaStreamConstraints): Promise<MediaStream> {

@@ -74,6 +74,10 @@ describe("useTaskChatLiveSync", () => {
 
   it("polls every configured interval", () => {
     const onRefresh = vi.fn();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
     renderHook(() => useTaskChatLiveSync("occ-1", onRefresh, { pollMs: 10_000 }));
 
     vi.advanceTimersByTime(9_999);
@@ -82,6 +86,28 @@ describe("useTaskChatLiveSync", () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(10_000);
     expect(onRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not poll while the app is in the background", () => {
+    const onRefresh = vi.fn();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "hidden",
+    });
+    renderHook(() => useTaskChatLiveSync("occ-1", onRefresh, { pollMs: 10_000 }));
+    vi.advanceTimersByTime(20_000);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it("refreshes when returning to the chat", () => {
+    const onRefresh = vi.fn();
+    renderHook(() => useTaskChatLiveSync("occ-1", onRefresh, { pollMs: false }));
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
   it("skips events for another occurrence", () => {

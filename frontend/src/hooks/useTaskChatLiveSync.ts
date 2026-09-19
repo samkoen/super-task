@@ -4,6 +4,7 @@ import {
   TASK_CHANGE_EVENT,
   type TaskChangeDetail,
 } from "../constants/events";
+import { isPageVisible, onPageVisible } from "../utils/pageVisible";
 
 /** Poll de secours chat (APK sans SSE / Render SSE hors WebView). */
 export const DEFAULT_TASK_CHAT_POLL_MS = 10_000;
@@ -64,16 +65,18 @@ export function useTaskChatLiveSync(
     window.addEventListener(TASK_CHANGE_EVENT, schedule);
     window.addEventListener(NOTIFICATION_EVENT, schedule);
 
+    const stopVisible = onPageVisible(() => onRefreshRef.current());
     let pollTimer: ReturnType<typeof setInterval> | undefined;
     if (pollMs > 0) {
       pollTimer = setInterval(() => {
-        onRefreshRef.current();
+        if (isPageVisible()) onRefreshRef.current();
       }, pollMs);
     }
 
     return () => {
       if (timer) clearTimeout(timer);
       if (pollTimer) clearInterval(pollTimer);
+      stopVisible();
       window.removeEventListener(TASK_CHANGE_EVENT, schedule);
       window.removeEventListener(NOTIFICATION_EVENT, schedule);
     };

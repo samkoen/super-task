@@ -76,6 +76,26 @@ describe("mediaCapture", () => {
     vi.unstubAllGlobals();
   });
 
+  it("preserveLiveMedia keeps the current preview playing", async () => {
+    const video = document.createElement("video");
+    const src = { getTracks: () => [] } as unknown as MediaStream;
+    video.srcObject = src;
+    document.body.appendChild(video);
+    const pause = vi.spyOn(video, "pause").mockImplementation(() => undefined);
+    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    vi.stubGlobal("navigator", {
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(stream) },
+    });
+
+    await expect(
+      getUserMediaWithFallback([{ video: true }], { preserveLiveMedia: true }),
+    ).resolves.toBe(stream);
+    expect(pause).not.toHaveBeenCalled();
+    expect(video.srcObject).toBe(src);
+    video.remove();
+    vi.unstubAllGlobals();
+  });
+
   it("getUserMediaWithFallback retries when Chrome still reports the camera busy", async () => {
     vi.useFakeTimers();
     const stream = { getTracks: () => [] } as unknown as MediaStream;

@@ -85,4 +85,18 @@ describe("useChatThread", () => {
     expect(transport.upload).toHaveBeenCalledWith(file, "file");
     expect(transport.send).toHaveBeenCalledWith({ file_url: "/f.pdf", file_name: "a.pdf" });
   });
+
+  it("does not show a send error when listing messages times out in the background", async () => {
+    const transport = fakeTransport({
+      list: vi.fn()
+        .mockResolvedValueOnce({ messages: [], has_more: false })
+        .mockRejectedValueOnce(new Error("timeout of 30000ms exceeded")),
+    });
+    const { result } = renderHook(() => useChatThread({ transport, enabled: true }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.loadLatest(true);
+    });
+    expect(result.current.error).toBe("");
+  });
 });

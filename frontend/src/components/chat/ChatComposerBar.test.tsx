@@ -22,16 +22,6 @@ vi.mock("../../hooks/useAudioRecorder", () => ({
   useAudioRecorder: () => audioState,
 }));
 
-vi.mock("../../hooks/useVideoRecorder", () => ({
-  useVideoRecorder: () => ({
-    startPreview: vi.fn().mockResolvedValue("failed"),
-    startRecording: vi.fn(),
-    stopAndWait: vi.fn().mockResolvedValue(null),
-    cleanup: vi.fn(),
-    onVideoRef: vi.fn(),
-  }),
-}));
-
 vi.mock("./ChatPhotoCapture", () => ({
   default: ({ open }: { open: boolean }) => (open ? <div>{he.mediaCapturePhotoTitle}</div> : null),
 }));
@@ -160,7 +150,7 @@ describe("ChatComposerBar", () => {
     expect(screen.queryByText(he.chatAudioButtons)).toBeNull();
   });
 
-  it("opens the camera on a short tap", () => {
+  it("opens the camera on click", () => {
     render(
       <ChatComposerBar
         body=""
@@ -170,8 +160,7 @@ describe("ChatComposerBar", () => {
         onSendMedia={vi.fn()}
       />,
     );
-    fireEvent.pointerDown(screen.getByLabelText(he.chatCameraAction));
-    fireEvent.pointerUp(screen.getByLabelText(he.chatCameraAction));
+    fireEvent.click(screen.getByLabelText(he.chatCameraAction));
     expect(screen.getByText(he.mediaCapturePhotoTitle)).toBeTruthy();
   });
 

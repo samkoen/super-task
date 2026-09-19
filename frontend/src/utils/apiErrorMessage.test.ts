@@ -50,6 +50,15 @@ describe("apiErrorMessage", () => {
     );
   });
 
+  it("maps axios timeouts to a connection error instead of the raw English text", () => {
+    expect(apiErrorMessage(new Error("timeout of 30000ms exceeded"), he.errorGeneric)).toBe(
+      he.errorServerUnreachable,
+    );
+    expect(apiErrorMessage(new Error("ECONNABORTED"), he.errorGeneric)).toBe(
+      he.errorServerUnreachable,
+    );
+  });
+
   it("detects interrupt errors used for upload retries", () => {
     expect(isFetchInterruptedError(new TypeError("Failed to fetch"))).toBe(true);
     expect(isFetchInterruptedError(new Error("upload failed"))).toBe(false);

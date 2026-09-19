@@ -1,6 +1,7 @@
 import { he } from "../i18n/he";
 import type { DirectChatCard } from "../services/directChatService";
 import type { EmployeeTaskChat } from "../services/taskService";
+import { formatChatDayBadge, messageDayKey } from "./chatDay";
 
 export type EmployeeChatRow =
   | {
@@ -47,9 +48,14 @@ export function buildEmployeeChatRows(
     ...tasks.map((task) => ({
       kind: "task" as const,
       id: task.id,
-      title: task.title,
+      title: taskChatListTitle(task.title, task.due_at || task.last_at),
       last_preview: task.last_preview,
       last_at: task.last_at,
     })),
   ];
+}
+
+export function taskChatListTitle(title: string, dateIso?: string | null): string {
+  const day = dateIso ? messageDayKey(dateIso) : "";
+  return day ? `${title} · ${formatChatDayBadge(day)}` : title;
 }

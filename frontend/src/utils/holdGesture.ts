@@ -8,18 +8,30 @@ export function createHoldGesture(handlers: {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let holding = false;
   let active = false;
+  let handled = false;
 
   const clearTimer = () => {
     if (timer !== undefined) clearTimeout(timer);
     timer = undefined;
   };
 
+  const finishHold = () => {
+    holding = false;
+    handled = true;
+    handlers.onHoldEnd();
+  };
+
+  const tap = () => {
+    handled = true;
+    handlers.onTap();
+  };
+
   return {
-    onPointerDown(event: { pointerId: number; currentTarget: { setPointerCapture?: (id: number) => void } }) {
+    onPointerDown() {
       if (active) return;
       active = true;
       holding = false;
-      event.currentTarget.setPointerCapture?.(event.pointerId);
+      handled = false;
       timer = setTimeout(() => {
         holding = true;
         handlers.onHoldStart();
@@ -30,20 +42,24 @@ export function createHoldGesture(handlers: {
       active = false;
       clearTimer();
       if (holding) {
-        holding = false;
-        handlers.onHoldEnd();
+        finishHold();
         return;
       }
-      handlers.onTap();
+      tap();
     },
     onPointerCancel() {
       if (!active) return;
       active = false;
       clearTimer();
       if (holding) {
-        holding = false;
-        handlers.onHoldEnd();
+        finishHold();
+        return;
       }
+      tap();
+    },
+    onClick() {
+      if (handled || holding) return;
+      tap();
     },
   };
 }

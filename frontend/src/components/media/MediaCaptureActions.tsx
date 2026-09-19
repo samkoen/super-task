@@ -348,7 +348,7 @@ function VideoCaptureDialog({
             onVideoRef={onVideoRef}
             facing={facing}
             onFlip={flip}
-            flipDisabled={starting || recording}
+            flipDisabled={starting}
           />
         )}
         {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}

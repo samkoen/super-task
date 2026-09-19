@@ -158,4 +158,57 @@ describe("useVideoRecorder", () => {
     const last = getUserMedia.mock.calls.at(-1)?.[0] as { video?: { facingMode?: { ideal?: string } } };
     expect(last.video?.facingMode?.ideal).toBe("user");
   });
+
+  it("switches to the selfie camera while recording", async () => {
+    const videoEl = document.createElement("video");
+    Object.defineProperty(videoEl, "videoWidth", { value: 64 });
+    Object.defineProperty(videoEl, "videoHeight", { value: 48 });
+    Object.defineProperty(videoEl, "readyState", { value: HTMLMediaElement.HAVE_CURRENT_DATA });
+    vi.spyOn(videoEl, "play").mockResolvedValue();
+    vi.spyOn(videoEl, "pause").mockImplementation(() => undefined);
+    vi.spyOn(videoEl, "load").mockImplementation(() => undefined);
+    HTMLCanvasElement.prototype.getContext = () =>
+      ({ drawImage: vi.fn() }) as unknown as CanvasRenderingContext2D;
+    const added: MediaStreamTrack[] = [];
+    HTMLCanvasElement.prototype.captureStream = function () {
+      return {
+        addTrack: (track: MediaStreamTrack) => added.push(track),
+        getTracks: () => added,
+        getAudioTracks: () => added.filter((t) => t.kind === "audio"),
+      } as unknown as MediaStream;
+    };
+    const backVideoStop = vi.fn();
+    const micStop = vi.fn();
+    const mic = { kind: "audio", stop: micStop } as unknown as MediaStreamTrack;
+    const back = {
+      getTracks: () => [{ kind: "video", stop: backVideoStop }, mic],
+      getAudioTracks: () => [mic],
+      removeTrack: vi.fn(),
+    };
+    const front = {
+      getTracks: () => [{ kind: "video", stop: vi.fn() }],
+      getAudioTracks: () => [],
+      removeTrack: vi.fn(),
+    };
+    const getUserMedia = vi.fn().mockResolvedValueOnce(back).mockResolvedValueOnce(front);
+    vi.stubGlobal("navigator", { mediaDevices: { getUserMedia } });
+
+    const { result } = renderHook(() => useVideoRecorder());
+    act(() => result.current.onVideoRef(videoEl));
+    await act(async () => {
+      await result.current.startPreview();
+    });
+    act(() => {
+      result.current.startRecording();
+    });
+    expect(result.current.recording).toBe(true);
+    await act(async () => {
+      await result.current.flip();
+    });
+    expect(result.current.recording).toBe(true);
+    expect(result.current.facing).toBe("user");
+    expect(result.current.blob).toBeNull();
+    expect(backVideoStop).toHaveBeenCalled();
+    expect(micStop).not.toHaveBeenCalled();
+  });
 });

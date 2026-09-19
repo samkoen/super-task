@@ -34,13 +34,8 @@ export function useChatThread(opts: { transport: ChatTransport; enabled: boolean
   const { sending, error, setError, runBusy } = useChatBusy();
 
   const fetchPage = useCallback(async (before?: string) => {
-    try {
-      return await transportRef.current.list(before);
-    } catch (e) {
-      setError(chatErrorMessage(e));
-      throw e;
-    }
-  }, [setError]);
+    return transportRef.current.list(before);
+  }, []);
 
   const paged = usePagedChatMessages({ enabled: opts.enabled, fetchPage });
   const send = useChatSend({

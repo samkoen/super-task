@@ -21,6 +21,7 @@ def employee_task_chat_card(occurrence, last_message) -> dict:
         "id": occurrence.id,
         "title": occurrence.title,
         "status": occurrence.status,
+        "due_at": getattr(occurrence, "due_at", None),
         "last_preview": preview or None,
         "last_at": last_message.created_at,
     }

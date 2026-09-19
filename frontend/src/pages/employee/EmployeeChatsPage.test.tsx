@@ -4,6 +4,7 @@ import EmployeeChatsPage from "./EmployeeChatsPage";
 import { he } from "../../i18n/he";
 import { directChatService } from "../../services/directChatService";
 import { taskService } from "../../services/taskService";
+import { taskChatListTitle } from "../../utils/employeeTaskChats";
 
 vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
@@ -66,8 +67,17 @@ describe("EmployeeChatsPage", () => {
           id: "occ-1",
           title: "מדף חלב",
           status: "in_progress",
+          due_at: "2026-09-07T08:00:00+03:00",
           last_preview: "שאלה",
           last_at: "2026-09-07T10:00:00+03:00",
+        },
+        {
+          id: "occ-2",
+          title: "מדף חלב",
+          status: "in_progress",
+          due_at: "2026-09-16T08:00:00+03:00",
+          last_preview: "אתמול",
+          last_at: "2026-09-16T11:00:00+03:00",
         },
       ],
     });
@@ -81,7 +91,8 @@ describe("EmployeeChatsPage", () => {
   it("lists the general chat first then open task chats", async () => {
     render(<EmployeeChatsPage />);
     expect(await screen.findByText(he.employeeGeneralChat)).toBeTruthy();
-    expect(screen.getByText("מדף חלב")).toBeTruthy();
+    expect(screen.getByText(taskChatListTitle("מדף חלב", "2026-09-07T08:00:00+03:00"))).toBeTruthy();
+    expect(screen.getByText(taskChatListTitle("מדף חלב", "2026-09-16T08:00:00+03:00"))).toBeTruthy();
   });
 
   it("opens the general thread", async () => {
@@ -92,7 +103,7 @@ describe("EmployeeChatsPage", () => {
 
   it("opens the task chat", async () => {
     render(<EmployeeChatsPage />);
-    fireEvent.click(await screen.findByText("מדף חלב"));
+    fireEvent.click(await screen.findByText(taskChatListTitle("מדף חלב", "2026-09-07T08:00:00+03:00")));
     await waitFor(() => expect(screen.getByText("task-thread:occ-1")).toBeTruthy());
   });
 });

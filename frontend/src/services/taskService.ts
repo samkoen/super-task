@@ -51,6 +51,7 @@ export interface EmployeeTaskChat {
   id: string;
   title: string;
   status: TaskStatus;
+  due_at?: string | null;
   last_preview: string | null;
   last_at: string | null;
 }
