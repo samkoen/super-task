@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useManagerInboxChats } from "./useManagerInboxChats";
 import { directChatService } from "../services/directChatService";
+import { he } from "../i18n/he";
 
 vi.mock("../services/directChatService", () => ({
   directChatService: {
@@ -49,5 +50,19 @@ describe("useManagerInboxChats", () => {
       await result.current.openCard(result.current.chats[0]);
     });
     expect(result.current.openChat).toEqual({ id: "conv-1", title: "ראובן" });
+    expect(result.current.openError).toBe("");
+  });
+
+  it("reports an error and keeps the chat closed when open fails", async () => {
+    vi.mocked(directChatService.openWith).mockRejectedValue(
+      new Error("timeout of 30000ms exceeded"),
+    );
+    const { result } = renderHook(() => useManagerInboxChats());
+    await waitFor(() => expect(result.current.chats).toHaveLength(1));
+    await act(async () => {
+      await result.current.openCard(result.current.chats[0]);
+    });
+    expect(result.current.openChat).toBeNull();
+    expect(result.current.openError).toBe(he.errorServerUnreachable);
   });
 });

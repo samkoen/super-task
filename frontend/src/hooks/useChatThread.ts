@@ -36,8 +36,11 @@ export function useChatThread(opts: { transport: ChatTransport; enabled: boolean
   const fetchPage = useCallback(async (before?: string) => {
     return transportRef.current.list(before);
   }, []);
+  const onLoadError = useCallback((e: unknown) => {
+    setError(chatErrorMessage(e));
+  }, [setError]);
 
-  const paged = usePagedChatMessages({ enabled: opts.enabled, fetchPage });
+  const paged = usePagedChatMessages({ enabled: opts.enabled, fetchPage, onError: onLoadError });
   const send = useChatSend({
     body,
     setBody,

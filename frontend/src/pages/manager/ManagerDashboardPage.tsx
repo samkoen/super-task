@@ -264,6 +264,9 @@ export default function ManagerDashboardPage() {
       {loading && !data ? <ListSkeleton variant="dashboard" /> : null}
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
+      {inbox.openError ? (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={inbox.clearOpenError}>{inbox.openError}</Alert>
+      ) : null}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
       {reviewLoading && (
         <Box display="flex" justifyContent="center" py={1}>
