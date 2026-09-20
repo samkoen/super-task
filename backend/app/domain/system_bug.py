@@ -25,11 +25,19 @@ def has_system_bug_explanation(note: str, *, has_audio: bool) -> bool:
     return bool((note or "").strip()) or has_audio
 
 
-def system_bug_subject(*, route: str, role: str, version: str) -> str:
+def _subject_tail(*, route: str, role: str, version: str) -> str:
     path = (route or "/").strip() or "/"
     who = (role or "?").strip() or "?"
     ver = (version or "?").strip() or "?"
-    return f"[סופר-מן] תקלה · {path} · {who} · {ver}"
+    return f"{path} · {who} · {ver}"
+
+
+def system_bug_subject(*, route: str, role: str, version: str) -> str:
+    return f"[סופר-מן] תקלה · {_subject_tail(route=route, role=role, version=version)}"
+
+
+def system_bug_fixed_subject(*, route: str, role: str, version: str) -> str:
+    return f"[סופר-מן] תקלה תוקנה · {_subject_tail(route=route, role=role, version=version)}"
 
 
 def parse_trail(raw: str) -> list[str]:
@@ -213,6 +221,10 @@ def parse_system_bug_status(raw: str | None) -> str:
     if value not in SYSTEM_BUG_STATUSES:
         raise ValueError("סטטוס לא תקין")
     return value
+
+
+def just_closed_system_bug(previous: str, new_status: str | None) -> bool:
+    return new_status == SYSTEM_BUG_STATUS_CLOSED and previous != SYSTEM_BUG_STATUS_CLOSED
 
 
 def clip_system_bug_comment(body: str) -> str:
