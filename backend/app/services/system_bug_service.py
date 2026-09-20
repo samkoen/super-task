@@ -18,8 +18,10 @@ from app.domain.system_bug import (
     has_system_bug_explanation,
     mail_safe_audio_attachment,
     parse_inbox_user_ids,
+    just_closed_system_bug,
     parse_system_bug_status,
     parse_trail,
+    system_bug_fixed_subject,
     system_bug_issue_body,
     system_bug_meta_rows,
     system_bug_recipients,
@@ -132,23 +134,25 @@ class SystemBugService:
         self._assert_inbox(actor)
         if self._repo is None:
             raise ValueError("דיווח לא נמצא")
+        current = self._repo.find_by_id(report_id)
+        if not current:
+            raise ValueError("דיווח לא נמצא")
         cleaned = _optional_status(status)
-        comments = self._comments_after_note(actor, report_id, comment)
+        comments = self._comments_from_row(actor, current, comment)
         if cleaned is None and comments is None:
             raise ValueError("נא לכתוב הערה או לבחור סטטוס")
         row = self._repo.patch(report_id, status=cleaned, comments=comments)
         if not row:
             raise ValueError("דיווח לא נמצא")
+        if just_closed_system_bug(current.status, cleaned):
+            _notify_fixed(self._actor_name(actor), row, comment)
         return row.to_dict()
 
-    def _comments_after_note(
-        self, actor: ActorContext, report_id: str, comment: str | None
+    def _comments_from_row(
+        self, actor: ActorContext, row: SystemBugReport, comment: str | None
     ) -> list | None:
         if not (comment or "").strip():
             return None
-        row = self._repo.find_by_id(report_id) if self._repo else None
-        if not row:
-            raise ValueError("דיווח לא נמצא")
         return append_system_bug_comment(
             list(row.comments or []),
             author_name=self._actor_name(actor),
@@ -314,15 +318,41 @@ def _deliver_to_all(
     subject: str,
     html: str,
     attachments: list[Attachment],
+    *,
+    kind: str = "system-bug",
 ) -> bool:
     return deliver_html_email(
         to_email=recipients,
         subject=subject,
         html_content=html,
-        kind="system-bug",
+        kind=kind,
         attachments=attachments,
         allow_simulation=False,
     )
+
+
+def _notify_fixed(closer_name: str, row: SystemBugReport, comment: str | None) -> None:
+    try:
+        _send_fixed_mail(closer_name, row, comment)
+    except Exception:
+        logger.exception("[system-bug] fixed-mail failed for %s", row.id)
+
+
+def _send_fixed_mail(closer_name: str, row: SystemBugReport, comment: str | None) -> None:
+    recipients = system_bug_recipients(SYSTEM_BUG_EMAIL)
+    if not recipients:
+        return
+    identity = SystemBugIdentity(
+        user_name=row.reporter_name,
+        branch_name=row.branch_name,
+        network_name=row.network_name,
+    )
+    subject = system_bug_fixed_subject(
+        route=row.route, role=row.reporter_role, version=row.app_version
+    )
+    html = _fixed_html_body(identity, closer_name, row, comment)
+    if not _deliver_to_all(recipients, subject, html, [], kind="system-bug-fixed"):
+        logger.error("[system-bug] fixed-mail not delivered for %s", row.id)
 
 
 def _send_bug_mail(
@@ -422,6 +452,44 @@ def _mail_attachments(
     if audio_file:
         items.append(audio_file)
     return items
+
+
+def _fixed_html_body(
+    identity: SystemBugIdentity,
+    closer_name: str,
+    row: SystemBugReport,
+    comment: str | None,
+) -> str:
+    extra = _fixed_extra(closer_name, comment, row.github_issue_url)
+    meta = "".join(
+        f"<tr><th align='right'>{escape(k)}</th><td>{escape(v)}</td></tr>"
+        for k, v in system_bug_meta_rows(
+            identity=identity,
+            role=row.reporter_role,
+            route=row.route,
+            trail=row.trail,
+            version=row.app_version,
+            extra=extra,
+        )
+    )
+    body = escape(row.note) if row.note else "—"
+    return (
+        f"<html><body dir='rtl'><h2>{escape(APP_NAME)} — התקלה תוקנה</h2>"
+        f"<p>התקלה טופלה ונסגרה.</p>"
+        f"<p>{body}</p><table>{meta}</table></body></html>"
+    )
+
+
+def _fixed_extra(closer_name: str, comment: str | None, github_url: str | None) -> dict[str, str]:
+    extra: dict[str, str] = {}
+    if (closer_name or "").strip():
+        extra["טופל על ידי"] = closer_name.strip()
+    text = (comment or "").strip()
+    if text:
+        extra["הערה"] = text
+    if (github_url or "").strip():
+        extra["GitHub"] = github_url.strip()
+    return extra
 
 
 def _html_body(

@@ -155,7 +155,7 @@ def test_inbox_delete_only_for_yitzhak(client_emp, app, world_seed, monkeypatch)
 
 
 def test_inbox_can_close_and_reopen(client_emp, app, world_seed, monkeypatch):
-    _patch_bug_delivery(monkeypatch)
+    sent = _patch_bug_delivery(monkeypatch)
     created = client_emp.post(
         "/api/system-bugs",
         data={"note": "נפל", "route": "/employee", "app_version": "0.1.0"},
@@ -170,6 +170,12 @@ def test_inbox_can_close_and_reopen(client_emp, app, world_seed, monkeypatch):
     closed = inbox.patch(f"/api/system-bugs/{report_id}", json={"status": "closed"})
     assert closed.status_code == 200, closed.text
     assert closed.json()["report"]["status"] == "closed"
+    assert len(sent) == 2
+    assert sent[1]["kind"] == "system-bug-fixed"
+    assert "תקלה תוקנה" in sent[1]["subject"]
+    assert "התקלה טופלה ונסגרה" in sent[1]["html_content"]
+    assert "נפל" in sent[1]["html_content"]
     opened = inbox.patch(f"/api/system-bugs/{report_id}", json={"status": "open"})
     assert opened.status_code == 200, opened.text
     assert opened.json()["report"]["status"] == "open"
+    assert len(sent) == 2

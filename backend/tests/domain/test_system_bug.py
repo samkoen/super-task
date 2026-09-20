@@ -10,6 +10,7 @@ from app.domain.system_bug import (
     mail_safe_audio_attachment,
     mail_safe_audio_filename,
     order_system_bugs_by_opened_at,
+    just_closed_system_bug,
     parse_system_bug_comments,
     parse_system_bug_emails,
     parse_system_bug_status,
@@ -17,6 +18,7 @@ from app.domain.system_bug import (
     parse_trail,
     system_bug_issue_body,
     system_bug_meta_rows,
+    system_bug_fixed_subject,
     system_bug_subject,
 )
 
@@ -24,6 +26,11 @@ from app.domain.system_bug import (
 def test_subject_includes_route_role_version():
     subject = system_bug_subject(route="/employee", role="employee", version="0.1.0")
     assert subject == "[סופר-מן] תקלה · /employee · employee · 0.1.0"
+
+
+def test_fixed_subject_marks_takala_as_fixed():
+    subject = system_bug_fixed_subject(route="/employee", role="employee", version="0.1.0")
+    assert subject == "[סופר-מן] תקלה תוקנה · /employee · employee · 0.1.0"
 
 
 def test_explanation_needs_text_or_audio():
@@ -131,6 +138,13 @@ def test_parse_system_bug_status_open_or_closed():
     assert parse_system_bug_status("closed") == SYSTEM_BUG_STATUS_CLOSED
     with pytest.raises(ValueError, match="סטטוס"):
         parse_system_bug_status("done")
+
+
+def test_just_closed_system_bug_only_on_open_to_closed():
+    assert just_closed_system_bug(SYSTEM_BUG_STATUS_OPEN, SYSTEM_BUG_STATUS_CLOSED) is True
+    assert just_closed_system_bug(SYSTEM_BUG_STATUS_CLOSED, SYSTEM_BUG_STATUS_CLOSED) is False
+    assert just_closed_system_bug(SYSTEM_BUG_STATUS_CLOSED, SYSTEM_BUG_STATUS_OPEN) is False
+    assert just_closed_system_bug(SYSTEM_BUG_STATUS_OPEN, None) is False
 
 
 def test_order_system_bugs_by_opened_at_keeps_closed_in_date_place():

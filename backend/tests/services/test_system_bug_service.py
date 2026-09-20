@@ -294,19 +294,59 @@ def test_delete_inbox_denies_other_user():
         SystemBugService(MagicMock(), users).delete_inbox_item(_actor(), "bug-1")
 
 
-def test_set_inbox_status_open_and_closed():
-    repo = MagicMock()
-    repo.patch.return_value = SimpleNamespace(to_dict=lambda: {"id": "bug-1", "status": "closed"})
+def _yitzhak_users():
     users = MagicMock()
     users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
-    result = SystemBugService(repo, users).set_inbox_status(_actor(), "bug-1", "closed")
+    return users
+
+
+def _open_bug(**kwargs):
+    data = {
+        "id": "bug-1",
+        "reporter_name": "דני כהן",
+        "reporter_role": "employee",
+        "branch_name": "שפע",
+        "network_name": "רמי לוי",
+        "note": "נפל",
+        "route": "/employee",
+        "trail": ["/employee"],
+        "app_version": "0.1.0",
+        "github_issue_url": None,
+        "status": "open",
+        "comments": [],
+    }
+    data.update(kwargs)
+    return SimpleNamespace(**data)
+
+
+def test_set_inbox_status_open_and_closed(monkeypatch):
+    sent = _patch_mail(monkeypatch)
+    repo = MagicMock()
+    current = _open_bug()
+    closed = _open_bug(status="closed")
+    closed.to_dict = lambda: {"id": "bug-1", "status": "closed"}
+    repo.find_by_id.return_value = current
+    repo.patch.return_value = closed
+    result = SystemBugService(repo, _yitzhak_users()).set_inbox_status(_actor(), "bug-1", "closed")
     assert result["status"] == "closed"
     repo.patch.assert_called_once_with("bug-1", status="closed", comments=None)
+    assert sent[0]["kind"] == "system-bug-fixed"
+    assert sent[0]["to_email"] == [
+        "skoen7665210@gmail.com",
+        "Bircat9172@gmail.com",
+    ]
+    assert sent[0]["allow_simulation"] is False
+    assert "תקלה תוקנה" in sent[0]["subject"]
+    assert "התקלה טופלה ונסגרה" in sent[0]["html_content"]
+    assert "נפל" in sent[0]["html_content"]
+    assert "טופל על ידי" in sent[0]["html_content"]
+    assert "יצחק" in sent[0]["html_content"]
 
 
-def test_patch_inbox_appends_comment_without_closing():
+def test_patch_inbox_appends_comment_without_closing(monkeypatch):
+    sent = _patch_mail(monkeypatch)
     repo = MagicMock()
-    repo.find_by_id.return_value = SimpleNamespace(comments=[])
+    repo.find_by_id.return_value = _open_bug()
     repo.patch.return_value = SimpleNamespace(
         to_dict=lambda: {
             "id": "bug-1",
@@ -314,38 +354,72 @@ def test_patch_inbox_appends_comment_without_closing():
             "comments": [{"author_name": "יצחק ריצ'רד", "body": "נבדק", "created_at": "t"}],
         }
     )
-    users = MagicMock()
-    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
-    result = SystemBugService(repo, users).patch_inbox(_actor(), "bug-1", comment="נבדק")
+    result = SystemBugService(repo, _yitzhak_users()).patch_inbox(_actor(), "bug-1", comment="נבדק")
     assert result["comments"][0]["body"] == "נבדק"
     kwargs = repo.patch.call_args.kwargs
     assert kwargs["status"] is None
     assert kwargs["comments"][0]["body"] == "נבדק"
     assert kwargs["comments"][0]["author_name"] == "יצחק ריצ'רד"
+    assert sent == []
 
 
-def test_patch_inbox_closes_with_comment():
+def test_patch_inbox_closes_with_comment(monkeypatch):
+    sent = _patch_mail(monkeypatch)
     repo = MagicMock()
-    repo.find_by_id.return_value = SimpleNamespace(comments=[])
-    repo.patch.return_value = SimpleNamespace(
-        to_dict=lambda: {"id": "bug-1", "status": "closed", "comments": [{"body": "תוקן"}]}
-    )
-    users = MagicMock()
-    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
-    result = SystemBugService(repo, users).patch_inbox(
+    repo.find_by_id.return_value = _open_bug()
+    closed = _open_bug(status="closed")
+    closed.to_dict = lambda: {"id": "bug-1", "status": "closed", "comments": [{"body": "תוקן"}]}
+    repo.patch.return_value = closed
+    result = SystemBugService(repo, _yitzhak_users()).patch_inbox(
         _actor(), "bug-1", status="closed", comment="תוקן"
     )
     assert result["status"] == "closed"
     repo.patch.assert_called_once()
     assert repo.patch.call_args.kwargs["status"] == "closed"
+    assert sent[0]["kind"] == "system-bug-fixed"
+    assert "תוקן" in sent[0]["html_content"]
+
+
+def test_reopen_does_not_send_fixed_mail(monkeypatch):
+    sent = _patch_mail(monkeypatch)
+    repo = MagicMock()
+    repo.find_by_id.return_value = _open_bug(status="closed")
+    opened = _open_bug(status="open")
+    opened.to_dict = lambda: {"id": "bug-1", "status": "open"}
+    repo.patch.return_value = opened
+    result = SystemBugService(repo, _yitzhak_users()).set_inbox_status(_actor(), "bug-1", "open")
+    assert result["status"] == "open"
+    assert sent == []
+
+
+def test_closing_already_closed_does_not_resend(monkeypatch):
+    sent = _patch_mail(monkeypatch)
+    repo = MagicMock()
+    repo.find_by_id.return_value = _open_bug(status="closed")
+    closed = _open_bug(status="closed")
+    closed.to_dict = lambda: {"id": "bug-1", "status": "closed"}
+    repo.patch.return_value = closed
+    SystemBugService(repo, _yitzhak_users()).set_inbox_status(_actor(), "bug-1", "closed")
+    assert sent == []
+
+
+def test_close_keeps_status_if_fixed_mail_fails(monkeypatch):
+    _patch_mail(monkeypatch)
+    monkeypatch.setattr("app.services.system_bug_service.deliver_html_email", lambda **_k: False)
+    repo = MagicMock()
+    repo.find_by_id.return_value = _open_bug()
+    closed = _open_bug(status="closed")
+    closed.to_dict = lambda: {"id": "bug-1", "status": "closed"}
+    repo.patch.return_value = closed
+    result = SystemBugService(repo, _yitzhak_users()).set_inbox_status(_actor(), "bug-1", "closed")
+    assert result["status"] == "closed"
 
 
 def test_patch_inbox_rejects_empty_payload():
     repo = MagicMock()
-    users = MagicMock()
-    users.find_by_id.return_value = SimpleNamespace(full_name="יצחק ריצ'רד")
+    repo.find_by_id.return_value = _open_bug()
     with pytest.raises(ValueError, match="הערה"):
-        SystemBugService(repo, users).patch_inbox(_actor(), "bug-1")
+        SystemBugService(repo, _yitzhak_users()).patch_inbox(_actor(), "bug-1")
 
 
 def test_set_inbox_status_denies_other_user():
