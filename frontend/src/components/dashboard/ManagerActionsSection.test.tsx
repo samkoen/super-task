@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import ManagerActionsSection from "./ManagerActionsSection";
 import { he } from "../../i18n/he";
 import type { DirectChatCard } from "../../services/directChatService";
+import type { TaskQueues, TimelineTask } from "../../services/dashboardService";
 
 vi.mock("./ActionRequiredCarousel", () => ({
   default: ({ mode }: { mode: string }) => <div>{mode}-carousel</div>,
@@ -47,4 +48,58 @@ describe("ManagerActionsSection", () => {
     expect(screen.getByText("ראובן")).toBeTruthy();
     expect(screen.getByRole("button", { name: he.dashboardDirectChatReply })).toBeTruthy();
   });
+
+  it("puts finished tasks waiting for approval above טיפול נדרש", () => {
+    render(
+      <ManagerActionsSection
+        queues={queuesWithBoth()}
+        chats={[]}
+        onReviewTask={vi.fn()}
+        onOpenChat={vi.fn()}
+      />,
+    );
+    const reviews = screen.getByText("reviews-carousel");
+    const actions = screen.getByText(he.dashboardActionsTitle, { exact: false });
+    const questions = screen.getByText("questions-carousel");
+    expect(reviews.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(actions.compareDocumentPosition(questions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
+
+function queuesWithBoth(): TaskQueues {
+  return {
+    completed: [],
+    in_progress: [],
+    upcoming: [],
+    pending_review: [reviewTask(), questionTask()],
+  };
+}
+
+function reviewTask(): TimelineTask {
+  return {
+    id: "review-1",
+    title: "ניקיון",
+    status: "pending_review",
+    segment: "pending_review",
+    due_at: "2026-09-19T10:00:00+03:00",
+    started_at: null,
+    completed_at: "2026-09-19T11:00:00+03:00",
+    duration_minutes: null,
+    elapsed_minutes: null,
+    department_name: null,
+    assignee_name: "עובד",
+    task_kind: "ad_hoc",
+    media_ready: true,
+  };
+}
+
+function questionTask(): TimelineTask {
+  return {
+    ...reviewTask(),
+    id: "question-1",
+    title: "שאלה",
+    status: "awaiting_response",
+    segment: "awaiting_response",
+    completed_at: null,
+  };
+}

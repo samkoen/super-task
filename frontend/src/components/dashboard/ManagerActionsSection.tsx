@@ -24,27 +24,67 @@ export default function ManagerActionsSection({
 }) {
   const questions = buildQuestionsQueue(queues);
   const reviews = buildPendingReviewQueue(queues);
-  const total = questions.length + reviews.length + chats.length;
+  const actionCount = questions.length + chats.length;
 
   return (
     <Box mb={3}>
-      <Typography variant="subtitle1" fontWeight={800} mb={1.5}>
-        {he.dashboardActionsTitle}
-        {total > 0 ? ` (${total})` : ""}
-      </Typography>
-      {total === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {he.dashboardActionsEmpty}
-        </Typography>
-      ) : (
-        <ActionsBody
+      {reviews.length > 0 ? (
+        <ActionRequiredCarousel queues={queues} mode="reviews" onReviewTask={onReviewTask} />
+      ) : null}
+      {actionCount > 0 ? (
+        <ActionsBlock
+          count={actionCount}
           chats={chats}
           queues={queues}
           onOpenChat={onOpenChat}
           onReviewTask={onReviewTask}
         />
-      )}
+      ) : reviews.length === 0 ? (
+        <ActionsHeading />
+      ) : null}
     </Box>
+  );
+}
+
+function ActionsHeading({ count = 0 }: { count?: number }) {
+  return (
+    <>
+      <Typography variant="subtitle1" fontWeight={800} mb={1.5}>
+        {he.dashboardActionsTitle}
+        {count > 0 ? ` (${count})` : ""}
+      </Typography>
+      {count === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          {he.dashboardActionsEmpty}
+        </Typography>
+      ) : null}
+    </>
+  );
+}
+
+function ActionsBlock({
+  count,
+  chats,
+  queues,
+  onOpenChat,
+  onReviewTask,
+}: {
+  count: number;
+  chats: DirectChatCard[];
+  queues: TaskQueues | null | undefined;
+  onOpenChat: (card: DirectChatCard) => void;
+  onReviewTask: (taskId: string) => void;
+}) {
+  return (
+    <>
+      <ActionsHeading count={count} />
+      <ActionsBody
+        chats={chats}
+        queues={queues}
+        onOpenChat={onOpenChat}
+        onReviewTask={onReviewTask}
+      />
+    </>
   );
 }
 
@@ -60,7 +100,6 @@ function ActionsBody({
   onReviewTask: (taskId: string) => void;
 }) {
   const hasQuestions = buildQuestionsQueue(queues).length > 0;
-  const hasReviews = buildPendingReviewQueue(queues).length > 0;
   return (
     <>
       {chats.map((card) => (
@@ -68,9 +107,6 @@ function ActionsBody({
       ))}
       {hasQuestions ? (
         <ActionRequiredCarousel queues={queues} mode="questions" onReviewTask={onReviewTask} />
-      ) : null}
-      {hasReviews ? (
-        <ActionRequiredCarousel queues={queues} mode="reviews" onReviewTask={onReviewTask} />
       ) : null}
     </>
   );

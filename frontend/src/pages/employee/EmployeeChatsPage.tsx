@@ -20,9 +20,9 @@ import FullscreenBackAppBar, {
   fullscreenChatBodySx,
   fullscreenChatDialogPaperSx,
 } from "../../components/chat/FullscreenBackAppBar";
-import TaskChatPanel from "../../components/tasks/TaskChatPanel";
+import TaskChatDialog from "../../components/tasks/TaskChatDialog";
 import { directChatService, type DirectChatCard } from "../../services/directChatService";
-import { taskService, type EmployeeTaskChat, type TaskStatus } from "../../services/taskService";
+import { taskService, type EmployeeTaskChat } from "../../services/taskService";
 import { formatTime } from "../../utils/dashboardTime";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -38,7 +38,6 @@ import {
   taskChatListTitle,
   type EmployeeChatRow,
 } from "../../utils/employeeTaskChats";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { useAuth } from "../../context/AuthContext";
 
 export default function EmployeeChatsPage() {
@@ -140,34 +139,18 @@ export default function EmployeeChatsPage() {
         </Box>
       </Dialog>
 
-      <Dialog
-        fullScreen
+      <TaskChatDialog
         open={Boolean(taskChat)}
+        occurrenceId={taskChat?.id ?? ""}
+        title={taskChat ? taskChatListTitle(taskChat.title, taskChat.due_at || taskChat.last_at) : he.taskChatTitle}
+        status={taskChat?.status}
+        employee
         onClose={() => {
           setTaskChat(null);
           void load();
         }}
-        dir="rtl"
-        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-      >
-        <FullscreenBackAppBar
-          title={taskChat ? taskChatListTitle(taskChat.title, taskChat.due_at || taskChat.last_at) : he.taskChatTitle}
-          onBack={() => {
-            setTaskChat(null);
-            void load();
-          }}
-        />
-        <Box sx={fullscreenChatBodySx}>
-          {taskChat && (
-            <TaskChatPanel
-              occurrenceId={taskChat.id}
-              occurrenceStatus={taskChat.status as TaskStatus}
-              composeEnabled={canComposeTaskChat(taskChat.status, true)}
-              onOccurrenceUpdated={() => void load()}
-            />
-          )}
-        </Box>
-      </Dialog>
+        onOccurrenceUpdated={() => void load()}
+      />
 
       <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="xs" dir="rtl">
         <List>

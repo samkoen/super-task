@@ -23,13 +23,12 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import StopIcon from "@mui/icons-material/Stop";
-import ChatIcon from "@mui/icons-material/Chat";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import TaskStatusChip from "./TaskStatusChip";
-import TaskChatPanel from "./TaskChatPanel";
+import { OpenTaskChatButton } from "./TaskChatDialog";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { dueDateIso, formatDueAt, formatHebrewDayShort } from "../../utils/dateView";
@@ -37,8 +36,8 @@ import { isManagerNextTask } from "../../utils/employeeTaskFocus";
 import { showsHebrewTitle } from "../../utils/employeeTaskCard";
 import { isNativeApp } from "../../utils/isNativeApp";
 import { mediaUrl } from "../../utils/mediaUrl";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
+import { taskFinishedAtText } from "../../utils/completionFinishedAt";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import { taskUrgencyLevel, type TaskUrgencyLevel } from "../../utils/taskUrgency";
 import type { TaskOccurrence } from "../../services/taskService";
@@ -79,6 +78,81 @@ function openingDayIso(task: TaskOccurrence): string | null {
   if (task.opened_on) return task.opened_on.slice(0, 10);
   if (task.created_at) return dueDateIso(task.created_at);
   return null;
+}
+
+function TaskCardChatActions({
+  task,
+  isEmployeeMode,
+  hasTextInstructions,
+  instructionsOpen,
+  onToggleInstructions,
+  onChatUpdated,
+  audioSrc,
+}: {
+  task: TaskOccurrence;
+  isEmployeeMode: boolean;
+  hasTextInstructions: boolean;
+  instructionsOpen: boolean;
+  onToggleInstructions: () => void;
+  onChatUpdated?: (task: TaskOccurrence, status: string) => void;
+  audioSrc: string | null;
+}) {
+  return (
+    <>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+        <OpenTaskChatButton
+          occurrenceId={task.id}
+          title={task.title}
+          status={task.status}
+          employee={isEmployeeMode}
+          chatFollowUpAt={task.chat_follow_up_at}
+          chatResolvedAt={task.chat_resolved_at}
+          completion={task.completion ?? null}
+          onOccurrenceUpdated={(status) => onChatUpdated?.(task, status)}
+        />
+        {isEmployeeMode && hasTextInstructions ? (
+          <Button
+            variant={instructionsOpen ? "contained" : "outlined"}
+            onClick={onToggleInstructions}
+            sx={{ alignSelf: "flex-start", minHeight: 48, px: 2, fontWeight: 800 }}
+          >
+            {he.taskInstructions}
+          </Button>
+        ) : null}
+      </Box>
+      {isEmployeeMode ? (
+        <Collapse in={instructionsOpen} unmountOnExit>
+          <TaskCardInstructions task={task} audioSrc={audioSrc} />
+        </Collapse>
+      ) : null}
+    </>
+  );
+}
+
+function TaskCardInstructions({ task, audioSrc }: { task: TaskOccurrence; audioSrc: string | null }) {
+  return (
+    <Box
+      sx={{
+        p: 1.25,
+        borderRadius: 2,
+        bgcolor: "action.hover",
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        maxHeight: 140,
+        overflow: "auto",
+      }}
+    >
+      {audioSrc ? (
+        <Box component="audio" src={audioSrc} controls preload="metadata" sx={{ width: "100%" }} />
+      ) : null}
+      {(task.description || task.spoken_text) && (
+        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+          {task.description || task.spoken_text}
+        </Typography>
+      )}
+    </Box>
+  );
 }
 
 /** Carry-over : date d'ouverture < date d'exécution (après rollover). */
@@ -163,7 +237,7 @@ export default function TaskOccurrenceCard({
   );
   const isEmployeeMode = Boolean(onOpen || onStart || onComplete);
   const showMenu = (!isEmployeeMode && Boolean(onEdit)) || canCancel;
-  const composeEnabled = canComposeTaskChat(task.status, isEmployeeMode);
+  const finishedAtText = taskFinishedAtText(task);
 
   const closeMenu = () => {
     setMenuAnchor(null);
@@ -407,84 +481,24 @@ export default function TaskOccurrenceCard({
             )}
           </Box>
 
-          {isEmployeeMode ? (
-            <>
-              <Button
-                variant={instructionsOpen ? "contained" : "outlined"}
-                startIcon={<ChatIcon />}
-                onClick={() => setInstructionsOpen((v) => !v)}
-                sx={{ alignSelf: "flex-start", minHeight: 48, px: 2, fontWeight: 800 }}
-              >
-                {he.taskChatSection}
-              </Button>
-              <Collapse in={instructionsOpen} unmountOnExit>
-                <Box
-                  sx={{
-                    p: 1.25,
-                    borderRadius: 2,
-                    bgcolor: "action.hover",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1.25,
-                  }}
-                >
-                  {hasTextInstructions ? (
-                    <Box
-                      sx={{
-                        maxHeight: 140,
-                        overflow: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                      }}
-                    >
-                      {audioSrc && (
-                        <Box
-                          component="audio"
-                          src={audioSrc}
-                          controls
-                          preload="metadata"
-                          sx={{ width: "100%" }}
-                        />
-                      )}
-                      {(task.description || task.spoken_text) && (
-                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                          {task.description || task.spoken_text}
-                        </Typography>
-                      )}
-                    </Box>
-                  ) : (
-                    <Typography variant="caption" color="text.secondary">
-                      {he.taskInstructionsEmpty}
-                    </Typography>
-                  )}
-                  <TaskChatPanel
-                    key={task.id}
-                    occurrenceId={task.id}
-                    compact
-                    composeEnabled={composeEnabled}
-                    onOccurrenceUpdated={(status) => onChatUpdated?.(task, status)}
-                  />
-                </Box>
-              </Collapse>
-            </>
-          ) : (
-            canEdit &&
-            onEdit && (
-              <Button
-                variant="outlined"
-                startIcon={<ChatIcon />}
-                onClick={() => onEdit(task)}
-                sx={{ alignSelf: "flex-start", minHeight: 48, px: 2, fontWeight: 800 }}
-              >
-                {he.taskChatSection}
-              </Button>
-            )
-          )}
+          <TaskCardChatActions
+            task={task}
+            isEmployeeMode={isEmployeeMode}
+            hasTextInstructions={hasTextInstructions}
+            instructionsOpen={instructionsOpen}
+            onToggleInstructions={() => setInstructionsOpen((v) => !v)}
+            onChatUpdated={onChatUpdated}
+            audioSrc={audioSrc}
+          />
 
           <Typography variant="body2" fontWeight={600} dir="ltr" sx={{ textAlign: "start" }}>
             {he.dueAt}: {formatDueAt(task.due_at)}
           </Typography>
+          {finishedAtText && (
+            <Typography variant="body2" fontWeight={700} dir="ltr" sx={{ textAlign: "start" }}>
+              {finishedAtText}
+            </Typography>
+          )}
 
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
             <Chip

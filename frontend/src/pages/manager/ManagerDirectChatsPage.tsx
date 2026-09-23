@@ -15,7 +15,7 @@ import FullscreenBackAppBar, {
   fullscreenChatBodySx,
   fullscreenChatDialogPaperSx,
 } from "../../components/chat/FullscreenBackAppBar";
-import TaskChatPanel from "../../components/tasks/TaskChatPanel";
+import TaskChatDialog from "../../components/tasks/TaskChatDialog";
 import { directChatService, type DirectChatCard } from "../../services/directChatService";
 import { taskService, type ManagerDayTaskChat } from "../../services/taskService";
 import { directChatTitle, sortDirectChatCards } from "../../utils/directChat";
@@ -24,7 +24,6 @@ import {
   filterManagerContacts,
   type ManagerEmployeeRow,
 } from "../../utils/managerChatInbox";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 
@@ -284,29 +283,20 @@ function TaskThreadDialog({ state }: { state: ReturnType<typeof useManagerChatsS
     void state.load();
     if (state.selected) void state.loadDayTasks(state.selected.counterpart_user_id);
   };
+  const chat = state.taskChat;
   return (
-    <Dialog
-      fullScreen
-      open={Boolean(state.taskChat)}
+    <TaskChatDialog
+      open={Boolean(chat)}
+      occurrenceId={chat?.id ?? ""}
+      title={chat?.title ?? he.taskChatTitle}
+      status={chat?.status}
+      employee={false}
       onClose={onClose}
-      dir="rtl"
-      PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-    >
-      <FullscreenBackAppBar title={state.taskChat?.title ?? he.taskChatTitle} onBack={onClose} />
-      <Box sx={fullscreenChatBodySx}>
-        {state.taskChat && (
-          <TaskChatPanel
-            occurrenceId={state.taskChat.id}
-            occurrenceStatus={state.taskChat.status}
-            composeEnabled={canComposeTaskChat(state.taskChat.status, false)}
-            onOccurrenceUpdated={() => {
-              void state.load();
-              if (state.selected) void state.loadDayTasks(state.selected.counterpart_user_id);
-            }}
-          />
-        )}
-      </Box>
-    </Dialog>
+      onOccurrenceUpdated={() => {
+        void state.load();
+        if (state.selected) void state.loadDayTasks(state.selected.counterpart_user_id);
+      }}
+    />
   );
 }
 

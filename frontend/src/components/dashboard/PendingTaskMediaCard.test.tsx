@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PendingTaskMediaCard from "./PendingTaskMediaCard";
+import { taskFinishedAtText } from "../../utils/completionFinishedAt";
 import { he } from "../../i18n/he";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 import type { TimelineTask } from "../../services/dashboardService";
@@ -38,6 +39,21 @@ describe("PendingTaskMediaCard", () => {
     expect(screen.getByText("ספירת מלאי מחסן")).toBeTruthy();
     expect(screen.getByText(he.timelineSegmentOverdue)).toBeTruthy();
     expect(screen.queryByLabelText(he.taskPhotoEnlarge)).toBeNull();
+  });
+
+  it("shows the siyum time on a finished square and hides it while open", () => {
+    const done = task({
+      status: "completed",
+      segment: "completed",
+      completed_at: "2026-08-25T12:00:00+03:00",
+    });
+    const { unmount } = render(<PendingTaskMediaCard task={done} />);
+    expect(
+      screen.getByText(taskFinishedAtText({ status: done.status, completion: done })!),
+    ).toBeTruthy();
+    unmount();
+    render(<PendingTaskMediaCard task={task()} />);
+    expect(screen.queryByText(he.markDone, { exact: false })).toBeNull();
   });
 
   it("calls onOpen when info area is clicked", () => {

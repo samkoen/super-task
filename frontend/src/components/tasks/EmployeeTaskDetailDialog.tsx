@@ -15,14 +15,13 @@ import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionRequirementSlots from "./CompletionRequirementSlots";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
-import TaskChatPanel from "./TaskChatPanel";
+import { OpenTaskChatButton } from "./TaskChatDialog";
 import TaskStatusChip from "./TaskStatusChip";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
-import { canComposeTaskChat, employeeOpensTaskChatFirst } from "../../utils/taskChatCompose";
 import { canDoTask } from "../../utils/employeeDoTask";
 import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
 import { rejectionRemark } from "../../utils/taskReview";
@@ -72,6 +71,7 @@ export interface EmployeeTaskDetailDialogProps {
   starting?: boolean;
   language?: EmployeeLanguage;
   capture?: EmployeeTaskCaptureProps;
+  chatFirst?: boolean;
 }
 
 /** Ouverture tâche côté oved : cases, capture et chat dans le même écran. */
@@ -84,6 +84,7 @@ export default function EmployeeTaskDetailDialog({
   starting = false,
   language = "he",
   capture,
+  chatFirst = false,
 }: EmployeeTaskDetailDialogProps) {
   if (!task) return null;
   const liveCapture = capture && canDoTask(task.status) ? capture : undefined;
@@ -114,6 +115,7 @@ export default function EmployeeTaskDetailDialog({
           language={language}
           liveCapture={liveCapture}
           onChatUpdated={onChatUpdated}
+          chatFirst={chatFirst}
         />
       </DialogContent>
       <TaskDetailActions
@@ -147,35 +149,30 @@ function TaskDetailChatAndMedia({
   language,
   liveCapture,
   onChatUpdated,
+  chatFirst = false,
 }: {
   task: EmployeeTaskDetailTask;
   language: EmployeeLanguage;
   liveCapture?: EmployeeTaskCaptureProps;
   onChatUpdated?: () => void;
+  chatFirst?: boolean;
 }) {
   const chat = (
-    <TaskChatPanel
-      key={task.id}
+    <OpenTaskChatButton
       occurrenceId={task.id}
-      occurrenceStatus={task.status}
-      compact
-      composeEnabled={canComposeTaskChat(task.status, true)}
+      title={task.title}
+      status={task.status}
+      employee
+      completion={task.completion ?? null}
       onOccurrenceUpdated={() => onChatUpdated?.()}
+      autoOpen={chatFirst}
     />
   );
   const media = <TaskDetailMedia task={task} language={language} capture={liveCapture} />;
-  if (employeeOpensTaskChatFirst(task.status)) {
-    return (
-      <>
-        {chat}
-        {media}
-      </>
-    );
-  }
   return (
     <>
-      {media}
       {chat}
+      {media}
     </>
   );
 }

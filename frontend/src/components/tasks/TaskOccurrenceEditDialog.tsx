@@ -22,9 +22,8 @@ import { he } from "../../i18n/he";
 import { assigneeOptionLabel, assigneesForBranch, withSelfAssignee } from "../../utils/assigneeOptions";
 import { appendDescriptionBlock } from "../../utils/photoAnnotation";
 import { startUrlFieldError } from "../../utils/startUrl";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { defaultApplyAdHocEditToNetwork, isNetworkAdHocOccurrence } from "../../utils/adHocNetworkTasks";
-import TaskChatPanel from "./TaskChatPanel";
+import { OpenTaskChatButton } from "./TaskChatDialog";
 import TaskReferenceMediaEditor from "./TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
 import CompletionMediaPreview from "./CompletionMediaPreview";
@@ -143,14 +142,14 @@ export default function TaskOccurrenceEditDialog({
           </Box>
         ) : (
           <>
-            <TaskChatPanel
-              key={`chat-${target.id}`}
+            <OpenTaskChatButton
               occurrenceId={target.id}
-              occurrenceStatus={target.status}
+              title={target.title}
+              status={target.status}
+              employee={false}
               chatFollowUpAt={target.chat_follow_up_at}
               chatResolvedAt={target.chat_resolved_at}
-              compact
-              composeEnabled={canComposeTaskChat(target.status, false)}
+              completion={target.completion ?? null}
               onOccurrenceUpdated={(_status, notice) => {
                 showSuccess(notice ?? he.taskChatSent);
                 if (notice !== he.taskChatSent) {

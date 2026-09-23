@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMediaBlob, fetchMediaBlobWithRetry, withStreamQuery } from "./fetchMediaBlob";
+
+const nativeFlag = vi.hoisted(() => ({ on: false }));
+
+vi.mock("./isNativeApp", () => ({
+  isNativeApp: () => nativeFlag.on,
+}));
 
 vi.mock("./mediaUrl", () => ({
   mediaUrl: (path: string | null | undefined) => (path ? `/proxy?src=${path}` : null),
@@ -11,6 +17,10 @@ vi.mock("./mediaUrl", () => ({
 }));
 
 describe("fetchMediaBlob", () => {
+  beforeEach(() => {
+    nativeFlag.on = false;
+  });
+
   it("fetches the proxied media with credentials", async () => {
     const blob = new Blob(["img"], { type: "image/jpeg" });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: async () => blob });
@@ -23,7 +33,23 @@ describe("fetchMediaBlob", () => {
     vi.unstubAllGlobals();
   });
 
-  it("follows a same-origin 302 to a presigned object URL", async () => {
+  it("streams a task video on Chrome so the player gets a video content type", async () => {
+    nativeFlag.on = false;
+    const blob = new Blob(["vid"], { type: "video/webm" });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, blob: async () => blob });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchMediaBlob("https://abc.r2.cloudflarestorage.com/super-media/v.webm")).resolves.toBe(
+      blob,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/proxy?src=https://abc.r2.cloudflarestorage.com/super-media/v.webm&stream=1",
+      { credentials: "include", redirect: "follow" },
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the Android 302 proxy for the same video", async () => {
+    nativeFlag.on = true;
     const blob = new Blob(["vid"], { type: "video/webm" });
     const fetchMock = vi
       .fn()
@@ -43,6 +69,7 @@ describe("fetchMediaBlob", () => {
       { credentials: "include", redirect: "manual" },
     );
     expect(fetchMock).toHaveBeenNthCalledWith(2, "https://signed.example/v.webm");
+    nativeFlag.on = false;
     vi.unstubAllGlobals();
   });
 
