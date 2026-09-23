@@ -24,6 +24,21 @@ allprojects {
     }
 }
 
+// kotlin-stdlib 1.8 already contains the jdk7/jdk8 extensions. Older
+// kotlin-stdlib-jdk7/jdk8 (1.6.x) on the androidTest classpath of
+// capacitor-cordova-android-plugins make checkDebugAndroidTestDuplicateClasses fail.
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            def requested = details.requested
+            if (requested.group == "org.jetbrains.kotlin" &&
+                    (requested.name == "kotlin-stdlib-jdk7" || requested.name == "kotlin-stdlib-jdk8")) {
+                details.useVersion "1.8.22"
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

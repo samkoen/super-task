@@ -95,6 +95,7 @@ function dashboard(over: Partial<EmployeeDashboard> = {}): EmployeeDashboard {
     pending_review_tasks: [],
     today_tasks: [],
     completed_tasks: [],
+    manager_waiting_tasks: [],
     ...over,
   };
 }

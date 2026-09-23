@@ -225,7 +225,7 @@ export interface EmployeeDashboard {
   pending_review_tasks: EmployeeTaskCard[];
   today_tasks: EmployeeTaskCard[];
   completed_tasks: EmployeeTaskCard[];
-  manager_waiting_tasks?: EmployeeTaskCard[];
+  manager_waiting_tasks: EmployeeTaskCard[];
 }
 
 export const dashboardService = {

@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -63,6 +64,10 @@ public class CaptureActivityInstrumentedTest {
         Context ctx = ApplicationProvider.getApplicationContext();
         Intent intent = new Intent(ctx, cls);
         try (ActivityScenario<Activity> scenario = ActivityScenario.launch(intent)) {
+            // finish() in onCreate destroys the activity before onActivity can run.
+            if (scenario.getState() == Lifecycle.State.DESTROYED) {
+                return;
+            }
             scenario.onActivity(activity ->
                 assertTrue(
                     "capture activity must finish when CAMERA is denied",
