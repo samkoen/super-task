@@ -15,12 +15,12 @@ import { ApiError } from "../../services/api";
 import { taskService, type TaskOccurrence, type TaskStatus } from "../../services/taskService";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
-import TaskChatPanel from "./TaskChatPanel";
+import { OpenTaskChatButton } from "./TaskChatDialog";
 import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
 import { he } from "../../i18n/he";
-import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
+import { completionFinishedText } from "../../utils/completionFinishedAt";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
 import { initialReviewMediaReady, reviewActionsBlocked } from "../../utils/reviewMediaGate";
 import {
@@ -59,6 +59,7 @@ export default function TaskCompletionReviewDialog({
   }, [task]);
 
   const completion = taskView?.completion;
+  const finishedAt = completionFinishedText(completion?.completed_at);
   const open = Boolean(taskView);
   const isAwaiting = taskView?.status === "awaiting_response";
   const isReview = taskView?.status === "pending_review";
@@ -183,14 +184,14 @@ export default function TaskCompletionReviewDialog({
           </Typography>
         )}
         {taskView && (
-          <TaskChatPanel
-            key={taskView.id}
+          <OpenTaskChatButton
             occurrenceId={taskView.id}
-            occurrenceStatus={taskView.status}
+            title={taskView.title}
+            status={taskView.status}
+            employee={false}
             chatFollowUpAt={taskView.chat_follow_up_at}
             chatResolvedAt={taskView.chat_resolved_at}
-            compact
-            composeEnabled={canComposeTaskChat(taskView.status, false)}
+            completion={taskView.completion ?? null}
             onOccurrenceUpdated={handleChatUpdated}
           />
         )}
@@ -205,6 +206,11 @@ export default function TaskCompletionReviewDialog({
           <Box>
             <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={1}>
               <CompletionOutcomeChip status={completion.status} />
+              {finishedAt && (
+                <Typography variant="body2" fontWeight={700} dir="ltr">
+                  {finishedAt}
+                </Typography>
+              )}
             </Box>
             {completion.status === "not_completed" && (
               <Alert severity="warning">

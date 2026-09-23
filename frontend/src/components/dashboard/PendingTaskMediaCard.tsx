@@ -1,6 +1,7 @@
 import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
 import type { TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
+import { taskFinishedAtText } from "../../utils/completionFinishedAt";
 import { formatDueAt } from "../../utils/dateView";
 import { isPendingFollowUpTask } from "../../utils/chatTaskFollowUp";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
@@ -14,6 +15,7 @@ interface PendingTaskMediaCardProps {
 /** Carte carrousel : moitié photo (zoom) + infos ; clic infos → ouvrir/éditer. */
 export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaCardProps) {
   const border = taskStatusVisual(task.status).bar;
+  const finishedAt = taskFinishedAtText({ status: task.status, completion: task });
   return (
     <Paper
       variant="outlined"
@@ -69,6 +71,11 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
         <Typography variant="caption" color="text.secondary" noWrap display="block">
           {[task.assignee_name, task.department_name].filter(Boolean).join(" · ") || "—"}
         </Typography>
+        {finishedAt && (
+          <Typography variant="caption" fontWeight={700} noWrap display="block" dir="ltr">
+            {finishedAt}
+          </Typography>
+        )}
         <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.5}>
           <Chip
             size="small"

@@ -4,6 +4,7 @@ import {
   nextMediaRetryDelayMs,
   sleepMs,
 } from "./mediaRetry";
+import { playableMediaBlob, shouldStreamVideoOnWeb } from "./videoPlayback";
 
 export { withStreamQuery } from "./mediaUrl";
 
@@ -15,16 +16,21 @@ export async function fetchMediaBlob(
 ): Promise<Blob> {
   const url = mediaUrl(path);
   if (!url) throw new Error("empty media path");
-  const requestUrl = options?.stream ? withStreamQuery(url) : url;
-  const response = await fetch(requestUrl, {
+  const stream = resolveStream(path, options);
+  const response = await fetch(stream ? withStreamQuery(url) : url, {
     credentials: "include",
-    redirect: options?.stream || shouldFollowRedirect(path) ? "follow" : "manual",
+    redirect: stream || shouldFollowRedirect(path) ? "follow" : "manual",
   });
   if (isRedirect(response.status)) {
-    return fetchRedirectedBlob(response);
+    return playableMediaBlob(await fetchRedirectedBlob(response), path);
   }
   if (!response.ok) throw new Error(`media fetch failed: ${response.status}`);
-  return response.blob();
+  return playableMediaBlob(await response.blob(), path);
+}
+
+function resolveStream(path: string, options?: FetchMediaBlobOptions): boolean {
+  if (options?.stream != null) return options.stream;
+  return shouldStreamVideoOnWeb(path);
 }
 
 function shouldFollowRedirect(path: string): boolean {

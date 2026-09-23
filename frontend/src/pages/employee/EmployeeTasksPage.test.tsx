@@ -40,13 +40,16 @@ vi.mock("../../components/tasks/EmployeeTaskDetailDialog", () => ({
   default: ({
     task,
     onChatUpdated,
+    chatFirst,
   }: {
     task: { title?: string } | null;
     onChatUpdated?: () => void;
+    chatFirst?: boolean;
   }) =>
     task ? (
       <div>
         <div>detail:{task.title}</div>
+        {chatFirst ? <div>chat-first</div> : null}
         <button type="button" onClick={() => onChatUpdated?.()}>send-chat</button>
       </div>
     ) : null,
@@ -92,6 +95,7 @@ function dashboard(over: Partial<EmployeeDashboard> = {}): EmployeeDashboard {
     pending_review_tasks: [],
     today_tasks: [],
     completed_tasks: [],
+    manager_waiting_tasks: [],
     ...over,
   };
 }
@@ -225,5 +229,50 @@ describe("EmployeeTasksPage punch doors", () => {
     fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (2)`));
     fireEvent.click(screen.getByText("פתיחת משמרת"));
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
+  });
+
+  it("keeps a manager-waiting task visible and opens its chat first", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        today_tasks: [card({ id: "t", title: "ניקוי מדף", status: "in_progress" })],
+        manager_waiting_tasks: [
+          card({
+            id: "t",
+            title: "ניקוי מדף",
+            status: "in_progress",
+            manager_message_preview: "תסתכל בתמונה",
+          }),
+        ],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
+    expect(screen.getByText("תסתכל בתמונה")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatOpen }));
+    expect(screen.getByText("chat-first")).toBeTruthy();
+    expect(screen.getByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
+  });
+
+  it("shows manager waiting above the clock-in door", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        today_tasks: [
+          card({ id: "s", title: "פתיחת משמרת", is_work_start: true }),
+          card({ id: "t", title: "ניקוי מדף" }),
+        ],
+        manager_waiting_tasks: [
+          card({
+            id: "t",
+            title: "ניקוי מדף",
+            manager_message_preview: "תסתכל בתמונה",
+          }),
+        ],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(screen.getByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
+    expect(screen.getByText("ניקוי מדף")).toBeTruthy();
   });
 });

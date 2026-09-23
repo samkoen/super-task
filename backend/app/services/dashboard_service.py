@@ -33,6 +33,7 @@ from app.domain.manager_dashboard import (
     task_queue_bucket,
 )
 from app.domain.employee_day_buckets import split_employee_day_tasks
+from app.domain.manager_waiting import select_manager_waiting, waiting_message_preview
 from app.domain.store_kpis import build_store_kpis
 from app.domain.quality_rating import aggregate_quality_ratings, empty_quality_summary
 from app.repositories.task_completion_repository import TaskCompletionRepository
@@ -117,6 +118,7 @@ class DashboardService:
         template_repo: TaskTemplateRepository | None = None,
         scheduler: TaskSchedulerService | None = None,
         network_repo=None,
+        message_repo=None,
     ):
         self._occurrences = occurrence_repo
         self._branches = branch_repo
@@ -127,6 +129,7 @@ class DashboardService:
         self._templates = template_repo
         self._scheduler = scheduler
         self._networks = network_repo
+        self._messages = message_repo
 
     def manager_dashboard(
         self,
@@ -208,6 +211,7 @@ class DashboardService:
             "pending_review_tasks": await localize_cards(buckets.pending_review),
             "today_tasks": await localize_cards(buckets.today_open),
             "completed_tasks": await localize_cards(buckets.completed),
+            "manager_waiting_tasks": await self._manager_waiting_cards(tasks_today, language),
         }
 
     def _resolve_manager_branch(self, actor: ActorContext, branch_id: str | None) -> str | None:
@@ -808,6 +812,19 @@ class DashboardService:
             return task
         template = self._templates.find_by_id(task.template_id)
         return merge_occurrence_reference_media(task, template)
+
+    async def _manager_waiting_cards(self, tasks: list[TaskOccurrence], language: str) -> list[dict]:
+        if self._messages is None or not tasks:
+            return []
+        last = self._messages.last_messages_for([task.id for task in tasks])
+        cards = []
+        for task, message in select_manager_waiting(tasks, last):
+            card = self._employee_task_card(task)
+            card["manager_message_preview"] = waiting_message_preview(message)
+            cards.append(card)
+        if self._translations and cards:
+            return await self._translations.apply_to_cards_translated(cards, language=language)
+        return cards
 
     def _employee_task_card(self, task: TaskOccurrence) -> dict:
         task = self._with_reference_media(task)

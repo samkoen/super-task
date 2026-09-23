@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import TaskCompletionReviewDialog from "./TaskCompletionReviewDialog";
+import { completionFinishedText } from "../../utils/completionFinishedAt";
 import { he } from "../../i18n/he";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
 
@@ -128,6 +129,7 @@ describe("TaskCompletionReviewDialog", () => {
         onDone={onDone}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSection }));
     fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
     expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
     expect(onDone).not.toHaveBeenCalled();
@@ -138,15 +140,18 @@ describe("TaskCompletionReviewDialog", () => {
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
     );
-    const chat = screen.getByTestId("task-chat-panel");
+    expect(screen.queryByTestId("task-chat-panel")).toBeNull();
+    expect(screen.getByRole("button", { name: he.taskChatSection })).toBeTruthy();
     const preview = screen.getByTestId("completion-preview");
-    expect(chat.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(preview).toBeTruthy();
+    expect(screen.getByText(completionFinishedText("2026-08-25T12:00:00+03:00")!)).toBeTruthy();
   });
 
   it("lets the menahel write in the task chat during review", () => {
     render(
       <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
     );
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSection }));
     expect(screen.getByTestId("task-chat-panel").getAttribute("data-compose")).toBe("true");
   });
 
@@ -155,6 +160,7 @@ describe("TaskCompletionReviewDialog", () => {
       <TaskCompletionReviewDialog task={reviewTask()} onClose={vi.fn()} onDone={vi.fn()} />,
     );
     expect(screen.getByRole("button", { name: he.taskApproveClose })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSection }));
     fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
     expect(screen.queryByRole("button", { name: he.taskApproveClose })).toBeNull();
     expect(screen.queryByRole("button", { name: he.taskReopen })).toBeNull();
@@ -168,6 +174,7 @@ describe("TaskCompletionReviewDialog", () => {
         onDone={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSection }));
     expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
     expect(screen.getByTestId("task-chat-panel").getAttribute("data-compose")).toBe("false");
   });

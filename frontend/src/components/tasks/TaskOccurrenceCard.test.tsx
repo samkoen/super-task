@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import TaskOccurrenceCard from "./TaskOccurrenceCard";
 import { he } from "../../i18n/he";
 import type { TaskOccurrence } from "../../services/taskService";
+import { taskFinishedAtText } from "../../utils/completionFinishedAt";
 import { taskCardBackgroundUrl } from "../../utils/taskCardBackground";
 
 vi.mock("../../utils/isNativeApp", () => ({
@@ -79,7 +80,7 @@ describe("TaskOccurrenceCard", () => {
     expect(screen.queryByTestId("task-chat-panel")).toBeNull();
   });
 
-  it("opens edit from menu and from chat button (menahel)", () => {
+  it("opens edit from the menu and the chat from the chat button", () => {
     const onEdit = vi.fn();
     render(
       <TaskOccurrenceCard
@@ -93,11 +94,12 @@ describe("TaskOccurrenceCard", () => {
     fireEvent.click(screen.getByText(he.editTask));
     expect(onEdit).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText(he.taskChatSection));
-    expect(onEdit).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSection }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
   });
 
-  it("keeps chat collapsed by default for oved and opens on toggle", () => {
+  it("opens the list-style chat from the oved card", () => {
     const onEdit = vi.fn();
     render(
       <TaskOccurrenceCard
@@ -110,7 +112,7 @@ describe("TaskOccurrenceCard", () => {
       />,
     );
     expect(screen.queryByTestId("task-chat-panel")).toBeNull();
-    fireEvent.click(screen.getByText(he.taskChatSection));
+    fireEvent.click(screen.getByRole("button", { name: he.taskChatSection }));
     expect(onEdit).not.toHaveBeenCalled();
     expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
   });
@@ -208,6 +210,31 @@ describe("TaskOccurrenceCard", () => {
     fireEvent.click(screen.getByRole("button", { name: he.markDone }));
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(he.doTask)).toBeNull();
+  });
+
+  it("shows the siyum time on the card once the oved finished", () => {
+    const task = baseTask({
+      status: "completed",
+      completion: {
+        id: "c1",
+        occurrence_id: "t1",
+        status: "completed",
+        note: null,
+        photo_path: null,
+        video_path: null,
+        audio_path: null,
+        not_completed_reason: null,
+        completed_by_id: "u1",
+        completed_at: "2026-08-25T12:00:00+03:00",
+      },
+    });
+    render(<TaskOccurrenceCard task={task} index={0} onReview={vi.fn()} />);
+    expect(screen.getByText(taskFinishedAtText(task)!)).toBeTruthy();
+  });
+
+  it("hides the siyum time while the task is still open", () => {
+    render(<TaskOccurrenceCard task={baseTask()} index={0} onEdit={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.queryByText(he.markDone, { exact: false })).toBeNull();
   });
 
   it("shows לא בוצע when the oved sent without finishing", () => {
