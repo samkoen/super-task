@@ -200,6 +200,7 @@ export interface EmployeeTaskCard {
   title_he?: string;
   manager_next_at?: string | null;
   is_manager_next?: boolean;
+  manager_message_preview?: string | null;
 }
 
 export interface EmployeeDashboard {
@@ -224,6 +225,7 @@ export interface EmployeeDashboard {
   pending_review_tasks: EmployeeTaskCard[];
   today_tasks: EmployeeTaskCard[];
   completed_tasks: EmployeeTaskCard[];
+  manager_waiting_tasks?: EmployeeTaskCard[];
 }
 
 export const dashboardService = {
@@ -249,6 +251,7 @@ export const dashboardService = {
       pending_review_tasks: data.pending_review_tasks ?? [],
       today_tasks: data.today_tasks ?? [],
       completed_tasks: data.completed_tasks ?? [],
+      manager_waiting_tasks: data.manager_waiting_tasks ?? [],
     };
   },
 };

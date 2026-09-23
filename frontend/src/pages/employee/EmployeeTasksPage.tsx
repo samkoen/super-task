@@ -46,6 +46,7 @@ import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCaptu
 import EmployeePunchDoor from "../../components/employee/EmployeePunchDoor";
 import EmployeeFinishedTaskSections from "../../components/employee/EmployeeFinishedTaskSections";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
+import EmployeeManagerWaitingSection from "../../components/employee/EmployeeManagerWaitingSection";
 import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
@@ -216,6 +217,7 @@ function mergeDashboardTranslations(
     pending_review_tasks: mergeTaskTranslations(dashboard.pending_review_tasks, translations),
     today_tasks: mergeTaskTranslations(dashboard.today_tasks, translations),
     completed_tasks: mergeTaskTranslations(dashboard.completed_tasks, translations),
+    manager_waiting_tasks: mergeTaskTranslations(dashboard.manager_waiting_tasks ?? [], translations),
   };
 }
 
@@ -291,6 +293,7 @@ export default function EmployeeTasksPage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [linkedStartReady, setLinkedStartReady] = useState(true);
   const [incompleteOpen, setIncompleteOpen] = useState(false);
+  const [chatFirst, setChatFirst] = useState(false);
   const linkedStartRef = useRef<Promise<boolean> | null>(null);
   const linkedStartIdRef = useRef<string | null>(null);
   const autoCompleteGen = useRef(0);
@@ -333,6 +336,7 @@ export default function EmployeeTasksPage() {
         ...data.pending_review_tasks,
         ...data.today_tasks,
         ...data.completed_tasks,
+        ...(data.manager_waiting_tasks ?? []),
       ];
       void translatePendingTasks(lang, allTasks);
     } catch (e) {
@@ -411,6 +415,7 @@ export default function EmployeeTasksPage() {
     setPhotoAnnotating(false);
     setIncompleteOpen(false);
     setDetailTask(null);
+    setChatFirst(false);
   }, [clearCompletionMedia]);
 
   const requirements = useMemo(
@@ -602,8 +607,10 @@ export default function EmployeeTasksPage() {
   );
   const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask));
   const openWorkTask = useCallback(
-    (task: EmployeeTaskCard) => {
-      if (punch.start && task.id !== punch.start.id) {
+    (task: EmployeeTaskCard, focusChat = false) => {
+      const redirected = Boolean(punch.start && task.id !== punch.start.id);
+      setChatFirst(focusChat && !redirected);
+      if (redirected && punch.start) {
         openDetail(punch.start);
         return;
       }
@@ -727,6 +734,10 @@ export default function EmployeeTasksPage() {
         <ListSkeleton variant="table" rows={5} />
       ) : (
         <>
+          <EmployeeManagerWaitingSection
+            tasks={dashboard?.manager_waiting_tasks ?? []}
+            onOpen={(task) => openWorkTask(task, true)}
+          />
           {punch.showStart && punch.start ? (
             <>
               {finishedSections}
@@ -816,6 +827,7 @@ export default function EmployeeTasksPage() {
       <EmployeeTaskDetailDialog
         task={detailTask}
         language={employeeLanguage}
+        chatFirst={chatFirst}
         titleNode={detailTask ? <EmployeeTaskTitle task={detailTask} variant="h6" /> : null}
         onClose={closeDetail}
         capture={

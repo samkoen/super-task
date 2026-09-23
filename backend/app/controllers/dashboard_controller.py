@@ -7,6 +7,7 @@ from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
+from app.repositories.task_message_repository import TaskMessageRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_translation_repository import TaskTranslationRepository
@@ -32,6 +33,7 @@ def get_service(db: Session = Depends(get_db)) -> DashboardService:
         templates,
         TaskSchedulerService(templates, occurrences, TaskCompletionRepository(db)),
         NetworkRepository(db),
+        message_repo=TaskMessageRepository(db),
     )
 
 

@@ -614,6 +614,7 @@ export const he = {
   chatTaskFollowUpChip: (when: string) => `מעקב: ${when}`,
   chatTaskNeedFollowUp: "בחרו מועד מעקב עתידי",
   employeeAwaitingResponseTasks: "ממתין לתגובת מנהל",
+  employeeManagerWaiting: "המנהל מחכה",
   completionMediaAdded: "קבצים שהוספת",
   completionMediaFromEmployee: "קבצים שצורפו על ידי העובד",
   /** Indique média vidéo/audio/clôture sans le charger dans la liste */
