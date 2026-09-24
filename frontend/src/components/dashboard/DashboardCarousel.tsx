@@ -1,6 +1,21 @@
 import { Box, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 
+export const dashboardCarouselRowSx = {
+  display: "flex",
+  gap: 1.5,
+  overflowX: "auto",
+  pb: 1,
+  mx: -0.5,
+  px: 0.5,
+  scrollSnapType: "x mandatory",
+  "&::-webkit-scrollbar": { height: 6 },
+  "&::-webkit-scrollbar-thumb": {
+    bgcolor: "action.disabled",
+    borderRadius: 3,
+  },
+} as const;
+
 interface DashboardCarouselProps {
   title: string;
   count: number;
@@ -34,22 +49,7 @@ export default function DashboardCarousel({
           {emptyLabel}
         </Typography>
       ) : (
-        <Box
-          sx={{
-            display: "flex",
-            gap: 1.5,
-            overflowX: "auto",
-            pb: 1,
-            mx: -0.5,
-            px: 0.5,
-            scrollSnapType: "x mandatory",
-            "&::-webkit-scrollbar": { height: 6 },
-            "&::-webkit-scrollbar-thumb": {
-              bgcolor: "action.disabled",
-              borderRadius: 3,
-            },
-          }}
-        >
+        <Box sx={dashboardCarouselRowSx}>
           {children}
         </Box>
       )}

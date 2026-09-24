@@ -10,6 +10,7 @@ import {
   buildQuestionsQueue,
 } from "../../utils/dashboardCarousels";
 import ActionRequiredCarousel from "./ActionRequiredCarousel";
+import { dashboardCarouselRowSx } from "./DashboardCarousel";
 
 export default function ManagerActionsSection({
   queues,
@@ -81,17 +82,19 @@ function ChatWaitingBlock({
   return (
     <>
       <ChatWaitingHeading count={count} />
-      {chats.map((card) => (
-        <DirectChatActionCard key={card.counterpart_user_id} card={card} onOpen={onOpenChat} />
-      ))}
-      {hasQuestions ? (
-        <ActionRequiredCarousel
-          queues={queues}
-          mode="questions"
-          embedded
-          onOpenChat={onOpenTaskChat}
-        />
-      ) : null}
+      <Box data-testid="chat-waiting-row" sx={dashboardCarouselRowSx}>
+        {chats.map((card) => (
+          <DirectChatActionCard key={card.counterpart_user_id} card={card} onOpen={onOpenChat} />
+        ))}
+        {hasQuestions ? (
+          <ActionRequiredCarousel
+            queues={queues}
+            mode="questions"
+            embedded
+            onOpenChat={onOpenTaskChat}
+          />
+        ) : null}
+      </Box>
     </>
   );
 }
@@ -107,8 +110,12 @@ function DirectChatActionCard({
     <Paper
       variant="outlined"
       sx={{
-        p: 1.25,
-        mb: 1,
+        minWidth: 110,
+        maxWidth: 130,
+        width: 120,
+        flex: "0 0 auto",
+        p: 0.75,
+        scrollSnapAlign: "start",
         borderWidth: 2,
         borderColor: "#c62828",
         bgcolor: alpha("#c62828", 0.04),
@@ -127,7 +134,14 @@ function DirectChatActionCard({
         variant="contained"
         startIcon={<ChatOutlinedIcon />}
         onClick={() => onOpen(card)}
-        sx={{ bgcolor: "#c62828", "&:hover": { bgcolor: "#c62828" } }}
+        sx={{
+          bgcolor: "#c62828",
+          "&:hover": { bgcolor: "#c62828" },
+          minWidth: 0,
+          px: 0.75,
+          py: 0.15,
+          fontSize: 11,
+        }}
       >
         {he.dashboardDirectChatReply}
       </Button>

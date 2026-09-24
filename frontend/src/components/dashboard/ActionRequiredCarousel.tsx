@@ -45,7 +45,10 @@ export default function ActionRequiredCarousel({
   embedded = false,
 }: ActionRequiredCarouselProps) {
   const items = itemsForMode(queues, mode);
-  if (embedded && items.length === 0) return null;
+  const cards = items.map((item) => (
+    <ActionQueueCard key={item.task.id} item={item} onReviewTask={onReviewTask} onOpenChat={onOpenChat} />
+  ));
+  if (embedded) return cards.length ? <>{cards}</> : null;
   const resolvedTitle =
     title ??
     (mode === "questions"
@@ -68,24 +71,37 @@ export default function ActionRequiredCarousel({
       emptyLabel={resolvedEmpty}
       showHeading={!embedded}
     >
-      {items.map(({ task, reason }) => {
-        const border = BORDER[reason];
-        return (
-          <Paper
-            key={task.id}
-            variant="outlined"
-            sx={{
-              minWidth: 110,
-              maxWidth: 130,
-              width: 120,
-              flex: "0 0 auto",
-              p: 0.75,
-              scrollSnapAlign: "start",
-              borderWidth: 2,
-              borderColor: border,
-              bgcolor: alpha(border, 0.04),
-            }}
-          >
+      {cards}
+    </DashboardCarousel>
+  );
+}
+
+function ActionQueueCard({
+  item,
+  onReviewTask,
+  onOpenChat,
+}: {
+  item: ActionQueueItem;
+  onReviewTask?: (taskId: string) => void;
+  onOpenChat?: (taskId: string) => void;
+}) {
+  const { task, reason } = item;
+  const border = BORDER[reason];
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        minWidth: 110,
+        maxWidth: 130,
+        width: 120,
+        flex: "0 0 auto",
+        p: 0.75,
+        scrollSnapAlign: "start",
+        borderWidth: 2,
+        borderColor: border,
+        bgcolor: alpha(border, 0.04),
+      }}
+    >
             <Box display="flex" gap={0.5} flexWrap="wrap" mb={0.5}>
               <Chip
                 size="small"
@@ -153,9 +169,6 @@ export default function ActionRequiredCarousel({
                 {he.taskChatOpen}
               </Button>
             )}
-          </Paper>
-        );
-      })}
-    </DashboardCarousel>
+    </Paper>
   );
 }
