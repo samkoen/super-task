@@ -47,6 +47,7 @@ describe("ManagerActionsSection", () => {
       />,
     );
     expect(screen.getByText(he.dashboardChatWaiting, { exact: false })).toBeTruthy();
+    expect(screen.getByTestId("chat-waiting-row").textContent).toContain("ראובן");
     expect(screen.getByText("ראובן")).toBeTruthy();
     expect(screen.getByRole("button", { name: he.dashboardDirectChatReply })).toBeTruthy();
     expect(screen.queryByText(he.dashboardQuestionsRow)).toBeNull();
@@ -56,7 +57,7 @@ describe("ManagerActionsSection", () => {
     render(
       <ManagerActionsSection
         queues={queuesWithBoth()}
-        chats={[]}
+        chats={[chat()]}
         onReviewTask={vi.fn()}
         onOpenChat={vi.fn()}
       />,
@@ -64,6 +65,9 @@ describe("ManagerActionsSection", () => {
     const reviews = screen.getByText("reviews-carousel");
     const chats = screen.getByText(he.dashboardChatWaiting, { exact: false });
     const questions = screen.getByText("questions-carousel");
+    const row = screen.getByTestId("chat-waiting-row");
+    expect(row.textContent).toContain("ראובן");
+    expect(row.textContent).toContain("questions-carousel");
     expect(reviews.compareDocumentPosition(chats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chats.compareDocumentPosition(questions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText(he.dashboardActionsTitle)).toBeNull();
