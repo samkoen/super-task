@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ManagerDashboardPage from "./ManagerDashboardPage";
 import { he } from "../../i18n/he";
-import { formatHebrewDay, todayIso } from "../../utils/dateView";
+import { formatHebrewDay, shiftDay, todayIso } from "../../utils/dateView";
 import { dashboardService } from "../../services/dashboardService";
 
 vi.mock("../../context/FeedbackContext", () => ({
@@ -144,6 +144,14 @@ describe("ManagerDashboardPage", () => {
     expect(screen.getByText(`${he.branch}: שפע · ${he.roleBranchManager}`)).toBeTruthy();
     expect(screen.getByRole("button", { name: he.employeeChangePhoto })).toBeTruthy();
     expect(screen.queryByRole("button", { name: he.employeeBreakStart })).toBeNull();
-    await waitFor(() => expect(screen.getByText("today-board")).toBeTruthy());
+    await waitFor(() => {
+      expect(screen.getByText("today-board")).toBeTruthy();
+      expect(dashboardService.getManager).toHaveBeenCalledWith(undefined, todayIso());
+    });
+    fireEvent.click(screen.getByRole("button", { name: he.tasksNextDay }));
+    await waitFor(() =>
+      expect(dashboardService.getManager).toHaveBeenCalledWith(undefined, shiftDay(todayIso(), 1)),
+    );
+    expect(screen.getByText(formatHebrewDay(shiftDay(todayIso(), 1)))).toBeTruthy();
   });
 });

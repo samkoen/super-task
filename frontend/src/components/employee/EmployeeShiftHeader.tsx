@@ -9,6 +9,7 @@ import type { QualityRatingSummary } from "../../utils/qualityRating";
 
 interface EmployeeShiftHeaderProps {
   dateLabel?: string;
+  dateNav?: ReactNode;
   name?: string;
   photoUrl?: string | null;
   photoEditable?: boolean;
@@ -133,8 +134,19 @@ function ShiftPresence({
   );
 }
 
+function ShiftDateRow({ dateLabel, dateNav }: Pick<EmployeeShiftHeaderProps, "dateLabel" | "dateNav">) {
+  if (dateNav) return <>{dateNav}</>;
+  if (!dateLabel) return null;
+  return (
+    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+      {dateLabel}
+    </Typography>
+  );
+}
+
 export default function EmployeeShiftHeader({
   dateLabel,
+  dateNav,
   name,
   photoUrl,
   photoEditable = false,
@@ -152,11 +164,7 @@ export default function EmployeeShiftHeader({
 }: EmployeeShiftHeaderProps) {
   return (
     <Box mb={1.5}>
-      {dateLabel ? (
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
-          {dateLabel}
-        </Typography>
-      ) : null}
+      <ShiftDateRow dateLabel={dateLabel} dateNav={dateNav} />
       <Paper variant="outlined" data-testid="employee-shift-header" sx={employeeShiftHeaderPaperSx}>
         <ShiftIdentity
           name={name}

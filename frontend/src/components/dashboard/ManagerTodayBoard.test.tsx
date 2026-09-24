@@ -48,6 +48,7 @@ const boardProps = {
   onOpenTask: vi.fn(),
   onOpenOwnTask: vi.fn(),
   onOpenChat: vi.fn(),
+  onOpenTaskChat: vi.fn(),
   onChanged: vi.fn(),
   onNewTask: vi.fn(),
   onGalleryTask: vi.fn(),

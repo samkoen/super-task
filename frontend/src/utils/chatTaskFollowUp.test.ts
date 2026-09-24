@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   datetimeLocalToIso,
   followUpIsPending,
+  chatNeedsManagerAttention,
   isContinuousChatTask,
   isOpenChatTask,
   isPendingFollowUpTask,
@@ -24,6 +25,30 @@ describe("chatTaskFollowUp", () => {
     };
     expect(isPendingFollowUpTask(task, NOW)).toBe(true);
     expect(isContinuousChatTask(task, NOW)).toBe(false);
+  });
+
+  it("hides a chat the manager already opened, until the employee writes again", () => {
+    const opened = {
+      status: "awaiting_response" as const,
+      segment: "awaiting_response" as const,
+      chat_follow_up_at: null,
+      chat_resolved_at: null,
+      chat_unread_count: 0,
+    };
+    const fresh = { ...opened, chat_unread_count: 1 };
+    expect(chatNeedsManagerAttention(opened, NOW)).toBe(false);
+    expect(chatNeedsManagerAttention(fresh, NOW)).toBe(true);
+  });
+
+  it("keeps a due reminder even after the manager opened the chat", () => {
+    const task = {
+      status: "awaiting_response" as const,
+      segment: "awaiting_response" as const,
+      chat_follow_up_at: "2026-08-29T21:00:00+03:00",
+      chat_resolved_at: null,
+      chat_unread_count: 0,
+    };
+    expect(chatNeedsManagerAttention(task, NOW)).toBe(true);
   });
 
   it("returns a due follow-up to the continuous row", () => {

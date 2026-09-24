@@ -32,8 +32,9 @@ describe("ManagerActionsSection", () => {
         onOpenChat={vi.fn()}
       />,
     );
-    expect(screen.getByText(he.dashboardActionsTitle)).toBeTruthy();
-    expect(screen.getByText(he.dashboardActionsEmpty)).toBeTruthy();
+    expect(screen.getByText(he.dashboardChatWaiting)).toBeTruthy();
+    expect(screen.getByText(he.dashboardChatWaitingEmpty)).toBeTruthy();
+    expect(screen.queryByText(he.dashboardActionsTitle)).toBeNull();
   });
 
   it("lists unread clali chats before task carousels", () => {
@@ -45,8 +46,10 @@ describe("ManagerActionsSection", () => {
         onOpenChat={vi.fn()}
       />,
     );
+    expect(screen.getByText(he.dashboardChatWaiting, { exact: false })).toBeTruthy();
     expect(screen.getByText("ראובן")).toBeTruthy();
     expect(screen.getByRole("button", { name: he.dashboardDirectChatReply })).toBeTruthy();
+    expect(screen.queryByText(he.dashboardQuestionsRow)).toBeNull();
   });
 
   it("puts finished tasks waiting for approval above טיפול נדרש", () => {
@@ -59,10 +62,12 @@ describe("ManagerActionsSection", () => {
       />,
     );
     const reviews = screen.getByText("reviews-carousel");
-    const actions = screen.getByText(he.dashboardActionsTitle, { exact: false });
+    const chats = screen.getByText(he.dashboardChatWaiting, { exact: false });
     const questions = screen.getByText("questions-carousel");
-    expect(reviews.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(actions.compareDocumentPosition(questions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(reviews.compareDocumentPosition(chats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chats.compareDocumentPosition(questions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(he.dashboardActionsTitle)).toBeNull();
+    expect(screen.queryByText(he.dashboardQuestionsRow)).toBeNull();
   });
 });
 

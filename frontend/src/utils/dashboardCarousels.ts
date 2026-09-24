@@ -1,5 +1,8 @@
 import type { TaskQueues, TimelineTask } from "../services/dashboardService";
-import { isContinuousChatTask, isPendingFollowUpTask } from "./chatTaskFollowUp";
+import {
+  chatNeedsManagerAttention,
+  isPendingFollowUpTask,
+} from "./chatTaskFollowUp";
 
 /** Priorité haute (cadre rouge/orange) — questions / ממתין לתגובה (phase chat). */
 export type ActionQueueReason = "awaiting_response" | "pending_review";
@@ -24,9 +27,11 @@ export function buildQuestionsQueue(
   nowMs = Date.now(),
 ): ActionQueueItem[] {
   if (!queues) return [];
-  const fromReview = (queues.pending_review ?? []).filter((t) => isContinuousChatTask(t, nowMs));
-  const fromUpcoming = (queues.upcoming ?? []).filter((t) => isContinuousChatTask(t, nowMs));
-  const fromInProgress = (queues.in_progress ?? []).filter((t) => isContinuousChatTask(t, nowMs));
+  const fromReview = (queues.pending_review ?? []).filter((t) => chatNeedsManagerAttention(t, nowMs));
+  const fromUpcoming = (queues.upcoming ?? []).filter((t) => chatNeedsManagerAttention(t, nowMs));
+  const fromInProgress = (queues.in_progress ?? []).filter((t) =>
+    chatNeedsManagerAttention(t, nowMs),
+  );
   const seen = new Set<string>();
   const out: ActionQueueItem[] = [];
   for (const task of [...fromReview, ...fromUpcoming, ...fromInProgress]) {
@@ -109,6 +114,19 @@ export function uniqueDepartments(tasks: TimelineTask[]): string[] {
     if (task.department_name) set.add(task.department_name);
   }
   return [...set].sort((a, b) => a.localeCompare(b, "he"));
+}
+
+export function findQueuedTask(
+  queues: TaskQueues | null | undefined,
+  taskId: string,
+): TimelineTask | undefined {
+  if (!queues) return undefined;
+  const lists = [queues.pending_review, queues.in_progress, queues.upcoming, queues.completed];
+  for (const list of lists) {
+    const found = (list ?? []).find((task) => task.id === taskId);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 export function uniqueAssignees(tasks: TimelineTask[]): string[] {

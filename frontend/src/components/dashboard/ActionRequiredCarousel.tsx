@@ -26,6 +26,7 @@ interface ActionRequiredCarouselProps {
   emptyLabel?: string;
   onReviewTask?: (taskId: string) => void;
   onOpenChat?: (taskId: string) => void;
+  embedded?: boolean;
 }
 
 function itemsForMode(queues: TaskQueues | null | undefined, mode: ActionCarouselMode) {
@@ -41,8 +42,10 @@ export default function ActionRequiredCarousel({
   emptyLabel,
   onReviewTask,
   onOpenChat,
+  embedded = false,
 }: ActionRequiredCarouselProps) {
   const items = itemsForMode(queues, mode);
+  if (embedded && items.length === 0) return null;
   const resolvedTitle =
     title ??
     (mode === "questions"
@@ -59,7 +62,12 @@ export default function ActionRequiredCarousel({
         : he.dashboardActionQueueEmpty);
 
   return (
-    <DashboardCarousel title={resolvedTitle} count={items.length} emptyLabel={resolvedEmpty}>
+    <DashboardCarousel
+      title={resolvedTitle}
+      count={items.length}
+      emptyLabel={resolvedEmpty}
+      showHeading={!embedded}
+    >
       {items.map(({ task, reason }) => {
         const border = BORDER[reason];
         return (

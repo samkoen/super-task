@@ -23,6 +23,20 @@ export function isContinuousChatTask(
   return !followUpIsPending(task.chat_follow_up_at, nowMs);
 }
 
+/** File menahel : message d'oved non lu, ou rappel מעקב arrivé à échéance. */
+export function chatNeedsManagerAttention(
+  task: Pick<TimelineTask, "status" | "segment" | "chat_follow_up_at" | "chat_resolved_at"> & {
+    chat_unread_count?: number | null;
+  },
+  nowMs = Date.now(),
+): boolean {
+  if (!isContinuousChatTask(task, nowMs)) return false;
+  const unread = task.chat_unread_count;
+  if (unread == null) return true;
+  if (unread > 0) return true;
+  return Boolean(task.chat_follow_up_at);
+}
+
 export function isPendingFollowUpTask(
   task: Pick<TimelineTask, "status" | "chat_follow_up_at" | "chat_resolved_at">,
   nowMs = Date.now(),

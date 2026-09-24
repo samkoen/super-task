@@ -4,6 +4,10 @@ import TaskChatDialog, { OpenTaskChatButton } from "./TaskChatDialog";
 import { he } from "../../i18n/he";
 import { taskService } from "../../services/taskService";
 
+vi.mock("../../hooks/useVideoPoster", () => ({
+  useVideoPoster: () => "data:image/jpeg;base64,poster",
+}));
+
 vi.mock("../../hooks/useResolvedMediaSrc", () => ({
   useResolvedMediaSrc: (path: string | null) => ({
     src: path,
@@ -54,9 +58,49 @@ describe("TaskChatDialog", () => {
     );
     expect(await screen.findByText("task-thread:occ-1")).toBeTruthy();
     await waitFor(() => expect(document.querySelector("img[src='/p.jpg']")).toBeTruthy());
+    expect(screen.getByAltText(he.completionReqVideo).getAttribute("src")).toBe(
+      "data:image/jpeg;base64,poster",
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.completionPlayVideo }));
     expect(document.querySelector("video[src='/v.mp4']")).toBeTruthy();
     expect(screen.queryByText(he.taskReferenceAudio)).toBeNull();
     expect(document.querySelector("audio")).toBeNull();
+  });
+
+  it("shows a play button and the stored first frame on every video square", async () => {
+    vi.mocked(taskService.getOccurrence).mockResolvedValue({
+      id: "occ-1",
+      completion: {
+        id: "c1",
+        occurrence_id: "occ-1",
+        status: "completed",
+        note: null,
+        photo_path: null,
+        video_path: null,
+        audio_path: null,
+        not_completed_reason: null,
+        completed_by_id: "u1",
+        completed_at: "2026-08-25T12:00:00+03:00",
+        completion_attachments: [
+          { kind: "video", url: "/a.mp4", poster_url: "/a.jpg" },
+          { kind: "video", url: "/b.mp4", poster_url: "/b.jpg" },
+        ],
+      },
+    } as never);
+    render(
+      <TaskChatDialog
+        open
+        occurrenceId="occ-1"
+        title="צילום מדף"
+        status="pending_review"
+        employee
+        onClose={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText(he.completionMediaAdded)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: he.completionPlayVideo })).toHaveLength(2);
+    expect(document.querySelector("img[src='/a.jpg']")).toBeTruthy();
+    expect(document.querySelector("img[src='/b.jpg']")).toBeTruthy();
   });
 
   it("opens the same chat from the task button without a thread until then", () => {

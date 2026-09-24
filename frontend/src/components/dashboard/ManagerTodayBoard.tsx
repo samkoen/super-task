@@ -19,6 +19,7 @@ export default function ManagerTodayBoard({
   onOpenTask,
   onOpenOwnTask,
   onOpenChat,
+  onOpenTaskChat,
   onChanged,
   onNewTask,
   onGalleryTask,
@@ -35,6 +36,7 @@ export default function ManagerTodayBoard({
   onOpenTask: (taskId: string) => void;
   onOpenOwnTask: (task: EmployeeTaskCard) => void;
   onOpenChat: (card: DirectChatCard) => void;
+  onOpenTaskChat: (taskId: string) => void;
   onChanged: () => void;
   onNewTask: () => void;
   onGalleryTask: () => void;
@@ -49,6 +51,7 @@ export default function ManagerTodayBoard({
         chats={chats}
         onReviewTask={onReviewTask}
         onOpenChat={onOpenChat}
+        onOpenTaskChat={onOpenTaskChat}
       />
       <ManagerOwnTasksSection work={work} onOpen={onOpenOwnTask} />
       {showTeam ? (

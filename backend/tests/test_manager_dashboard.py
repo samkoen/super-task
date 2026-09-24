@@ -12,6 +12,7 @@ from app.domain.manager_dashboard import (
     exclude_assignee_tasks,
     hide_from_manager_review_queue,
     sort_timeline_tasks,
+    stamp_chat_unread,
     task_queue_bucket,
     timeline_segment,
 )
@@ -197,6 +198,13 @@ def test_build_timeline_item_includes_media_ready():
         assignee_name="יוסי",
     )
     assert item["media_ready"] is False
+
+
+def test_stamp_chat_unread_zero_when_the_manager_already_opened():
+    queues = {"pending_review": [{"id": "a"}, {"id": "b"}], "upcoming": []}
+    stamp_chat_unread(queues, {"a": 2})
+    assert queues["pending_review"][0]["chat_unread_count"] == 2
+    assert queues["pending_review"][1]["chat_unread_count"] == 0
 
 
 def test_task_queue_bucket_includes_pending_and_overdue_before_start():
