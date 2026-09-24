@@ -108,6 +108,19 @@ describe("buildQuestionsQueue / buildPendingReviewQueue", () => {
       "awaiting_response",
       "pending_review",
     ]);
+    const opened: TaskQueues = {
+      ...withQuestion,
+      upcoming: [
+        ...queues.upcoming,
+        task({
+          id: "seen",
+          status: "awaiting_response" as TimelineTask["status"],
+          segment: "upcoming",
+          chat_unread_count: 0,
+        }),
+      ],
+    };
+    expect(buildQuestionsQueue(opened).map((i) => i.task.id)).toEqual([]);
   });
 });
 

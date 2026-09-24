@@ -6,6 +6,7 @@ interface DashboardCarouselProps {
   count: number;
   emptyLabel: string;
   children: ReactNode;
+  showHeading?: boolean;
 }
 
 /** Conteneur section + scroll horizontal pour cartes dashboard. */
@@ -14,17 +15,20 @@ export default function DashboardCarousel({
   count,
   emptyLabel,
   children,
+  showHeading = true,
 }: DashboardCarouselProps) {
   return (
-    <Box mb={3}>
-      <Box display="flex" alignItems="baseline" gap={1} mb={1.5}>
-        <Typography variant="subtitle1" fontWeight={700}>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          ({count})
-        </Typography>
-      </Box>
+    <Box mb={showHeading ? 3 : 1}>
+      {showHeading ? (
+        <Box display="flex" alignItems="baseline" gap={1} mb={1.5}>
+          <Typography variant="subtitle1" fontWeight={700}>
+            {title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            ({count})
+          </Typography>
+        </Box>
+      ) : null}
       {count === 0 ? (
         <Typography variant="body2" color="text.secondary">
           {emptyLabel}

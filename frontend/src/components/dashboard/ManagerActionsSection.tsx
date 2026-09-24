@@ -16,97 +16,81 @@ export default function ManagerActionsSection({
   chats,
   onReviewTask,
   onOpenChat,
+  onOpenTaskChat,
 }: {
   queues: TaskQueues | null | undefined;
   chats: DirectChatCard[];
   onReviewTask: (taskId: string) => void;
   onOpenChat: (card: DirectChatCard) => void;
+  onOpenTaskChat?: (taskId: string) => void;
 }) {
   const questions = buildQuestionsQueue(queues);
   const reviews = buildPendingReviewQueue(queues);
-  const actionCount = questions.length + chats.length;
+  const waiting = questions.length + chats.length;
 
   return (
     <Box mb={3}>
       {reviews.length > 0 ? (
         <ActionRequiredCarousel queues={queues} mode="reviews" onReviewTask={onReviewTask} />
       ) : null}
-      {actionCount > 0 ? (
-        <ActionsBlock
-          count={actionCount}
+      {waiting > 0 ? (
+        <ChatWaitingBlock
+          count={waiting}
           chats={chats}
           queues={queues}
           onOpenChat={onOpenChat}
-          onReviewTask={onReviewTask}
+          onOpenTaskChat={onOpenTaskChat ?? onReviewTask}
         />
       ) : reviews.length === 0 ? (
-        <ActionsHeading />
+        <ChatWaitingHeading />
       ) : null}
     </Box>
   );
 }
 
-function ActionsHeading({ count = 0 }: { count?: number }) {
+function ChatWaitingHeading({ count = 0 }: { count?: number }) {
   return (
     <>
       <Typography variant="subtitle1" fontWeight={800} mb={1.5}>
-        {he.dashboardActionsTitle}
+        {he.dashboardChatWaiting}
         {count > 0 ? ` (${count})` : ""}
       </Typography>
       {count === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          {he.dashboardActionsEmpty}
+          {he.dashboardChatWaitingEmpty}
         </Typography>
       ) : null}
     </>
   );
 }
 
-function ActionsBlock({
+function ChatWaitingBlock({
   count,
   chats,
   queues,
   onOpenChat,
-  onReviewTask,
+  onOpenTaskChat,
 }: {
   count: number;
   chats: DirectChatCard[];
   queues: TaskQueues | null | undefined;
   onOpenChat: (card: DirectChatCard) => void;
-  onReviewTask: (taskId: string) => void;
-}) {
-  return (
-    <>
-      <ActionsHeading count={count} />
-      <ActionsBody
-        chats={chats}
-        queues={queues}
-        onOpenChat={onOpenChat}
-        onReviewTask={onReviewTask}
-      />
-    </>
-  );
-}
-
-function ActionsBody({
-  chats,
-  queues,
-  onOpenChat,
-  onReviewTask,
-}: {
-  chats: DirectChatCard[];
-  queues: TaskQueues | null | undefined;
-  onOpenChat: (card: DirectChatCard) => void;
-  onReviewTask: (taskId: string) => void;
+  onOpenTaskChat: (taskId: string) => void;
 }) {
   const hasQuestions = buildQuestionsQueue(queues).length > 0;
   return (
     <>
+      <ChatWaitingHeading count={count} />
       {chats.map((card) => (
         <DirectChatActionCard key={card.counterpart_user_id} card={card} onOpen={onOpenChat} />
       ))}
       {hasQuestions ? (
-        <ActionRequiredCarousel queues={queues} mode="questions" onReviewTask={onReviewTask} />
+        <ActionRequiredCarousel
+          queues={queues}
+          mode="questions"
+          embedded
+          onOpenChat={onOpenTaskChat}
+        />
       ) : null}
     </>
   );

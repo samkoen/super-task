@@ -129,6 +129,13 @@ def hide_from_manager_review_queue(status: str, completion) -> bool:
     return not bool(getattr(completion, "media_ready", True))
 
 
+def stamp_chat_unread(queues: dict[str, list[dict]], counts: dict[str, int]) -> None:
+    """Messages de l'oved non lus par le menahel, par tâche."""
+    for items in queues.values():
+        for item in items:
+            item["chat_unread_count"] = int(counts.get(item["id"], 0))
+
+
 def task_queue_bucket(status: str) -> str | None:
     """File dashboard : completed | in_progress | pending_review | upcoming | None."""
     if status == task_status.CANCELLED:

@@ -30,6 +30,7 @@ from app.domain.manager_dashboard import (
     exclude_assignee_tasks,
     hide_from_manager_review_queue,
     sort_timeline_tasks,
+    stamp_chat_unread,
     task_queue_bucket,
 )
 from app.domain.employee_day_buckets import split_employee_day_tasks
@@ -287,7 +288,7 @@ class DashboardService:
         completion_map = self._with_promoted_media(
             self._completions.find_by_occurrence_ids(done_ids)
         )
-        payload["task_queues"] = self._task_queues(ovdim, completion_map, now)
+        payload["task_queues"] = self._queues_with_unread(ovdim, completion_map, now, actor_id)
 
     def _branch_manager_dashboard(
         self,
@@ -346,7 +347,7 @@ class DashboardService:
             now,
         )
         ovdim_tasks = exclude_assignee_tasks(tasks_today, actor.user_id)
-        task_queues = self._task_queues(ovdim_tasks, completion_map, now)
+        task_queues = self._queues_with_unread(ovdim_tasks, completion_map, now, actor.user_id)
         unfinished = self._unfinished_tasks(overdue_branch, day, now)
         store_kpis = build_store_kpis(tasks_today)
 
@@ -523,7 +524,9 @@ class DashboardService:
         payload["manages_all_workers"] = True
         payload["store_kpis"] = build_store_kpis(collected["tasks"])
         payload["team"] = team
-        payload["task_queues"] = self._task_queues(ovdim_tasks, completion_map, now)
+        payload["task_queues"] = self._queues_with_unread(
+            ovdim_tasks, completion_map, now, actor.user_id
+        )
         payload["unfinished_tasks"] = self._unfinished_tasks(collected["overdue"], day, now)
         payload["counts"] = {
             **payload["counts"],
@@ -675,6 +678,19 @@ class DashboardService:
             })
         team.sort(key=lambda m: (not m["is_active"], m["full_name"]))
         return team
+
+    def _queues_with_unread(self, tasks, completion_map, now: datetime, viewer_id: str) -> dict:
+        queues = self._task_queues(tasks, completion_map, now)
+        self._stamp_queue_unread(queues, viewer_id)
+        return queues
+
+    def _stamp_queue_unread(self, queues: dict, viewer_id: str) -> None:
+        if self._messages is None:
+            return
+        ids = [item["id"] for items in queues.values() for item in items]
+        if not ids:
+            return
+        stamp_chat_unread(queues, self._messages.unread_counts(ids, viewer_id))
 
     def _task_queues(
         self,

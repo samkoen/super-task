@@ -16,15 +16,18 @@ import { branchService, type Branch } from "../../services/branchService";
 import {
   dashboardService,
   type ManagerDashboard,
+  type TimelineTask,
 } from "../../services/dashboardService";
 import {
   promotionStageService,
   type PromotionStage,
 } from "../../services/promotionStageService";
+import DashboardDayNav from "../../components/dashboard/DashboardDayNav";
 import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
 import HealthBadge from "../../components/dashboard/HealthBadge";
 import ManagerTodayBoard from "../../components/dashboard/ManagerTodayBoard";
 import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
+import TaskChatDialog from "../../components/tasks/TaskChatDialog";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
@@ -46,7 +49,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
-import { formatHebrewDay, todayIso } from "../../utils/dateView";
+import { findQueuedTask } from "../../utils/dashboardCarousels";
+import { todayIso } from "../../utils/dateView";
 import {
   bindNotificationAudioUnlock,
   playManagerQuestionSound,
@@ -75,9 +79,11 @@ export default function ManagerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
+  const [chatTask, setChatTask] = useState<TimelineTask | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
+  const [viewDay, setViewDay] = useState(todayIso);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [stages, setStages] = useState<PromotionStage[]>([]);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -97,7 +103,7 @@ export default function ManagerDashboardPage() {
     }
     try {
       const branchId = canPickBranch ? selectedBranch || undefined : undefined;
-      const dash = await dashboardService.getManager(branchId, todayIso());
+      const dash = await dashboardService.getManager(branchId, viewDay);
       setData(dash);
       const bid = dash.branch?.id;
       if (bid) {
@@ -114,7 +120,12 @@ export default function ManagerDashboardPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [canPickBranch, selectedBranch]);
+  }, [canPickBranch, selectedBranch, viewDay]);
+
+  const openTaskChat = useCallback((taskId: string) => {
+    const task = findQueuedTask(data?.task_queues, taskId);
+    if (task) setChatTask(task);
+  }, [data]);
 
   const ownWork = useOwnTaskWork(() => {
     void load(true);
@@ -231,7 +242,7 @@ export default function ManagerDashboardPage() {
   return (
     <Box>
       <EmployeeShiftHeader
-        dateLabel={formatHebrewDay(todayIso())}
+        dateNav={<DashboardDayNav day={viewDay} onChange={setViewDay} />}
         name={user?.full_name}
         photoUrl={photoUrl}
         photoEditable
@@ -287,6 +298,7 @@ export default function ManagerDashboardPage() {
           onOpenTask={(id) => setEditOccurrenceId(id)}
           onOpenOwnTask={ownWork.open}
           onOpenChat={(card) => void inbox.openCard(card)}
+          onOpenTaskChat={openTaskChat}
           onChanged={() => void load(true)}
           onNewTask={() => goTasks({ openNewTask: true })}
           onGalleryTask={() => goTasks({ openGalleryTask: true })}
@@ -326,6 +338,19 @@ export default function ManagerDashboardPage() {
           <DepartmentProgressGrid departments={data.by_department} />
         )}
 
+      <TaskChatDialog
+        open={Boolean(chatTask)}
+        occurrenceId={chatTask?.id ?? ""}
+        title={chatTask?.title ?? he.taskChatTitle}
+        status={chatTask?.status}
+        employee={false}
+        chatFollowUpAt={chatTask?.chat_follow_up_at}
+        chatResolvedAt={chatTask?.chat_resolved_at}
+        onClose={() => {
+          setChatTask(null);
+          void load(true);
+        }}
+      />
       <TaskCompletionReviewDialog
         task={reviewTarget}
         onClose={() => setReviewTarget(null)}

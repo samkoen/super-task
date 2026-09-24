@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Dialog, Typography } from "@mui/material";
+import { Box, Button, Dialog, IconButton, Typography } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
+import { useVideoPoster } from "../../hooks/useVideoPoster";
+import CompletionExampleDialog from "./CompletionExampleDialog";
 import { taskService, type TaskCompletion, type TaskStatus } from "../../services/taskService";
 import type { CompletionAttachment } from "../../utils/completionMedia";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
@@ -171,17 +174,7 @@ function TaskChatMediaThumb({ item }: { item: CompletionAttachment }) {
   const remote = Boolean(item.url && !item.url.startsWith("blob:"));
   const media = useResolvedMediaSrc(item.url, remote);
   if (!media.src) return null;
-  if (item.kind === "video") {
-    return (
-      <Box
-        component="video"
-        src={media.src}
-        controls
-        playsInline
-        sx={{ height: 120, maxWidth: 180, borderRadius: 1, bgcolor: "common.black", flex: "0 0 auto" }}
-      />
-    );
-  }
+  if (item.kind === "video") return <TaskChatVideoThumb item={item} src={media.src} />;
   return (
     <Box
       component="img"
@@ -191,3 +184,79 @@ function TaskChatMediaThumb({ item }: { item: CompletionAttachment }) {
     />
   );
 }
+
+function TaskChatVideoThumb({ item, src }: { item: CompletionAttachment; src: string }) {
+  const [playing, setPlaying] = useState(false);
+  const poster = useChatVideoPoster(item.poster_url, src);
+  return (
+    <>
+      <Box sx={chatVideoThumbSx}>
+        <ChatVideoFrame poster={poster} src={src} />
+        <IconButton aria-label={he.completionPlayVideo} onClick={() => setPlaying(true)} sx={chatPlayButtonSx}>
+          <PlayArrowIcon />
+        </IconButton>
+      </Box>
+      {playing ? (
+        <CompletionExampleDialog
+          src={src}
+          title={he.completionReqVideo}
+          kind="video"
+          onClose={() => setPlaying(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function useChatVideoPoster(posterUrl: string | undefined, src: string): string | null {
+  const remote = Boolean(posterUrl && !posterUrl.startsWith("blob:"));
+  const stored = useResolvedMediaSrc(posterUrl ?? null, remote);
+  const captured = useVideoPoster(stored.src ? null : src);
+  return stored.src || captured;
+}
+
+function ChatVideoFrame({ poster, src }: { poster: string | null; src: string }) {
+  if (poster) {
+    return (
+      <Box
+        component="img"
+        src={poster}
+        alt={he.completionReqVideo}
+        sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      />
+    );
+  }
+  return (
+    <Box
+      component="video"
+      src={src}
+      muted
+      playsInline
+      preload="metadata"
+      sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }}
+    />
+  );
+}
+
+const chatVideoThumbSx = {
+  position: "relative",
+  width: 120,
+  height: 120,
+  flex: "0 0 auto",
+  overflow: "hidden",
+  borderRadius: 1,
+  bgcolor: "common.black",
+} as const;
+
+const chatPlayButtonSx = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  zIndex: 2,
+  width: 48,
+  height: 48,
+  bgcolor: "rgba(0,0,0,0.55)",
+  color: "common.white",
+  "&:hover": { bgcolor: "rgba(0,0,0,0.7)" },
+} as const;
