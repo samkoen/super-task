@@ -16,6 +16,7 @@ import {
   isCompleteBlockedUntilStart,
   requireLinkedStart,
   resolveTaskForComplete,
+  shouldEnsureStartBeforeComplete,
   shouldAutoCompleteEmployeeTask,
   shouldOpenStartUrlOnBegin,
   shouldStopAfterOpeningStartUrl,
@@ -102,17 +103,30 @@ describe("employeeDoTask", () => {
     expect(started.task.status).toBe("in_progress");
   });
 
-  it("does not force a completed task into in_progress when start is refused", async () => {
+  it("does not restart a task that is already closed", async () => {
+    const start = vi.fn();
     const task = { id: "t1", status: "completed" as const };
-    await expect(
-      resolveTaskForComplete(task, {
-        openLink: false,
-        slotsFilled: true,
-        start: async () => {
-          throw new Error("ניתן להתחיל רק משימה במצב ממתין או באיחור");
-        },
-      }),
-    ).rejects.toThrow("ניתן להתחיל רק משימה");
+    const started = await resolveTaskForComplete(task, {
+      openLink: false,
+      slotsFilled: true,
+      start,
+    });
+    expect(start).not.toHaveBeenCalled();
+    expect(started.task.status).toBe("completed");
+  });
+
+  it("does not restart a task that is waiting for a chat reply", async () => {
+    const start = vi.fn();
+    const task = { id: "t1", status: "awaiting_response" as const };
+    const started = await resolveTaskForComplete(task, {
+      openLink: false,
+      slotsFilled: true,
+      start,
+    });
+    expect(shouldEnsureStartBeforeComplete("awaiting_response")).toBe(false);
+    expect(start).not.toHaveBeenCalled();
+    expect(started.deferComplete).toBe(false);
+    expect(started.task.status).toBe("awaiting_response");
   });
 
   it("starts on the server even if the card already looks in progress", async () => {

@@ -59,6 +59,11 @@ export async function startIgnoringIfAlreadyStarted<
   }
 }
 
+/** En attente de réponse chat, la tâche est déjà ouverte : start renvoie une erreur. */
+export function shouldEnsureStartBeforeComplete(status: string): boolean {
+  return needsTaskStart(status) || status === "in_progress";
+}
+
 export async function resolveTaskForComplete<
   T extends { id: string; status: string; start_url?: string | null; started_at?: string | null },
 >(
@@ -69,7 +74,9 @@ export async function resolveTaskForComplete<
     start: () => Promise<{ occurrence?: { status?: string; started_at?: string | null } | null }>;
   },
 ): Promise<{ task: T; deferComplete: boolean }> {
-  const next = await startIgnoringIfAlreadyStarted(task, opts.start);
+  const next = shouldEnsureStartBeforeComplete(task.status)
+    ? await startIgnoringIfAlreadyStarted(task, opts.start)
+    : task;
   return {
     task: next,
     deferComplete: shouldStopAfterOpeningStartUrl(opts.openLink, opts.slotsFilled),
