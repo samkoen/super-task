@@ -672,9 +672,7 @@ class TaskOccurrenceService:
         )
         if as_assignee and occurrence.status == task_status.PENDING_REVIEW:
             raise ValueError("המשימה ממתינה לאישור מנהל")
-        if as_assignee and occurrence.status not in {
-            task_status.IN_PROGRESS,
-        }:
+        if as_assignee and not task_status.employee_may_submit(occurrence.status):
             raise ValueError("יש להתחיל את המשימה לפני הסיום")
         completion_status = normalize_completion_status(completion_status)
         reason_clean = normalize_not_completed_reason(
@@ -699,7 +697,7 @@ class TaskOccurrenceService:
         if employee_submission and not existing:
             self._stamp_work_start_arrival(occurrence, media["attachments"])
 
-        if existing and occurrence.status == task_status.IN_PROGRESS:
+        if existing and task_status.employee_may_submit(occurrence.status):
             completion = self._completions.update_submission(
                 occurrence_id,
                 status=completion_status,

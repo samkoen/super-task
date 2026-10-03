@@ -5,14 +5,32 @@ import { he } from "../../i18n/he";
 
 vi.mock("../media/MediaCaptureActions", () => ({
   default: ({
+    photoAdded,
     videoAdded,
+    photoLabel,
     videoLabel,
+    photoDoneLabel,
     videoDoneLabel,
+    allowedKinds,
   }: {
+    photoAdded?: boolean;
     videoAdded?: boolean;
+    photoLabel?: string;
     videoLabel?: string;
+    photoDoneLabel?: string;
     videoDoneLabel?: string;
-  }) => <button type="button">{videoAdded ? videoDoneLabel : videoLabel}</button>,
+    allowedKinds?: string[];
+  }) => (
+    <button type="button">
+      {allowedKinds?.[0] === "video"
+        ? videoAdded
+          ? videoDoneLabel
+          : videoLabel
+        : photoAdded
+          ? photoDoneLabel
+          : photoLabel}
+    </button>
+  ),
 }));
 
 vi.mock("../../hooks/useVideoPoster", () => ({
@@ -80,6 +98,19 @@ describe("CompletionSlotTile", () => {
     expect(screen.getByAltText("צילום של בסטות").getAttribute("src")).toBe("blob:kept-/poster.jpg");
     expect(screen.getByText(he.reviewVideoLoading)).toBeTruthy();
     expect(screen.queryByRole("button", { name: he.completionPlayVideo })).toBeNull();
+  });
+
+  it("shows the take-photo button under an empty required photo", () => {
+    render(
+      <CompletionSlotTile
+        req={{ kind: "photo", title: "מדף חלב" }}
+        index={0}
+        fill={null}
+        interactive
+        onCapture={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
   });
 
   it("keeps the take-video label before a video exists", () => {

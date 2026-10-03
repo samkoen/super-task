@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { Box, CircularProgress, IconButton, Typography } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
@@ -63,48 +64,72 @@ export default function CompletionSlotTile({
   const title = slotDisplayTitle(req, index);
   const filled = Boolean(rawFill);
 
+  const capture = interactive && onCapture ? (
+    <SlotCaptureBar
+      req={req}
+      filled={filled}
+      disabled={disabled}
+      onCapture={onCapture}
+      onAnnotatingChange={onAnnotatingChange}
+    />
+  ) : null;
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+      <Box
+        sx={{
+          position: "relative",
+          width: "100%",
+          height: filled ? 160 : 148,
+          borderRadius: 2,
+          overflow: "hidden",
+          border: 1,
+          borderColor: filled ? "success.main" : "divider",
+          bgcolor: "action.hover",
+        }}
+      >
+        <SlotBackground
+          filled={filled}
+          filledSrc={filledSrc}
+          posterSrc={posterSrc}
+          pending={Boolean(fill?.pending) || resolved.loading}
+          exampleSrc={exampleSrc}
+          kind={req.kind}
+          title={title}
+          onEnlarge={onEnlarge}
+        />
+        {hintControls && slotGuideText(req) ? (
+          <CompletionSlotHintButtons {...hintControls} />
+        ) : null}
+        <SlotOverlay req={req} title={title} filled={filled} />
+        <SlotMarkPhoto
+          kind={req.kind}
+          url={fill?.url || fill?.previewUrl || null}
+          marked={photoMarked}
+          disabled={disabled}
+          onMarkPhoto={onMarkPhoto}
+        />
+        {filled ? null : <EmptySlotCapture>{capture}</EmptySlotCapture>}
+      </Box>
+      {filled ? capture : null}
+    </Box>
+  );
+}
+
+function EmptySlotCapture({ children }: { children: ReactNode }) {
+  if (!children) return null;
   return (
     <Box
       sx={{
-        position: "relative",
-        aspectRatio: "1",
-        borderRadius: 2,
-        overflow: "hidden",
-        border: 1,
-        borderColor: filled ? "success.main" : "divider",
-        bgcolor: "action.hover",
+        position: "absolute",
+        top: 46,
+        left: 10,
+        right: 10,
+        zIndex: 4,
+        "& .MuiButton-root": { width: "100%", bgcolor: "background.paper", py: 1 },
       }}
     >
-      <SlotBackground
-        filled={filled}
-        filledSrc={filledSrc}
-        posterSrc={posterSrc}
-        pending={Boolean(fill?.pending) || resolved.loading}
-        exampleSrc={exampleSrc}
-        kind={req.kind}
-        title={title}
-        onEnlarge={onEnlarge}
-      />
-      {hintControls && slotGuideText(req) ? (
-        <CompletionSlotHintButtons {...hintControls} />
-      ) : null}
-      <SlotOverlay req={req} title={title} filled={filled} />
-      {interactive && onCapture && (
-        <SlotCaptureBar
-          req={req}
-          filled={filled}
-          disabled={disabled}
-          onCapture={onCapture}
-          onAnnotatingChange={onAnnotatingChange}
-        />
-      )}
-      <SlotMarkPhoto
-        kind={req.kind}
-        url={fill?.url || fill?.previewUrl || null}
-        marked={photoMarked}
-        disabled={disabled}
-        onMarkPhoto={onMarkPhoto}
-      />
+      {children}
     </Box>
   );
 }
@@ -130,16 +155,9 @@ function SlotMarkPhoto({
   );
 }
 
-function captureBarSx(filled: boolean) {
+function captureBarSx() {
   return {
-    position: "absolute" as const,
-    bottom: 8,
-    left: 8,
-    right: 8,
-    zIndex: 2,
-    ...(filled
-      ? { "& .MuiButton-root": { minWidth: 0, py: 0.25, px: 1, fontSize: 11, width: "100%" } }
-      : {}),
+    "& .MuiButton-root": { width: "100%", maxWidth: 280 },
   };
 }
 
@@ -157,7 +175,7 @@ function SlotCaptureBar({
   onAnnotatingChange?: (busy: boolean) => void;
 }) {
   return (
-    <Box sx={captureBarSx(filled)}>
+    <Box sx={captureBarSx()}>
       <MediaCaptureActions
         photoAdded={req.kind === "photo" && filled}
         videoAdded={req.kind === "video" && filled}

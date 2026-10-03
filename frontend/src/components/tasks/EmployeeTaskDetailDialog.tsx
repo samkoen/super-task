@@ -100,12 +100,23 @@ export default function EmployeeTaskDetailDialog({
       fullWidth
       maxWidth="sm"
       dir="rtl"
+      PaperProps={{ sx: { overflow: "hidden", display: "flex", flexDirection: "column" } }}
       disableEnforceFocus
       disableAutoFocus
       disableRestoreFocus
     >
       <DialogTitle>{titleNode ?? task.title}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
+      <DialogContent
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          pt: 1,
+          flex: "1 1 auto",
+          minHeight: 0,
+          overflowY: "auto",
+        }}
+      >
         <TaskStatusRow task={task} />
         {task.description ? (
           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
@@ -122,6 +133,16 @@ export default function EmployeeTaskDetailDialog({
           chatFirst={chatFirst}
         />
       </DialogContent>
+      {liveCapture ? (
+        <Box sx={{ px: 3, pt: 1, flexShrink: 0, borderTop: 1, borderColor: "divider" }}>
+          <ExtraCompletionMedia
+            extras={liveCapture.extras ?? []}
+            onChange={liveCapture.onExtrasChange ?? (() => undefined)}
+            disabled={liveCapture.saving}
+            onAnnotatingChange={liveCapture.onAnnotatingChange}
+          />
+        </Box>
+      ) : null}
       <TaskDetailActions
         task={task}
         onClose={onClose}
@@ -258,12 +279,6 @@ function TaskLiveCapture({
         onChange={capture.onSlotsChange}
         disabled={capture.saving}
         language={language}
-        onAnnotatingChange={capture.onAnnotatingChange}
-      />
-      <ExtraCompletionMedia
-        extras={capture.extras ?? []}
-        onChange={capture.onExtrasChange ?? (() => undefined)}
-        disabled={capture.saving}
         onAnnotatingChange={capture.onAnnotatingChange}
       />
       <TextField
