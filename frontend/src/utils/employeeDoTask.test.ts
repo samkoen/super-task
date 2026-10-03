@@ -29,7 +29,10 @@ describe("employeeDoTask", () => {
     expect(needsTaskStart("in_progress")).toBe(false);
     expect(canDoTask("pending")).toBe(true);
     expect(canDoTask("in_progress")).toBe(true);
+    expect(canDoTask("awaiting_response")).toBe(true);
     expect(canDoTask("pending_review")).toBe(false);
+    expect(canSubmitEmployeeTask("awaiting_response", null, false)).toBe(true);
+    expect(doTaskButtonLabel("awaiting_response")).toBe(he.markDone);
   });
 
   it("lets the first tap start a linked task before slots are filled", () => {

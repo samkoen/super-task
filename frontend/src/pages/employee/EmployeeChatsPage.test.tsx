@@ -101,6 +101,24 @@ describe("EmployeeChatsPage", () => {
     await waitFor(() => expect(screen.getByText("general-thread")).toBeTruthy());
   });
 
+  it("shows today's silent task with the empty preview", async () => {
+    vi.mocked(taskService.listEmployeeChats).mockResolvedValue({
+      items: [
+        {
+          id: "occ-silent",
+          title: "ניקיון",
+          status: "pending",
+          due_at: "2026-10-03T08:00:00+03:00",
+          last_preview: null,
+          last_at: null,
+        },
+      ],
+    });
+    render(<EmployeeChatsPage />);
+    expect(await screen.findByText(taskChatListTitle("ניקיון", "2026-10-03T08:00:00+03:00"))).toBeTruthy();
+    expect(screen.getByText(he.directChatEmpty)).toBeTruthy();
+  });
+
   it("opens the task chat", async () => {
     render(<EmployeeChatsPage />);
     fireEvent.click(await screen.findByText(taskChatListTitle("מדף חלב", "2026-09-07T08:00:00+03:00")));

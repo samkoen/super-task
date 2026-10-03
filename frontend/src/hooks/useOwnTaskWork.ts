@@ -27,6 +27,12 @@ import {
   slotsMeetTaskRequirements,
   uploadRequirementSlots,
 } from "../utils/employeeCompletionUpload";
+import {
+  extrasFromTaskCompletion,
+  mediaWithExtras,
+  revokeExtraMedia,
+  type ExtraSlot,
+} from "../utils/extraCompletionMedia";
 import { type PendingMedia, revokePendingMedia } from "../utils/pendingMedia";
 import { playTaskEndSound } from "../utils/notificationSounds";
 import { openExternalUrl } from "../utils/startUrl";
@@ -39,9 +45,11 @@ export async function submitOwnCompletion(opts: {
   note: string;
   requirements: ReturnType<typeof effectiveRequirements>;
   slots: Array<PendingMedia | null>;
+  extras?: ExtraSlot[];
   incompleteReason?: string;
 }) {
-  await waitUntilPendingVideosReady(opts.slots);
+  const extras = opts.extras ?? [];
+  await waitUntilPendingVideosReady(mediaWithExtras(opts.slots, extras));
   const attachments = await uploadRequirementSlots(
     opts.requirements,
     opts.slots,
@@ -51,6 +59,7 @@ export async function submitOwnCompletion(opts: {
       audio: taskService.uploadAudio,
     },
     opts.slotsFilled,
+    extras,
   );
   await completeAfterEnsuringStart(
     () =>
@@ -82,6 +91,7 @@ export function useOwnTaskWork(onChanged: () => void) {
   const [detailTask, setDetailTask] = useState<EmployeeTaskCard | null>(null);
   const [note, setNote] = useState("");
   const [slotMedia, setSlotMedia] = useState<Array<PendingMedia | null>>([]);
+  const [extraMedia, setExtraMedia] = useState<ExtraSlot[]>([]);
   const [saving, setSaving] = useState(false);
   const [photoAnnotating, setPhotoAnnotating] = useState(false);
   const [linkedStartReady, setLinkedStartReady] = useState(true);
@@ -93,6 +103,10 @@ export function useOwnTaskWork(onChanged: () => void) {
   const clearMedia = useCallback(() => {
     setSlotMedia((prev) => {
       prev.forEach((item) => revokePendingMedia(item));
+      return [];
+    });
+    setExtraMedia((prev) => {
+      revokeExtraMedia(prev);
       return [];
     });
   }, []);
@@ -110,6 +124,7 @@ export function useOwnTaskWork(onChanged: () => void) {
     setDetailTask,
     setNote,
     setSlotMedia,
+    setExtraMedia,
     setLinkedStartReady,
     showSuccess,
   });
@@ -130,6 +145,7 @@ export function useOwnTaskWork(onChanged: () => void) {
     saving,
     note,
     slotMedia,
+    extraMedia,
     requirements,
     setSaving,
     setDetailTask,
@@ -159,6 +175,7 @@ export function useOwnTaskWork(onChanged: () => void) {
     capture: ownTaskCapture({
       detailTask,
       slotMedia,
+      extraMedia,
       note,
       setNote,
       saving,
@@ -171,6 +188,7 @@ export function useOwnTaskWork(onChanged: () => void) {
         setSlotMedia(next);
         maybeAutoSubmit(detailTask, saving, requirements, next, linkedStartReady, autoCompleteGen, submit);
       },
+      onExtrasChange: setExtraMedia,
     }),
   };
 }
@@ -208,6 +226,7 @@ function maybeAutoSubmit(
 function ownTaskCapture(opts: {
   detailTask: EmployeeTaskCard | null;
   slotMedia: Array<PendingMedia | null>;
+  extraMedia: ExtraSlot[];
   note: string;
   setNote: (v: string) => void;
   saving: boolean;
@@ -217,11 +236,14 @@ function ownTaskCapture(opts: {
   linkedStartReady: boolean;
   submit: () => Promise<void>;
   onSlotsChange: (next: Array<PendingMedia | null>) => void;
+  onExtrasChange: (next: ExtraSlot[]) => void;
 }) {
   if (!opts.detailTask || !canDoTask(opts.detailTask.status)) return undefined;
   return {
     slots: opts.slotMedia,
     onSlotsChange: opts.onSlotsChange,
+    extras: opts.extraMedia,
+    onExtrasChange: opts.onExtrasChange,
     note: opts.note,
     onNoteChange: opts.setNote,
     onSubmit: () => {
@@ -280,6 +302,7 @@ function useOpenOwnTask(opts: {
   setDetailTask: (task: EmployeeTaskCard) => void;
   setNote: (note: string) => void;
   setSlotMedia: (slots: Array<PendingMedia | null>) => void;
+  setExtraMedia: (extras: ExtraSlot[]) => void;
   setLinkedStartReady: (ready: boolean) => void;
   showSuccess: (msg: string) => void;
 }) {
@@ -288,11 +311,10 @@ function useOpenOwnTask(opts: {
     if (openLink) openExternalUrl(task.start_url);
     opts.clearMedia();
     const next = openLink ? cardAfterStart(task) : task;
-    opts.setSlotMedia(
-      canDoTask(next.status)
-        ? slotsFromTaskCompletion(effectiveRequirements(next), next.completion)
-        : [],
-    );
+    const doable = canDoTask(next.status);
+    const openedRequirements = doable ? effectiveRequirements(next) : [];
+    opts.setSlotMedia(doable ? slotsFromTaskCompletion(openedRequirements, next.completion) : []);
+    opts.setExtraMedia(doable ? extrasFromTaskCompletion(openedRequirements, next.completion) : []);
     opts.setNote(next.completion?.note ?? "");
     opts.setDetailTask(next);
     opts.setLinkedStartReady(!openLink);
@@ -308,6 +330,7 @@ function useSubmitOwnTask(args: {
   saving: boolean;
   note: string;
   slotMedia: Array<PendingMedia | null>;
+  extraMedia: ExtraSlot[];
   requirements: ReturnType<typeof effectiveRequirements>;
   setSaving: (v: boolean) => void;
   setDetailTask: (task: EmployeeTaskCard | null) => void;
@@ -319,7 +342,7 @@ function useSubmitOwnTask(args: {
   onChanged: () => void;
 }) {
   const {
-    detailTask, saving, note, slotMedia, requirements, setSaving, setDetailTask,
+    detailTask, saving, note, slotMedia, extraMedia, requirements, setSaving, setDetailTask,
     setLinkedStartReady, setIncompleteOpen, clearMedia, showSuccess, showError, onChanged,
   } = args;
   return useCallback(async (slots?: Array<PendingMedia | null>, incompleteReason?: string) => {
@@ -351,6 +374,7 @@ function useSubmitOwnTask(args: {
         note,
         requirements: effectiveRequirements(resolved.task),
         slots: media,
+        extras: extraMedia,
         incompleteReason,
       });
       setIncompleteOpen(false);
@@ -365,7 +389,7 @@ function useSubmitOwnTask(args: {
       setSaving(false);
     }
   }, [
-    clearMedia, detailTask, note, onChanged, requirements, saving, setDetailTask,
+    clearMedia, detailTask, extraMedia, note, onChanged, requirements, saving, setDetailTask,
     setIncompleteOpen, setLinkedStartReady, setSaving, showError, showSuccess, slotMedia,
   ]);
 }

@@ -145,6 +145,39 @@ describe("employeeCompletionUpload", () => {
     expect(slots.map((item) => item?.keptUrl)).toEqual(["/p.jpg", "/v.mp4"]);
   });
 
+  it("appends optional photo and audio after the required video", async () => {
+    const slots = [videoSlot("required.webm")];
+    const extras = [
+      {
+        kind: "photo" as const,
+        media: createPendingMedia(new File(["p"], "extra.jpg", { type: "image/jpeg" })),
+      },
+      {
+        kind: "audio" as const,
+        media: createPendingMedia(new File(["a"], "note.webm", { type: "audio/webm" })),
+      },
+    ];
+    const uploaders = {
+      photo: vi.fn(async (file: File) => ({ url: `/uploads/${file.name}` })),
+      video: vi.fn(async (file: File) => ({ url: `/uploads/${file.name}` })),
+      audio: vi.fn(async (file: File) => ({ url: `/uploads/${file.name}` })),
+    };
+    const attachments = await uploadRequirementSlots(
+      [{ kind: "video", min_seconds: 10 }],
+      slots,
+      uploaders,
+      true,
+      extras,
+    );
+    expect(attachments.map((item) => [item.kind, item.url])).toEqual([
+      ["video", "/uploads/required.webm"],
+      ["photo", "/uploads/extra.jpg"],
+      ["audio", "/uploads/note.webm"],
+    ]);
+    slots.forEach((item) => revokePendingMedia(item));
+    extras.forEach((item) => revokePendingMedia(item.media));
+  });
+
   it("does not treat a zero-byte video as ready", () => {
     const empty = createPendingMedia(new File([], "empty.webm", { type: "video/webm" }), 12);
     expect(slotsMeetTaskRequirements([{ kind: "video", min_seconds: 10 }], [empty])).toBe(false);

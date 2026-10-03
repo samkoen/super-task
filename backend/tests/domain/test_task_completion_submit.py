@@ -34,6 +34,13 @@ def test_done_ignores_reason_and_requires_media():
     assert requires_completion_media(task_status.COMPLETION_NOT_DONE) is False
 
 
+def test_chat_wait_still_allows_the_employee_to_submit():
+    assert task_status.employee_may_submit(task_status.IN_PROGRESS) is True
+    assert task_status.employee_may_submit(task_status.AWAITING_RESPONSE) is True
+    assert task_status.employee_may_submit(task_status.PENDING) is False
+    assert task_status.employee_may_submit(task_status.PENDING_REVIEW) is False
+
+
 def test_assignee_submission_always_goes_to_review():
     assert employee_submission_needs_review(True) is True
     assert employee_submission_needs_review(False) is False

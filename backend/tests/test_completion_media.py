@@ -333,6 +333,36 @@ def test_should_alert_manager_review_waits_for_media_ready():
     assert should_alert_manager_review({"media_ready": False}) is False
 
 
+def test_extra_attachments_after_required_slots_are_kept():
+    reqs = normalize_requirements([{"kind": "photo"}])
+    attachments = [
+        {"kind": "photo", "url": "/p.jpg"},
+        {"kind": "video", "url": "/extra.mp4", "duration_seconds": 4},
+        {"kind": "audio", "url": "/note.webm"},
+    ]
+    assert_attachments_match(reqs, attachments)
+
+
+def test_optional_extras_allowed_when_nothing_is_required():
+    assert_attachments_match([], [{"kind": "photo", "url": "/extra.jpg"}])
+
+
+def test_extra_without_url_is_rejected():
+    reqs = normalize_requirements([{"kind": "photo"}])
+    with pytest.raises(ValueError, match="נוסף"):
+        assert_attachments_match(
+            reqs,
+            [{"kind": "photo", "url": "/p.jpg"}, {"kind": "audio", "url": ""}],
+        )
+
+
+def test_too_many_optional_extras_are_rejected():
+    reqs = normalize_requirements([{"kind": "photo"}])
+    extras = [{"kind": "photo", "url": f"/e{i}.jpg"} for i in range(7)]
+    with pytest.raises(ValueError, match="6"):
+        assert_attachments_match(reqs, [{"kind": "photo", "url": "/p.jpg"}, *extras])
+
+
 def test_normalize_drops_invalid_poster_url():
     items = normalize_attachments(
         [{"kind": "video", "url": "/v.mp4", "poster_url": "javascript:alert(1)"}]

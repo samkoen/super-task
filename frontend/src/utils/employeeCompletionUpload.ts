@@ -2,6 +2,7 @@ import { he } from "../i18n/he";
 import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
 import { meetsCompletionRequirements } from "./completionMedia";
 import { attachmentsFromCompletion, mapAttachmentsToSlots } from "./completionSlotView";
+import type { ExtraSlot } from "./extraCompletionMedia";
 import {
   type PendingMedia,
   completionAttachmentFromPending,
@@ -57,10 +58,15 @@ export async function uploadRequirementSlots(
   slots: Array<PendingMedia | null>,
   uploaders: SlotUploaders,
   requireAll = false,
+  extras: ExtraSlot[] = [],
 ): Promise<CompletionAttachment[]> {
   const attachments: CompletionAttachment[] = [];
   for (let i = 0; i < requirements.length; i += 1) {
     const item = await uploadOneRequirementSlot(requirements[i], slots[i], uploaders, requireAll);
+    if (item) attachments.push(item);
+  }
+  for (const extra of extras) {
+    const item = await uploadOneRequirementSlot({ kind: extra.kind }, extra.media, uploaders, false);
     if (item) attachments.push(item);
   }
   return attachments;

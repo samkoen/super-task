@@ -1,6 +1,7 @@
 import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
 import type { ReactNode } from "react";
 import TaskPhotoThumb from "../tasks/TaskPhotoThumb";
+import { taskSquareClickProps } from "../tasks/taskSquareClick";
 import { taskStatusChipColor, taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
@@ -55,14 +56,17 @@ function EmployeeTaskTile({
   return (
     <Paper
       variant="outlined"
+      {...taskSquareClickProps(`${he.openTask}: ${task.title}`, () => onOpen(task))}
       sx={{
         width: TILE,
         flex: "0 0 auto",
         p: 0,
         overflow: "hidden",
+        cursor: "pointer",
         borderColor: alpha(visual.bar, highlight ? 0.7 : 0.35),
         borderInlineStartWidth: 3,
         borderInlineStartColor: visual.bar,
+        "&:hover": { bgcolor: "action.hover" },
       }}
     >
       <Box sx={{ height: TILE, bgcolor: alpha(visual.bar, 0.06) }}>
@@ -73,18 +77,24 @@ function EmployeeTaskTile({
           height={TILE}
         />
       </Box>
-      <OpenTaskButton task={task} onOpen={onOpen} sx={{ p: 0.75 }}>
-        <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
-          {task.title}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" dir="ltr" noWrap display="block">
-          {formatDueAt(task.due_at)}
-        </Typography>
-        <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.5}>
-          <StatusChip status={task.status} />
-        </Box>
-      </OpenTaskButton>
+      <TileCaption task={task} />
     </Paper>
+  );
+}
+
+function TileCaption({ task }: { task: EmployeeTaskCard }) {
+  return (
+    <Box sx={{ p: 0.75, textAlign: "start" }}>
+      <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
+        {task.title}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" dir="ltr" noWrap display="block">
+        {formatDueAt(task.due_at)}
+      </Typography>
+      <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.5}>
+        <StatusChip status={task.status} />
+      </Box>
+    </Box>
   );
 }
 

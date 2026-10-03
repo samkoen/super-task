@@ -13,6 +13,7 @@ import {
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionRequirementSlots from "./CompletionRequirementSlots";
+import ExtraCompletionMedia from "./ExtraCompletionMedia";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import { OpenTaskChatButton } from "./TaskChatDialog";
@@ -30,6 +31,7 @@ import {
   attachmentsFromCompletion,
 } from "../../utils/completionSlotView";
 import type { CompletionRequirement } from "../../utils/completionMedia";
+import type { ExtraSlot } from "../../utils/extraCompletionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import type { TaskCompletion, TaskStatus } from "../../services/taskService";
@@ -53,6 +55,8 @@ export interface EmployeeTaskDetailTask {
 export type EmployeeTaskCaptureProps = {
   slots: Array<PendingMedia | null>;
   onSlotsChange: (next: Array<PendingMedia | null>) => void;
+  extras?: ExtraSlot[];
+  onExtrasChange?: (next: ExtraSlot[]) => void;
   note: string;
   onNoteChange: (value: string) => void;
   onSubmit: () => void;
@@ -96,12 +100,23 @@ export default function EmployeeTaskDetailDialog({
       fullWidth
       maxWidth="sm"
       dir="rtl"
+      PaperProps={{ sx: { overflow: "hidden", display: "flex", flexDirection: "column" } }}
       disableEnforceFocus
       disableAutoFocus
       disableRestoreFocus
     >
       <DialogTitle>{titleNode ?? task.title}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
+      <DialogContent
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.5,
+          pt: 1,
+          flex: "1 1 auto",
+          minHeight: 0,
+          overflowY: "auto",
+        }}
+      >
         <TaskStatusRow task={task} />
         {task.description ? (
           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
@@ -118,6 +133,16 @@ export default function EmployeeTaskDetailDialog({
           chatFirst={chatFirst}
         />
       </DialogContent>
+      {liveCapture ? (
+        <Box sx={{ px: 3, pt: 1, flexShrink: 0, borderTop: 1, borderColor: "divider" }}>
+          <ExtraCompletionMedia
+            extras={liveCapture.extras ?? []}
+            onChange={liveCapture.onExtrasChange ?? (() => undefined)}
+            disabled={liveCapture.saving}
+            onAnnotatingChange={liveCapture.onAnnotatingChange}
+          />
+        </Box>
+      ) : null}
       <TaskDetailActions
         task={task}
         onClose={onClose}

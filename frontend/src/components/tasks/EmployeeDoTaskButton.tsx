@@ -23,7 +23,7 @@ export default function EmployeeDoTaskButton({
   size = "medium",
 }: EmployeeDoTaskButtonProps) {
   if (!canDoTask(status)) return null;
-  const finishing = status === "in_progress";
+  const finishing = status === "in_progress" || status === "awaiting_response";
   const icon = starting ? (
     <CircularProgress size={16} color="inherit" />
   ) : finishing ? (

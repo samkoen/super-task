@@ -51,6 +51,12 @@ import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
+import {
+  extrasFromTaskCompletion,
+  mediaWithExtras,
+  revokeExtraMedia,
+  type ExtraSlot,
+} from "../../utils/extraCompletionMedia";
 import { type PendingMedia, revokePendingMedia } from "../../utils/pendingMedia";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import {
@@ -142,14 +148,16 @@ async function submitEmployeeCompletion(opts: {
   note: string;
   requirements: ReturnType<typeof effectiveRequirements>;
   slots: Array<PendingMedia | null>;
+  extras?: ExtraSlot[];
   incompleteReason?: string;
 }) {
+  const extras = opts.extras ?? [];
   siyumTrace("submit-start", {
     taskId: opts.taskId,
     slotsFilled: opts.slotsFilled,
-    slotCount: opts.slots.filter(Boolean).length,
+    slotCount: opts.slots.filter(Boolean).length + extras.length,
   });
-  await waitUntilPendingVideosReady(opts.slots);
+  await waitUntilPendingVideosReady(mediaWithExtras(opts.slots, extras));
   const attachments = await uploadRequirementSlots(
     opts.requirements,
     opts.slots,
@@ -159,6 +167,7 @@ async function submitEmployeeCompletion(opts: {
       audio: taskService.uploadAudio,
     },
     opts.slotsFilled,
+    extras,
   );
   const payload = employeeCompletePayload({
     slotsFilled: opts.slotsFilled,
@@ -275,6 +284,7 @@ export default function EmployeeTasksPage() {
   const [detailTask, setDetailTask] = useState<EmployeeTaskCard | null>(null);
   const [note, setNote] = useState("");
   const [slotMedia, setSlotMedia] = useState<Array<PendingMedia | null>>([]);
+  const [extraMedia, setExtraMedia] = useState<ExtraSlot[]>([]);
   const [saving, setSaving] = useState(false);
   const [photoAnnotating, setPhotoAnnotating] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -359,6 +369,10 @@ export default function EmployeeTasksPage() {
       prev.forEach((item) => revokePendingMedia(item));
       return [];
     });
+    setExtraMedia((prev) => {
+      revokeExtraMedia(prev);
+      return [];
+    });
   }, []);
 
   const persistLinkedStart = useCallback(async (task: EmployeeTaskCard) => {
@@ -395,11 +409,10 @@ export default function EmployeeTasksPage() {
     }
     clearCompletionMedia();
     const next: EmployeeTaskCard = openLink ? cardAfterStart(task) : task;
-    setSlotMedia(
-      canDoTask(next.status)
-        ? slotsFromTaskCompletion(effectiveRequirements(next), next.completion)
-        : [],
-    );
+    const doable = canDoTask(next.status);
+    const openedRequirements = doable ? effectiveRequirements(next) : [];
+    setSlotMedia(doable ? slotsFromTaskCompletion(openedRequirements, next.completion) : []);
+    setExtraMedia(doable ? extrasFromTaskCompletion(openedRequirements, next.completion) : []);
     setNote(next.completion?.note ?? "");
     setDetailTask(next);
     setLinkedStartReady(!openLink);
@@ -497,6 +510,7 @@ export default function EmployeeTasksPage() {
         note,
         requirements: effectiveRequirements(resolved.task),
         slots,
+        extras: extraMedia,
         incompleteReason,
       });
       setIncompleteOpen(false);
@@ -835,6 +849,8 @@ export default function EmployeeTasksPage() {
             ? {
                 slots: slotMedia,
                 onSlotsChange: handleSlotsChange,
+                extras: extraMedia,
+                onExtrasChange: setExtraMedia,
                 note,
                 onNoteChange: setNote,
                 onSubmit: () => {

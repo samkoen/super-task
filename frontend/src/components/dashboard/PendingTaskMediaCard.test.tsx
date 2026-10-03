@@ -56,11 +56,12 @@ describe("PendingTaskMediaCard", () => {
     expect(screen.queryByText(he.markDone, { exact: false })).toBeNull();
   });
 
-  it("calls onOpen when info area is clicked", () => {
+  it("calls onOpen when the photo area or the caption is clicked", () => {
     const onOpen = vi.fn();
     render(<PendingTaskMediaCard task={task()} onOpen={onOpen} />);
+    fireEvent.click(screen.getByText("ס"));
     fireEvent.click(screen.getByLabelText(`${he.openTask}: ספירת מלאי מחסן`));
-    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledTimes(2);
     expect(onOpen.mock.calls[0][0].id).toBe("t1");
   });
 
@@ -76,9 +77,13 @@ describe("PendingTaskMediaCard", () => {
     }
     vi.stubGlobal("Image", FakeImage);
 
-    render(<PendingTaskMediaCard task={task()} />);
+    const onOpen = vi.fn();
+    const { container } = render(<PendingTaskMediaCard task={task()} onOpen={onOpen} />);
     const enlarge = await screen.findByLabelText(he.taskPhotoEnlarge);
+    fireEvent.click(container.querySelector("img")!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
     fireEvent.click(enlarge);
+    expect(onOpen).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(screen.getByAltText(he.taskReferencePhoto)).toBeTruthy();
     });

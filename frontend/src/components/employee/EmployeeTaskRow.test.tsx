@@ -35,6 +35,8 @@ describe("EmployeeTaskRow", () => {
     expect(screen.queryByText(he.taskChatSection)).toBeNull();
     fireEvent.click(screen.getByLabelText(`${he.openTask}: ניקיון מדף`));
     expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("נ"));
+    expect(onOpen).toHaveBeenCalledTimes(2);
   });
 
   it("highlights overdue exceptions", () => {
@@ -52,8 +54,15 @@ describe("EmployeeTaskRow", () => {
       }
     }
     vi.stubGlobal("Image", FakeImage);
-    render(<EmployeeTaskRow task={card({ task_kind: "ad_hoc" })} onOpen={vi.fn()} />);
-    expect(await screen.findByLabelText(he.taskPhotoEnlarge)).toBeTruthy();
+    const onOpen = vi.fn();
+    const { container } = render(
+      <EmployeeTaskRow task={card({ task_kind: "ad_hoc" })} onOpen={onOpen} />,
+    );
+    const enlarge = await screen.findByLabelText(he.taskPhotoEnlarge);
+    fireEvent.click(container.querySelector("img")!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(enlarge);
+    expect(onOpen).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
 

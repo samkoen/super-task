@@ -4,7 +4,12 @@ import { isFetchInterruptedError } from "./apiErrorMessage";
 import { normalizeStartUrl } from "./startUrl";
 
 const STARTABLE: ReadonlySet<string> = new Set(["pending", "overdue"]);
-const DOABLE: ReadonlySet<string> = new Set(["pending", "overdue", "in_progress"]);
+const DOABLE: ReadonlySet<string> = new Set([
+  "pending",
+  "overdue",
+  "in_progress",
+  "awaiting_response",
+]);
 
 export function needsTaskStart(status: TaskStatus | string): boolean {
   return STARTABLE.has(status);
@@ -172,7 +177,8 @@ export function canSubmitEmployeeTask(
 }
 
 export function doTaskButtonLabel(status: TaskStatus | string): string {
-  return status === "in_progress" ? he.markDone : he.doTask;
+  if (status === "in_progress" || status === "awaiting_response") return he.markDone;
+  return he.doTask;
 }
 
 export function cardAfterStart<T extends { status: string; started_at?: string | null }>(
