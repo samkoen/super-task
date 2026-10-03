@@ -72,7 +72,7 @@ interface TaskPhotoThumbProps {
   height: number;
 }
 
-/** Mini photo de tâche (dashboard / oved) — zoom sans ouvrir la tâche. */
+/** Mini photo : seul l’icône zoom capture le clic, le reste du carré remonte au parent. */
 export default function TaskPhotoThumb({ photoUrl, title, accent, height }: TaskPhotoThumbProps) {
   const photoBg = taskCardBackgroundUrl(photoUrl);
   const ready = usePhotoReady(photoBg);
@@ -96,29 +96,9 @@ export default function TaskPhotoThumb({ photoUrl, title, accent, height }: Task
   );
 }
 
-function LoadedPhoto({ photoBg, onZoom }: { photoBg: string; onZoom: () => void }) {
+function PhotoFill({ photoBg }: { photoBg: string }) {
   return (
-    <Box
-      component="button"
-      type="button"
-      aria-label={he.taskPhotoEnlarge}
-      onClick={(e) => {
-        e.stopPropagation();
-        onZoom();
-      }}
-      sx={{
-        position: "absolute",
-        inset: 0,
-        border: 0,
-        p: 0,
-        m: 0,
-        cursor: "zoom-in",
-        display: "block",
-        width: "100%",
-        height: "100%",
-        bgcolor: "transparent",
-      }}
-    >
+    <>
       <Box
         aria-hidden
         sx={{
@@ -130,25 +110,63 @@ function LoadedPhoto({ photoBg, onZoom }: { photoBg: string; onZoom: () => void 
           filter: "blur(18px)",
           transform: "scale(1.12)",
           opacity: 0.55,
+          pointerEvents: "none",
         }}
       />
       <Box
         component="img"
         src={photoBg}
         alt=""
-        sx={{ position: "relative", zIndex: 1, width: "100%", height: "100%", objectFit: "contain" }}
-      />
-      <ZoomOutMapIcon
         sx={{
-          position: "absolute",
-          zIndex: 2,
-          insetInlineEnd: 4,
-          bottom: 4,
-          color: "#fff",
-          opacity: 0.85,
-          fontSize: 14,
+          position: "relative",
+          zIndex: 1,
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          pointerEvents: "none",
         }}
       />
+    </>
+  );
+}
+
+function ZoomPhotoButton({ onZoom }: { onZoom: () => void }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      aria-label={he.taskPhotoEnlarge}
+      onClick={(event) => {
+        event.stopPropagation();
+        onZoom();
+      }}
+      sx={{
+        position: "absolute",
+        zIndex: 2,
+        insetInlineEnd: 2,
+        bottom: 2,
+        width: 28,
+        height: 28,
+        p: 0,
+        border: 0,
+        borderRadius: 1,
+        cursor: "zoom-in",
+        color: "#fff",
+        bgcolor: "rgba(15,23,42,0.45)",
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <ZoomOutMapIcon sx={{ fontSize: 16 }} />
     </Box>
+  );
+}
+
+function LoadedPhoto({ photoBg, onZoom }: { photoBg: string; onZoom: () => void }) {
+  return (
+    <>
+      <PhotoFill photoBg={photoBg} />
+      <ZoomPhotoButton onZoom={onZoom} />
+    </>
   );
 }

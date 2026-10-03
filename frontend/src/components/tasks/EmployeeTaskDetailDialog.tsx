@@ -13,6 +13,7 @@ import {
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionRequirementSlots from "./CompletionRequirementSlots";
+import ExtraCompletionMedia from "./ExtraCompletionMedia";
 import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import { OpenTaskChatButton } from "./TaskChatDialog";
@@ -30,6 +31,7 @@ import {
   attachmentsFromCompletion,
 } from "../../utils/completionSlotView";
 import type { CompletionRequirement } from "../../utils/completionMedia";
+import type { ExtraSlot } from "../../utils/extraCompletionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import type { TaskCompletion, TaskStatus } from "../../services/taskService";
@@ -53,6 +55,8 @@ export interface EmployeeTaskDetailTask {
 export type EmployeeTaskCaptureProps = {
   slots: Array<PendingMedia | null>;
   onSlotsChange: (next: Array<PendingMedia | null>) => void;
+  extras?: ExtraSlot[];
+  onExtrasChange?: (next: ExtraSlot[]) => void;
   note: string;
   onNoteChange: (value: string) => void;
   onSubmit: () => void;
@@ -254,6 +258,12 @@ function TaskLiveCapture({
         onChange={capture.onSlotsChange}
         disabled={capture.saving}
         language={language}
+        onAnnotatingChange={capture.onAnnotatingChange}
+      />
+      <ExtraCompletionMedia
+        extras={capture.extras ?? []}
+        onChange={capture.onExtrasChange ?? (() => undefined)}
+        disabled={capture.saving}
         onAnnotatingChange={capture.onAnnotatingChange}
       />
       <TextField

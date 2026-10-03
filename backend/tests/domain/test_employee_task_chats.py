@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.domain import task_status
 from app.domain.employee_task_chats import (
+    append_today_open_chats,
     employee_task_chat_card,
     is_open_employee_chat_task,
     sort_employee_task_chats,
@@ -51,6 +52,36 @@ def test_card_preview_falls_back_to_media_icon():
         created_at="2026-09-07T11:00:00+03:00",
     )
     assert employee_task_chat_card(occ, msg)["last_preview"] == "📷"
+
+
+def test_card_without_message_has_no_preview():
+    occ = SimpleNamespace(
+        id="occ-3",
+        title="היום",
+        status=task_status.PENDING,
+        due_at="2026-10-03T08:00:00+03:00",
+    )
+    card = employee_task_chat_card(occ)
+    assert card["last_preview"] is None
+    assert card["last_at"] is None
+    assert card["due_at"] == "2026-10-03T08:00:00+03:00"
+
+
+def test_today_open_tasks_join_started_chats_without_duplicates():
+    started = [
+        {"id": "old", "last_at": "2026-09-01T10:00:00+03:00"},
+        {"id": "live", "last_at": "2026-10-03T09:00:00+03:00"},
+    ]
+    today = [
+        SimpleNamespace(id="live", title="חי", status=task_status.IN_PROGRESS),
+        SimpleNamespace(id="empty", title="ריק", status=task_status.PENDING),
+        SimpleNamespace(id="done", title="סגור", status=task_status.COMPLETED),
+    ]
+    assert [i["id"] for i in append_today_open_chats(started, today)] == [
+        "live",
+        "old",
+        "empty",
+    ]
 
 
 def test_sorts_newest_chat_first():

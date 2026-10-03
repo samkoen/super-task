@@ -6,19 +6,24 @@ import { formatDueAt } from "../../utils/dateView";
 import { isPendingFollowUpTask } from "../../utils/chatTaskFollowUp";
 import { taskStatusVisual } from "../../constants/taskStatusVisual";
 import TaskPhotoThumb from "../tasks/TaskPhotoThumb";
+import { taskSquareClickProps } from "../tasks/taskSquareClick";
 
 interface PendingTaskMediaCardProps {
   task: TimelineTask;
   onOpen?: (task: TimelineTask) => void;
 }
 
-/** Carte carrousel : moitié photo (zoom) + infos ; clic infos → ouvrir/éditer. */
+/** Carte carrousel : clic n’importe où sur le carré → ouvrir/éditer. */
 export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaCardProps) {
   const border = taskStatusVisual(task.status).bar;
   const finishedAt = taskFinishedAtText({ status: task.status, completion: task });
+  const openProps = onOpen
+    ? taskSquareClickProps(`${he.openTask}: ${task.title}`, () => onOpen(task))
+    : {};
   return (
     <Paper
       variant="outlined"
+      {...openProps}
       sx={{
         minWidth: 120,
         maxWidth: 130,
@@ -27,9 +32,11 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
         p: 0,
         overflow: "hidden",
         scrollSnapAlign: "start",
+        cursor: onOpen ? "pointer" : "default",
         borderColor: alpha(border, 0.45),
         borderInlineStartWidth: 3,
         borderInlineStartColor: border,
+        "&:hover": onOpen ? { bgcolor: "action.hover" } : undefined,
       }}
     >
       <Box
@@ -47,24 +54,7 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
           height={60}
         />
       </Box>
-      <Box
-        component={onOpen ? "button" : "div"}
-        type={onOpen ? "button" : undefined}
-        onClick={onOpen ? () => onOpen(task) : undefined}
-        aria-label={onOpen ? `${he.openTask}: ${task.title}` : undefined}
-        sx={{
-          p: 0.75,
-          width: "100%",
-          textAlign: "start",
-          border: 0,
-          bgcolor: "transparent",
-          cursor: onOpen ? "pointer" : "default",
-          font: "inherit",
-          color: "inherit",
-          display: "block",
-          "&:hover": onOpen ? { bgcolor: "action.hover" } : undefined,
-        }}
-      >
+      <Box sx={{ p: 0.75, textAlign: "start" }}>
         <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
           {task.title}
         </Typography>

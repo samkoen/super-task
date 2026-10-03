@@ -18,9 +18,9 @@ from app.domain.break_notify import break_alert_payload
 from app.domain.chat_file import stored_file_name
 from app.domain.chat_page import clamp_chat_page_size
 from app.domain.employee_task_chats import (
+    append_today_open_chats,
     employee_task_chat_card,
     is_open_employee_chat_task,
-    sort_employee_task_chats,
 )
 from app.domain.manager_employee_chats import manager_task_chat_card, sort_manager_day_chats
 from app.domain.scope import ActorContext, assert_branch_visible
@@ -102,15 +102,21 @@ class TaskMessageService:
     def list_employee_chats(self, actor: ActorContext) -> dict:
         if not can_use_employee_work_surface(actor):
             raise PermissionError("אין הרשאה לרשימת שיחות")
+        today = self._occurrences.list_occurrences(
+            assignee_user_id=actor.user_id,
+            due_on=datetime.now(TZ).date(),
+        )
+        return {"items": append_today_open_chats(self._started_open_chats(actor), today)}
+
+    def _started_open_chats(self, actor: ActorContext) -> list[dict]:
         pairs = self._messages.list_open_chats_for_assignee(
             actor.user_id, exclude_statuses=task_status.TERMINAL
         )
-        items = [
+        return [
             employee_task_chat_card(occ, msg)
             for occ, msg in pairs
             if is_open_employee_chat_task(occ.status)
         ]
-        return {"items": sort_employee_task_chats(items)}
 
     def list_manager_day_chats(self, actor: ActorContext, employee_id: str) -> dict:
         self._assert_can_list_employee_day(actor, employee_id)

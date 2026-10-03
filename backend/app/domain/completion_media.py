@@ -8,6 +8,7 @@ VALID_KINDS = ("photo", "video", "audio")
 VISUAL_KINDS = frozenset({"photo", "video"})
 MAX_MIN_VIDEO_SECONDS = 600
 MAX_REQUIREMENTS = 10
+MAX_EXTRA_ATTACHMENTS = 6
 MAX_SLOT_TITLE = 80
 MAX_SLOT_HINT = 300
 MAX_EXAMPLE_URL = 1024
@@ -339,12 +340,19 @@ def merge_completion_requirements(
 
 
 def assert_attachments_match(requirements: list[dict], attachments: list[dict]) -> None:
-    if not requirements:
-        return
-    if len(attachments) < len(requirements):
+    if requirements and len(attachments) < len(requirements):
         raise ValueError(_missing_kind_message(requirements[len(attachments)]["kind"]))
     for req, att in zip(requirements, attachments, strict=False):
         _assert_slot_matches(req, att)
+    _assert_optional_extras(attachments[len(requirements) :])
+
+
+def _assert_optional_extras(extras: list[dict]) -> None:
+    if len(extras) > MAX_EXTRA_ATTACHMENTS:
+        raise ValueError("אפשר להוסיף עד 6 קבצים נוספים")
+    for item in extras:
+        if not str(item.get("url") or "").strip():
+            raise ValueError("קובץ נוסף לא תקין")
 
 
 def _as_item_list(raw: object | None) -> list:

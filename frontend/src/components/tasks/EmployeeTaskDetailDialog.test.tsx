@@ -290,6 +290,22 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByText("ניקיון")).toBeTruthy();
   });
 
+  it("lets the oved add optional photo, video and audio besides required slots", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("in_progress"),
+          completion_requirements: [{ kind: "photo", title: "חלב" }],
+        }}
+        capture={capture()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.extraCompletionTitle)).toBeTruthy();
+    expect(screen.getByText(he.extraCompletionHint)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
+  });
+
   it("lets the oved click send even when a photo is still missing", () => {
     render(
       <EmployeeTaskDetailDialog
