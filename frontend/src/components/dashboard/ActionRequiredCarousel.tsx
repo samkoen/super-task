@@ -1,6 +1,5 @@
-import { Box, Button, Chip, Paper, Typography, alpha } from "@mui/material";
+import { Box, Button, Chip, Typography, alpha } from "@mui/material";
 import type { TaskQueues } from "../../services/dashboardService";
-import { taskSquareClickProps } from "../tasks/taskSquareClick";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { formatTime } from "../../utils/dashboardTime";
@@ -97,13 +96,9 @@ function ActionQueueCard({
   const { task, reason } = item;
   const border = BORDER[reason];
   const openReview = reviewSquareOpen(reason, task.id, onReviewTask);
-  const openProps = openReview
-    ? taskSquareClickProps(`${he.taskReviewAction}: ${task.title}`, openReview)
-    : {};
   return (
-    <Paper
-      variant="outlined"
-      {...openProps}
+    <Box
+      {...(openReview ? reviewSquareButton(task.title, openReview) : {})}
       sx={{
         minWidth: 110,
         maxWidth: 130,
@@ -112,10 +107,14 @@ function ActionQueueCard({
         p: 0.75,
         scrollSnapAlign: "start",
         borderWidth: 2,
+        borderStyle: "solid",
         borderColor: border,
+        borderRadius: 1,
         bgcolor: alpha(border, 0.04),
         cursor: openReview ? "pointer" : undefined,
         textAlign: "start",
+        font: "inherit",
+        color: "inherit",
         "&:hover": openReview ? { bgcolor: alpha(border, 0.1) } : undefined,
       }}
     >
@@ -172,6 +171,15 @@ function ActionQueueCard({
                 {he.taskChatOpen}
               </Button>
             )}
-    </Paper>
+    </Box>
   );
+}
+
+function reviewSquareButton(title: string, onOpen: () => void) {
+  return {
+    component: "button" as const,
+    type: "button" as const,
+    onClick: onOpen,
+    "aria-label": `${he.taskReviewAction}: ${title}`,
+  };
 }
