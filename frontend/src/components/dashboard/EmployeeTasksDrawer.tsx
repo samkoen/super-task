@@ -216,7 +216,10 @@ export default function EmployeeTasksDrawer({
           description: item.description,
           recurrence: normalizeFixedRecurrence(item.recurrence),
           due_time: item.due_time || "09:00",
-          weekly_days: item.weekly_days || undefined,
+          weekly_days: weeklyDaysPayload(
+            normalizeFixedRecurrence(item.recurrence),
+            item.weekly_days,
+          ),
           monthly_day: item.monthly_day ?? undefined,
           assignee_user_id: member.user_id,
           source_gallery_item_id: item.id,

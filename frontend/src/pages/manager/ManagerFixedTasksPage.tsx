@@ -80,6 +80,13 @@ import {
   initialWeeklyDays,
   weeklyDaysPayload,
 } from "../../utils/taskRecurrence";
+import {
+  MANAGER_FIXED_TASKS_DRAFT_KEY,
+  readFixedTaskCreateDraft,
+  readFixedTaskEditDraft,
+  setFixedTaskCreateOpen,
+  writeFixedTaskEditDraft,
+} from "../../utils/fixedTaskScreenDraft";
 
 type EditForm = {
   title: string;
@@ -105,15 +112,24 @@ export default function ManagerFixedTasksPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FixedTemplateFilter>("all");
   const [filterBranch, setFilterBranch] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(
+    () => readFixedTaskCreateDraft(MANAGER_FIXED_TASKS_DRAFT_KEY)?.open ?? false,
+  );
   const [createSaving, setCreateSaving] = useState(false);
-  const [editing, setEditing] = useState<TaskTemplate | null>(null);
-  const [editForm, setEditForm] = useState<EditForm | null>(null);
-  const [editMedia, setEditMedia] = useState<TaskReferenceMediaValue>({
-    reference_photo_url: "",
-    reference_video_url: "",
-    reference_audio_url: "",
-  });
+  const [editing, setEditing] = useState<TaskTemplate | null>(
+    () => readFixedTaskEditDraft(MANAGER_FIXED_TASKS_DRAFT_KEY)?.template ?? null,
+  );
+  const [editForm, setEditForm] = useState<EditForm | null>(
+    () => readFixedTaskEditDraft(MANAGER_FIXED_TASKS_DRAFT_KEY)?.form ?? null,
+  );
+  const [editMedia, setEditMedia] = useState<TaskReferenceMediaValue>(
+    () =>
+      readFixedTaskEditDraft(MANAGER_FIXED_TASKS_DRAFT_KEY)?.media ?? {
+        reference_photo_url: "",
+        reference_video_url: "",
+        reference_audio_url: "",
+      },
+  );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<TaskTemplate | null>(null);
   const [deleteAllBranches, setDeleteAllBranches] = useState(false);
@@ -148,6 +164,17 @@ export default function ManagerFixedTasksPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setFixedTaskCreateOpen(MANAGER_FIXED_TASKS_DRAFT_KEY, createOpen);
+  }, [createOpen]);
+
+  useEffect(() => {
+    writeFixedTaskEditDraft(
+      MANAGER_FIXED_TASKS_DRAFT_KEY,
+      editing && editForm ? { template: editing, form: editForm, media: editMedia } : null,
+    );
+  }, [editing, editForm, editMedia]);
 
   const rows = useMemo(
     () => sortFixedTemplates(filterFixedTemplates(templates, filter)),
@@ -191,7 +218,7 @@ export default function ManagerFixedTasksPage() {
         description: payload.description,
         recurrence: payload.recurrence,
         due_time: payload.due_time,
-        weekly_days: payload.weekly_days,
+        weekly_days: weeklyDaysPayload(payload.recurrence, payload.weekly_days),
         monthly_day: payload.monthly_day,
         ops_category: payload.ops_category,
         completion_requirements,
@@ -476,6 +503,7 @@ export default function ManagerFixedTasksPage() {
           defaultBranchId={user?.branch_id ?? branches[0]?.id ?? ""}
           defaultDueAt={datetimeLocalForNewTask(todayIso())}
           forcedTaskKind="fixed"
+          rememberKey={MANAGER_FIXED_TASKS_DRAFT_KEY}
           saving={createSaving}
           onError={showError}
           currentUserId={user?.id}

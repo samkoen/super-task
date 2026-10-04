@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import CompletionExampleDialog from "./CompletionExampleDialog";
+import { he } from "../../i18n/he";
 
 describe("CompletionExampleDialog", () => {
   it("plays a captured video with controls", () => {
@@ -11,6 +12,21 @@ describe("CompletionExampleDialog", () => {
     expect(video?.getAttribute("src")).toBe("blob:oved-video");
     expect(video?.hasAttribute("controls")).toBe(true);
     expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByRole("button", { name: he.reviewMarkVideoFrame })).toBeNull();
+  });
+
+  it("offers to circle the paused frame while reviewing", () => {
+    render(
+      <CompletionExampleDialog
+        src="blob:oved-video"
+        title="סיום משמרת"
+        kind="video"
+        onClose={vi.fn()}
+        onMarkFrame={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: he.reviewMarkVideoFrame })).toBeTruthy();
+    expect(screen.getByText(he.reviewMarkVideoHint)).toBeTruthy();
   });
 
   it("shows a photo when the preview is not a video", () => {

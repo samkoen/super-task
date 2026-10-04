@@ -1,21 +1,23 @@
-import { Box, Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
+import { Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
+import { ReviewableVideo } from "./MarkVideoFrameButton";
 
 export default function CompletionExampleDialog({
   src,
   title,
   kind = "photo",
   onClose,
+  onMarkFrame,
 }: {
   src: string | null;
   title: string;
   kind?: "photo" | "video";
   onClose: () => void;
+  onMarkFrame?: (frameUrl: string) => void;
 }) {
   const media = useResolvedMediaSrc(src, Boolean(src && !src.startsWith("blob:")));
-  const playSrc = media.src;
   return (
     <Dialog open={Boolean(src)} onClose={onClose} fullWidth maxWidth="sm" dir="rtl">
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 1 }}>
@@ -25,19 +27,26 @@ export default function CompletionExampleDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {playSrc && kind === "video" ? (
-          <Box
-            component="video"
-            src={playSrc}
-            controls
-            autoPlay
-            playsInline
-            sx={{ width: "100%", borderRadius: 1, display: "block", bgcolor: "common.black" }}
-          />
-        ) : playSrc ? (
-          <img src={playSrc} alt={title} style={{ width: "100%", borderRadius: 8, display: "block" }} />
-        ) : null}
+        <ExampleBody playSrc={media.src} title={title} kind={kind} onMarkFrame={onMarkFrame} />
       </DialogContent>
     </Dialog>
   );
+}
+
+function ExampleBody({
+  playSrc,
+  title,
+  kind,
+  onMarkFrame,
+}: {
+  playSrc: string | null;
+  title: string;
+  kind: "photo" | "video";
+  onMarkFrame?: (frameUrl: string) => void;
+}) {
+  if (playSrc && kind === "video") {
+    return <ReviewableVideo src={playSrc} onMarkFrame={onMarkFrame} autoPlay />;
+  }
+  if (!playSrc) return null;
+  return <img src={playSrc} alt={title} style={{ width: "100%", borderRadius: 8, display: "block" }} />;
 }

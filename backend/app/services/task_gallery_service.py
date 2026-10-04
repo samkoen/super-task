@@ -261,7 +261,7 @@ class TaskGalleryService:
         if recurrence not in task_recurrence.RECURRING:
             raise ValueError("חזרה לא תקינה למשימה קבועה")
         due_time = (body.get("due_time") or "09:00").strip()
-        weekly_days = (body.get("weekly_days") or "").strip() or None
+        weekly_days = task_recurrence.coerce_weekly_days(body.get("weekly_days"))
         monthly_day = body.get("monthly_day")
         if monthly_day is not None:
             monthly_day = int(monthly_day)

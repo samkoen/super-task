@@ -218,6 +218,16 @@ describe("CompletionRequirementsEditor", () => {
     expect(screen.queryByText(he.completionSlotExample)).toBeNull();
   });
 
+  it("adds a message slot without an example photo", () => {
+    const onChange = vi.fn();
+    const view = render(<CompletionRequirementsEditor value={[]} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: he.completionAddMessageReq }));
+    expect(onChange).toHaveBeenCalledWith([{ kind: "message" }]);
+    view.rerender(<CompletionRequirementsEditor value={[{ kind: "message" }]} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: requirementRowLabel({ kind: "message" }) }));
+    expect(screen.queryByText(he.completionSlotExample)).toBeNull();
+  });
+
   it("lets the menahel add a second video", () => {
     const onChange = vi.fn();
     const { rerender } = render(

@@ -86,12 +86,14 @@ def _sse_payload_from_create_template(item: dict) -> dict:
     created = item.pop("_created_occurrence", None)
     if created:
         return created
+    # Pas d'occurrence aujourd'hui : ne pas lier la notif à l'id du template (FK).
     return {
-        "id": item.get("id"),
+        "id": None,
         "branch_id": item.get("branch_id"),
         "assignee_user_id": item.get("assignee_user_id"),
         "title": item.get("title"),
         "status": "pending",
+        "created_by_id": item.get("created_by_id"),
     }
 
 

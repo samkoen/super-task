@@ -8,6 +8,7 @@ import {
 import {
   applyPendingSlot,
   createKeptMedia,
+  createMessageMedia,
   createPendingMedia,
   revokePendingMedia,
 } from "./pendingMedia";
@@ -182,5 +183,17 @@ describe("employeeCompletionUpload", () => {
     const empty = createPendingMedia(new File([], "empty.webm", { type: "video/webm" }), 12);
     expect(slotsMeetTaskRequirements([{ kind: "video", min_seconds: 10 }], [empty])).toBe(false);
     revokePendingMedia(empty);
+  });
+
+  it("closes a message slot with text and without an upload", async () => {
+    const uploaders = { photo: vi.fn(), video: vi.fn(), audio: vi.fn() };
+    const slots = [createMessageMedia("  שלום  ")];
+    expect(slotsMeetTaskRequirements([{ kind: "message" }], slots)).toBe(true);
+    expect(slotsMeetTaskRequirements([{ kind: "message" }], [null])).toBe(false);
+    const attachments = await uploadRequirementSlots([{ kind: "message" }], slots, uploaders, true);
+    expect(attachments).toEqual([{ kind: "message", text: "שלום" }]);
+    expect(uploaders.photo).not.toHaveBeenCalled();
+    expect(uploaders.video).not.toHaveBeenCalled();
+    expect(uploaders.audio).not.toHaveBeenCalled();
   });
 });

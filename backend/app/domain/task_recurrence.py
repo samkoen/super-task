@@ -39,14 +39,14 @@ def due_at_for_date(day: date, due_time_str: str | None) -> datetime:
     return datetime.combine(day, t, tzinfo=TZ)
 
 
-def parse_weekly_days(value: str | None) -> set[int]:
-    if not value:
-        return set()
+# Ordre d'affichage : dimanche → samedi. 0 = lundi reste valide (pas « vide »).
+_WEEKDAY_ORDER = (6, 0, 1, 2, 3, 4, 5)
+
+
+def parse_weekly_days(value: object | None) -> set[int]:
+    parts = _weekday_parts(value)
     out: set[int] = set()
-    for part in value.split(","):
-        part = part.strip()
-        if not part:
-            continue
+    for part in parts:
         try:
             day = int(part)
         except ValueError:
@@ -54,6 +54,34 @@ def parse_weekly_days(value: str | None) -> set[int]:
         if 0 <= day <= 6:
             out.add(day)
     return out
+
+
+def _weekday_parts(value: object | None) -> list[str]:
+    if value is None or value is False:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(part).strip() for part in value if str(part).strip()]
+    text = str(value).strip()
+    if not text:
+        return []
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def coerce_weekly_days(value: object | None) -> str | None:
+    """Un seul jour (0, \"0\", [\"2\"]) reste une chaîne non vide."""
+    selected = parse_weekly_days(value)
+    if not selected:
+        return None
+    return ",".join(str(day) for day in _WEEKDAY_ORDER if day in selected)
+
+
+def stored_weekly_days(recurrence: str, value: object | None) -> str | None:
+    if not uses_weekly_days(recurrence):
+        return None
+    days = coerce_weekly_days(value)
+    if recurrence == WEEKLY and not days:
+        raise ValueError("נדרש יום בשבוע למשימה שבועית")
+    return days
 
 
 def should_generate_on_date(

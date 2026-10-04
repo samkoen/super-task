@@ -2,6 +2,7 @@ import { Box, Button, Typography } from "@mui/material";
 import CompactAudioPlayer from "../media/CompactAudioPlayer";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import MarkCompletionPhotoButton from "./MarkCompletionPhotoButton";
+import { ReviewableVideo } from "./MarkVideoFrameButton";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
@@ -35,6 +36,7 @@ interface CompletionMediaPreviewProps {
 function kindLabel(kind: string): string {
   if (kind === "video") return he.taskReferenceVideo;
   if (kind === "audio") return he.taskReferenceAudio;
+  if (kind === "message") return he.completionReqMessage;
   return he.taskReferencePhoto;
 }
 
@@ -65,6 +67,7 @@ export default function CompletionMediaPreview({
   const reqs = normalizeRequirements(requirements);
   const hasVisualGuides = visualSlotCount(reqs) > 0;
   const mapped = mapAttachmentsToSlots(reqs, items, { videosPending });
+  const looseMessages = hasVisualGuides ? [] : messageTexts(items);
   const hasAudio = items.some((item) => item.kind === "audio") || reqs.some((r) => r.kind === "audio");
   const resolvedTranscript = displayedAudioTranscript(
     viewer === "employee"
@@ -72,7 +75,7 @@ export default function CompletionMediaPreview({
       : audio_transcript,
     { hasAudio, allowFallback: transcriptFallback },
   );
-  if (!items.length && !resolvedTranscript && !hasVisualGuides) return null;
+  if (!items.length && !resolvedTranscript && !hasVisualGuides && !looseMessages.length) return null;
   const leftover = hasVisualGuides ? mapped.leftover : [];
 
   return (
@@ -116,7 +119,31 @@ export default function CompletionMediaPreview({
           <Typography variant="body2">{resolvedTranscript}</Typography>
         </Box>
       )}
+      <MessageTexts texts={looseMessages} />
     </Box>
+  );
+}
+
+function messageTexts(items: CompletionAttachment[]): string[] {
+  return items
+    .filter((item) => item.kind === "message")
+    .map((item) => (item.text || "").trim())
+    .filter(Boolean);
+}
+
+function MessageTexts({ texts }: { texts: string[] }) {
+  if (!texts.length) return null;
+  return (
+    <>
+      {texts.map((text, index) => (
+        <Box key={`message-${index}`} sx={{ p: 1.25, bgcolor: "action.hover", borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+            {he.completionReqMessage}
+          </Typography>
+          <Typography variant="body2">{text}</Typography>
+        </Box>
+      ))}
+    </>
   );
 }
 
@@ -190,12 +217,20 @@ function LeftoverMediaItem({
       <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
         {kindLabel(item.kind)}
       </Typography>
-      <LeftoverMediaBody item={item} src={resolved.src} posterSrc={poster.src} videosPending={videosPending} />
+      <LeftoverMediaBody
+        item={item}
+        src={resolved.src}
+        posterSrc={poster.src}
+        videosPending={videosPending}
+        onMarkFrame={onMarkPhoto}
+      />
       {item.kind === "photo" && onMarkPhoto && item.url ? (
         <MarkCompletionPhotoButton
           marked={marked}
           disabled={disabled}
-          onClick={() => onMarkPhoto(item.url)}
+          onClick={() => {
+            if (item.url) onMarkPhoto(item.url);
+          }}
         />
       ) : null}
       {onRemove && (
@@ -224,11 +259,13 @@ function LeftoverMediaBody({
   src,
   posterSrc,
   videosPending,
+  onMarkFrame,
 }: {
   item: CompletionAttachment;
   src: string;
   posterSrc: string | null;
   videosPending: boolean;
+  onMarkFrame?: (frameUrl: string) => void;
 }) {
   if (item.kind === "photo") {
     return (
@@ -260,14 +297,7 @@ function LeftoverMediaBody({
     );
   }
   if (item.kind === "video") {
-    return (
-      <Box
-        component="video"
-        src={src}
-        controls
-        sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
-      />
-    );
+    return <ReviewableVideo src={src} onMarkFrame={onMarkFrame} maxHeight={200} />;
   }
   return <CompactAudioPlayer src={src} />;
 }

@@ -1,11 +1,13 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Box, Button, CircularProgress, Typography } from "@mui/material";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
 import { ApiError } from "../../services/api";
 import { aiService } from "../../services/aiService";
 import { taskService } from "../../services/taskService";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import { he } from "../../i18n/he";
 import { mediaUrl } from "../../utils/mediaUrl";
+import { referenceFileKind } from "../../utils/referenceMediaFile";
 
 export interface TaskReferenceMediaValue {
   reference_photo_url: string;
@@ -24,6 +26,39 @@ interface TaskReferenceMediaEditorProps {
   onDescriptionAppend?: (transcript: string) => void;
   disabled?: boolean;
   onError?: (message: string) => void;
+}
+
+function ReferenceFileButton({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean;
+  onPick: (file: File) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        hidden
+        accept="image/*,video/*"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) onPick(file);
+        }}
+      />
+      <Button
+        startIcon={<AttachFileIcon />}
+        variant="outlined"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+      >
+        {he.addReferenceFromFile}
+      </Button>
+    </>
+  );
 }
 
 function revokeIfBlob(url: string | undefined): void {
@@ -147,14 +182,27 @@ export default function TaskReferenceMediaEditor({
       <Typography variant="subtitle2" color="text.secondary">
         {he.taskReferenceMediaHint}
       </Typography>
-      <MediaCaptureActions
-        photoAdded={Boolean(value.reference_photo_url)}
-        videoAdded={Boolean(value.reference_video_url)}
-        audioAdded={Boolean(value.reference_audio_url)}
-        uploadingKind={uploadingKind}
-        disabled={disabled || transcribingAudio}
-        onCapture={handleCapture}
-      />
+      <Box display="flex" flexWrap="wrap" gap={1} alignItems="center">
+        <MediaCaptureActions
+          photoAdded={Boolean(value.reference_photo_url)}
+          videoAdded={Boolean(value.reference_video_url)}
+          audioAdded={Boolean(value.reference_audio_url)}
+          uploadingKind={uploadingKind}
+          disabled={disabled || transcribingAudio}
+          onCapture={handleCapture}
+        />
+        <ReferenceFileButton
+          disabled={disabled || transcribingAudio || uploadingKind !== null}
+          onPick={(file) => {
+            const kind = referenceFileKind(file);
+            if (!kind) {
+              onError?.(he.referenceFileInvalid);
+              return;
+            }
+            void handleCapture(file, kind);
+          }}
+        />
+      </Box>
       {transcribingAudio && (
         <Box display="flex" alignItems="center" gap={1}>
           <CircularProgress size={18} />

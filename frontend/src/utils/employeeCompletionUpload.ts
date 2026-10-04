@@ -1,12 +1,13 @@
 import { he } from "../i18n/he";
 import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
-import { meetsCompletionRequirements } from "./completionMedia";
+import { MAX_MESSAGE_TEXT, meetsCompletionRequirements } from "./completionMedia";
 import { attachmentsFromCompletion, mapAttachmentsToSlots } from "./completionSlotView";
 import type { ExtraSlot } from "./extraCompletionMedia";
 import {
   type PendingMedia,
   completionAttachmentFromPending,
   createKeptMedia,
+  createMessageMedia,
   pendingSlotIsFilled,
   uploadPendingMedia,
 } from "./pendingMedia";
@@ -31,9 +32,11 @@ export function slotsFromKeptAttachments(
   requirements: CompletionRequirement[],
   attachments: CompletionAttachment[] | null | undefined,
 ): Array<PendingMedia | null> {
-  return mapAttachmentsToSlots(requirements, attachments).fills.map((fill) =>
-    fill?.url ? createKeptMedia(fill.url, fill.durationSeconds, fill.posterUrl ?? undefined) : null,
-  );
+  return mapAttachmentsToSlots(requirements, attachments).fills.map((fill) => {
+    if (fill?.text?.trim()) return createMessageMedia(fill.text);
+    if (fill?.url) return createKeptMedia(fill.url, fill.durationSeconds, fill.posterUrl ?? undefined);
+    return null;
+  });
 }
 
 export function slotsFromTaskCompletion(
@@ -78,6 +81,27 @@ async function uploadOneRequirementSlot(
   uploaders: SlotUploaders,
   requireAll: boolean,
 ): Promise<CompletionAttachment | null> {
+  if (req.kind === "message") return messageAttachment(media, requireAll);
+  return uploadFileSlot(req, media, uploaders, requireAll);
+}
+
+function messageAttachment(
+  media: PendingMedia | null,
+  requireAll: boolean,
+): CompletionAttachment | null {
+  const text = (media?.text || "").trim().slice(0, MAX_MESSAGE_TEXT);
+  if (text) return { kind: "message", text };
+  if (requireAll) throw new Error(he.completionMessageRequired);
+  return null;
+}
+
+async function uploadFileSlot(
+  req: CompletionRequirement,
+  media: PendingMedia | null,
+  uploaders: SlotUploaders,
+  requireAll: boolean,
+): Promise<CompletionAttachment | null> {
+  if (req.kind === "message") return null;
   const url = await uploadPendingMedia(media, uploaders[req.kind]);
   if (url) {
     const withPoster = await withUploadedVideoPoster(req.kind, media, uploaders.photo);

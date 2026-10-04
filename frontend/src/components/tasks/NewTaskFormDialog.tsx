@@ -40,6 +40,11 @@ import {
   weekdaysOnRecurrenceChange,
 } from "../../utils/taskRecurrence";
 import { startUrlFieldError } from "../../utils/startUrl";
+import {
+  readFixedTaskCreateForm,
+  writeFixedTaskCreateForm,
+  type FixedTaskCreateFormDraft,
+} from "../../utils/fixedTaskScreenDraft";
 
 const EMPTY_MEDIA: TaskReferenceMediaValue = {
   reference_photo_url: "",
@@ -91,6 +96,8 @@ export interface NewTaskFormDialogProps {
   saving?: boolean;
   onError?: (message: string) => void;
   currentUserId?: string;
+  /** Garde le brouillon si on quitte /manager/fixed-tasks. */
+  rememberKey?: string;
 }
 
 export default function NewTaskFormDialog({
@@ -111,26 +118,36 @@ export default function NewTaskFormDialog({
   saving = false,
   onError,
   currentUserId,
+  rememberKey,
 }: NewTaskFormDialogProps) {
   const branches = asList<Branch>(branchesProp);
   const employees = asList<User>(employeesProp);
-  const [taskKind, setTaskKind] = useState<NewTaskKind>(forcedTaskKind ?? "ad_hoc");
-  const [branchId, setBranchId] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [assigneeUserId, setAssigneeUserId] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const [recurrence, setRecurrence] = useState<TaskRecurrence>("daily");
-  const [dueTime, setDueTime] = useState("09:00");
-  const [weeklyDays, setWeeklyDays] = useState(DAILY_DEFAULT_WEEKDAYS);
-  const [monthlyDay, setMonthlyDay] = useState(1);
-  const [opsCategory, setOpsCategory] = useState<OpsCategory | "">("");
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
-  const [completionRequirements, setCompletionRequirements] = useState<CompletionRequirement[]>([]);
-  const [isWorkStart, setIsWorkStart] = useState(false);
-  const [isWorkEnd, setIsWorkEnd] = useState(false);
-  const [startUrl, setStartUrl] = useState("");
-  const [media, setMedia] = useState<TaskReferenceMediaValue>(EMPTY_MEDIA);
+  const remembered = useRef(
+    rememberKey ? readFixedTaskCreateForm(rememberKey) : null,
+  ).current;
+  const [taskKind, setTaskKind] = useState<NewTaskKind>(
+    remembered?.taskKind ?? forcedTaskKind ?? "ad_hoc",
+  );
+  const [branchId, setBranchId] = useState(remembered?.branchId ?? "");
+  const [title, setTitle] = useState(remembered?.title ?? "");
+  const [description, setDescription] = useState(remembered?.description ?? "");
+  const [assigneeUserId, setAssigneeUserId] = useState(remembered?.assigneeUserId ?? "");
+  const [dueAt, setDueAt] = useState(remembered?.dueAt ?? "");
+  const [recurrence, setRecurrence] = useState<TaskRecurrence>(remembered?.recurrence ?? "daily");
+  const [dueTime, setDueTime] = useState(remembered?.dueTime ?? "09:00");
+  const [weeklyDays, setWeeklyDays] = useState(remembered?.weeklyDays ?? DAILY_DEFAULT_WEEKDAYS);
+  const [monthlyDay, setMonthlyDay] = useState(remembered?.monthlyDay ?? 1);
+  const [opsCategory, setOpsCategory] = useState<OpsCategory | "">(remembered?.opsCategory ?? "");
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(
+    remembered?.selectedBranchIds ?? [],
+  );
+  const [completionRequirements, setCompletionRequirements] = useState<CompletionRequirement[]>(
+    remembered?.completionRequirements ?? [],
+  );
+  const [isWorkStart, setIsWorkStart] = useState(remembered?.isWorkStart ?? false);
+  const [isWorkEnd, setIsWorkEnd] = useState(remembered?.isWorkEnd ?? false);
+  const [startUrl, setStartUrl] = useState(remembered?.startUrl ?? "");
+  const [media, setMedia] = useState<TaskReferenceMediaValue>(remembered?.media ?? EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
   const wasOpenRef = useRef(false);
 
@@ -138,7 +155,7 @@ export default function NewTaskFormDialog({
   useEffect(() => {
     const justOpened = open && !wasOpenRef.current;
     wasOpenRef.current = open;
-    if (!justOpened) return;
+    if (!justOpened || remembered) return;
     setTaskKind(forcedTaskKind ?? "ad_hoc");
     setBranchId(defaultBranchId);
     setTitle(initialPrefill?.title ?? "");
@@ -162,6 +179,50 @@ export default function NewTaskFormDialog({
     // Snapshot à l'ouverture seulement
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (!rememberKey || !open) return;
+    const draft: FixedTaskCreateFormDraft = {
+      taskKind,
+      branchId,
+      title,
+      description,
+      assigneeUserId,
+      dueAt,
+      recurrence,
+      dueTime,
+      weeklyDays,
+      monthlyDay,
+      opsCategory,
+      selectedBranchIds,
+      completionRequirements,
+      isWorkStart,
+      isWorkEnd,
+      startUrl,
+      media,
+    };
+    writeFixedTaskCreateForm(rememberKey, draft);
+  }, [
+    rememberKey,
+    open,
+    taskKind,
+    branchId,
+    title,
+    description,
+    assigneeUserId,
+    dueAt,
+    recurrence,
+    dueTime,
+    weeklyDays,
+    monthlyDay,
+    opsCategory,
+    selectedBranchIds,
+    completionRequirements,
+    isWorkStart,
+    isWorkEnd,
+    startUrl,
+    media,
+  ]);
 
   const allBranchIds = useMemo(() => branches.map((b) => b.id), [branches]);
   const branchScope = canPickBranch

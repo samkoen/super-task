@@ -4,6 +4,7 @@ import type { CompletionKind, CompletionRequirement } from "./completionMedia";
 export function requirementKindLabel(kind: CompletionKind): string {
   if (kind === "video") return he.completionReqVideo;
   if (kind === "audio") return he.completionReqAudio;
+  if (kind === "message") return he.completionReqMessage;
   return he.completionReqPhoto;
 }
 

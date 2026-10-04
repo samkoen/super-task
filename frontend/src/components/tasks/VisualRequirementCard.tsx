@@ -61,7 +61,7 @@ export default function VisualRequirementCard({
           onCommit={onSecondsCommit}
         />
       )}
-      {req.kind !== "audio" && (
+      {req.kind !== "audio" && req.kind !== "message" && (
         <ExamplePhotoField
           title={req.title}
           exampleSrc={exampleSrc}

@@ -3,6 +3,7 @@ import CompletionSlotGrid from "./CompletionSlotGrid";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import type { CompletionKind, CompletionRequirement } from "../../utils/completionMedia";
 import {
+  applyMessageSlot,
   applyPendingSlot,
   pendingSlotHasFile,
   type PendingMedia,
@@ -31,6 +32,10 @@ export default function CompletionRequirementSlots({
     onChange(applyPendingSlot(slotsRef.current, index, file, durationSeconds));
   };
 
+  const setMessage = (index: number, text: string) => {
+    onChange(applyMessageSlot(slotsRef.current, index, text));
+  };
+
   return (
     <CompletionSlotGrid
       requirements={requirements}
@@ -39,12 +44,14 @@ export default function CompletionRequirementSlots({
       disabled={disabled}
       language={language}
       onCapture={setSlot}
+      onMessage={setMessage}
       onAnnotatingChange={onAnnotatingChange}
     />
   );
 }
 
 function fillFromSlot(kind: CompletionKind, media: PendingMedia | null) {
+  if (kind === "message") return { kind, text: media?.text ?? "" };
   if (pendingSlotHasFile(media)) return { previewUrl: media.previewUrl, kind };
   if (media?.keptUrl) return { url: media.keptUrl, kind };
   return null;

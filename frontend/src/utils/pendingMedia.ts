@@ -1,3 +1,5 @@
+import { MAX_MESSAGE_TEXT } from "./completionMedia";
+
 /** Média capturé en local — upload serveur uniquement à la soumission. */
 
 export type PendingMedia = {
@@ -9,6 +11,8 @@ export type PendingMedia = {
   keptUrl?: string;
   posterUrl?: string;
   posterFile?: File | null;
+  /** Texte d’une case message — pas de fichier. */
+  text?: string;
 };
 
 export function createPendingMedia(
@@ -65,7 +69,7 @@ export function revokePendingMedia(media: PendingMedia | null | undefined): void
 }
 
 export function pendingSlotIsFilled(media: PendingMedia | null | undefined): boolean {
-  return pendingSlotHasFile(media) || Boolean(media?.keptUrl);
+  return pendingSlotHasFile(media) || Boolean(media?.keptUrl) || Boolean(media?.text?.trim());
 }
 
 export function replacePendingMedia(
@@ -101,5 +105,26 @@ export function applyPendingSlot(
   const next = slots.slice();
   while (next.length <= index) next.push(null);
   next[index] = replacePendingMedia(next[index], file, durationSeconds ?? null);
+  return next;
+}
+
+export function createMessageMedia(text: string): PendingMedia {
+  return {
+    file: null,
+    previewUrl: "",
+    capturedAt: "",
+    text: text.slice(0, MAX_MESSAGE_TEXT),
+  };
+}
+
+export function applyMessageSlot(
+  slots: Array<PendingMedia | null>,
+  index: number,
+  text: string,
+): Array<PendingMedia | null> {
+  const next = slots.slice();
+  while (next.length <= index) next.push(null);
+  const capped = text.slice(0, MAX_MESSAGE_TEXT);
+  next[index] = capped ? createMessageMedia(capped) : null;
   return next;
 }

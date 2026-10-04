@@ -58,6 +58,21 @@ describe("CompletionMediaPreview", () => {
     expect(onMarkPhoto).toHaveBeenCalledWith("/p.jpg");
   });
 
+  it("offers to circle a paused end-of-shift video while reviewing", () => {
+    const onMarkPhoto = vi.fn();
+    render(
+      <CompletionMediaPreview
+        video_path="/end.mp4"
+        requirements={[{ kind: "video", title: "סיום משמרת", min_seconds: 10 }]}
+        onMarkPhoto={onMarkPhoto}
+        transcriptFallback={false}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.completionPlayVideo }));
+    expect(screen.getByRole("button", { name: he.reviewMarkVideoFrame })).toBeTruthy();
+    expect(screen.getByText(he.reviewMarkVideoHint)).toBeTruthy();
+  });
+
   it("hides the mark action when the manager is not reviewing", () => {
     render(<CompletionMediaPreview photo_path="/p.jpg" transcriptFallback={false} />);
     expect(screen.queryByRole("button", { name: he.reviewMarkPhoto })).toBeNull();

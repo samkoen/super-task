@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Typography } from "@mui/material";
+import { Box, TextField, Typography } from "@mui/material";
 import CompletionExampleDialog from "./CompletionExampleDialog";
 import CompletionHintDialog from "./CompletionHintDialog";
 import CompletionSlotHintButtons from "./CompletionSlotHintButtons";
@@ -8,7 +8,7 @@ import MediaCaptureActions from "../media/MediaCaptureActions";
 import { he } from "../../i18n/he";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { useSlotHintPlayback } from "../../hooks/useSlotHintPlayback";
-import { countVisualKinds, type CompletionRequirement } from "../../utils/completionMedia";
+import { countVisualKinds, MAX_MESSAGE_TEXT, type CompletionRequirement } from "../../utils/completionMedia";
 import {
   filledVisualCount,
   slotDisplayTitle,
@@ -25,6 +25,7 @@ export default function CompletionSlotGrid({
   disabled = false,
   language = "he",
   onCapture,
+  onMessage,
   onAnnotatingChange,
   onMarkPhoto,
   markedPhotoUrls,
@@ -35,6 +36,7 @@ export default function CompletionSlotGrid({
   disabled?: boolean;
   language?: EmployeeLanguage;
   onCapture?: (index: number, file: File, durationSeconds?: number) => void;
+  onMessage?: (index: number, text: string) => void;
   onAnnotatingChange?: (busy: boolean) => void;
   onMarkPhoto?: (url: string) => void;
   markedPhotoUrls?: string[];
@@ -63,25 +65,21 @@ export default function CompletionSlotGrid({
           hints={hints}
         />
       )}
-      {requirements.map((req, index) =>
-        req.kind === "audio" ? (
-          <AudioSlot
-            key={`audio-${index}`}
-            req={req}
-            index={index}
-            fill={fills[index] ?? null}
-            interactive={interactive}
-            disabled={disabled}
-            onCapture={onCapture}
-            hintControls={slotHintControls(req, index, hints)}
-          />
-        ) : null,
-      )}
+      <NonVisualSlots
+        requirements={requirements}
+        fills={fills}
+        interactive={interactive}
+        disabled={disabled}
+        onCapture={onCapture}
+        onMessage={onMessage}
+        hints={hints}
+      />
       <CompletionExampleDialog
         src={preview?.src ?? null}
         title={preview?.title ?? ""}
         kind={preview?.kind}
         onClose={() => setPreview(null)}
+        onMarkFrame={onMarkPhoto ? (frameUrl) => markVideoFrame(frameUrl, setPreview, onMarkPhoto) : undefined}
       />
       {hints.dialog && (
         <CompletionHintDialog
@@ -91,6 +89,81 @@ export default function CompletionSlotGrid({
         />
       )}
     </Box>
+  );
+}
+
+function markVideoFrame(
+  frameUrl: string,
+  setPreview: (value: null) => void,
+  onMarkPhoto: (url: string) => void,
+) {
+  setPreview(null);
+  onMarkPhoto(frameUrl);
+}
+
+function NonVisualSlots({
+  requirements,
+  fills,
+  interactive,
+  disabled,
+  onCapture,
+  onMessage,
+  hints,
+}: {
+  requirements: CompletionRequirement[];
+  fills: Array<SlotFill | null>;
+  interactive: boolean;
+  disabled: boolean;
+  onCapture?: (index: number, file: File, durationSeconds?: number) => void;
+  onMessage?: (index: number, text: string) => void;
+  hints: ReturnType<typeof useSlotHintPlayback>;
+}) {
+  return (
+    <>
+      {requirements.map((req, index) =>
+        textSlot(req, index, fills[index] ?? null, interactive, disabled, onCapture, onMessage, hints),
+      )}
+    </>
+  );
+}
+
+function textSlot(
+  req: CompletionRequirement,
+  index: number,
+  fill: SlotFill | null,
+  interactive: boolean,
+  disabled: boolean,
+  onCapture: ((index: number, file: File, durationSeconds?: number) => void) | undefined,
+  onMessage: ((index: number, text: string) => void) | undefined,
+  hints: ReturnType<typeof useSlotHintPlayback>,
+) {
+  const hintControls = slotHintControls(req, index, hints);
+  if (req.kind === "audio") {
+    return (
+      <AudioSlot
+        key={`audio-${index}`}
+        req={req}
+        index={index}
+        fill={fill}
+        interactive={interactive}
+        disabled={disabled}
+        onCapture={onCapture}
+        hintControls={hintControls}
+      />
+    );
+  }
+  if (req.kind !== "message") return null;
+  return (
+    <MessageSlot
+      key={`message-${index}`}
+      req={req}
+      index={index}
+      fill={fill}
+      interactive={interactive}
+      disabled={disabled}
+      onMessage={onMessage}
+      hintControls={hintControls}
+    />
   );
 }
 
@@ -149,7 +222,7 @@ function VisualSlotList({
       }}
     >
       {requirements.map((req, index) =>
-        req.kind === "audio" ? null : (
+        req.kind === "photo" || req.kind === "video" ? (
           <CompletionSlotTile
             key={`${req.kind}-${index}`}
             req={req}
@@ -164,7 +237,7 @@ function VisualSlotList({
             photoMarked={Boolean(fills[index]?.url && markedPhotoUrls?.includes(fills[index]?.url || ""))}
             hintControls={slotHintControls(req, index, hints)}
           />
-        ),
+        ) : null,
       )}
     </Box>
   );
@@ -227,6 +300,49 @@ function AudioSlot({
         />
       )}
       {src && <Box component="audio" src={src} controls sx={{ mt: 1, width: "100%" }} />}
+    </Box>
+  );
+}
+
+function MessageSlot({
+  req,
+  index,
+  fill,
+  interactive,
+  disabled,
+  onMessage,
+  hintControls,
+}: {
+  req: CompletionRequirement;
+  index: number;
+  fill: SlotFill | null;
+  interactive: boolean;
+  disabled?: boolean;
+  onMessage?: (index: number, text: string) => void;
+  hintControls: ReturnType<typeof slotHintControls>;
+}) {
+  const text = fill?.text ?? "";
+  if (!interactive && !text.trim()) return null;
+  return (
+    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, p: 1.25 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 1 }}>
+        <Typography variant="subtitle2">{slotDisplayTitle(req, index)}</Typography>
+        {hintControls ? <CompletionSlotHintButtons {...hintControls} inline /> : null}
+      </Box>
+      {interactive && onMessage ? (
+        <TextField
+          label={he.completionReqMessage}
+          value={text}
+          onChange={(event) => onMessage(index, event.target.value)}
+          disabled={disabled}
+          fullWidth
+          multiline
+          minRows={2}
+          inputProps={{ maxLength: MAX_MESSAGE_TEXT }}
+        />
+      ) : (
+        <Typography variant="body2">{text}</Typography>
+      )}
     </Box>
   );
 }

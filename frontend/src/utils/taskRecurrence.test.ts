@@ -62,6 +62,8 @@ describe("taskRecurrence", () => {
   it("sends weekdays for daily and weekly only", () => {
     expect(weeklyDaysPayload("daily", "0,1,2")).toBe("0,1,2");
     expect(weeklyDaysPayload("weekly", "4")).toBe("4");
+    expect(weeklyDaysPayload("weekly", 0)).toBe("0");
+    expect(weeklyDaysPayload("weekly", ["2"])).toBe("2");
     expect(weeklyDaysPayload("monthly", "4")).toBeUndefined();
     expect(usesWeeklyDays("daily")).toBe(true);
   });

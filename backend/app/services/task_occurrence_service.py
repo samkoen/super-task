@@ -9,6 +9,7 @@ from app.domain.completion_media import (
     COMPLETION_VIDEOS_NOT_READY,
     assert_attachments_match,
     assert_completion_media,
+    attachment_is_filled,
     effective_requirements,
     first_path_of_kind,
     packed_media_fields,
@@ -615,7 +616,7 @@ class TaskOccurrenceService:
     ) -> dict:
         packed = TaskOccurrenceService._pack_attachments(attachments)
         if not require_complete:
-            filled = [item for item in attachments if (item.get("url") or "").strip()]
+            filled = [item for item in attachments if attachment_is_filled(item)]
             return TaskOccurrenceService._pack_attachments(filled)
         if raw_reqs is not None:
             assert_attachments_match(reqs, attachments)

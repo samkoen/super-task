@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from app.domain import task_recurrence
 
 
@@ -28,6 +30,20 @@ def test_recurring_excludes_biweekly():
     assert "biweekly" not in task_recurrence.RECURRING
     assert task_recurrence.uses_weekly_days("daily")
     assert not task_recurrence.uses_weekly_days("monthly")
+
+
+def test_one_weekday_stays_set_including_monday_zero():
+    assert task_recurrence.coerce_weekly_days(0) == "0"
+    assert task_recurrence.coerce_weekly_days("0") == "0"
+    assert task_recurrence.coerce_weekly_days(["2"]) == "2"
+    assert task_recurrence.coerce_weekly_days("3") == "3"
+    assert task_recurrence.stored_weekly_days("weekly", 0) == "0"
+    assert task_recurrence.stored_weekly_days("weekly", ["4"]) == "4"
+
+
+def test_weekly_without_a_day_is_refused():
+    with pytest.raises(ValueError, match="יום"):
+        task_recurrence.stored_weekly_days("weekly", None)
 
 
 def test_should_generate_weekly_friday():
