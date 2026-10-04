@@ -34,8 +34,10 @@ describe("ActionRequiredCarousel", () => {
     );
     expect(screen.getByText(he.dashboardReviewRow)).toBeTruthy();
     expect(screen.getByText("ניקוי מדף")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: he.taskReviewAction }));
+    fireEvent.click(screen.getByText("ניקוי מדף"));
     expect(onReview).toHaveBeenCalledWith("pr1");
+    fireEvent.click(screen.getByRole("button", { name: `${he.taskReviewAction}: ניקוי מדף` }));
+    expect(onReview).toHaveBeenCalledTimes(2);
   });
 
   it("shows empty state for questions row", () => {
