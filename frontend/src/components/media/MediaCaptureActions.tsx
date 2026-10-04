@@ -15,6 +15,7 @@ import {
   useTheme,
 } from "@mui/material";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
 import StopIcon from "@mui/icons-material/Stop";
@@ -31,6 +32,7 @@ import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
 import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
 import { dialogActionsPbCss } from "../../utils/systemInsets";
+import { referenceFileKind } from "../../utils/referenceMediaFile";
 import { videoElapsedLabel } from "../../utils/videoElapsedLabel";
 
 export type MediaKind = "photo" | "video" | "audio";
@@ -81,6 +83,56 @@ function useBlobPreviewUrl(blob: Blob | null) {
     };
   }, [previewUrl]);
   return previewUrl;
+}
+
+function takePhotoFile(
+  event: { target: HTMLInputElement },
+  onPhoto: (file: File) => void | Promise<void>,
+  setInvalid: (value: boolean) => void,
+) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (referenceFileKind(file) !== "photo") {
+    setInvalid(true);
+    return;
+  }
+  setInvalid(false);
+  void onPhoto(file);
+}
+
+function PhotoFromFileButton({
+  disabled,
+  onPhoto,
+}: {
+  disabled: boolean;
+  onPhoto: (file: File) => void | Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [invalid, setInvalid] = useState(false);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        hidden
+        accept="image/*"
+        onChange={(event) => takePhotoFile(event, onPhoto, setInvalid)}
+      />
+      <Button
+        startIcon={<AttachFileIcon />}
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+      >
+        {he.addReferenceFromFile}
+      </Button>
+      {invalid ? (
+        <Typography variant="caption" color="error" sx={{ flexBasis: "100%" }}>
+          {he.referencePhotoFileInvalid}
+        </Typography>
+      ) : null}
+    </>
+  );
 }
 
 export function PhotoCaptureDialog({
@@ -216,9 +268,18 @@ export function PhotoCaptureDialog({
           {he.cancel}
         </Button>
         {onSkip && !hasPreview && (
-          <Button onClick={onSkip} disabled={capturing || uploading || confirming}>
-            {he.newTaskSkipPhoto}
-          </Button>
+          <>
+            <Button onClick={onSkip} disabled={capturing || uploading || confirming}>
+              {he.newTaskSkipPhoto}
+            </Button>
+            <PhotoFromFileButton
+              disabled={capturing || uploading || confirming}
+              onPhoto={async (file) => {
+                await onCapture(file);
+                onClose();
+              }}
+            />
+          </>
         )}
         {error && !hasPreview && (
           <Button onClick={() => void start()} disabled={capturing || uploading || confirming}>
