@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-VALID_KINDS = ("photo", "video", "audio")
+VALID_KINDS = ("photo", "video", "audio", "message")
 VISUAL_KINDS = frozenset({"photo", "video"})
 MAX_MIN_VIDEO_SECONDS = 600
 MAX_REQUIREMENTS = 10
@@ -12,6 +12,7 @@ MAX_EXTRA_ATTACHMENTS = 6
 MAX_SLOT_TITLE = 80
 MAX_SLOT_HINT = 300
 MAX_EXAMPLE_URL = 1024
+MAX_MESSAGE_TEXT = 500
 
 
 def packed_media_fields(requirements: list[dict]) -> dict:
@@ -211,6 +212,13 @@ def normalize_captured_at(value: object | None) -> str | None:
     return dt.isoformat()
 
 
+def attachment_is_filled(item: dict) -> bool:
+    """Un message compte s'il a du texte ; un média compte s'il a une URL."""
+    if item.get("kind") == "message":
+        return bool(str(item.get("text") or "").strip())
+    return bool(str(item.get("url") or "").strip())
+
+
 def first_path_of_kind(attachments: list[dict], kind: str) -> str | None:
     for item in attachments:
         if item.get("kind") == kind and (item.get("url") or "").strip():
@@ -267,7 +275,7 @@ def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
         return []
     urls: list[str] = []
     for item in requirements:
-        if not isinstance(item, dict) or item.get("kind") == "audio":
+        if not isinstance(item, dict) or item.get("kind") in {"audio", "message"}:
             continue
         url = str(item.get("example_url") or "").strip()
         if url:
@@ -288,7 +296,7 @@ def _is_bare_photo_list(requirements: list[dict]) -> bool:
 
 
 def _guide_keys_for(kind: object) -> tuple[str, ...]:
-    if kind == "audio":
+    if kind in {"audio", "message"}:
         return ("title", "hint")
     return _GUIDE_KEYS
 
@@ -409,8 +417,8 @@ def _normalize_requirement(item: object) -> dict:
     if kind not in VALID_KINDS:
         raise ValueError("סוג מדיה לא תקין")
     guides = _slot_guide_fields(item)
-    if kind == "audio":
-        return {"kind": "audio", **{key: guides[key] for key in ("title", "hint") if key in guides}}
+    if kind in {"audio", "message"}:
+        return {"kind": kind, **{key: guides[key] for key in ("title", "hint") if key in guides}}
     entry = {"kind": kind, **guides}
     if kind != "video":
         return entry
@@ -427,6 +435,8 @@ def _normalize_attachment(item: object) -> dict:
     kind = str(item.get("kind") or "").strip()
     if kind not in VALID_KINDS:
         raise ValueError("סוג מדיה לא תקין")
+    if kind == "message":
+        return {"kind": "message", "text": _normalize_message_text(item.get("text"))}
     url = str(item.get("url") or item.get("path") or "").strip()
     entry: dict = {"kind": kind, "url": url}
     if kind == "video":
@@ -467,12 +477,29 @@ def _fill_slots_from_legacy(
             used["audio"] = True
             out.append({"kind": "audio", "url": audio})
         else:
-            out.append({"kind": kind, "url": ""})
+            out.append(_empty_slot(kind))
     return out
+
+
+def _empty_slot(kind: str) -> dict:
+    if kind == "message":
+        return {"kind": "message", "text": ""}
+    return {"kind": kind, "url": ""}
+
+
+def _normalize_message_text(value: object | None) -> str:
+    text = str(value or "").strip()
+    if len(text) > MAX_MESSAGE_TEXT:
+        raise ValueError("ההודעה ארוכה מדי")
+    return text
 
 
 def _assert_slot_matches(req: dict, att: dict) -> None:
     kind = req["kind"]
+    if kind == "message":
+        if att.get("kind") != "message" or not str(att.get("text") or "").strip():
+            raise ValueError(_missing_kind_message(kind))
+        return
     if att.get("kind") != kind or not (att.get("url") or "").strip():
         raise ValueError(_missing_kind_message(kind))
     if kind != "video":
@@ -488,4 +515,6 @@ def _missing_kind_message(kind: str) -> str:
         return "נדרשת וידאו לסיום המשימה"
     if kind == "audio":
         return "נדרש שמע לסיום המשימה"
+    if kind == "message":
+        return "נדרשת הודעה לסיום המשימה"
     return "נדרשת תמונה לסיום המשימה"

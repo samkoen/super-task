@@ -4,6 +4,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import VisualRequirementCard from "./VisualRequirementCard";
 import { he } from "../../i18n/he";
 import {
@@ -164,6 +165,9 @@ function AddRequirementButtons({
       </Button>
       <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={() => onAdd("audio")} disabled={!canAdd}>
         {he.completionAddAudioReq}
+      </Button>
+      <Button size="small" variant="outlined" startIcon={<ChatBubbleOutlineIcon />} onClick={() => onAdd("message")} disabled={!canAdd}>
+        {he.completionAddMessageReq}
       </Button>
     </Box>
   );

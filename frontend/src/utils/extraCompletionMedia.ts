@@ -44,10 +44,13 @@ export function extrasFromAttachments(
   attachments: CompletionAttachment[] | null | undefined,
 ): ExtraSlot[] {
   const leftover = mapAttachmentsToSlots(requirements, attachments).leftover;
-  return leftover.slice(0, MAX_EXTRA_COMPLETION_MEDIA).map((item) => ({
-    kind: item.kind,
-    media: createKeptMedia(item.url, item.duration_seconds, item.poster_url),
-  }));
+  return leftover
+    .filter((item): item is CompletionAttachment & { url: string } => Boolean(item.url))
+    .slice(0, MAX_EXTRA_COMPLETION_MEDIA)
+    .map((item) => ({
+      kind: item.kind,
+      media: createKeptMedia(item.url, item.duration_seconds, item.poster_url),
+    }));
 }
 
 export function extrasFromTaskCompletion(

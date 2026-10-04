@@ -1,4 +1,4 @@
-export type CompletionKind = "photo" | "video" | "audio";
+export type CompletionKind = "photo" | "video" | "audio" | "message";
 
 export type CompletionRequirement = {
   kind: CompletionKind;
@@ -14,7 +14,8 @@ export type CompletionRequirement = {
 
 export type CompletionAttachment = {
   kind: CompletionKind;
-  url: string;
+  url?: string;
+  text?: string;
   duration_seconds?: number;
   captured_at?: string;
   poster_url?: string;
@@ -24,6 +25,7 @@ export const MAX_COMPLETION_REQUIREMENTS = 10;
 export const DEFAULT_VIDEO_SECONDS = 10;
 export const MAX_SLOT_TITLE = 80;
 export const MAX_SLOT_HINT = 300;
+export const MAX_MESSAGE_TEXT = 500;
 
 export function normalizeMinVideoSeconds(value: number | string | null | undefined): number | null {
   if (value == null || value === "") return null;
@@ -70,8 +72,8 @@ export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const kind = (item as { kind?: string }).kind;
-    if (kind !== "photo" && kind !== "video" && kind !== "audio") continue;
-    if (kind === "audio") {
+    if (kind !== "photo" && kind !== "video" && kind !== "audio" && kind !== "message") continue;
+    if (kind === "audio" || kind === "message") {
       const title = readSlotTitle(item as { title?: unknown });
       const hint = readSlotHint(item as { hint?: unknown });
       out.push({
@@ -193,6 +195,10 @@ export function applyWordPhotoSlots(
   return [...nextWords, ...kept].slice(0, MAX_COMPLETION_REQUIREMENTS);
 }
 
+export function kindSkipsExample(kind: CompletionKind): boolean {
+  return kind === "audio" || kind === "message";
+}
+
 export function addRequirement(
   list: CompletionRequirement[],
   kind: CompletionKind,
@@ -264,7 +270,7 @@ export function setRequirementExample(
   pending_example: File | null,
 ): CompletionRequirement[] {
   return list.map((item, i) =>
-    i === index && item.kind !== "audio" ? { ...item, example_url, pending_example } : item,
+    i === index && !kindSkipsExample(item.kind) ? { ...item, example_url, pending_example } : item,
   );
 }
 
@@ -284,7 +290,7 @@ export function toApiRequirement(item: CompletionRequirement): CompletionRequire
   if (title) next.title = title;
   const hint = (item.hint || "").trim().slice(0, MAX_SLOT_HINT);
   if (hint) next.hint = hint;
-  if (item.kind === "audio") return next;
+  if (kindSkipsExample(item.kind)) return next;
   const url = (item.example_url || "").trim();
   if (url && !url.startsWith("blob:")) next.example_url = url;
   return next;
@@ -297,7 +303,7 @@ export async function resolveRequirementExamples(
   const out: CompletionRequirement[] = [];
   for (const item of list) {
     const next = toApiRequirement(item);
-    if (item.kind !== "audio" && item.pending_example) {
+    if (!kindSkipsExample(item.kind) && item.pending_example) {
       next.example_url = (await uploadPhoto(item.pending_example)).url;
     }
     out.push(next);

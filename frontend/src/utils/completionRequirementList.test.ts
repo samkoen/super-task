@@ -17,6 +17,7 @@ describe("completionRequirementList", () => {
       `עגבניה: ${he.completionReqVideo}`,
     );
     expect(requirementKindLabel("audio")).toBe(he.completionReqAudio);
+    expect(requirementKindLabel("message")).toBe(he.completionReqMessage);
   });
 
   it("uses untitled when the slot has no name", () => {

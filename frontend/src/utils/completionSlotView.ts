@@ -4,6 +4,7 @@ import type { CompletionAttachment, CompletionRequirement } from "./completionMe
 
 export type SlotFill = {
   url?: string | null;
+  text?: string | null;
   previewUrl?: string | null;
   posterUrl?: string | null;
   pending?: boolean;
@@ -21,7 +22,12 @@ export function slotDisplayTitle(req: CompletionRequirement, index: number): str
   if (req.kind === "video") {
     return `${he.completionRequirementN(index + 1)} · ${he.completionSlotVideoMin(req.min_seconds ?? 10)}`;
   }
-  const kindLabel = req.kind === "audio" ? he.completionSlotAudio : he.completionSlotPhoto;
+  const kindLabel =
+    req.kind === "audio"
+      ? he.completionSlotAudio
+      : req.kind === "message"
+        ? he.completionSlotMessage
+        : he.completionSlotPhoto;
   return `${he.completionRequirementN(index + 1)} · ${kindLabel}`;
 }
 
@@ -60,11 +66,18 @@ function toSlotFill(
 ): SlotFill {
   return {
     url: item.url,
+    text: item.text,
     kind: item.kind,
     posterUrl: item.poster_url,
     durationSeconds: item.duration_seconds,
     pending: req.kind === "video" && Boolean(opts?.videosPending),
   };
+}
+
+function attachmentMatchesSlot(req: CompletionRequirement, item: CompletionAttachment): boolean {
+  if (item.kind !== req.kind) return false;
+  if (req.kind === "message") return Boolean((item.text || "").trim());
+  return Boolean(item.url);
 }
 
 function pickAttachmentIndex(
@@ -74,8 +87,8 @@ function pickAttachmentIndex(
   index: number,
 ): number {
   const direct = items[index];
-  if (direct?.url && direct.kind === req.kind && !used.has(index)) return index;
-  return items.findIndex((item, i) => !used.has(i) && item.kind === req.kind && Boolean(item.url));
+  if (direct && attachmentMatchesSlot(req, direct) && !used.has(index)) return index;
+  return items.findIndex((item, i) => !used.has(i) && attachmentMatchesSlot(req, item));
 }
 
 /** Associe chaque case à un fichier, même si l’ordre des attachments diffère. */
@@ -92,7 +105,7 @@ export function mapAttachmentsToSlots(
     used.add(pick);
     return toSlotFill(items[pick], req, opts);
   });
-  return { fills, leftover: items.filter((item, i) => !used.has(i) && Boolean(item.url)) };
+  return { fills, leftover: items.filter((item, i) => !used.has(i) && item.kind !== "message" && Boolean(item.url)) };
 }
 
 export function fillsFromAttachments(
@@ -108,11 +121,11 @@ export function filledVisualCount(
   fills: Array<SlotFill | null | undefined>,
 ): number {
   return requirements.reduce((count, req, index) => {
-    if (req.kind === "audio") return count;
+    if (req.kind !== "photo" && req.kind !== "video") return count;
     return slotFillSrc(fills[index] ?? null) ? count + 1 : count;
   }, 0);
 }
 
 export function visualSlotCount(requirements: CompletionRequirement[]): number {
-  return requirements.filter((req) => req.kind !== "audio").length;
+  return requirements.filter((req) => req.kind === "photo" || req.kind === "video").length;
 }

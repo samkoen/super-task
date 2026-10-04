@@ -113,6 +113,14 @@ describe("completionMedia", () => {
     ]);
   });
 
+  it("keeps title and hint on a message and drops the example", () => {
+    expect(
+      normalizeRequirements([
+        { kind: "message", title: "ספירה", hint: "כתבו", example_url: "/x.jpg" },
+      ]),
+    ).toEqual([{ kind: "message", title: "ספירה", hint: "כתבו" }]);
+  });
+
   it("keeps spaces while typing a slot title or hint", () => {
     const withSpace = setRequirementTitle([{ kind: "photo" }], 0, "מדף ");
     expect(withSpace[0].title).toBe("מדף ");

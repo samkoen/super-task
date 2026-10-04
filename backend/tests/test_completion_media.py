@@ -1,5 +1,6 @@
 from app.domain.completion_media import (
     COMPLETION_VIDEOS_NOT_READY,
+    attachment_is_filled,
     attachment_urls,
     assert_attachments_match,
     assert_completion_media,
@@ -361,6 +362,34 @@ def test_too_many_optional_extras_are_rejected():
     extras = [{"kind": "photo", "url": f"/e{i}.jpg"} for i in range(7)]
     with pytest.raises(ValueError, match="6"):
         assert_attachments_match(reqs, [{"kind": "photo", "url": "/p.jpg"}, *extras])
+
+
+def test_message_requirement_keeps_title_and_hint_only():
+    assert normalize_requirements(
+        [{"kind": "message", "title": "ספירה", "hint": "כתבו", "example_url": "/x.jpg"}]
+    ) == [{"kind": "message", "title": "ספירה", "hint": "כתבו"}]
+
+
+def test_message_without_text_is_rejected():
+    reqs = normalize_requirements([{"kind": "message"}])
+    with pytest.raises(ValueError, match="הודעה"):
+        assert_attachments_match(reqs, [{"kind": "message", "text": "  "}])
+
+
+def test_message_alone_closes_without_media():
+    reqs = normalize_requirements([{"kind": "message"}])
+    assert_attachments_match(reqs, [{"kind": "message", "text": "שלום"}])
+
+
+def test_message_text_too_long_is_rejected():
+    with pytest.raises(ValueError, match="ארוכה"):
+        normalize_attachments([{"kind": "message", "text": "א" * 501}])
+
+
+def test_filled_message_has_text_not_a_url():
+    assert attachment_is_filled({"kind": "message", "text": "1"}) is True
+    assert attachment_is_filled({"kind": "message", "text": " "}) is False
+    assert attachment_is_filled({"kind": "photo", "url": ""}) is False
 
 
 def test_normalize_drops_invalid_poster_url():

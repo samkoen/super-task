@@ -35,6 +35,7 @@ interface CompletionMediaPreviewProps {
 function kindLabel(kind: string): string {
   if (kind === "video") return he.taskReferenceVideo;
   if (kind === "audio") return he.taskReferenceAudio;
+  if (kind === "message") return he.completionReqMessage;
   return he.taskReferencePhoto;
 }
 
@@ -65,6 +66,7 @@ export default function CompletionMediaPreview({
   const reqs = normalizeRequirements(requirements);
   const hasVisualGuides = visualSlotCount(reqs) > 0;
   const mapped = mapAttachmentsToSlots(reqs, items, { videosPending });
+  const looseMessages = hasVisualGuides ? [] : messageTexts(items);
   const hasAudio = items.some((item) => item.kind === "audio") || reqs.some((r) => r.kind === "audio");
   const resolvedTranscript = displayedAudioTranscript(
     viewer === "employee"
@@ -72,7 +74,7 @@ export default function CompletionMediaPreview({
       : audio_transcript,
     { hasAudio, allowFallback: transcriptFallback },
   );
-  if (!items.length && !resolvedTranscript && !hasVisualGuides) return null;
+  if (!items.length && !resolvedTranscript && !hasVisualGuides && !looseMessages.length) return null;
   const leftover = hasVisualGuides ? mapped.leftover : [];
 
   return (
@@ -116,7 +118,31 @@ export default function CompletionMediaPreview({
           <Typography variant="body2">{resolvedTranscript}</Typography>
         </Box>
       )}
+      <MessageTexts texts={looseMessages} />
     </Box>
+  );
+}
+
+function messageTexts(items: CompletionAttachment[]): string[] {
+  return items
+    .filter((item) => item.kind === "message")
+    .map((item) => (item.text || "").trim())
+    .filter(Boolean);
+}
+
+function MessageTexts({ texts }: { texts: string[] }) {
+  if (!texts.length) return null;
+  return (
+    <>
+      {texts.map((text, index) => (
+        <Box key={`message-${index}`} sx={{ p: 1.25, bgcolor: "action.hover", borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+            {he.completionReqMessage}
+          </Typography>
+          <Typography variant="body2">{text}</Typography>
+        </Box>
+      ))}
+    </>
   );
 }
 
@@ -195,7 +221,9 @@ function LeftoverMediaItem({
         <MarkCompletionPhotoButton
           marked={marked}
           disabled={disabled}
-          onClick={() => onMarkPhoto(item.url)}
+          onClick={() => {
+            if (item.url) onMarkPhoto(item.url);
+          }}
         />
       ) : null}
       {onRemove && (

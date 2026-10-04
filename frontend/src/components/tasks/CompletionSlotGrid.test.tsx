@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import { he } from "../../i18n/he";
 
@@ -45,5 +45,22 @@ describe("CompletionSlotGrid audio hints", () => {
   it("hides hint controls when audio has no title or hint", () => {
     render(<CompletionSlotGrid requirements={[{ kind: "audio" }]} fills={[null]} />);
     expect(screen.queryByLabelText(he.completionShowHint)).toBeNull();
+  });
+
+  it("lets the employee type a message without a file", () => {
+    const onMessage = vi.fn();
+    render(
+      <CompletionSlotGrid
+        requirements={[{ kind: "message" }]}
+        fills={[{ kind: "message", text: "" }]}
+        interactive
+        onMessage={onMessage}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(he.completionReqMessage), {
+      target: { value: "שלום" },
+    });
+    expect(onMessage).toHaveBeenCalledWith(0, "שלום");
+    expect(screen.queryByText("capture")).toBeNull();
   });
 });

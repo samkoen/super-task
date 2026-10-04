@@ -14,9 +14,9 @@ export function completionPhotoUrls(completion: {
   video_path?: string | null;
   audio_path?: string | null;
 } | null | undefined): string[] {
-  return attachmentsFromCompletion(completion)
-    .filter((item) => item.kind === "photo" && item.url)
-    .map((item) => item.url);
+  return attachmentsFromCompletion(completion).flatMap((item) =>
+    item.kind === "photo" && item.url ? [item.url] : [],
+  );
 }
 
 export function upsertReviewPhotoMark(

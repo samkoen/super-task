@@ -96,4 +96,12 @@ describe("completionSlotView", () => {
     expect(mapped.fills.map((item) => item?.url)).toEqual(["/p.jpg", "/v.mp4"]);
     expect(mapped.leftover).toEqual([{ kind: "audio", url: "/a.webm" }]);
   });
+
+  it("maps a message by its text", () => {
+    const mapped = mapAttachmentsToSlots([{ kind: "message" }], [
+      { kind: "message", text: "שלום" },
+    ]);
+    expect(mapped.fills[0]?.text).toBe("שלום");
+    expect(mapped.leftover).toEqual([]);
+  });
 });
