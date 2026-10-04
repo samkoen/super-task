@@ -81,10 +81,13 @@ export function normalizeFixedRecurrence(value: string | null | undefined): Task
 
 export function weeklyDaysPayload(
   recurrence: string,
-  weeklyDays: string,
+  weeklyDays: unknown,
 ): string | undefined {
   if (!usesWeeklyDays(recurrence)) return undefined;
-  return weeklyDays.trim() || undefined;
+  const days = parseWeeklyDays(weeklyDays);
+  if (!days.length) return undefined;
+  if (recurrence === "weekly") return days[0];
+  return joinWeeklyDays(days);
 }
 
 export function formatWeekdaysPart(weeklyDays: unknown): string {

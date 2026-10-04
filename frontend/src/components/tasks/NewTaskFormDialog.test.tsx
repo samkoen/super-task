@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import NewTaskFormDialog from "./NewTaskFormDialog";
 import { he } from "../../i18n/he";
+import {
+  clearFixedTaskCreateDraft,
+  writeFixedTaskCreateForm,
+} from "../../utils/fixedTaskScreenDraft";
 
 vi.mock("./TaskReferenceMediaEditor", () => ({
   default: () => <div data-testid="media-editor" />,
@@ -76,6 +80,41 @@ describe("NewTaskFormDialog", () => {
       .filter((btn) => btn.getAttribute("aria-pressed") === "true");
     expect(pressed).toHaveLength(1);
     expect(screen.queryByLabelText(he.weekday)).toBeNull();
+  });
+
+  it("submits weekly fixed task with mandatory audio on one weekday", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        branches={[{ id: "b1", name: "סניף", network_id: "n1" } as never]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        defaultAssigneeId="u1"
+        forcedTaskKind="fixed"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "ספירה" } });
+    fireEvent.mouseDown(screen.getByLabelText(he.recurrence));
+    fireEvent.click(screen.getByRole("option", { name: he.recurrenceLabels.weekly }));
+    fireEvent.click(
+      within(screen.getByLabelText(he.weekdays)).getByRole("button", { name: he.weekdayMon }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.completionAddAudioReq }));
+    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        recurrence: "weekly",
+        weekly_days: "0",
+        completion_requirements: [expect.objectContaining({ kind: "audio" })],
+      }),
+    );
   });
 
   it("offers gallery as assignee and enables submit without due date", () => {
@@ -267,6 +306,57 @@ describe("NewTaskFormDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: he.submit }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0].start_url).toBe(url);
+  });
+
+  it("restores example photos after leaving the fixed-tasks screen", () => {
+    const key = "fixed-tasks-draft-test";
+    clearFixedTaskCreateDraft(key);
+    const file = new File(["img"], "example.jpg", { type: "image/jpeg" });
+    writeFixedTaskCreateForm(key, {
+      taskKind: "fixed",
+      branchId: "b1",
+      title: "ששש",
+      description: "תיאור",
+      assigneeUserId: "u1",
+      dueAt: "",
+      recurrence: "weekly",
+      dueTime: "09:00",
+      weeklyDays: "2",
+      monthlyDay: 1,
+      opsCategory: "",
+      selectedBranchIds: ["b1"],
+      completionRequirements: [
+        { kind: "photo", title: "מדף", example_url: "blob:http://localhost/ex", pending_example: file },
+      ],
+      isWorkStart: false,
+      isWorkEnd: false,
+      startUrl: "",
+      media: { reference_photo_url: "", reference_video_url: "", reference_audio_url: "" },
+    });
+    const props = {
+      open: true,
+      onClose: vi.fn(),
+      onSubmit: vi.fn(),
+      branches: [{ id: "b1", name: "סניף", network_id: "n1" } as never],
+      employees: [{ id: "u1", full_name: "עובד", branch_id: "b1" } as never],
+      isBranchManager: true,
+      canPickBranch: false,
+      defaultBranchId: "b1",
+      defaultDueAt: "2026-07-20T10:00",
+      defaultAssigneeId: "u1",
+      forcedTaskKind: "fixed" as const,
+      rememberKey: key,
+    };
+    const { unmount } = render(<NewTaskFormDialog {...props} />);
+    expect((screen.getByLabelText(he.taskTitle) as HTMLInputElement).value).toBe("ששש");
+    fireEvent.click(screen.getByRole("button", { name: "מדף: תמונה" }));
+    expect(screen.getByAltText("מדף").getAttribute("src")).toBe("blob:http://localhost/ex");
+    unmount();
+    render(<NewTaskFormDialog {...props} />);
+    expect((screen.getByLabelText(he.taskTitle) as HTMLInputElement).value).toBe("ששש");
+    fireEvent.click(screen.getByRole("button", { name: "מדף: תמונה" }));
+    expect(screen.getByAltText("מדף").getAttribute("src")).toBe("blob:http://localhost/ex");
+    clearFixedTaskCreateDraft(key);
   });
 
   it("does not crash when closed with missing employee or branch lists", () => {

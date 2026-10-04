@@ -106,8 +106,7 @@ class TaskTemplateService:
             raise ValueError("משימה קבועה דורשת חזרה יומית/שבועית/חודשית")
         if not assignee_user_id:
             raise ValueError("נדרש שיוך לעובד למשימה קבועה")
-        if recurrence == task_recurrence.WEEKLY and not (weekly_days or "").strip():
-            raise ValueError("נדרש יום בשבוע למשימה שבועית")
+        weekly_days = task_recurrence.stored_weekly_days(recurrence, weekly_days)
         parsed_monthly_day: int | None = None
         if recurrence == task_recurrence.MONTHLY:
             raw_day = monthly_day if monthly_day is not None else 1

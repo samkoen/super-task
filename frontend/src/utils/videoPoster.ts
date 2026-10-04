@@ -36,6 +36,25 @@ export async function captureVideoPoster(src: string): Promise<string | null> {
 }
 
 function frameToJpeg(video: HTMLVideoElement): string | null {
+  const canvas = drawVideoFrame(video);
+  if (!canvas) return null;
+  try {
+    return canvas.toDataURL("image/jpeg", 0.7);
+  } catch {
+    return null;
+  }
+}
+
+export function capturePausedVideoFrame(video: HTMLVideoElement): Promise<Blob | null> {
+  video.pause();
+  const canvas = drawVideoFrame(video);
+  if (!canvas) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.85);
+  });
+}
+
+function drawVideoFrame(video: HTMLVideoElement): HTMLCanvasElement | null {
   const width = video.videoWidth;
   const height = video.videoHeight;
   if (!width || !height) return null;
@@ -44,10 +63,10 @@ function frameToJpeg(video: HTMLVideoElement): string | null {
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.drawImage(video, 0, 0);
   try {
-    return canvas.toDataURL("image/jpeg", 0.7);
+    ctx.drawImage(video, 0, 0);
   } catch {
     return null;
   }
+  return canvas;
 }

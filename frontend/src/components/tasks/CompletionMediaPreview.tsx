@@ -2,6 +2,7 @@ import { Box, Button, Typography } from "@mui/material";
 import CompactAudioPlayer from "../media/CompactAudioPlayer";
 import CompletionSlotGrid from "./CompletionSlotGrid";
 import MarkCompletionPhotoButton from "./MarkCompletionPhotoButton";
+import { ReviewableVideo } from "./MarkVideoFrameButton";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { displayedAudioTranscript } from "../../utils/displayedAudioTranscript";
@@ -216,7 +217,13 @@ function LeftoverMediaItem({
       <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
         {kindLabel(item.kind)}
       </Typography>
-      <LeftoverMediaBody item={item} src={resolved.src} posterSrc={poster.src} videosPending={videosPending} />
+      <LeftoverMediaBody
+        item={item}
+        src={resolved.src}
+        posterSrc={poster.src}
+        videosPending={videosPending}
+        onMarkFrame={onMarkPhoto}
+      />
       {item.kind === "photo" && onMarkPhoto && item.url ? (
         <MarkCompletionPhotoButton
           marked={marked}
@@ -252,11 +259,13 @@ function LeftoverMediaBody({
   src,
   posterSrc,
   videosPending,
+  onMarkFrame,
 }: {
   item: CompletionAttachment;
   src: string;
   posterSrc: string | null;
   videosPending: boolean;
+  onMarkFrame?: (frameUrl: string) => void;
 }) {
   if (item.kind === "photo") {
     return (
@@ -288,14 +297,7 @@ function LeftoverMediaBody({
     );
   }
   if (item.kind === "video") {
-    return (
-      <Box
-        component="video"
-        src={src}
-        controls
-        sx={{ maxWidth: "100%", maxHeight: 200, borderRadius: 1, display: "block" }}
-      />
-    );
+    return <ReviewableVideo src={src} onMarkFrame={onMarkFrame} maxHeight={200} />;
   }
   return <CompactAudioPlayer src={src} />;
 }

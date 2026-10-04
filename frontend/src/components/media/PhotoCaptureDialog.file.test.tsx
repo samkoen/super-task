@@ -10,13 +10,14 @@ function camera(): ReturnType<typeof useCameraStream> {
     active: false,
     starting: false,
     error: "",
+    stream: null,
     facing: "environment",
     onVideoRef: () => undefined,
-    start: async () => undefined,
-    flip: () => undefined,
+    start: async () => "ready",
+    flip: async () => undefined,
     stop: () => undefined,
     videoRef: { current: null },
-  } as ReturnType<typeof useCameraStream>;
+  };
 }
 
 describe("new task photo step file pick", () => {

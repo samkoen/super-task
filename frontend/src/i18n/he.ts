@@ -650,6 +650,9 @@ export const he = {
   reviewMarkPhoto: "סמן מה לתקן",
   reviewPhotoMarked: "סומן לתיקון",
   reviewMarkPhotoSave: "שמירה לתיקון",
+  reviewMarkVideoFrame: "סמן בעיגול את הרגע",
+  reviewMarkVideoHint: "עצרו את הסרטון, סמנו בעיגול מה לשיפור, ושמרו. הסימון יישלח לעובד בפתיחה מחדש.",
+  reviewMarkVideoFailed: "עצרו את הסרטון על הפריים שרוצים לסמן",
   reviewMarkedPhotoCount: (n: number) =>
     n === 1
       ? "תמונה אחת תישלח בצ׳אט בלחיצה על פתיחה מחדש"

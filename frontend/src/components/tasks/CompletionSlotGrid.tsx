@@ -79,6 +79,7 @@ export default function CompletionSlotGrid({
         title={preview?.title ?? ""}
         kind={preview?.kind}
         onClose={() => setPreview(null)}
+        onMarkFrame={onMarkPhoto ? (frameUrl) => markVideoFrame(frameUrl, setPreview, onMarkPhoto) : undefined}
       />
       {hints.dialog && (
         <CompletionHintDialog
@@ -89,6 +90,15 @@ export default function CompletionSlotGrid({
       )}
     </Box>
   );
+}
+
+function markVideoFrame(
+  frameUrl: string,
+  setPreview: (value: null) => void,
+  onMarkPhoto: (url: string) => void,
+) {
+  setPreview(null);
+  onMarkPhoto(frameUrl);
 }
 
 function NonVisualSlots({

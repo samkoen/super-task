@@ -5,6 +5,11 @@ import { he } from "../../i18n/he";
 import { taskService } from "../../services/taskService";
 import { userService } from "../../services/userService";
 import { ApiError } from "../../services/api";
+import {
+  MANAGER_FIXED_TASKS_DRAFT_KEY,
+  clearFixedTaskCreateDraft,
+  writeFixedTaskCreateForm,
+} from "../../utils/fixedTaskScreenDraft";
 
 const { showError, showSuccess } = vi.hoisted(() => ({
   showError: vi.fn(),
@@ -39,7 +44,8 @@ vi.mock("../../services/branchService", () => ({
 }));
 
 vi.mock("../../components/tasks/NewTaskFormDialog", () => ({
-  default: () => null,
+  default: (props: { rememberKey?: string }) =>
+    props.rememberKey ? <div data-testid="fixed-task-create-restored" /> : null,
 }));
 
 vi.mock("../../components/tasks/TaskReferenceMediaEditor", () => ({
@@ -53,6 +59,7 @@ vi.mock("../../components/tasks/CompletionRequirementsEditor", () => ({
 
 describe("ManagerFixedTasksPage", () => {
   beforeEach(() => {
+    clearFixedTaskCreateDraft(MANAGER_FIXED_TASKS_DRAFT_KEY);
     vi.mocked(userService.listTeam).mockResolvedValue([]);
   });
 
@@ -115,6 +122,35 @@ describe("ManagerFixedTasksPage", () => {
     render(<ManagerFixedTasksPage />);
     await waitFor(() => expect(screen.getByRole("heading", { name: he.managerFixedTasks })).toBeTruthy());
     expect(screen.queryByText(he.pageCrashTitle)).toBeNull();
+  });
+
+  it("reopens the create form after leaving the screen", async () => {
+    const file = new File(["img"], "example.jpg", { type: "image/jpeg" });
+    writeFixedTaskCreateForm(MANAGER_FIXED_TASKS_DRAFT_KEY, {
+      taskKind: "fixed",
+      branchId: "b1",
+      title: "ששש",
+      description: "",
+      assigneeUserId: "u1",
+      dueAt: "",
+      recurrence: "weekly",
+      dueTime: "09:00",
+      weeklyDays: "2",
+      monthlyDay: 1,
+      opsCategory: "",
+      selectedBranchIds: ["b1"],
+      completionRequirements: [
+        { kind: "photo", title: "מדף", example_url: "blob:ex", pending_example: file },
+      ],
+      isWorkStart: false,
+      isWorkEnd: false,
+      startUrl: "",
+      media: { reference_photo_url: "", reference_video_url: "", reference_audio_url: "" },
+    });
+    vi.mocked(taskService.listTemplates).mockResolvedValue([]);
+    render(<ManagerFixedTasksPage />);
+    expect(screen.getByTestId("fixed-task-create-restored")).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("heading", { name: he.managerFixedTasks })).toBeTruthy());
   });
 
   it("shows an error instead of a blank page when loading fails", async () => {
