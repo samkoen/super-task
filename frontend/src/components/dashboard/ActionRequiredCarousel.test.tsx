@@ -34,9 +34,11 @@ describe("ActionRequiredCarousel", () => {
     );
     expect(screen.getByText(he.dashboardReviewRow)).toBeTruthy();
     expect(screen.getByText("ניקוי מדף")).toBeTruthy();
-    fireEvent.click(screen.getByText("ניקוי מדף"));
+    const title = screen.getByText("ניקוי מדף");
+    expect(title.closest("button")?.getAttribute("aria-label")).toBe(`${he.taskReviewAction}: ניקוי מדף`);
+    fireEvent.click(title);
     expect(onReview).toHaveBeenCalledWith("pr1");
-    fireEvent.click(screen.getByRole("button", { name: `${he.taskReviewAction}: ניקוי מדף` }));
+    fireEvent.click(screen.getByText(he.taskReviewAction));
     expect(onReview).toHaveBeenCalledTimes(2);
   });
 
