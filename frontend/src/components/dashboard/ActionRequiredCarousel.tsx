@@ -1,6 +1,6 @@
 import { Box, Button, Chip, Paper, Typography, alpha } from "@mui/material";
-import RateReviewIcon from "@mui/icons-material/RateReview";
 import type { TaskQueues } from "../../services/dashboardService";
+import { taskSquareClickProps } from "../tasks/taskSquareClick";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { formatTime } from "../../utils/dashboardTime";
@@ -76,6 +76,15 @@ export default function ActionRequiredCarousel({
   );
 }
 
+function reviewSquareOpen(
+  reason: ActionQueueItem["reason"],
+  taskId: string,
+  onReviewTask?: (taskId: string) => void,
+) {
+  if (reason !== "pending_review" || !onReviewTask) return null;
+  return () => onReviewTask(taskId);
+}
+
 function ActionQueueCard({
   item,
   onReviewTask,
@@ -87,9 +96,14 @@ function ActionQueueCard({
 }) {
   const { task, reason } = item;
   const border = BORDER[reason];
+  const openReview = reviewSquareOpen(reason, task.id, onReviewTask);
+  const openProps = openReview
+    ? taskSquareClickProps(`${he.taskReviewAction}: ${task.title}`, openReview)
+    : {};
   return (
     <Paper
       variant="outlined"
+      {...openProps}
       sx={{
         minWidth: 110,
         maxWidth: 130,
@@ -100,6 +114,9 @@ function ActionQueueCard({
         borderWidth: 2,
         borderColor: border,
         bgcolor: alpha(border, 0.04),
+        cursor: openReview ? "pointer" : undefined,
+        textAlign: "start",
+        "&:hover": openReview ? { bgcolor: alpha(border, 0.1) } : undefined,
       }}
     >
             <Box display="flex" gap={0.5} flexWrap="wrap" mb={0.5}>
@@ -133,24 +150,10 @@ function ActionQueueCard({
                 .filter(Boolean)
                 .join(" · ")}
             </Typography>
-            {reason === "pending_review" && onReviewTask && (
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={<RateReviewIcon />}
-                onClick={() => onReviewTask(task.id)}
-                sx={{
-                  bgcolor: border,
-                  "&:hover": { bgcolor: border },
-                  minWidth: 0,
-                  px: 0.75,
-                  py: 0.15,
-                  fontSize: 11,
-                  "& .MuiButton-startIcon": { marginInlineEnd: 4 },
-                }}
-              >
+            {openReview && (
+              <Typography variant="caption" fontWeight={800} sx={{ color: border }}>
                 {he.taskReviewAction}
-              </Button>
+              </Typography>
             )}
             {reason === "awaiting_response" && (onOpenChat || onReviewTask) && (
               <Button
