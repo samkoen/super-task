@@ -153,5 +153,9 @@ describe("ManagerDashboardPage", () => {
       expect(dashboardService.getManager).toHaveBeenCalledWith(undefined, shiftDay(todayIso(), 1)),
     );
     expect(screen.getByText(formatHebrewDay(shiftDay(todayIso(), 1)))).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.tasksPreviousDay }));
+    await waitFor(() =>
+      expect(dashboardService.getManager).toHaveBeenCalledWith(undefined, todayIso()),
+    );
   });
 });
