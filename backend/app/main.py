@@ -50,6 +50,7 @@ from app.core.config import (
 )
 from app.db.auto_migrate import run_startup_migrations
 from app.realtime.sse_hub import sse_hub
+from app.spa import mount_frontend
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,10 @@ def create_app() -> FastAPI:
     app.include_router(ai_controller.router, prefix="/api/ai", tags=["ai"])
     app.include_router(cron_controller.router, prefix="/api/cron", tags=["cron"])
     app.include_router(media_controller.router, prefix="/api/media", tags=["media"])
+
+    # HTML et /api sur le même hôte : cookie de session first-party pour Safari iOS.
+    # Sans frontend/dist, rien n'est monté (dev Vite, tests). L'APK ne passe pas par ici.
+    mount_frontend(app)
 
     return app
 
