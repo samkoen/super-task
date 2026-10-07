@@ -19,6 +19,7 @@ import type { User } from "../../services/api";
 import type { Branch } from "../../services/branchService";
 import { asList } from "../../utils/asList";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
+import DeliveryTaskTypeField from "./DeliveryTaskTypeField";
 import BranchChecklist from "./BranchChecklist";
 import TaskReferenceMediaEditor, {
   type TaskReferenceMediaValue,
@@ -40,6 +41,7 @@ import {
   weekdaysOnRecurrenceChange,
 } from "../../utils/taskRecurrence";
 import { startUrlFieldError } from "../../utils/startUrl";
+import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
 import {
   readFixedTaskCreateForm,
   writeFixedTaskCreateForm,
@@ -74,6 +76,8 @@ export interface NewTaskFormSubmitPayload {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  opened_by_delivery_note?: boolean;
+  delivery_note_task_type?: string | null;
 }
 
 export interface NewTaskFormDialogProps {
@@ -147,6 +151,12 @@ export default function NewTaskFormDialog({
   const [isWorkStart, setIsWorkStart] = useState(remembered?.isWorkStart ?? false);
   const [isWorkEnd, setIsWorkEnd] = useState(remembered?.isWorkEnd ?? false);
   const [startUrl, setStartUrl] = useState(remembered?.startUrl ?? "");
+  const [openedByDeliveryNote, setOpenedByDeliveryNote] = useState(
+    remembered?.openedByDeliveryNote ?? false,
+  );
+  const [deliveryNoteTaskType, setDeliveryNoteTaskType] = useState(
+    remembered?.deliveryNoteTaskType ?? DELIVERY_TASK_LINE_CHECK,
+  );
   const [media, setMedia] = useState<TaskReferenceMediaValue>(remembered?.media ?? EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
   const wasOpenRef = useRef(false);
@@ -174,6 +184,8 @@ export default function NewTaskFormDialog({
     setIsWorkStart(false);
     setIsWorkEnd(false);
     setStartUrl("");
+    setOpenedByDeliveryNote(false);
+    setDeliveryNoteTaskType(DELIVERY_TASK_LINE_CHECK);
     setMedia(initialMedia ?? EMPTY_MEDIA);
     setLocalError("");
     // Snapshot à l'ouverture seulement
@@ -200,6 +212,8 @@ export default function NewTaskFormDialog({
       isWorkEnd,
       startUrl,
       media,
+      openedByDeliveryNote,
+      deliveryNoteTaskType,
     };
     writeFixedTaskCreateForm(rememberKey, draft);
   }, [
@@ -222,6 +236,8 @@ export default function NewTaskFormDialog({
     isWorkEnd,
     startUrl,
     media,
+    openedByDeliveryNote,
+    deliveryNoteTaskType,
   ]);
 
   const allBranchIds = useMemo(() => branches.map((b) => b.id), [branches]);
@@ -286,6 +302,11 @@ export default function NewTaskFormDialog({
       setLocalError(he.fixedTaskSelectBranchesRequired);
       return;
     }
+    const openedByNote = taskKind === "fixed" && openedByDeliveryNote;
+    const deliveryNote = {
+      opened_by_delivery_note: openedByNote,
+      delivery_note_task_type: openedByNote ? deliveryNoteTaskType : null,
+    };
     if (groupedCreate) {
       if (taskKind === "ad_hoc" && !dueAt) {
         return;
@@ -309,6 +330,7 @@ export default function NewTaskFormDialog({
         is_work_start: isWorkStart,
         is_work_end: isWorkEnd,
         start_url: startUrl.trim() || null,
+        ...deliveryNote,
         media,
       });
       return;
@@ -342,6 +364,7 @@ export default function NewTaskFormDialog({
       is_work_start: taskKind === "fixed" ? isWorkStart : false,
       is_work_end: taskKind === "fixed" ? isWorkEnd : false,
       start_url: startUrl.trim() || null,
+      ...deliveryNote,
       media,
     });
   };
@@ -361,6 +384,29 @@ export default function NewTaskFormDialog({
           : he.newTask}
       </DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        {taskKind === "fixed" && (
+          <>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={openedByDeliveryNote}
+                  onChange={(event) => setOpenedByDeliveryNote(event.target.checked)}
+                  disabled={saving}
+                />
+              }
+              label={he.deliveryNoteOpenModel}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {he.deliveryNoteOpenModelHint}
+            </Typography>
+            {openedByDeliveryNote ? (
+              <DeliveryTaskTypeField
+                value={deliveryNoteTaskType}
+                onChange={setDeliveryNoteTaskType}
+              />
+            ) : null}
+          </>
+        )}
         {!forcedTaskKind && (
           <Box>
             <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>

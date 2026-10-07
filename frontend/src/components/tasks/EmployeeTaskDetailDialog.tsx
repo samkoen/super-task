@@ -10,6 +10,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import DeliveryLineCheck from "./DeliveryLineCheck";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionRequirementSlots from "./CompletionRequirementSlots";
@@ -123,6 +124,7 @@ export default function EmployeeTaskDetailDialog({
             {task.description}
           </Typography>
         ) : null}
+        <DeliveryLineCheck occurrenceId={task.id} disabled={!canDoTask(task.status)} />
         <StartUrlButton url={task.start_url} fullWidth />
         <TaskRejectionRemark completion={task.completion} />
         <TaskDetailChatAndMedia

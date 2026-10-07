@@ -33,6 +33,10 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import { ApiError } from "../../services/api";
 import type { User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
+import AgrolineConnectionCard from "../../components/tasks/AgrolineConnectionCard";
+import DeliveryTaskTypeField from "../../components/tasks/DeliveryTaskTypeField";
+import { deliveryNoteService } from "../../services/deliveryNoteService";
+import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
 import {
   taskService,
   type OpsCategory,
@@ -131,6 +135,7 @@ export default function ManagerFixedTasksPage() {
       },
   );
   const [saving, setSaving] = useState(false);
+  const [agrolineCustomer, setAgrolineCustomer] = useState("");
   const [deleting, setDeleting] = useState<TaskTemplate | null>(null);
   const [deleteAllBranches, setDeleteAllBranches] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
@@ -225,6 +230,8 @@ export default function ManagerFixedTasksPage() {
         is_work_start: payload.is_work_start,
         is_work_end: payload.is_work_end,
         start_url: payload.start_url,
+        opened_by_delivery_note: payload.opened_by_delivery_note,
+        delivery_note_task_type: payload.delivery_note_task_type,
         ...media,
       });
       setCreateOpen(false);
@@ -330,6 +337,36 @@ export default function ManagerFixedTasksPage() {
     }
   };
 
+  const markOpenedByDeliveryNote = async (opened: boolean, taskType?: string) => {
+    if (!editing) return;
+    const type = opened ? taskType || editing.delivery_note_task_type || DELIVERY_TASK_LINE_CHECK : null;
+    try {
+      const saved = await deliveryNoteService.markTemplate(editing.id, opened, type);
+      setEditing({
+        ...editing,
+        opened_by_delivery_note: saved.opened_by_delivery_note,
+        delivery_note_task_type: saved.delivery_note_task_type,
+      });
+      showSuccess(he.deliveryNoteModelSaved);
+      await load();
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
+  const linkAgrolineCustomer = async () => {
+    const name = agrolineCustomer.trim();
+    if (!editing || !name) return;
+    try {
+      const linked = await deliveryNoteService.linkCustomer(name, editing.branch_id);
+      const opened = linked.opened_occurrence_ids?.length ?? 0;
+      showSuccess(opened ? `${he.deliveryNoteCustomerLinked} (${opened})` : he.deliveryNoteCustomerLinked);
+      setAgrolineCustomer("");
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+    }
+  };
+
   const handleToggleActive = async (tpl: TaskTemplate) => {
     try {
       await taskService.updateTemplate(tpl.id, {
@@ -373,6 +410,8 @@ export default function ManagerFixedTasksPage() {
           </Button>
         }
       />
+
+      <AgrolineConnectionCard />
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
         <Box display="flex" gap={1.5} flexWrap="wrap" alignItems="center">
@@ -523,6 +562,35 @@ export default function ManagerFixedTasksPage() {
             <Typography variant="body2" color="text.secondary">
               {formatTemplateSchedule(editing)}
             </Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={Boolean(editing.opened_by_delivery_note)}
+                  onChange={(e) => void markOpenedByDeliveryNote(e.target.checked)}
+                />
+              }
+              label={he.deliveryNoteOpenModel}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {he.deliveryNoteOpenModelHint}
+            </Typography>
+            {editing.opened_by_delivery_note ? (
+              <DeliveryTaskTypeField
+                value={editing.delivery_note_task_type}
+                onChange={(taskType) => void markOpenedByDeliveryNote(true, taskType)}
+              />
+            ) : null}
+            <Box display="flex" gap={1} alignItems="center">
+              <TextField
+                label={he.deliveryNoteCustomer}
+                value={agrolineCustomer}
+                onChange={(e) => setAgrolineCustomer(e.target.value)}
+                fullWidth
+              />
+              <Button onClick={() => void linkAgrolineCustomer()} disabled={!agrolineCustomer.trim()}>
+                {he.deliveryNoteLinkCustomer}
+              </Button>
+            </Box>
             <TextField
               label={he.taskTitle}
               value={editForm.title}

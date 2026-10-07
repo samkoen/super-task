@@ -43,6 +43,8 @@ class TaskSchedulerService:
         }
 
     def generate_from_template(self, template, *, on_date: date):
+        if getattr(template, "opened_by_delivery_note", False):
+            return None
         anchor = None
         if template.biweekly_anchor:
             anchor = datetime.fromisoformat(template.biweekly_anchor).date()
