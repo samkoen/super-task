@@ -33,7 +33,6 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import { ApiError } from "../../services/api";
 import type { User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
-import AgrolineConnectionCard from "../../components/tasks/AgrolineConnectionCard";
 import DeliveryTaskTypeField from "../../components/tasks/DeliveryTaskTypeField";
 import { deliveryNoteService } from "../../services/deliveryNoteService";
 import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
@@ -410,8 +409,6 @@ export default function ManagerFixedTasksPage() {
           </Button>
         }
       />
-
-      <AgrolineConnectionCard />
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
         <Box display="flex" gap={1.5} flexWrap="wrap" alignItems="center">

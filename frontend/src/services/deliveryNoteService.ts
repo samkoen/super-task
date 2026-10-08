@@ -18,6 +18,7 @@ export const deliveryNoteService = {
 
   account: async () => {
     const response = await api.get<{
+      enabled: boolean;
       configured: boolean;
       username: string;
       internal: boolean;
@@ -25,11 +26,18 @@ export const deliveryNoteService = {
     return response.data;
   },
 
-  saveAccount: async (payload: { username: string; password: string; internal: boolean }) => {
-    const response = await api.post<{ configured: boolean; username: string; internal: boolean }>(
-      "/delivery-notes/account",
-      payload,
-    );
+  saveAccount: async (payload: {
+    enabled: boolean;
+    username: string;
+    password: string;
+    internal: boolean;
+  }) => {
+    const response = await api.post<{
+      enabled: boolean;
+      configured: boolean;
+      username: string;
+      internal: boolean;
+    }>("/delivery-notes/account", payload);
     return response.data;
   },
 
@@ -40,6 +48,7 @@ export const deliveryNoteService = {
         customer_name: string;
         document_date: string;
         kind: string;
+        pdf_url?: string | null;
         lines: Array<{ product_name: string; quantity: number; unit: string; origin_name?: string | null }>;
       }>
     >("/delivery-notes/inbox");

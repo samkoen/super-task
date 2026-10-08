@@ -28,6 +28,24 @@ from app.repositories.task_template_repository import TaskTemplateRepository
 _MANAGERS = {roles.ADMIN, roles.NETWORK_MANAGER, roles.BRANCH_MANAGER}
 
 
+def _account_view(row: dict, *, configured: bool) -> dict:
+    return {
+        "enabled": bool(row.get("enabled", True)),
+        "configured": configured,
+        "username": row.get("username") or "",
+        "internal": bool(row.get("is_internal")),
+    }
+
+
+def _env_account_view() -> dict:
+    return {
+        "enabled": True,
+        "configured": True,
+        "username": config.AGROLINE_USERNAME,
+        "internal": config.AGROLINE_INTERNAL,
+    }
+
+
 class DeliveryNoteService:
     def __init__(
         self,
@@ -87,33 +105,44 @@ class DeliveryNoteService:
             "opened_occurrence_ids": self._open_models(note),
         }
 
-    def save_account(self, actor: ActorContext, username: str, password: str, internal: bool) -> dict:
+    def save_account(
+        self, actor: ActorContext, username: str, password: str, internal: bool, enabled: bool
+    ) -> dict:
         self._assert_manager(actor)
+        if self._accounts is None:
+            raise ValueError("שמירת החשבון אינה זמינה")
+        if not enabled:
+            return self._disable_account()
         name = username.strip()
         if not name:
             raise ValueError("חסר שם משתמש")
-        encrypted = self._password_to_store(password)
-        if self._accounts is None:
-            raise ValueError("שמירת החשבון אינה זמינה")
-        saved = self._accounts.save(name[:120], encrypted, bool(internal))
-        return {**saved, "configured": True}
+        saved = self._accounts.save(name[:120], self._password_to_store(password), bool(internal), True)
+        return _account_view(saved, configured=True)
 
     def account_status(self, actor: ActorContext) -> dict:
         self._assert_manager(actor)
         row = self._accounts.get() if self._accounts else None
         if row:
-            return {"configured": True, "username": row["username"], "internal": row["is_internal"]}
+            return _account_view(row, configured=bool(row.get("username")))
         if config.AGROLINE_USERNAME:
-            return {"configured": True, "username": config.AGROLINE_USERNAME, "internal": config.AGROLINE_INTERNAL}
-        return {"configured": False, "username": "", "internal": False}
+            return _env_account_view()
+        return {"enabled": False, "configured": False, "username": "", "internal": False}
 
     def credentials(self) -> tuple[str, str, bool]:
         row = self._accounts.get() if self._accounts else None
         if row:
+            if not row.get("enabled", True):
+                raise ValueError("אין גישה לאגרוליין")
             return row["username"], decrypt_password(row["password_encrypted"]), row["is_internal"]
         if config.AGROLINE_USERNAME and config.AGROLINE_PASSWORD:
             return config.AGROLINE_USERNAME, config.AGROLINE_PASSWORD, config.AGROLINE_INTERNAL
         raise ValueError("חסרים פרטי התחברות לאגרוליין")
+
+    def _disable_account(self) -> dict:
+        saved = self._accounts.set_enabled(False) if self._accounts else None
+        if saved is None:
+            return {"enabled": False, "configured": False, "username": "", "internal": False}
+        return _account_view(saved, configured=bool(saved.get("username")))
 
     def pull_documents(self, actor: ActorContext, documents: list) -> dict:
         self._assert_manager(actor)

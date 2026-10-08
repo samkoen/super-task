@@ -103,6 +103,7 @@ def save_account(
         str(payload.get("username") or ""),
         str(payload.get("password") or ""),
         bool(payload.get("internal")),
+        bool(payload.get("enabled")),
     )
 
 

@@ -814,6 +814,7 @@ class AgrolineAccount(Base):
     username: Mapped[str] = mapped_column(String(120), nullable=False)
     password_encrypted: Mapped[str] = mapped_column(String(1024), nullable=False)
     is_internal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

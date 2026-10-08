@@ -314,6 +314,52 @@ def test_linking_the_snif_gives_the_task_to_its_dedicated_oved():
     assert occurrences.created[0].branch_id == "snif-1"
 
 
+class _Accounts:
+    def __init__(self):
+        self.row = None
+
+    def get(self):
+        return self.row
+
+    def save(self, username, password_encrypted, is_internal, enabled):
+        self.row = {
+            "username": username,
+            "password_encrypted": password_encrypted,
+            "is_internal": is_internal,
+            "enabled": enabled,
+        }
+        return self.row
+
+    def set_enabled(self, enabled):
+        if self.row is None:
+            return None
+        self.row = {**self.row, "enabled": enabled}
+        return self.row
+
+
+def test_agroline_access_off_keeps_the_login_but_blocks_sync():
+    accounts = _Accounts()
+    accounts.row = {
+        "username": "yitz",
+        "password_encrypted": "enc",
+        "is_internal": True,
+        "enabled": True,
+    }
+    service = DeliveryNoteService(SimpleNamespace(), SimpleNamespace(), SimpleNamespace(), accounts)
+    saved = service.save_account(_actor(), "", "", False, False)
+    assert saved["enabled"] is False
+    assert saved["username"] == "yitz"
+    assert accounts.row["password_encrypted"] == "enc"
+    with pytest.raises(ValueError, match="גישה"):
+        service.credentials()
+
+
+def test_agroline_access_on_requires_a_username():
+    service = DeliveryNoteService(SimpleNamespace(), SimpleNamespace(), SimpleNamespace(), _Accounts())
+    with pytest.raises(ValueError, match="שם משתמש"):
+        service.save_account(_actor(), "  ", "secret", False, True)
+
+
 def test_marking_the_model_sets_the_line_check_type():
     template = _template("tpl-a")
     template.opened_by_delivery_note = False
