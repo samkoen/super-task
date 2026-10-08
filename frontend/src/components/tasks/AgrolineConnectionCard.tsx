@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { SxProps, Theme } from "@mui/material/styles";
 import {
   Box,
   Button,
@@ -19,7 +20,11 @@ import { employeeFieldSx, employeePrimaryButtonSx } from "../../styles/employeeU
 
 type Account = Awaited<ReturnType<typeof deliveryNoteService.account>>;
 
-export default function AgrolineConnectionCard() {
+const cardSx = (extra?: SxProps<Theme>) =>
+  [{ p: { xs: 2, sm: 3 }, mb: 3, maxWidth: 560, borderRadius: 3 }, ...(Array.isArray(extra) ? extra : extra ? [extra] : [])] as SxProps<Theme>;
+
+/** Identifiants Agroline (lecture des תעודות) : distincts du mot de passe de Super. */
+export default function AgrolineConnectionCard({ sx }: { sx?: SxProps<Theme> } = {}) {
   const { showError, showSuccess } = useFeedback();
   const [account, setAccount] = useState<Account | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -30,9 +35,16 @@ export default function AgrolineConnectionCard() {
   const [syncing, setSyncing] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
 
+  const [loadError, setLoadError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
-    deliveryNoteService.account().then(applyAccount(setAccount, setEnabled, setUsername, setInternal)).catch(() => undefined);
-  }, []);
+    setLoadError("");
+    deliveryNoteService
+      .account()
+      .then(applyAccount(setAccount, setEnabled, setUsername, setInternal))
+      .catch((error) => setLoadError(error instanceof ApiError ? error.message : he.errorGeneric));
+  }, [attempt]);
 
   const save = () => void storeAccount(
     { enabled, username, password, internal },
@@ -44,9 +56,13 @@ export default function AgrolineConnectionCard() {
   );
   const sync = () => void runSync(setBusy, setSyncing, showSuccess, showError);
 
+  if (!account && loadError) {
+    return <LoadErrorPanel message={loadError} sx={sx} onRetry={() => setAttempt(attempt + 1)} />;
+  }
   if (!account) return null;
   return (
     <AccessPanel
+      sx={sx}
       account={account}
       enabled={enabled}
       username={username}
@@ -66,7 +82,30 @@ export default function AgrolineConnectionCard() {
   );
 }
 
+/** Sans cette carte, le manager croirait que la fonction n'existe pas : on affiche la cause. */
+function LoadErrorPanel({
+  message,
+  sx,
+  onRetry,
+}: {
+  message: string;
+  sx?: SxProps<Theme>;
+  onRetry: () => void;
+}) {
+  return (
+    <Paper variant="outlined" sx={cardSx(sx)}>
+      <Typography variant="h6" fontWeight={800} mb={1}>{he.agrolineAccountTitle}</Typography>
+      <Typography color="error" mb={0.5}>{he.agrolineLoadFailed}</Typography>
+      <Typography color="text.secondary" variant="body2" mb={2}>{message}</Typography>
+      <Button variant="outlined" onClick={onRetry} sx={{ minHeight: 48, borderRadius: "14px", fontWeight: 700 }}>
+        {he.mediaCaptureRetry}
+      </Button>
+    </Paper>
+  );
+}
+
 function AccessPanel(props: {
+  sx?: SxProps<Theme>;
   account: Account;
   enabled: boolean;
   username: string;
@@ -85,8 +124,8 @@ function AccessPanel(props: {
 }) {
   const connected = props.account.enabled && props.account.configured;
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3, maxWidth: 560, borderRadius: 3 }}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} mb={1}>
+    <Paper variant="outlined" sx={cardSx(props.sx)}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} mb={0.5}>
         <Typography variant="h6" fontWeight={800}>{he.agrolineAccountTitle}</Typography>
         <Chip
           size="small"
@@ -94,6 +133,7 @@ function AccessPanel(props: {
           label={connected ? he.agrolineConnected : he.agrolineNotConnected}
         />
       </Box>
+      <Typography color="text.secondary" variant="body2" mb={1}>{he.agrolineAccountHint}</Typography>
       <FormControlLabel
         control={<Switch checked={props.enabled} onChange={(event) => props.onEnabled(event.target.checked)} />}
         label={<Typography fontWeight={700}>{he.agrolineAccess}</Typography>}

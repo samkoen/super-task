@@ -1104,6 +1104,8 @@ export const he = {
   deliveryNoteKindFresh: "טריים",
   deliveryNoteKindMixed: "מגוון",
   agrolineAccountTitle: "חיבור לאגרוליין",
+  agrolineAccountHint: "פרטי ההתחברות של אגרוליין בלבד, לקריאת תעודות המשלוח. אין קשר לסיסמה של Super.",
+  agrolineLoadFailed: "לא ניתן לטעון את פרטי החיבור לאגרוליין",
   agrolineAccess: "גישה לאגרוליין",
   agrolineNotesRead: "תעודות נקראו",
   agrolineViewNotes: "תעודות היום",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Box, Button, CircularProgress, Dialog, DialogContent, Typography } from "@mui/material";
-import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import { Box, CircularProgress, Dialog, DialogContent, Typography } from "@mui/material";
+import DeliveryPdfButton from "./DeliveryPdfButton";
 import { deliveryNoteService } from "../../services/deliveryNoteService";
 import { he } from "../../i18n/he";
 import { employeeCardSx } from "../../styles/employeeUi";
@@ -59,23 +59,7 @@ function NoteCard({ note }: { note: InboxNote }) {
           {lineCount ? ` · ${he.deliveryNoteLinesCount(lineCount)}` : ""}
         </Typography>
       </Box>
-      {note.pdf_url ? <PdfLink url={note.pdf_url} /> : null}
+      <DeliveryPdfButton url={note.pdf_url} />
     </Box>
-  );
-}
-
-function PdfLink({ url }: { url: string }) {
-  return (
-    <Button
-      component="a"
-      href={url}
-      target="_blank"
-      rel="noopener"
-      variant="outlined"
-      startIcon={<PictureAsPdfOutlinedIcon />}
-      sx={{ minHeight: 48, borderRadius: "14px", fontWeight: 700, flexShrink: 0 }}
-    >
-      {he.deliveryNotePdf}
-    </Button>
   );
 }

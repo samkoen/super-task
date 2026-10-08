@@ -250,6 +250,38 @@ def test_employee_cannot_ingest():
         service.ingest(_actor(role="employee", user_id="oved-1"), _document())
 
 
+def test_employee_can_read_the_account_and_save_the_login():
+    accounts = _Accounts()
+    service = DeliveryNoteService(SimpleNamespace(), SimpleNamespace(), SimpleNamespace(), accounts)
+    oved = _actor(role="employee", user_id="oved-1")
+    assert service.account_status(oved)["configured"] is False
+    saved = service.save_account(oved, "yitz", "secret", False, True)
+    assert saved["username"] == "yitz"
+    assert service.account_status(oved)["configured"] is True
+
+
+def test_employee_sync_opens_tasks_only_for_his_own_snif():
+    service, notes, occurrences = _service([_template("tpl-a")])
+    notes.links["לקוח אחר"] = "snif-2"
+    oved = _actor(role="employee", user_id="oved-1", branch_id="snif-1")
+    outcome = service.pull_documents(oved, [_document(), {**_document("999"), "customer_name": "לקוח אחר"}])
+    assert [row["agroline_number"] for row in outcome["results"]] == ["2315109"]
+    assert [row["agroline_number"] for row in outcome["errors"]] == ["999"]
+    assert "999" not in notes.notes
+    assert len(occurrences.created) == 1
+
+
+def test_employee_can_list_the_inbox_but_not_ingest_directly():
+    service, _, _ = _service([_template("tpl-a")])
+    service.ingest(_actor(), _document())
+    oved = _actor(role="employee", user_id="oved-1")
+    assert len(service.list_inbox(oved, "2026-10-02")) == 1
+    with pytest.raises(PermissionError):
+        service.ingest(oved, _document("111"))
+    with pytest.raises(PermissionError):
+        service.link_customer(oved, "שפע", "snif-1")
+
+
 def test_assignee_saves_a_problem_with_one_note():
     service, notes, _ = _service([_template("tpl-a")])
     opened = service.ingest(_actor(), _document())

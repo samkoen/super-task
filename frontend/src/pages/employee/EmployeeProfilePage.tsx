@@ -16,6 +16,7 @@ import {
   type PasswordFormValue,
 } from "./EmployeeProfileSections";
 import AppUpdateCard from "../../components/appUpdate/AppUpdateCard";
+import AgrolineConnectionCard from "../../components/tasks/AgrolineConnectionCard";
 
 const EMPTY_PASSWORD: PasswordFormValue = {
   current_password: "",
@@ -153,6 +154,7 @@ export default function EmployeeProfilePage() {
         onChange={setPasswordForm}
         onSave={() => void handleChangePassword()}
       />
+      <AgrolineConnectionCard sx={{ mb: 0 }} />
       <AppUpdateCard layoutSx={{ mt: 0 }} />
       <Button
         variant="outlined"

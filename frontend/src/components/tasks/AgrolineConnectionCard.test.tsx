@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import AgrolineConnectionCard from "./AgrolineConnectionCard";
 import { he } from "../../i18n/he";
+import { ApiError } from "../../services/api";
 import { deliveryNoteService } from "../../services/deliveryNoteService";
 
 const showSuccess = vi.fn();
@@ -20,9 +21,20 @@ vi.mock("../../services/deliveryNoteService", () => ({
 }));
 
 describe("AgrolineConnectionCard", () => {
+  it("shows why the card cannot load, and retries", async () => {
+    vi.mocked(deliveryNoteService.account).mockRejectedValueOnce(new ApiError("למנהלים בלבד", 403));
+    render(<AgrolineConnectionCard />);
+    expect(await screen.findByText(he.agrolineLoadFailed)).toBeTruthy();
+    expect(screen.getByText("למנהלים בלבד")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.mediaCaptureRetry }));
+    expect(await screen.findByRole("checkbox", { name: he.agrolineAccess })).toBeTruthy();
+    expect(screen.queryByText(he.agrolineLoadFailed)).toBeNull();
+  });
+
   it("hides the Agroline fields until access is checked", async () => {
     render(<AgrolineConnectionCard />);
     expect(await screen.findByText(he.agrolineAccountTitle)).toBeTruthy();
+    expect(screen.getByText(he.agrolineAccountHint)).toBeTruthy();
     expect(screen.queryByLabelText(he.agrolineUsername)).toBeNull();
     expect(screen.queryByRole("button", { name: he.agrolineSync })).toBeNull();
     fireEvent.click(screen.getByRole("checkbox", { name: he.agrolineAccess }));

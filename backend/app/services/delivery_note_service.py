@@ -99,6 +99,9 @@ class DeliveryNoteService:
 
     def ingest(self, actor: ActorContext, document: dict) -> dict:
         self._assert_manager(actor)
+        return self._ingest_document(actor, document)
+
+    def _ingest_document(self, actor: ActorContext, document: dict) -> dict:
         doc = normalize_document(document)
         branch_id = self._branch_for_customer(doc["customer_name"])
         if branch_id:
@@ -114,7 +117,7 @@ class DeliveryNoteService:
     def save_account(
         self, actor: ActorContext, username: str, password: str, internal: bool, enabled: bool
     ) -> dict:
-        self._assert_manager(actor)
+        self._assert_agroline_user(actor)
         if self._accounts is None:
             raise ValueError("שמירת החשבון אינה זמינה")
         if not enabled:
@@ -126,7 +129,7 @@ class DeliveryNoteService:
         return _account_view(saved, configured=True)
 
     def account_status(self, actor: ActorContext) -> dict:
-        self._assert_manager(actor)
+        self._assert_agroline_user(actor)
         row = self._accounts.get() if self._accounts else None
         if row:
             return _account_view(row, configured=bool(row.get("username")))
@@ -151,7 +154,7 @@ class DeliveryNoteService:
         return _account_view(saved, configured=bool(saved.get("username")))
 
     def pull_documents(self, actor: ActorContext, documents: list) -> dict:
-        self._assert_manager(actor)
+        self._assert_agroline_user(actor)
         results: list[dict] = []
         errors: list[dict] = []
         for document in documents:
@@ -160,7 +163,7 @@ class DeliveryNoteService:
         return {"results": results, "errors": errors}
 
     def open_pending(self, actor: ActorContext) -> list[str]:
-        self._assert_manager(actor)
+        self._assert_agroline_user(actor)
         opened: list[str] = []
         for note in self._notes.notes_without_branch():
             opened.extend(self._attach_pending(actor, note))
@@ -185,7 +188,7 @@ class DeliveryNoteService:
         return group_mishloah(notes)
 
     def list_inbox(self, actor: ActorContext, document_date: str) -> list[dict]:
-        self._assert_manager(actor)
+        self._assert_agroline_user(actor)
         return self._notes.list_inbox(document_date)
 
     def check_for_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict | None:
@@ -220,7 +223,7 @@ class DeliveryNoteService:
 
     def _ingest_one(self, actor, document, results: list[dict], errors: list[dict]) -> None:
         try:
-            results.append(self.ingest(actor, document))
+            results.append(self._ingest_document(actor, document))
         except (ValueError, PermissionError) as exc:
             errors.append(
                 {"agroline_number": str(document.get("agroline_number") or ""), "error": str(exc)}
@@ -326,10 +329,18 @@ class DeliveryNoteService:
         if actor.role not in _MANAGERS:
             raise PermissionError("למנהלים בלבד")
 
+    def _assert_agroline_user(self, actor: ActorContext) -> None:
+        """Connexion, synchro et liste des תעודות : tout utilisateur connecté (manager ou oved)."""
+        if actor.role not in roles.ALL_ROLES:
+            raise PermissionError("אין הרשאה")
+
     def _assert_branch(self, actor: ActorContext, branch_id: str) -> None:
-        if actor.role != roles.BRANCH_MANAGER:
+        if actor.role in (roles.ADMIN, roles.NETWORK_MANAGER):
             return
-        if not actor.branch_id or actor.branch_id != branch_id:
+        allowed = {actor.branch_id}
+        if actor.role == roles.EMPLOYEE:
+            allowed.update(actor.membership_branch_ids)
+        if branch_id not in allowed:
             raise PermissionError("אין הרשאה לסניף זה")
 
     def _assert_can_answer(self, actor: ActorContext, occurrence) -> None:

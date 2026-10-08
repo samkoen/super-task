@@ -46,12 +46,20 @@ vi.mock("../../components/employee/EmployeeAvatarCapture", () => ({
 }));
 
 vi.mock("../../components/appUpdate/AppUpdateCard", () => ({ default: () => null }));
+vi.mock("../../components/tasks/AgrolineConnectionCard", () => ({
+  default: () => <div>agroline-card</div>,
+}));
 
 describe("EmployeeProfilePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentUser = user;
     refresh.mockResolvedValue(undefined);
+  });
+
+  it("offers the Agroline connection to the oved too", () => {
+    render(<EmployeeProfilePage />);
+    expect(screen.getByText("agroline-card")).toBeTruthy();
   });
 
   it("saves the edited profile", async () => {

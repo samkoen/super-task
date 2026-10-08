@@ -1,6 +1,16 @@
 """Tâche קבועה שבועית : un seul jour + שמע obligatoire doit être accepté."""
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+_TZ = ZoneInfo("Asia/Jerusalem")
+
+
+def _today_weekday() -> str:
+    """Jour courant (lundi=0 … dimanche=6) dans le fuseau de l'application."""
+    return str(datetime.now(_TZ).weekday())
+
 
 def _body(world, **over) -> dict:
     body = {
@@ -57,7 +67,7 @@ def test_weekly_one_day_list_with_required_audio_is_created(client_mgr, world_se
 def test_weekly_today_with_required_audio_creates_occurrence(client_mgr, world_seed):
     created = client_mgr.post(
         "/api/tasks/templates",
-        json=_body(world_seed, title="היום", weekly_days="6"),
+        json=_body(world_seed, title="היום", weekly_days=_today_weekday()),
     )
     assert created.status_code == 201, created.text
     template_id = created.json()["template"]["id"]
