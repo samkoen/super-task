@@ -180,7 +180,7 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(screen.getByText(`${he.employeeHideCompleted} (1)`)).toBeTruthy();
   });
 
-  it("shows pending-review tasks while the start door is open", async () => {
+  it("hides pending-review tasks while the start door is open", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         today_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true })],
@@ -189,12 +189,11 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
-    fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (1)`));
-    fireEvent.click(screen.getByText("מילוי מדף"));
-    expect(screen.getByText("detail:מילוי מדף")).toBeTruthy();
+    expect(screen.queryByText(`${he.employeeShowCompleted} (1)`)).toBeNull();
+    expect(screen.queryByText("מילוי מדף")).toBeNull();
   });
 
-  it("keeps completed tasks visible while the start door is open", async () => {
+  it("shows only the start door: no other task, no finished list", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         today_tasks: [
@@ -207,10 +206,8 @@ describe("EmployeeTasksPage punch doors", () => {
     renderPage();
     expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
     expect(screen.queryByText("מדף חלב")).toBeNull();
-    expect(screen.getByText(`${he.employeeShowCompleted} (1)`)).toBeTruthy();
-    fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (1)`));
-    fireEvent.click(screen.getByText("ניקוי רצפה"));
-    expect(screen.getByText("detail:ניקוי רצפה")).toBeTruthy();
+    expect(screen.queryByText(`${he.employeeShowCompleted} (1)`)).toBeNull();
+    expect(screen.queryByText("ניקוי רצפה")).toBeNull();
   });
 
   it("shows a submitted clock-in in the finished list, not as a door", async () => {
@@ -254,7 +251,7 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(screen.getByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
   });
 
-  it("shows manager waiting above the clock-in door", async () => {
+  it("hides manager waiting while the clock-in door is open", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         today_tasks: [
@@ -272,7 +269,7 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
-    expect(screen.getByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
-    expect(screen.getByText("ניקוי מדף")).toBeTruthy();
+    expect(screen.queryByText(`${he.employeeManagerWaiting} (1)`)).toBeNull();
+    expect(screen.queryByText("ניקוי מדף")).toBeNull();
   });
 });

@@ -12,7 +12,7 @@ import { taskSquareClickProps } from "../tasks/taskSquareClick";
 import { taskStatusChipColor, taskStatusVisual } from "../../constants/taskStatusVisual";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
-import { shouldHighlightEmployeeTask } from "../../utils/employeeDashboardSections";
+import { employeeDisplayStatus, shouldHighlightEmployeeTask } from "../../utils/employeeDashboardSections";
 import type { EmployeeTaskCard } from "../../services/dashboardService";
 import type { TaskStatus } from "../../services/taskService";
 import { employeeCardSx } from "../../styles/employeeUi";
@@ -49,7 +49,8 @@ export default function EmployeeTaskRow({
   return <EmployeeTaskTile task={task} onOpen={onOpen} />;
 }
 
-function StatusChip({ status }: { status: TaskStatus }) {
+function StatusChip({ status: rawStatus }: { status: TaskStatus }) {
+  const status = employeeDisplayStatus(rawStatus);
   if (shouldHighlightEmployeeTask(status) && status === "overdue") {
     return <Chip size="small" color="error" label={he.alertOverdue} sx={chipLabelSx} />;
   }
@@ -64,7 +65,8 @@ function StatusChip({ status }: { status: TaskStatus }) {
   );
 }
 
-function StatusBadge({ status }: { status: TaskStatus }) {
+function StatusBadge({ status: rawStatus }: { status: TaskStatus }) {
+  const status = employeeDisplayStatus(rawStatus);
   const visual = taskStatusVisual(status);
   const Icon = STATUS_ICON[status] ?? ScheduleIcon;
   return (
@@ -87,8 +89,9 @@ function StatusBadge({ status }: { status: TaskStatus }) {
 }
 
 function cardSx(task: EmployeeTaskCard) {
-  const visual = taskStatusVisual(task.status);
-  const highlight = shouldHighlightEmployeeTask(task.status);
+  const status = employeeDisplayStatus(task.status);
+  const visual = taskStatusVisual(status);
+  const highlight = shouldHighlightEmployeeTask(status);
   return {
     ...employeeCardSx,
     width: "100%",
@@ -129,7 +132,7 @@ function TaskTexts({ task }: { task: EmployeeTaskCard }) {
 }
 
 function EmployeeTaskTile({ task, onOpen }: Omit<EmployeeTaskRowProps, "layout">) {
-  const visual = taskStatusVisual(task.status);
+  const visual = taskStatusVisual(employeeDisplayStatus(task.status));
   return (
     <Paper
       variant="outlined"

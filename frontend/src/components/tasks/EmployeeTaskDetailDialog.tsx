@@ -31,6 +31,7 @@ import { formatDueAt } from "../../utils/dateView";
 import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
 import { canDoTask } from "../../utils/employeeDoTask";
 import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
+import { employeeDisplayStatus } from "../../utils/employeeDashboardSections";
 import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import { attachmentsFromCompletion } from "../../utils/completionSlotView";
@@ -230,7 +231,7 @@ function TaskDescription({ text }: { text?: string | null }) {
 function TaskStatusRow({ task }: { task: EmployeeTaskDetailTask }) {
   return (
     <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-      <TaskStatusChip status={task.status} />
+      <TaskStatusChip status={employeeDisplayStatus(task.status)} />
       {task.completion && showsCompletionOutcome(task.status) ? (
         <CompletionOutcomeChip status={task.completion.status} />
       ) : null}

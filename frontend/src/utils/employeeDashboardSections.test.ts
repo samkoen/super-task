@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectUniqueTasks,
+  employeeDisplayStatus,
   isDynamicEmployeeTask,
   mergeEmployeeFinishedTasks,
   shouldHighlightEmployeeTask,
@@ -20,6 +21,13 @@ function task(
 }
 
 describe("employeeDashboardSections", () => {
+  it("shows pending_review as completed to the oved and leaves other statuses alone", () => {
+    expect(employeeDisplayStatus("pending_review")).toBe("completed");
+    expect(employeeDisplayStatus("completed")).toBe("completed");
+    expect(employeeDisplayStatus("overdue")).toBe("overdue");
+    expect(employeeDisplayStatus("in_progress")).toBe("in_progress");
+  });
+
   it("treats only ad-hoc as the photo-tile list", () => {
     expect(isDynamicEmployeeTask(task("a", { task_kind: "ad_hoc" }))).toBe(true);
     expect(isDynamicEmployeeTask(task("b", { status: "overdue" }))).toBe(false);

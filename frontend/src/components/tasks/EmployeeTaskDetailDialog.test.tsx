@@ -457,6 +457,12 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.queryByRole("button", { name: he.markDone })).toBeNull();
   });
 
+  it("shows the completed status, not a waiting-for-approval one, to the oved", () => {
+    render(<EmployeeTaskDetailDialog task={task("pending_review")} onClose={vi.fn()} />);
+    expect(screen.queryByText(he.taskStatusLabels.pending_review)).toBeNull();
+    expect(screen.getByText(he.taskStatusLabels.completed)).toBeTruthy();
+  });
+
   it("opens the chat from the button while the task waits for approval", () => {
     render(<EmployeeTaskDetailDialog task={task("pending_review")} onClose={vi.fn()} />);
     expect(screen.queryByTestId("task-chat-panel")).toBeNull();

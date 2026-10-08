@@ -706,6 +706,13 @@ export default function EmployeeTasksPage() {
     />
   );
 
+  const managerWaiting = (
+    <EmployeeManagerWaitingSection
+      tasks={dashboard?.manager_waiting_tasks ?? []}
+      onOpen={(task) => openWorkTask(task, true)}
+    />
+  );
+
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", px: { xs: 1, sm: 2 } }}>
       <EmployeeShiftHeader
@@ -750,25 +757,19 @@ export default function EmployeeTasksPage() {
         <ListSkeleton variant="table" rows={5} />
       ) : (
         <>
-          <EmployeeManagerWaitingSection
-            tasks={dashboard?.manager_waiting_tasks ?? []}
-            onOpen={(task) => openWorkTask(task, true)}
-          />
           {punch.showStart && punch.start ? (
-            <>
-              {finishedSections}
-              <EmployeePunchDoor
-                kind="start"
-                name={headerName}
-                photoUrl={photoUrl}
-                taskTitle={punch.start.title}
-                onOpen={() => {
-                  if (punch.start) openDetail(punch.start);
-                }}
-              />
-            </>
+            <EmployeePunchDoor
+              kind="start"
+              name={headerName}
+              photoUrl={photoUrl}
+              taskTitle={punch.start.title}
+              onOpen={() => {
+                if (punch.start) openDetail(punch.start);
+              }}
+            />
           ) : punch.showEnd && punch.end ? (
             <>
+              {managerWaiting}
               {finishedSections}
               <EmployeePunchDoor
                 kind="end"
@@ -784,6 +785,7 @@ export default function EmployeeTasksPage() {
             </>
           ) : (
             <>
+              {managerWaiting}
               <EmployeeOpenWorkLists
                 punchEnd={punch.end}
                 onRequestEnd={punch.requestEnd}

@@ -32,7 +32,8 @@ describe("EmployeeFinishedTaskSections", () => {
     );
     expect(screen.queryByText(he.taskPendingReview)).toBeNull();
     expect(screen.getByText(`${he.employeeShowCompleted} (1)`)).toBeTruthy();
-    expect(screen.getByText(he.taskStatusLabels.pending_review).closest(".MuiChip-colorInfo")).toBeTruthy();
+    expect(screen.queryByText(he.taskStatusLabels.pending_review)).toBeNull();
+    expect(screen.getByText(he.taskStatusLabels.completed).closest(".MuiChip-colorSuccess")).toBeTruthy();
   });
 
   it("keeps the completed accordion visible even with no open work", () => {
