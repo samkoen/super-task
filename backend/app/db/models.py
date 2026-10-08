@@ -241,6 +241,10 @@ class TaskTemplate(Base):
         Uuid(as_uuid=True), ForeignKey("task_gallery_items.id", ondelete="SET NULL"), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    opened_by_delivery_note: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    delivery_note_task_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
@@ -676,4 +680,141 @@ class AppRelease(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AgrolineBranchLink(Base):
+    """Nom client Agroline → snif Super. Réglé une fois."""
+
+    __tablename__ = "agroline_branch_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    customer_name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    branch_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=False, index=True
+    )
+
+
+class DeliveryNote(Base):
+    """Une תעודת משלוח. Le modèle de tâche ne stocke pas ce document."""
+
+    __tablename__ = "delivery_notes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    agroline_number: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True, index=True
+    )
+    customer_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    document_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    pdf_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class DeliveryNoteLine(Base):
+    __tablename__ = "delivery_note_lines"
+    __table_args__ = (
+        UniqueConstraint("delivery_note_id", "position", name="uq_delivery_line_position"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    delivery_note_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("delivery_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    product_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    unit: Mapped[str] = mapped_column(String(32), nullable=False)
+    origin_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+
+class DeliveryNoteOpening(Base):
+    """Une occurrence par couple תעודה + modèle."""
+
+    __tablename__ = "delivery_note_openings"
+    __table_args__ = (
+        UniqueConstraint("delivery_note_id", "template_id", name="uq_delivery_opening_model"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    delivery_note_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("delivery_notes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    template_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("task_templates.id"), nullable=False, index=True
+    )
+    occurrence_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("task_occurrences.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    overall_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    task_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="line_check"
+    )
+
+
+class DeliveryLineAnswer(Base):
+    __tablename__ = "delivery_line_answers"
+    __table_args__ = (
+        UniqueConstraint("opening_id", "line_id", name="uq_delivery_line_answer"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    opening_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("delivery_note_openings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    line_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("delivery_note_lines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    arrival: Mapped[str] = mapped_column(String(16), nullable=False)
+    received_qty: Mapped[float | None] = mapped_column(Float, nullable=True)
+    condition: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    rejected_qty: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+
+class AgrolineAccount(Base):
+    """Identifiants Agroline. Le mot de passe est chiffré, jamais renvoyé."""
+
+    __tablename__ = "agroline_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    username: Mapped[str] = mapped_column(String(120), nullable=False)
+    password_encrypted: Mapped[str] = mapped_column(String(1024), nullable=False)
+    is_internal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

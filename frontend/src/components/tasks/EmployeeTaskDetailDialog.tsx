@@ -16,6 +16,7 @@ import {
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { EMPLOYEE_BRAND, EMPLOYEE_CARD_RADIUS, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN, employeeFieldSx } from "../../styles/employeeUi";
+import DeliveryLineCheck from "./DeliveryLineCheck";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import EmployeeCaptureSteps from "./EmployeeCaptureSteps";
@@ -128,6 +129,7 @@ export default function EmployeeTaskDetailDialog({
         <TaskStatusRow task={task} />
         <TaskRejectionRemark completion={task.completion} />
         <TaskDescription text={task.description} />
+        <DeliveryLineCheck occurrenceId={task.id} disabled={!canDoTask(task.status)} />
         <StartUrlButton url={task.start_url} fullWidth />
         <OpenTaskChatButton
           occurrenceId={task.id}

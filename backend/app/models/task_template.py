@@ -31,6 +31,8 @@ class TaskTemplate:
     is_work_end: bool = False
     start_url: str | None = None
     network_group_id: str | None = None
+    opened_by_delivery_note: bool = False
+    delivery_note_task_type: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -59,6 +61,8 @@ class TaskTemplate:
             "biweekly_anchor": self.biweekly_anchor,
             "source_gallery_item_id": self.source_gallery_item_id,
             "is_active": self.is_active,
+            "opened_by_delivery_note": self.opened_by_delivery_note,
+            "delivery_note_task_type": self.delivery_note_task_type,
             "created_by_id": self.created_by_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,

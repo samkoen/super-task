@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.actor import load_actor
 from app.controllers.controller_helpers import handle_controller_errors
+from app.controllers.delivery_note_controller import get_service as get_delivery_note_service
+from app.db.mappers import task_occurrence_domain_to_api
 from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.department_repository import DepartmentRepository
@@ -31,6 +33,7 @@ from app.services.task_message_service import TaskMessageService
 from app.services.task_occurrence_service import TaskOccurrenceService
 from app.services.task_scheduler_service import TaskSchedulerService
 from app.services.task_translation_service import TaskTranslationService
+from app.services.delivery_note_service import DeliveryNoteService
 from app.services.task_template_service import TaskTemplateService
 
 router = APIRouter()
@@ -206,16 +209,45 @@ def list_templates(
     return service.list_templates(actor, branch_id=branch_id)
 
 
+def _open_saved_teudot(db: Session, actor, templates: list[dict], payload: dict, notes) -> None:
+    task_type = payload.get("delivery_note_task_type")
+    occurrences = TaskOccurrenceRepository(db)
+    for item in templates:
+        template_id = str(item.get("id") or "")
+        if not template_id:
+            continue
+        item.pop("_created_occurrence", None)
+        saved = notes.mark_opened_by_delivery_note(actor, template_id, True, task_type)
+        _emit_opened_occurrences(db, occurrences, saved.get("opened_occurrence_ids") or [])
+
+
+def _emit_opened_occurrences(db: Session, occurrences, ids: list) -> None:
+    for occ_id in ids:
+        occ = occurrences.find_by_id(occ_id)
+        if occ is not None:
+            _emit_task_event(db, "task_created", task_occurrence_domain_to_api(occ))
+
+
+def _publish_created_templates(db: Session, actor, templates: list[dict], payload: dict, notes) -> None:
+    if payload.get("opened_by_delivery_note"):
+        _open_saved_teudot(db, actor, templates, payload, notes)
+        return
+    for item in templates:
+        _emit_task_event(db, "task_created", _sse_payload_from_create_template(item))
+
+
 @router.post("/templates", status_code=201)
 @handle_controller_errors
 def create_template(
     request: Request,
     data: dict[str, Any] | None = Body(default=None),
     service: TaskTemplateService = Depends(get_template_service),
+    notes: DeliveryNoteService = Depends(get_delivery_note_service),
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
     payload = data or {}
+    opened = bool(payload.get("opened_by_delivery_note"))
     if payload.get("apply_to_network"):
         result = service.create_templates_for_network(
             actor,
@@ -236,10 +268,10 @@ def create_template(
             is_work_end=bool(payload.get("is_work_end")),
             start_url=payload.get("start_url"),
             branch_ids=_parse_optional_ids(payload.get("branch_ids")),
+            opened_by_delivery_note=opened,
+            delivery_note_task_type=payload.get("delivery_note_task_type"),
         )
-        for item in result["templates"]:
-            emit_item = _sse_payload_from_create_template(item)
-            _emit_task_event(db, "task_created", emit_item)
+        _publish_created_templates(db, actor, result["templates"], payload, notes)
         return {
             "message": f"נוצרו {len(result['templates'])} משימות קבועות ברשת",
             "templates": result["templates"],
@@ -267,9 +299,10 @@ def create_template(
         is_work_start=bool(payload.get("is_work_start")),
         is_work_end=bool(payload.get("is_work_end")),
         start_url=payload.get("start_url"),
+        opened_by_delivery_note=opened,
+        delivery_note_task_type=payload.get("delivery_note_task_type"),
     )
-    emit_item = _sse_payload_from_create_template(item)
-    _emit_task_event(db, "task_created", emit_item)
+    _publish_created_templates(db, actor, [item], payload, notes)
     return {"message": "משימה קבועה נוצרה", "template": item}
 
 

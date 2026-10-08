@@ -5,6 +5,12 @@ import { he } from "../../i18n/he";
 import type { TaskStatus } from "../../services/taskService";
 import type { EmployeeTaskCaptureProps } from "./EmployeeTaskDetailDialog";
 
+vi.mock("../../services/deliveryNoteService", () => ({
+  deliveryNoteService: {
+    checkForOccurrence: vi.fn(async () => null),
+  },
+}));
+
 vi.mock("./TaskChatPanel", () => ({
   default: () => <div data-testid="task-chat-panel">{he.taskChatTitle}</div>,
 }));

@@ -20,6 +20,8 @@ export type FixedTaskCreateFormDraft = {
   isWorkEnd: boolean;
   startUrl: string;
   media: TaskReferenceMediaValue;
+  openedByDeliveryNote?: boolean;
+  deliveryNoteTaskType?: string;
 };
 
 export type FixedTaskEditDraft = {

@@ -359,6 +359,68 @@ describe("NewTaskFormDialog", () => {
     clearFixedTaskCreateDraft(key);
   });
 
+  it("sends the delivery-note flag when the create checkbox is checked", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        branches={[{ id: "b1", name: "סניף", network_id: "n1" } as never]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        defaultAssigneeId="u1"
+        forcedTaskKind="fixed"
+      />,
+    );
+    expect(screen.queryByLabelText(he.deliveryNoteTaskType)).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: he.deliveryNoteOpenModel }));
+    expect(screen.getByLabelText(he.deliveryNoteTaskType)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        opened_by_delivery_note: true,
+        delivery_note_task_type: "line_check",
+      }),
+    );
+  });
+
+  it("keeps the delivery-note flag when several snifim are selected", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        branches={[
+          { id: "b1", name: "א", network_id: "n1" } as never,
+          { id: "b2", name: "ב", network_id: "n1" } as never,
+        ]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager={false}
+        canPickBranch
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        forcedTaskKind="fixed"
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: he.deliveryNoteOpenModel }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "ב" }));
+    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        apply_to_network: true,
+        opened_by_delivery_note: true,
+        delivery_note_task_type: "line_check",
+      }),
+    );
+  });
+
   it("does not crash when closed with missing employee or branch lists", () => {
     expect(() =>
       render(

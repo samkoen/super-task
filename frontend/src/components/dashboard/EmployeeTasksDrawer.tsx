@@ -163,6 +163,8 @@ export default function EmployeeTasksDrawer({
           is_work_start: payload.is_work_start,
           is_work_end: payload.is_work_end,
           start_url: payload.start_url,
+          opened_by_delivery_note: payload.opened_by_delivery_note,
+          delivery_note_task_type: payload.delivery_note_task_type,
           ...media,
         });
         showSuccess(res.message);
