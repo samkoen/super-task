@@ -240,14 +240,17 @@ export default function ManagerFixedTasksPage() {
     await deliveryNoteService.markTemplate(template.id, wanted.opened, wanted.taskType);
   };
 
-  const linkAgrolineCustomer = async (customerName: string) => {
-    if (!editing || !customerName) return;
+  /** Renvoie `true` si le client est lié (le champ n'est vidé qu'à ce moment-là). */
+  const linkAgrolineCustomer = async (customerName: string): Promise<boolean> => {
+    if (!editing || !customerName) return false;
     try {
       const linked = await deliveryNoteService.linkCustomer(customerName, editing.branch_id);
       const opened = linked.opened_occurrence_ids?.length ?? 0;
       showSuccess(opened ? `${he.deliveryNoteCustomerLinked} (${opened})` : he.deliveryNoteCustomerLinked);
+      return true;
     } catch (e) {
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      return false;
     }
   };
 

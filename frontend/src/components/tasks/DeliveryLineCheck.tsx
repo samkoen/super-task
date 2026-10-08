@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Button, CircularProgress, Typography } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { ApiError } from "../../services/api";
 import { deliveryNoteService } from "../../services/deliveryNoteService";
@@ -29,17 +29,23 @@ type Props = {
 
 export default function DeliveryLineCheck({ occurrenceId, disabled = false, onSaved }: Props) {
   const [note, setNote] = useState<DeliveryCheck | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    loadCheck(occurrenceId).then((loaded) => {
-      if (!cancelled && loaded) setNote(loaded);
+    setLoadFailed(false);
+    loadCheck(occurrenceId).then((result) => {
+      if (cancelled) return;
+      if (result === "error") setLoadFailed(true);
+      else if (result) setNote(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [occurrenceId]);
+  }, [occurrenceId, attempt]);
 
+  if (loadFailed) return <LoadError onRetry={() => setAttempt(attempt + 1)} />;
   if (!note) return null;
   if (note.task_type === DELIVERY_TASK_ORIGIN) return <DeliveryOriginList note={note} />;
   return (
@@ -55,12 +61,28 @@ export default function DeliveryLineCheck({ occurrenceId, disabled = false, onSa
   );
 }
 
-async function loadCheck(occurrenceId: string): Promise<DeliveryCheck | null> {
+/** `null` : la tâche n'a pas de תעודה (404, cas normal). `"error"` : échec réseau ou serveur. */
+async function loadCheck(occurrenceId: string): Promise<DeliveryCheck | null | "error"> {
   try {
     return await deliveryNoteService.checkForOccurrence(occurrenceId);
-  } catch {
-    return null;
+  } catch (err) {
+    return err instanceof ApiError && err.status === 404 ? null : "error";
   }
+}
+
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Alert
+      severity="error"
+      action={
+        <Button color="inherit" onClick={onRetry} sx={{ fontWeight: 800, minHeight: 44 }}>
+          {he.mediaCaptureRetry}
+        </Button>
+      }
+    >
+      {he.deliveryNoteLoadFailed}
+    </Alert>
+  );
 }
 
 function draftsFrom(note: DeliveryCheck): Record<string, DeliveryLineDraft> {

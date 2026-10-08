@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DeliveryLineCheck from "./DeliveryLineCheck";
+import { ApiError } from "../../services/api";
 import { deliveryNoteService } from "../../services/deliveryNoteService";
 import { he } from "../../i18n/he";
 import { DELIVERY_TASK_ORIGIN, type DeliveryCheck } from "../../utils/deliveryNote";
@@ -103,11 +104,20 @@ describe("DeliveryLineCheck", () => {
     expect(screen.queryByText(he.deliveryNoteSaved)).toBeNull();
   });
 
-  it("renders nothing when the task has no delivery note", async () => {
-    vi.mocked(deliveryNoteService.checkForOccurrence).mockRejectedValueOnce(new Error("404"));
+  it("renders nothing when the task has no delivery note (404)", async () => {
+    vi.mocked(deliveryNoteService.checkForOccurrence).mockRejectedValueOnce(new ApiError("none", 404));
     const { container } = render(<DeliveryLineCheck occurrenceId="occ-2" />);
     await waitFor(() => expect(deliveryNoteService.checkForOccurrence).toHaveBeenCalled());
     expect(container.textContent).toBe("");
+  });
+
+  it("shows an error with retry on a server failure, then loads the note", async () => {
+    vi.mocked(deliveryNoteService.checkForOccurrence).mockRejectedValueOnce(new ApiError("boom", 500));
+    render(<DeliveryLineCheck occurrenceId="occ-3" />);
+    expect(await screen.findByText(he.deliveryNoteLoadFailed)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.mediaCaptureRetry }));
+    expect(await screen.findByText(he.deliveryNoteCheckHint)).toBeTruthy();
+    expect(screen.queryByText(he.deliveryNoteLoadFailed)).toBeNull();
   });
 
   it("lists only products that have a country for the origin task", async () => {

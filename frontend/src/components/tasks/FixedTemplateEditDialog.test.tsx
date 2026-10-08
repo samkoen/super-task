@@ -92,7 +92,7 @@ describe("FixedTemplateEditDialog", () => {
   });
 
   it("links an Agroline customer only when a name is typed", async () => {
-    const onLinkCustomer = vi.fn().mockResolvedValue(undefined);
+    const onLinkCustomer = vi.fn().mockResolvedValue(true);
     render(
       <FixedTemplateEditDialog
         {...props({ form: { ...form, opened_by_delivery_note: true }, onLinkCustomer })}
@@ -100,9 +100,25 @@ describe("FixedTemplateEditDialog", () => {
     );
     const link = screen.getByRole("button", { name: he.deliveryNoteLinkCustomer }) as HTMLButtonElement;
     expect(link.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText(he.deliveryNoteCustomer), { target: { value: "  יד השם " } });
+    const field = screen.getByLabelText(he.deliveryNoteCustomer) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "  יד השם " } });
     fireEvent.click(link);
     await waitFor(() => expect(onLinkCustomer).toHaveBeenCalledWith("יד השם"));
+    await waitFor(() => expect(field.value).toBe(""));
+  });
+
+  it("keeps the typed customer name when linking fails", async () => {
+    const onLinkCustomer = vi.fn().mockResolvedValue(false);
+    render(
+      <FixedTemplateEditDialog
+        {...props({ form: { ...form, opened_by_delivery_note: true }, onLinkCustomer })}
+      />,
+    );
+    const field = screen.getByLabelText(he.deliveryNoteCustomer) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "יד השם" } });
+    fireEvent.click(screen.getByRole("button", { name: he.deliveryNoteLinkCustomer }));
+    await waitFor(() => expect(onLinkCustomer).toHaveBeenCalled());
+    expect(field.value).toBe("יד השם");
   });
 
   it("renders nothing without a template", () => {

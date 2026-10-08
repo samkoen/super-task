@@ -1055,6 +1055,7 @@ export const he = {
   deliveryNoteCustomerHint: "כתבו את שם הלקוח בדיוק כפי שהוא מופיע באגרוליין, כדי שהתעודות שלו יגיעו לסניף הזה.",
   deliveryNoteCheckHint: "כל השורות תקינות. סמנו רק מה שלא תקין.",
   deliveryNoteSaved: "הבדיקה נשמרה",
+  deliveryNoteLoadFailed: "לא הצלחנו לטעון את תעודת המשלוח",
   deliveryNoteNoteMissingHint: "כתבו מה לא תקין בשורה הזו",
   deliveryNotePhotoAttached: "התמונה צורפה (לחצו להחלפה)",
   deliveryNoteFixNotes: "חסרה הערה בשורות שסומנו כלא תקינות",

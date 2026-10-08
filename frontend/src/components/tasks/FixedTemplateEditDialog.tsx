@@ -51,17 +51,16 @@ export interface FixedTemplateEditDialogProps {
   onTranscript: (transcript: string) => void;
   onError: (message: string) => void;
   /** Rattache un client Agroline au snif de la tâche (action immédiate, hors bouton d'enregistrement). */
-  onLinkCustomer?: (customerName: string) => Promise<void>;
+  onLinkCustomer?: (customerName: string) => Promise<boolean>;
 }
 
-function CustomerLinkRow({ onLink }: { onLink: (customerName: string) => Promise<void> }) {
+function CustomerLinkRow({ onLink }: { onLink: (customerName: string) => Promise<boolean> }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const link = async () => {
     setBusy(true);
     try {
-      await onLink(name.trim());
-      setName("");
+      if (await onLink(name.trim())) setName("");
     } finally {
       setBusy(false);
     }
