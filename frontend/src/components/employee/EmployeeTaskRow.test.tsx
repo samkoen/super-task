@@ -73,7 +73,7 @@ describe("EmployeeTaskRow", () => {
     expect(screen.getByText("ניקיון מדף")).toBeTruthy();
   });
 
-  it("uses the blue info chip for pending manager approval", () => {
+  it("shows a task awaiting manager approval exactly like a completed one", () => {
     render(
       <EmployeeTaskRow
         task={card({ status: "pending_review" })}
@@ -81,7 +81,8 @@ describe("EmployeeTaskRow", () => {
         layout="list"
       />,
     );
-    const chip = screen.getByText(he.taskStatusLabels.pending_review);
-    expect(chip.closest(".MuiChip-colorInfo")).toBeTruthy();
+    expect(screen.queryByText(he.taskStatusLabels.pending_review)).toBeNull();
+    const chip = screen.getByText(he.taskStatusLabels.completed);
+    expect(chip.closest(".MuiChip-colorSuccess")).toBeTruthy();
   });
 });

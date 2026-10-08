@@ -6,6 +6,11 @@ export function isDynamicEmployeeTask(task: { task_kind?: string | null }): bool
   return task.task_kind === "ad_hoc";
 }
 
+/** L'oved ne distingue pas « terminée » de « en attente d'ichour manager ». */
+export function employeeDisplayStatus<S extends string>(status: S): S | "completed" {
+  return status === "pending_review" ? "completed" : status;
+}
+
 export function shouldHighlightEmployeeTask(status: string): boolean {
   return status === "overdue" || status === "awaiting_response";
 }
