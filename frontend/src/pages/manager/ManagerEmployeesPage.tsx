@@ -27,6 +27,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { ApiError, type JobFunction, type User } from "../../services/api";
 import { EMPLOYEE_LANGUAGES, EMPLOYEE_LANGUAGE_LABELS, employeeLanguageLabel, type EmployeeLanguage } from "../../domain/employeeLanguages";
@@ -37,6 +38,8 @@ import { he } from "../../i18n/he";
 import { userBelongsToBranch, userBranchLabels } from "../../utils/userBranchMembership";
 import { canManageAsTeamEmployee } from "../../utils/teamEmployeeActions";
 import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
+import WhatsAppSendDialog from "../../components/manager/WhatsAppSendDialog";
+import type { WhatsAppStatus } from "../../services/whatsappService";
 
 const JOB_FUNCTIONS: JobFunction[] = ["head_cashier", "stockers", "warehouse_worker"];
 
@@ -75,6 +78,8 @@ export default function ManagerEmployeesPage() {
   const [addBranchId, setAddBranchId] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [whatsappTarget, setWhatsappTarget] = useState<User | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,6 +161,15 @@ export default function ManagerEmployeesPage() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     }
+  };
+
+  const openWhatsApp = (employee: User | null) => {
+    setWhatsappTarget(employee);
+    setWhatsappOpen(true);
+  };
+
+  const handleWhatsAppSent = (status: WhatsAppStatus) => {
+    setSuccess(status === "simulated" ? he.whatsappSimulated : he.whatsappSent);
   };
 
   const openAccessConfirm = (employee: User) => {
@@ -291,9 +305,14 @@ export default function ManagerEmployeesPage() {
               : he.managerEmployeesSubtitle}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
-          {he.newEmployee}
-        </Button>
+        <Box display="flex" gap={1} flexWrap="wrap">
+          <Button variant="outlined" startIcon={<WhatsAppIcon />} onClick={() => openWhatsApp(null)}>
+            {he.whatsappSendExternal}
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            {he.newEmployee}
+          </Button>
+        </Box>
       </Box>
 
       {isNetworkManager && branches.length > 0 && (
@@ -380,6 +399,11 @@ export default function ManagerEmployeesPage() {
                       <Tooltip title={he.edit}>
                         <IconButton size="small" onClick={() => openEdit(u)}>
                           <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={he.whatsappSend}>
+                        <IconButton size="small" color="success" onClick={() => openWhatsApp(u)}>
+                          <WhatsAppIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title={he.resetEmployeePassword}>
@@ -577,6 +601,13 @@ export default function ManagerEmployeesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <WhatsAppSendDialog
+        open={whatsappOpen}
+        employee={whatsappTarget}
+        onClose={() => setWhatsappOpen(false)}
+        onSent={handleWhatsAppSent}
+      />
 
       <Dialog open={passwordOpen} onClose={() => setPasswordOpen(false)} fullWidth maxWidth="xs" dir="rtl">
         <DialogTitle>{he.resetEmployeePassword}</DialogTitle>
