@@ -503,6 +503,7 @@ class TaskTemplateService:
         assert primary is not None
         result = self._to_api(primary)
         result["updated_count"] = len(targets)
+        result["updated_ids"] = [target.id for target in targets]
         return result
 
     def _group_templates_in_scope(self, actor, existing) -> list:

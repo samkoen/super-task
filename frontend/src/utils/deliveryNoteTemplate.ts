@@ -30,3 +30,8 @@ export function deliveryNoteNeedsUpdate(
 ): boolean {
   return saved.opened !== wanted.opened || saved.taskType !== wanted.taskType;
 }
+
+/** Mod?les ? mettre ? jour : celui qu'on ?dite + les fr?res modifi?s en mode r?seau (sans doublon). */
+export function deliveryNoteTargetIds(templateId: string, updatedIds: string[] = []): string[] {
+  return Array.from(new Set([templateId, ...updatedIds]));
+}

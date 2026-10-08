@@ -342,13 +342,20 @@ def update_template(
         apply_to_network=bool(payload.get("apply_to_network")),
     )
     count = item.pop("updated_count", 1)
+    ids = item.pop("updated_ids", [template_id])
     if bool(payload.get("apply_to_network")) and count > 1:
         return {
             "message": f"עודכנו {count} משימות קבועות ברשת",
             "template": item,
             "updated_count": count,
+            "updated_ids": ids,
         }
-    return {"message": "המשימה עודכנה", "template": item, "updated_count": count}
+    return {
+        "message": "המשימה עודכנה",
+        "template": item,
+        "updated_count": count,
+        "updated_ids": ids,
+    }
 
 
 @router.delete("/templates/{template_id}")

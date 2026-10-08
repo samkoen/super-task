@@ -18,6 +18,7 @@ import { deliveryNoteService } from "../../services/deliveryNoteService";
 import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
 import {
   deliveryNoteNeedsUpdate,
+  deliveryNoteTargetIds,
   formDeliveryNoteState,
   savedDeliveryNoteState,
 } from "../../utils/deliveryNoteTemplate";
@@ -234,10 +235,17 @@ export default function ManagerFixedTasksPage() {
     }
   };
 
-  const saveDeliveryNoteState = async (template: TaskTemplate, form: EditForm) => {
+  /** Applique le réglage teuda au modèle édité et, en mode réseau, à tous les modèles modifiés. */
+  const saveDeliveryNoteState = async (
+    template: TaskTemplate,
+    form: EditForm,
+    updatedIds: string[] = [],
+  ) => {
     const wanted = formDeliveryNoteState(form);
     if (!deliveryNoteNeedsUpdate(savedDeliveryNoteState(template), wanted)) return;
-    await deliveryNoteService.markTemplate(template.id, wanted.opened, wanted.taskType);
+    for (const id of deliveryNoteTargetIds(template.id, updatedIds)) {
+      await deliveryNoteService.markTemplate(id, wanted.opened, wanted.taskType);
+    }
   };
 
   /** Renvoie `true` si le client est lié (le champ n'est vidé qu'à ce moment-là). */
@@ -287,7 +295,7 @@ export default function ManagerFixedTasksPage() {
         apply_to_network: editForm.apply_to_network,
         ...media,
       });
-      await saveDeliveryNoteState(editing, editForm);
+      await saveDeliveryNoteState(editing, editForm, res.updated_ids);
       setEditing(null);
       setEditForm(null);
       showSuccess(he.managerFixedTasksSavedNetwork(res.updated_count ?? 1));

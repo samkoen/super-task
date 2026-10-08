@@ -97,6 +97,20 @@ def test_mishloah_groups_same_branch_and_day_only():
     assert len(groups) == 2
 
 
+def test_mishloah_keeps_unlinked_notes_in_their_own_group_with_null_branch():
+    groups = group_mishloah(
+        [
+            {"branch_id": None, "document_date": "2026-10-02", "agroline_number": "1"},
+            {"branch_id": "snif", "document_date": "2026-10-02", "agroline_number": "2"},
+            {"branch_id": None, "document_date": "2026-10-02", "agroline_number": "3"},
+        ]
+    )
+    unlinked = next(group for group in groups if group["branch_id"] is None)
+    assert len(unlinked["delivery_notes"]) == 2
+    assert len(groups) == 2
+    assert all(group["branch_id"] != "None" for group in groups)
+
+
 def test_customer_name_matches_the_snif_despite_quotes():
     assert same_customer_name('שפע החיד"א', "שפע החידא")
     assert not same_customer_name("שפע המגיד", "שפע המגיד ממזריטש")

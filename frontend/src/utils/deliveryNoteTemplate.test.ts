@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deliveryNoteNeedsUpdate,
+  deliveryNoteTargetIds,
   formDeliveryNoteState,
   savedDeliveryNoteState,
 } from "./deliveryNoteTemplate";
@@ -35,5 +36,11 @@ describe("deliveryNoteTemplate", () => {
       deliveryNoteNeedsUpdate(opened, formDeliveryNoteState({ opened_by_delivery_note: true, delivery_note_task_type: "origin_list" })),
     ).toBe(true);
     expect(deliveryNoteNeedsUpdate(opened, formDeliveryNoteState({}))).toBe(true);
+  });
+
+  it("targets the edited template alone, or all network siblings without duplicates", () => {
+    expect(deliveryNoteTargetIds("t1")).toEqual(["t1"]);
+    expect(deliveryNoteTargetIds("t1", ["t1", "t2", "t3"])).toEqual(["t1", "t2", "t3"]);
+    expect(deliveryNoteTargetIds("t1", ["t2"])).toEqual(["t1", "t2"]);
   });
 });

@@ -453,6 +453,7 @@ def test_update_network_keeps_per_branch_assignee(monkeypatch):
     svc, templates, actor = _network_update_setup(monkeypatch)
     result = svc.update_template(actor, "t1", **_edit_kwargs())
     assert result["updated_count"] == 2
+    assert sorted(result["updated_ids"]) == ["t1", "t2"]
     by_id = {c.args[0]: c.kwargs for c in templates.update.call_args_list}
     assert by_id["t1"]["assignee_user_id"] == "e1"
     assert by_id["t2"]["assignee_user_id"] == "e2a"

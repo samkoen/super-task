@@ -284,6 +284,8 @@ export const taskService = {
       message: string;
       template: TaskTemplate;
       updated_count?: number;
+      /** Tous les modèles modifiés (le modèle édité + ses frères quand `apply_to_network`). */
+      updated_ids?: string[];
     }>(`/tasks/templates/${templateId}`, payload);
     return response.data;
   },

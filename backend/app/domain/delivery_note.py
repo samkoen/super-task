@@ -36,14 +36,16 @@ LINE_FIELDS = (
 )
 
 
-def mishloah_key(branch_id: str, document_date: str) -> tuple[str, str]:
+def mishloah_key(branch_id: str | None, document_date: str) -> tuple[str | None, str]:
     return (branch_id, document_date)
 
 
 def group_mishloah(notes: list[dict]) -> list[dict]:
-    buckets: dict[tuple[str, str], list[dict]] = {}
+    """Regroupe par snif et par jour; une teuda sans snif garde `branch_id` à None (jamais "None")."""
+    buckets: dict[tuple[str | None, str], list[dict]] = {}
     for note in notes:
-        key = mishloah_key(str(note["branch_id"]), str(note["document_date"]))
+        branch = note.get("branch_id")
+        key = mishloah_key(str(branch) if branch else None, str(note["document_date"]))
         buckets.setdefault(key, []).append(note)
     return [
         {"branch_id": key[0], "document_date": key[1], "delivery_notes": rows}
