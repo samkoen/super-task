@@ -20,6 +20,7 @@ from app.models.task_occurrence import TaskOccurrence
 from app.models.task_template import TaskTemplate
 from app.models.app_release import AppRelease
 from app.models.user import User
+from app.models.whatsapp_message import WhatsAppMessage
 
 
 def parse_uuid(value: str | uuid.UUID | None) -> uuid.UUID:
@@ -498,3 +499,24 @@ def app_release_domain_to_api(release: AppRelease) -> dict:
     data = release.to_dict()
     data.pop("apk_url", None)
     return data
+
+
+def whatsapp_message_orm_to_domain(row: orm.WhatsAppMessage | None) -> WhatsAppMessage | None:
+    if row is None:
+        return None
+    consent_at = row.consent_confirmed_at
+    return WhatsAppMessage(
+        id=str(row.id),
+        sent_by_user_id=str(row.sent_by_user_id) if row.sent_by_user_id else None,
+        recipient_user_id=str(row.recipient_user_id) if row.recipient_user_id else None,
+        recipient_name=row.recipient_name,
+        recipient_phone=row.recipient_phone,
+        template_key=row.template_key,
+        variables=dict(row.variables or {}),
+        brevo_message_id=row.brevo_message_id,
+        status=row.status,
+        error=row.error,
+        consent_confirmed=bool(row.consent_confirmed),
+        consent_confirmed_at=parse_datetime_iso(consent_at) if consent_at else None,
+        created_at=parse_datetime_iso(row.created_at),
+    )

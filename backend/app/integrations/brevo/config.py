@@ -34,3 +34,19 @@ def brevo_sandbox_recipient() -> str:
 
 def brevo_is_configured() -> bool:
     return brevo_credentials_ok() and not brevo_force_simulation()
+
+
+def brevo_whatsapp_sender_number() -> str | None:
+    digits = "".join(ch for ch in (config.BREVO_WHATSAPP_SENDER_NUMBER or "") if ch.isdigit())
+    return digits or None
+
+
+def brevo_whatsapp_template_id() -> int | None:
+    raw = (config.BREVO_WHATSAPP_TEMPLATE_ID or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def brevo_whatsapp_credentials_ok() -> bool:
+    return bool(
+        brevo_api_key() and brevo_whatsapp_sender_number() and brevo_whatsapp_template_id()
+    )
