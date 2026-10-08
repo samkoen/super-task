@@ -36,6 +36,7 @@ from app.controllers import (
     task_controller,
     task_gallery_controller,
     user_controller,
+    whatsapp_controller,
 )
 from app.core.config import (
     COOKIE_SECURE,
@@ -155,6 +156,7 @@ def create_app() -> FastAPI:
     app.include_router(
         app_release_controller.router, prefix="/api/app-releases", tags=["app-releases"]
     )
+    app.include_router(whatsapp_controller.router, prefix="/api/whatsapp", tags=["whatsapp"])
     app.include_router(direct_chat_controller.router, prefix="/api/direct-chats", tags=["direct-chats"])
     app.include_router(dashboard_controller.router, prefix="/api/dashboard", tags=["dashboard"])
     app.include_router(
