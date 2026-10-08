@@ -41,6 +41,9 @@ const note: DeliveryCheck = {
   ],
 };
 
+const notOk = (product: string) => screen.getByRole("button", { name: `${he.deliveryNoteNotOk}: ${product}` });
+const ok = (product: string) => screen.getByRole("button", { name: `${he.deliveryNoteConditionOk}: ${product}` });
+
 describe("DeliveryLineCheck", () => {
   beforeEach(() => {
     vi.mocked(deliveryNoteService.checkForOccurrence).mockResolvedValue(note);
@@ -50,31 +53,61 @@ describe("DeliveryLineCheck", () => {
     });
   });
 
-  it("shows a table and keeps save off until a marked line has a remark", async () => {
+  it("shows one card per line, all OK by default, with the facts of each product", async () => {
     render(<DeliveryLineCheck occurrenceId="occ-1" />);
     expect(await screen.findByText("תעודת משלוח 2316228 · שפע כף החיים · טריים")).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: he.deliveryNoteColumnPack })).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: he.deliveryNoteColumnQty })).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: he.deliveryNoteWeight })).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: he.deliveryNoteNotOk })).toBeTruthy();
-    expect(screen.getByText("קרטון")).toBeTruthy();
-    expect(screen.getByText("9.23")).toBeTruthy();
+    expect(screen.getByText(he.deliveryNoteCheckHint)).toBeTruthy();
+    expect(screen.getByText(/1 קרטון/)).toBeTruthy();
+    expect(screen.getByText(/9\.23/)).toBeTruthy();
     expect(screen.getByText("איטליה")).toBeTruthy();
     expect(screen.getByText("2 תקינות · 0 לא תקין · התקבל")).toBeTruthy();
+    expect(ok("עגבניות").getAttribute("aria-pressed")).toBe("true");
+    expect(notOk("עגבניות").getAttribute("aria-pressed")).toBe("false");
+  });
 
-    const boxes = screen.getAllByRole("checkbox", { name: he.deliveryNoteNotOk });
-    fireEvent.click(boxes[0]);
+  it("keeps save off until a line marked not OK has a remark, then saves", async () => {
+    render(<DeliveryLineCheck occurrenceId="occ-1" />);
+    await screen.findByText(he.deliveryNoteCheckHint);
+    fireEvent.click(notOk("תפוח מוזהב יבוא"));
     expect(screen.getByText("1 תקינות · 1 לא תקין · יש בעיה")).toBeTruthy();
-    const save = screen.getByRole("button", { name: he.deliveryNoteSave });
-    expect((save as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(he.deliveryNoteFixNotes)).toBeTruthy();
+    const save = screen.getByRole("button", { name: he.deliveryNoteSave }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "רקוב" } });
-    expect((save as HTMLButtonElement).disabled).toBe(false);
+    expect(save.disabled).toBe(false);
     fireEvent.click(save);
     await waitFor(() => expect(deliveryNoteService.submitAnswers).toHaveBeenCalled());
     const payload = vi.mocked(deliveryNoteService.submitAnswers).mock.calls[0][1];
     expect(payload.lines[0]).toMatchObject({ arrival: "problem", note: "רקוב" });
     expect(payload.lines[1]).toMatchObject({ arrival: "ok", note: null });
+    expect(await screen.findByText(he.deliveryNoteSaved)).toBeTruthy();
+  });
+
+  it("drops the remark when the line is switched back to OK", async () => {
+    render(<DeliveryLineCheck occurrenceId="occ-1" />);
+    await screen.findByText(he.deliveryNoteCheckHint);
+    fireEvent.click(notOk("עגבניות"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "רקוב" } });
+    fireEvent.click(ok("עגבניות"));
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText("2 תקינות · 0 לא תקין · התקבל")).toBeTruthy();
+  });
+
+  it("shows the error and keeps the form when saving fails", async () => {
+    vi.mocked(deliveryNoteService.submitAnswers).mockRejectedValueOnce(new Error("x"));
+    render(<DeliveryLineCheck occurrenceId="occ-1" />);
+    await screen.findByText(he.deliveryNoteCheckHint);
+    fireEvent.click(screen.getByRole("button", { name: he.deliveryNoteSave }));
+    expect(await screen.findByText(he.errorGeneric)).toBeTruthy();
+    expect(screen.queryByText(he.deliveryNoteSaved)).toBeNull();
+  });
+
+  it("renders nothing when the task has no delivery note", async () => {
+    vi.mocked(deliveryNoteService.checkForOccurrence).mockRejectedValueOnce(new Error("404"));
+    const { container } = render(<DeliveryLineCheck occurrenceId="occ-2" />);
+    await waitFor(() => expect(deliveryNoteService.checkForOccurrence).toHaveBeenCalled());
+    expect(container.textContent).toBe("");
   });
 
   it("lists only products that have a country for the origin task", async () => {
@@ -84,10 +117,8 @@ describe("DeliveryLineCheck", () => {
     });
     render(<DeliveryLineCheck occurrenceId="occ-1" />);
     expect(await screen.findByText("תפוח מוזהב יבוא")).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: he.deliveryNoteColumnOrigin })).toBeTruthy();
-    expect(screen.getByText("איטליה")).toBeTruthy();
+    expect(screen.getByText(`${he.deliveryNoteColumnOrigin}: איטליה`)).toBeTruthy();
     expect(screen.queryByText("עגבניות")).toBeNull();
-    expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: he.deliveryNoteSave })).toBeNull();
   });
 });

@@ -47,7 +47,7 @@ export default function EmployeeChatRowItem({
         ...(unread > 0 ? { borderInlineStart: `5px solid ${EMPLOYEE_BRAND}` } : {}),
       }}
     >
-      <RowAvatar general={general} />
+      <ChatRowAvatar general={general} />
       <ListItemText
         primary={row.title}
         secondary={row.last_preview || he.chatRowEmpty}
@@ -59,12 +59,12 @@ export default function EmployeeChatRowItem({
           fontWeight: unread > 0 ? 700 : 400,
         }}
       />
-      <RowTrailing time={row.last_at} unread={unread} />
+      <ChatRowTrailing time={row.last_at} unread={unread} />
     </ListItemButton>
   );
 }
 
-function RowAvatar({ general }: { general: boolean }) {
+export function ChatRowAvatar({ general }: { general: boolean }) {
   return (
     <Avatar
       sx={{
@@ -79,7 +79,7 @@ function RowAvatar({ general }: { general: boolean }) {
   );
 }
 
-function RowTrailing({ time, unread }: { time: string | null; unread: number }) {
+export function ChatRowTrailing({ time, unread }: { time: string | null; unread: number }) {
   return (
     <Box display="flex" alignItems="center" gap={0.5} flexShrink={0}>
       <Box textAlign="end" minWidth={52} display="flex" flexDirection="column" alignItems="flex-end" gap={0.5}>

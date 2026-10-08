@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  FormControlLabel,
+  Paper,
+  Switch,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { ApiError } from "../../services/api";
 import AgrolineNotesDialog from "./AgrolineNotesDialog";
 import { deliveryNoteService } from "../../services/deliveryNoteService";
 import { useFeedback } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
+import { employeeFieldSx, employeePrimaryButtonSx } from "../../styles/employeeUi";
 
 type Account = Awaited<ReturnType<typeof deliveryNoteService.account>>;
 
@@ -72,22 +83,35 @@ function AccessPanel(props: {
   onSync: () => void;
   onNotes: (open: boolean) => void;
 }) {
+  const connected = props.account.enabled && props.account.configured;
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3, maxWidth: 560 }}>
-      <Typography variant="h6" fontWeight={700} mb={1}>{he.agrolineAccountTitle}</Typography>
+    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3, maxWidth: 560, borderRadius: 3 }}>
+      <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} mb={1}>
+        <Typography variant="h6" fontWeight={800}>{he.agrolineAccountTitle}</Typography>
+        <Chip
+          size="small"
+          color={connected ? "success" : "default"}
+          label={connected ? he.agrolineConnected : he.agrolineNotConnected}
+        />
+      </Box>
       <FormControlLabel
-        control={<Checkbox checked={props.enabled} onChange={(event) => props.onEnabled(event.target.checked)} />}
-        label={he.agrolineAccess}
+        control={<Switch checked={props.enabled} onChange={(event) => props.onEnabled(event.target.checked)} />}
+        label={<Typography fontWeight={700}>{he.agrolineAccess}</Typography>}
+        sx={{ mx: 0, minHeight: 48 }}
       />
       {props.enabled ? <AccountFields {...props} configured={props.account.configured} /> : null}
-      <Box display="flex" gap={1} flexWrap="wrap" mt={1}>
-        <Button variant="outlined" disabled={props.busy || (props.enabled && !props.username.trim())} onClick={props.onSave}>
-          {he.agrolineSaveAccount}
-        </Button>
-        {props.account.enabled && props.account.configured ? (
-          <SyncActions busy={props.busy} syncing={props.syncing} onSync={props.onSync} onOpen={() => props.onNotes(true)} />
-        ) : null}
-      </Box>
+      <Button
+        variant="contained"
+        fullWidth
+        disabled={props.busy || (props.enabled && !props.username.trim())}
+        onClick={props.onSave}
+        sx={{ ...employeePrimaryButtonSx, mt: 2 }}
+      >
+        {he.agrolineSaveAccount}
+      </Button>
+      {connected ? (
+        <SyncActions busy={props.busy} syncing={props.syncing} onSync={props.onSync} onOpen={() => props.onNotes(true)} />
+      ) : null}
       <AgrolineNotesDialog open={props.notesOpen} onClose={() => props.onNotes(false)} />
     </Paper>
   );
@@ -126,19 +150,28 @@ function AccountFields({
 }) {
   return (
     <Box display="flex" flexDirection="column" gap={2} mt={1}>
-      <TextField label={he.agrolineUsername} value={username} onChange={(event) => onUsername(event.target.value)} fullWidth size="small" />
+      <TextField
+        label={he.agrolineUsername}
+        value={username}
+        onChange={(event) => onUsername(event.target.value)}
+        fullWidth
+        sx={employeeFieldSx}
+        inputProps={{ dir: "ltr", autoCapitalize: "none" }}
+      />
       <TextField
         label={he.agrolinePassword}
         type="password"
         value={password}
         onChange={(event) => onPassword(event.target.value)}
-        placeholder={configured ? he.agrolinePasswordKept : ""}
+        helperText={configured ? he.agrolinePasswordKept : undefined}
         fullWidth
-        size="small"
+        sx={employeeFieldSx}
+        inputProps={{ dir: "ltr" }}
       />
       <FormControlLabel
-        control={<Checkbox checked={internal} onChange={(event) => onInternal(event.target.checked)} />}
+        control={<Switch checked={internal} onChange={(event) => onInternal(event.target.checked)} />}
         label={he.agrolineInternal}
+        sx={{ mx: 0, minHeight: 48 }}
       />
     </Box>
   );
@@ -156,17 +189,28 @@ function SyncActions({
   onOpen: () => void;
 }) {
   return (
-    <>
+    <Box display="flex" flexDirection="column" gap={1} mt={3} pt={2} sx={{ borderTop: 1, borderColor: "divider" }}>
+      <Typography color="text.secondary">{he.agrolineSyncHint}</Typography>
       <Button
-        variant="contained"
+        variant="outlined"
+        fullWidth
         disabled={busy}
         onClick={onSync}
-        startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : undefined}
+        startIcon={syncing ? <CircularProgress size={18} color="inherit" /> : undefined}
+        sx={{ minHeight: 52, borderRadius: "14px", fontWeight: 800 }}
       >
         {he.agrolineSync}
       </Button>
-      <Button variant="text" disabled={busy} onClick={onOpen}>{he.agrolineViewNotes}</Button>
-    </>
+      <Button
+        variant="text"
+        fullWidth
+        disabled={busy}
+        onClick={onOpen}
+        sx={{ minHeight: 48, borderRadius: "14px", fontWeight: 700 }}
+      >
+        {he.agrolineViewNotes}
+      </Button>
+    </Box>
   );
 }
 

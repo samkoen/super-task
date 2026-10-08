@@ -29,6 +29,34 @@ describe("AgrolineConnectionCard", () => {
     expect(screen.getByLabelText(he.agrolineUsername)).toBeTruthy();
   });
 
+  it("shows the connection status and blocks saving without a username", async () => {
+    vi.mocked(deliveryNoteService.account).mockResolvedValueOnce({
+      enabled: true,
+      configured: false,
+      username: "",
+      internal: false,
+    });
+    render(<AgrolineConnectionCard />);
+    expect(await screen.findByText(he.agrolineNotConnected)).toBeTruthy();
+    const save = screen.getByRole("button", { name: he.agrolineSaveAccount }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(he.agrolineUsername), { target: { value: "user" } });
+    expect(save.disabled).toBe(false);
+  });
+
+  it("shows the sync actions with their explanation once connected", async () => {
+    vi.mocked(deliveryNoteService.account).mockResolvedValueOnce({
+      enabled: true,
+      configured: true,
+      username: "user",
+      internal: false,
+    });
+    render(<AgrolineConnectionCard />);
+    expect(await screen.findByText(he.agrolineConnected)).toBeTruthy();
+    expect(screen.getByText(he.agrolineSyncHint)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.agrolineViewNotes })).toBeTruthy();
+  });
+
   it("shows a spinner while the sync is running and reports how many teudot were read", async () => {
     let release: (value: { results: { opened_occurrence_ids: string[] }[]; errors: never[] }) => void = () => undefined;
     vi.mocked(deliveryNoteService.account).mockResolvedValue({

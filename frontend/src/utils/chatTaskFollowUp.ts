@@ -53,6 +53,30 @@ export function toDatetimeLocalValue(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+export type FollowUpPreset = { key: "hour" | "tomorrow" | "week"; value: string };
+
+/** Choix rapides de rappel (valeurs `datetime-local`) : dans une heure, demain 9h, dans 7 jours 9h. */
+export function followUpPresets(now: Date): FollowUpPreset[] {
+  const inHour = new Date(now.getTime() + 60 * 60 * 1000);
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0);
+  const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 9, 0);
+  return [
+    { key: "hour", value: toDatetimeLocalValue(inHour.toISOString()) },
+    { key: "tomorrow", value: toDatetimeLocalValue(tomorrow.toISOString()) },
+    { key: "week", value: toDatetimeLocalValue(nextWeek.toISOString()) },
+  ];
+}
+
+/** Rappel lisible (« יום ה׳, 9 באוק׳ · 09:00 »), ou chaîne vide si la valeur est invalide. */
+export function formatFollowUpPreview(value: string): string {
+  const iso = datetimeLocalToIso(value);
+  if (!iso) return "";
+  const d = new Date(iso);
+  const day = d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
+  const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  return `${day} · ${time}`;
+}
+
 export function datetimeLocalToIso(value: string): string | null {
   const raw = value.trim();
   if (!raw) return null;

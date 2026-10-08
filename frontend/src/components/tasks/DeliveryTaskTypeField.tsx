@@ -1,35 +1,42 @@
-import { MenuItem, TextField } from "@mui/material";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import PublicIcon from "@mui/icons-material/Public";
 import { he } from "../../i18n/he";
 import {
   DELIVERY_TASK_LINE_CHECK,
   DELIVERY_TASK_ORIGIN,
-  DELIVERY_TASK_TYPES,
 } from "../../utils/deliveryNote";
+import ChoiceCards, { type ChoiceCardOption } from "../ui/ChoiceCards";
 
-const LABELS: Record<(typeof DELIVERY_TASK_TYPES)[number], string> = {
-  [DELIVERY_TASK_LINE_CHECK]: he.deliveryNoteTaskTypeLineCheck,
-  [DELIVERY_TASK_ORIGIN]: he.deliveryNoteTaskTypeOrigin,
-};
+const OPTIONS: ChoiceCardOption<string>[] = [
+  {
+    value: DELIVERY_TASK_LINE_CHECK,
+    icon: FactCheckOutlinedIcon,
+    label: he.deliveryNoteTaskTypeLineCheck,
+    hint: he.deliveryNoteTaskTypeLineCheckHint,
+  },
+  {
+    value: DELIVERY_TASK_ORIGIN,
+    icon: PublicIcon,
+    label: he.deliveryNoteTaskTypeOrigin,
+    hint: he.deliveryNoteTaskTypeOriginHint,
+  },
+];
 
 type Props = {
   value: string | null | undefined;
   onChange: (value: string) => void;
+  disabled?: boolean;
 };
 
-export default function DeliveryTaskTypeField({ value, onChange }: Props) {
+/** Ce que l'oved fera de la teuda : contrôler chaque ligne, ou simplement voir les pays d'origine. */
+export default function DeliveryTaskTypeField({ value, onChange, disabled = false }: Props) {
   return (
-    <TextField
-      select
-      label={he.deliveryNoteTaskType}
+    <ChoiceCards
+      options={OPTIONS}
       value={value || DELIVERY_TASK_LINE_CHECK}
-      onChange={(event) => onChange(event.target.value)}
-      fullWidth
-    >
-      {DELIVERY_TASK_TYPES.map((type) => (
-        <MenuItem key={type} value={type}>
-          {LABELS[type]}
-        </MenuItem>
-      ))}
-    </TextField>
+      onChange={onChange}
+      ariaLabel={he.deliveryNoteTaskType}
+      disabled={disabled}
+    />
   );
 }

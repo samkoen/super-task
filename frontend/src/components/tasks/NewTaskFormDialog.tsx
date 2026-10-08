@@ -1,47 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Box,
-  Button,
-  Checkbox,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  MenuItem,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from "@mui/material";
+import { Box, Button, CircularProgress, MenuItem, TextField, Typography } from "@mui/material";
 import type { User } from "../../services/api";
 import type { Branch } from "../../services/branchService";
 import { asList } from "../../utils/asList";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
-import DeliveryTaskTypeField from "./DeliveryTaskTypeField";
 import BranchChecklist from "./BranchChecklist";
 import TaskReferenceMediaEditor, {
   type TaskReferenceMediaValue,
 } from "./TaskReferenceMediaEditor";
-import WeekdayMultiSelect from "./WeekdayMultiSelect";
+import FormDialog from "../ui/FormDialog";
+import DeliveryNoteTemplateFields from "./form/DeliveryNoteTemplateFields";
+import TaskAdvancedFields, { type TaskAdvancedValue } from "./form/TaskAdvancedFields";
+import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
+import TaskFormSection from "./form/TaskFormSection";
+import TaskKindPicker from "./form/TaskKindPicker";
+import TaskScheduleFields, { type TaskScheduleValue } from "./form/TaskScheduleFields";
+import { dialogSecondaryActionSx } from "../../styles/dialogUi";
+import { employeeFieldSx, employeePrimaryButtonSx } from "../../styles/employeeUi";
+import { taskFormMissing, taskFormMissingMessage } from "../../utils/taskFormReadiness";
 import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { ASSIGN_TO_GALLERY, isAssignToGallery } from "../../constants/taskAssignment";
-import { OPS_CATEGORIES, type OpsCategory, type TaskRecurrence } from "../../services/taskService";
+import { type OpsCategory, type TaskRecurrence } from "../../services/taskService";
 import { he } from "../../i18n/he";
 import { assigneeOptionLabel, assigneesForBranch } from "../../utils/assigneeOptions";
 import type { CompletionRequirement } from "../../utils/completionMedia";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
 import {
   createFieldsFromBranchSelection,
 } from "../../utils/fixedTaskCreateScope";
-import {
-  DAILY_DEFAULT_WEEKDAYS,
-  FIXED_RECURRENCE_OPTIONS,
-  weekdaysOnRecurrenceChange,
-} from "../../utils/taskRecurrence";
+import { DAILY_DEFAULT_WEEKDAYS } from "../../utils/taskRecurrence";
 import { startUrlFieldError } from "../../utils/startUrl";
-import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
 import {
   readFixedTaskCreateForm,
   writeFixedTaskCreateForm,
@@ -78,7 +65,7 @@ export interface NewTaskFormSubmitPayload {
   start_url?: string | null;
   opened_by_delivery_note?: boolean;
   delivery_note_task_type?: string | null;
-}
+  }
 
 export interface NewTaskFormDialogProps {
   open: boolean;
@@ -159,6 +146,7 @@ export default function NewTaskFormDialog({
   );
   const [media, setMedia] = useState<TaskReferenceMediaValue>(remembered?.media ?? EMPTY_MEDIA);
   const [localError, setLocalError] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const wasOpenRef = useRef(false);
 
   // Reset UNIQUEMENT à l'ouverture (pas à chaque re-render parent / dueAt / employees).
@@ -369,251 +357,93 @@ export default function NewTaskFormDialog({
     });
   };
 
-  const canSubmit =
-    (groupedCreate
-      ? selectedBranchIds.length > 0 && (taskKind === "fixed" || Boolean(dueAt))
-      : Boolean(assigneeUserId.trim()) && Boolean(effectiveBranchId.trim()) &&
-        (toGallery || taskKind === "fixed" || Boolean(dueAt))) &&
-    !saving;
+
+  const missing = taskFormMissing({
+    taskKind,
+    grouped: groupedCreate,
+    canPickBranch,
+    selectedBranchCount: selectedBranchIds.length,
+    assigneeUserId,
+    effectiveBranchId,
+    toGallery,
+    dueAt,
+  });
+  const canSubmit = missing.length === 0 && !saving;
+  const missingMessage = taskFormMissingMessage(missing);
+  const urlProblem = Boolean(localError) && Boolean(startUrlFieldError(startUrl));
+  const dialogTitle =
+    isBranchManager && branchName ? `${he.newTask} — ${branchName}` : he.newTask;
+
+  const patchSchedule = (patch: Partial<TaskScheduleValue>) => {
+    if (patch.dueAt !== undefined) setDueAt(patch.dueAt);
+    if (patch.recurrence !== undefined) setRecurrence(patch.recurrence);
+    if (patch.dueTime !== undefined) setDueTime(patch.dueTime);
+    if (patch.weeklyDays !== undefined) setWeeklyDays(patch.weeklyDays);
+    if (patch.monthlyDay !== undefined) setMonthlyDay(patch.monthlyDay);
+  };
+  const patchAdvanced = (patch: Partial<TaskAdvancedValue>) => {
+    if (patch.startUrl !== undefined) setStartUrl(patch.startUrl);
+    if (patch.opsCategory !== undefined) setOpsCategory(patch.opsCategory);
+    if (patch.isWorkStart !== undefined) setIsWorkStart(patch.isWorkStart);
+    if (patch.isWorkEnd !== undefined) setIsWorkEnd(patch.isWorkEnd);
+  };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" dir="rtl">
-      <DialogTitle>
-        {isBranchManager && branchName
-          ? `${he.newTask} — ${branchName}`
-          : he.newTask}
-      </DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-        {taskKind === "fixed" && (
-          <>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={openedByDeliveryNote}
-                  onChange={(event) => setOpenedByDeliveryNote(event.target.checked)}
-                  disabled={saving}
-                />
-              }
-              label={he.deliveryNoteOpenModel}
-            />
-            <Typography variant="caption" color="text.secondary">
-              {he.deliveryNoteOpenModelHint}
+    <FormDialog
+      open={open}
+      title={dialogTitle}
+      onClose={onClose}
+      busy={saving}
+      actions={
+        <>
+          <Button onClick={onClose} disabled={saving} sx={dialogSecondaryActionSx}>
+            {he.cancel}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleSubmit()}
+            disabled={!canSubmit}
+            sx={employeePrimaryButtonSx}
+          >
+            {saving ? <CircularProgress size={24} color="inherit" /> : he.newTaskCreate}
+          </Button>
+          {localError ? (
+            <Typography color="error" fontWeight={700} sx={{ textAlign: "center" }}>
+              {localError}
             </Typography>
-            {openedByDeliveryNote ? (
-              <DeliveryTaskTypeField
-                value={deliveryNoteTaskType}
-                onChange={setDeliveryNoteTaskType}
-              />
-            ) : null}
-          </>
-        )}
-        {!forcedTaskKind && (
-          <Box>
-            <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-              {he.taskKind}
+          ) : null}
+          {missingMessage ? (
+            <Typography color="text.secondary" sx={{ textAlign: "center", fontSize: "1rem" }}>
+              {missingMessage}
             </Typography>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={taskKind}
-              onChange={(_, v: NewTaskKind | null) => {
-                if (v) setTaskKind(v);
-              }}
-              disabled={saving}
-            >
-              <ToggleButton value="ad_hoc">{he.taskKindLabels.ad_hoc}</ToggleButton>
-              <ToggleButton value="fixed">{he.taskKindLabels.fixed}</ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-        )}
+          ) : null}
+        </>
+      }
+    >
+      {!forcedTaskKind && (
+        <TaskFormSection title={he.taskKind}>
+          <TaskKindPicker value={taskKind} onChange={setTaskKind} disabled={saving} />
+        </TaskFormSection>
+      )}
 
-        {canPickBranch && (
-          <Box>
-            <BranchChecklist
-              branches={branches}
-              selectedIds={selectedBranchIds}
-              onChange={setSelectedBranchIds}
-              disabled={saving}
-            />
-            {groupedCreate && (
-              <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
-                {he.fixedTaskApplyToNetworkHint}
-              </Typography>
-            )}
-          </Box>
-        )}
-
+      <TaskFormSection title={he.taskFormSectionWhat}>
         <TextField
           label={he.taskTitle}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           helperText={he.taskTitleOptionalHint}
           fullWidth
+          sx={employeeFieldSx}
         />
         <TextField
           label={he.description}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           multiline
-          rows={2}
+          minRows={2}
           fullWidth
+          sx={employeeFieldSx}
         />
-        <TextField
-          label={he.startUrl}
-          value={startUrl}
-          onChange={(e) => setStartUrl(e.target.value)}
-          helperText={he.startUrlHint}
-          fullWidth
-          dir="ltr"
-        />
-
-        {!groupedCreate && (
-        <TextField
-          select
-          label={he.assignee}
-          value={assigneeUserId}
-          onChange={(e) => setAssigneeUserId(e.target.value)}
-          required
-          fullWidth
-          disabled={lockAssignee || saving}
-          error={Boolean(localError && !assigneeUserId)}
-          helperText={toGallery ? he.assignToGalleryHint : undefined}
-        >
-          {!lockAssignee && forcedTaskKind !== "fixed" && (
-            <MenuItem value={ASSIGN_TO_GALLERY}>
-              <Box component="span" fontWeight={700}>{he.assignToGallery}</Box>
-            </MenuItem>
-          )}
-          {branchEmployees.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{assigneeOptionLabel(u, currentUserId)}</MenuItem>
-          ))}
-        </TextField>
-        )}
-
-        {taskKind === "ad_hoc" && !toGallery ? (
-          <TextField
-            label={he.dueAt}
-            type="datetime-local"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            required
-            fullWidth
-            dir="ltr"
-          />
-        ) : null}
-        {taskKind === "fixed" ? (
-          <>
-            <TextField
-              select
-              label={he.recurrence}
-              value={recurrence}
-              onChange={(e) => {
-                const next = e.target.value as TaskRecurrence;
-                setWeeklyDays((current) => weekdaysOnRecurrenceChange(next, current));
-                setRecurrence(next);
-              }}
-              fullWidth
-            >
-              {FIXED_RECURRENCE_OPTIONS.map((r) => (
-                <MenuItem key={r} value={r}>{he.recurrenceLabels[r]}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label={he.dueTime}
-              type="time"
-              value={dueTime}
-              onChange={(e) => setDueTime(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              dir="ltr"
-            />
-            {recurrence === "daily" || recurrence === "weekly" ? (
-              <WeekdayMultiSelect
-                value={weeklyDays}
-                onChange={setWeeklyDays}
-                exclusive={recurrence === "weekly"}
-              />
-            ) : null}
-            {recurrence === "monthly" && (
-              <TextField
-                select
-                label={he.monthlyDay}
-                value={String(monthlyDay)}
-                onChange={(e) => setMonthlyDay(Number(e.target.value))}
-                fullWidth
-              >
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                  <MenuItem key={day} value={String(day)}>{day}</MenuItem>
-                ))}
-              </TextField>
-            )}
-            <TextField
-              select
-              label={he.opsCategory}
-              value={opsCategory}
-              onChange={(e) => setOpsCategory(e.target.value as OpsCategory | "")}
-              fullWidth
-            >
-              <MenuItem value="">{he.opsCategoryNone}</MenuItem>
-              {OPS_CATEGORIES.map((key) => (
-                <MenuItem key={key} value={key}>
-                  {he.opsCategoryLabels[key]}
-                </MenuItem>
-              ))}
-            </TextField>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isWorkStart}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsWorkStart(checked);
-                    if (checked) setIsWorkEnd(false);
-                  }}
-                  disabled={saving}
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body2">{he.workStartTask}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {he.workStartTaskHint}
-                  </Typography>
-                </Box>
-              }
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={isWorkEnd}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsWorkEnd(checked);
-                    if (checked) setIsWorkStart(false);
-                  }}
-                  disabled={saving}
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body2">{he.workEndTask}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {he.workEndTaskHint}
-                  </Typography>
-                </Box>
-              }
-            />
-          </>
-        ) : null}
-
-        <CompletionRequirementsEditor
-          value={completionRequirements}
-          onChange={setCompletionRequirements}
-          disabled={saving}
-        />
-
         <TaskReferenceMediaEditor
           value={media}
           onChange={setMedia}
@@ -623,23 +453,84 @@ export default function NewTaskFormDialog({
           disabled={saving}
           onError={onError}
         />
+      </TaskFormSection>
 
-        {localError && (
-          <Typography variant="caption" color="error">
-            {localError}
-          </Typography>
+      <TaskFormSection title={he.taskFormSectionWho}>
+        {canPickBranch && (
+          <Box>
+            <BranchChecklist
+              branches={branches}
+              selectedIds={selectedBranchIds}
+              onChange={setSelectedBranchIds}
+              disabled={saving}
+            />
+            {groupedCreate && (
+              <Typography color="text.secondary" display="block" mt={0.75}>
+                {he.fixedTaskApplyToNetworkHint}
+              </Typography>
+            )}
+          </Box>
         )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss() }}>
-        <Button onClick={onClose} disabled={saving}>{he.cancel}</Button>
-        <Button
-          variant="contained"
-          onClick={() => void handleSubmit()}
-          disabled={!canSubmit}
-        >
-          {saving ? <CircularProgress size={22} /> : he.submit}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        {!groupedCreate && (
+          <TextField
+            select
+            label={he.assignee}
+            value={assigneeUserId}
+            onChange={(e) => setAssigneeUserId(e.target.value)}
+            required
+            fullWidth
+            disabled={lockAssignee || saving}
+            error={Boolean(localError && !assigneeUserId)}
+            helperText={toGallery ? he.assignToGalleryHint : undefined}
+            sx={employeeFieldSx}
+          >
+            {!lockAssignee && forcedTaskKind !== "fixed" && (
+              <MenuItem value={ASSIGN_TO_GALLERY}>
+                <Box component="span" fontWeight={700}>{he.assignToGallery}</Box>
+              </MenuItem>
+            )}
+            {branchEmployees.map((u) => (
+              <MenuItem key={u.id} value={u.id}>{assigneeOptionLabel(u, currentUserId)}</MenuItem>
+            ))}
+          </TextField>
+        )}
+        <TaskScheduleFields
+          taskKind={taskKind}
+          toGallery={toGallery}
+          value={{ dueAt, recurrence, dueTime, weeklyDays, monthlyDay }}
+          onChange={patchSchedule}
+          disabled={saving}
+        />
+      </TaskFormSection>
+
+      {taskKind === "fixed" ? (
+        <TaskFormSection title={he.deliveryNoteSectionTitle}>
+          <DeliveryNoteTemplateFields
+            enabled={openedByDeliveryNote}
+            onEnabledChange={setOpenedByDeliveryNote}
+            taskType={deliveryNoteTaskType}
+            onTaskTypeChange={setDeliveryNoteTaskType}
+            disabled={saving}
+          />
+        </TaskFormSection>
+      ) : null}
+
+      <TaskFormSection title={he.taskFormSectionProof}>
+        <CompletionRequirementsEditor
+          value={completionRequirements}
+          onChange={setCompletionRequirements}
+          disabled={saving}
+        />
+      </TaskFormSection>
+
+      <TaskAdvancedFields
+        taskKind={taskKind}
+        value={{ startUrl, opsCategory, isWorkStart, isWorkEnd }}
+        onChange={patchAdvanced}
+        open={advancedOpen || urlProblem}
+        onOpenChange={setAdvancedOpen}
+        disabled={saving}
+      />
+    </FormDialog>
   );
 }

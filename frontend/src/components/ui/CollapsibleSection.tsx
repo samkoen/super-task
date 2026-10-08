@@ -12,18 +12,27 @@ export default function CollapsibleSection({
   label,
   children,
   defaultOpen = false,
+  open: openProp,
+  onOpenChange,
 }: {
   label: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  /** Mode contrôlé : permet au parent de déplier la section (ex. erreur dans un champ replié). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [innerOpen, setInnerOpen] = useState(defaultOpen);
+  const open = openProp ?? innerOpen;
   const panelId = useId();
   return (
     <Box>
       <Button
         fullWidth
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setInnerOpen(!open);
+          onOpenChange?.(!open);
+        }}
         aria-expanded={open}
         aria-controls={panelId}
         endIcon={

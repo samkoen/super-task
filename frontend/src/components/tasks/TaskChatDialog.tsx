@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Dialog, IconButton, Typography } from "@mui/material";
+import { Box, Button, ButtonBase, Dialog, IconButton, Typography } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { he } from "../../i18n/he";
@@ -100,7 +100,7 @@ export function OpenTaskChatButton({
         variant="outlined"
         startIcon={<ChatIcon />}
         onClick={() => setOpen(true)}
-        sx={{ alignSelf: "flex-start", minHeight: 48, px: 2, fontWeight: 800 }}
+        sx={{ alignSelf: "flex-start", minHeight: 52, px: 2.5, borderRadius: "14px", fontWeight: 800, fontSize: "1.05rem" }}
       >
         {he.taskChatSection}
       </Button>
@@ -158,7 +158,7 @@ function TaskChatMediaStrip({
   if (!items.length) return null;
   return (
     <Box sx={{ flexShrink: 0, mb: 1 }}>
-      <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+      <Typography fontWeight={700} color="text.secondary" display="block" mb={0.75} sx={{ fontSize: "0.95rem" }}>
         {employee ? he.completionMediaAdded : he.completionMediaFromEmployee}
       </Typography>
       <Box sx={{ display: "flex", gap: 1, overflowX: "auto", pb: 0.5 }}>
@@ -175,13 +175,35 @@ function TaskChatMediaThumb({ item }: { item: CompletionAttachment }) {
   const media = useResolvedMediaSrc(item.url, remote);
   if (!media.src) return null;
   if (item.kind === "video") return <TaskChatVideoThumb item={item} src={media.src} />;
+  return <TaskChatPhotoThumb src={media.src} />;
+}
+
+/** Photo de la tâche : on peut la toucher pour l'agrandir. */
+function TaskChatPhotoThumb({ src }: { src: string }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Box
-      component="img"
-      src={media.src}
-      alt={he.taskReferencePhoto}
-      sx={{ height: 120, maxWidth: 180, objectFit: "cover", borderRadius: 1, flex: "0 0 auto" }}
-    />
+    <>
+      <ButtonBase
+        aria-label={he.completionEnlargeExample}
+        onClick={() => setOpen(true)}
+        sx={{ flex: "0 0 auto", borderRadius: "12px", overflow: "hidden" }}
+      >
+        <Box
+          component="img"
+          src={src}
+          alt={he.taskReferencePhoto}
+          sx={{ height: 140, maxWidth: 200, objectFit: "cover", display: "block" }}
+        />
+      </ButtonBase>
+      {open ? (
+        <CompletionExampleDialog
+          src={src}
+          title={he.taskReferencePhoto}
+          kind="photo"
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -240,11 +262,11 @@ function ChatVideoFrame({ poster, src }: { poster: string | null; src: string })
 
 const chatVideoThumbSx = {
   position: "relative",
-  width: 120,
-  height: 120,
+  width: 140,
+  height: 140,
   flex: "0 0 auto",
   overflow: "hidden",
-  borderRadius: 1,
+  borderRadius: "12px",
   bgcolor: "common.black",
 } as const;
 

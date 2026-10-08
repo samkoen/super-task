@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
-import { Badge, Box, ListItemButton, ListItemText, Typography } from "@mui/material";
-import { formatTime } from "../../utils/dashboardTime";
+import { Box, ListItemButton, ListItemText } from "@mui/material";
+import { he } from "../../i18n/he";
+import { EMPLOYEE_BRAND, EMPLOYEE_INK, employeeCardSx } from "../../styles/employeeUi";
+import { ChatRowTrailing } from "./EmployeeChatRowItem";
 
+/** Ligne de la boîte de discussions : même carte que côté oved, avec les non-lus en évidence. */
 export default function ChatInboxRow({
   title,
   preview,
@@ -19,10 +22,19 @@ export default function ChatInboxRow({
   leading?: ReactNode;
   titleExtra?: ReactNode;
 }) {
+  const unread = unreadCount > 0;
   return (
     <ListItemButton
       onClick={onClick}
-      sx={{ borderBottom: "1px solid", borderColor: "divider", py: 1.25 }}
+      data-unread={unread ? "true" : "false"}
+      sx={{
+        ...employeeCardSx,
+        minHeight: 84,
+        gap: 1.5,
+        px: 1.5,
+        py: 1.25,
+        ...(unread ? { borderInlineStart: `5px solid ${EMPLOYEE_BRAND}` } : {}),
+      }}
     >
       {leading}
       <ListItemText
@@ -36,18 +48,21 @@ export default function ChatInboxRow({
             title
           )
         }
-        secondary={preview}
-        primaryTypographyProps={{ fontWeight: unreadCount ? 800 : 600, component: "div" }}
-        secondaryTypographyProps={{ noWrap: true }}
+        secondary={preview || he.chatRowEmpty}
+        primaryTypographyProps={{
+          component: "div",
+          fontWeight: unread ? 800 : 700,
+          fontSize: "1.1rem",
+          color: EMPLOYEE_INK,
+        }}
+        secondaryTypographyProps={{
+          noWrap: true,
+          fontSize: "1rem",
+          color: unread ? "text.primary" : "text.secondary",
+          fontWeight: unread ? 700 : 400,
+        }}
       />
-      <Box textAlign="left" minWidth={56}>
-        {lastAt && (
-          <Typography variant="caption" color="text.secondary" display="block">
-            {formatTime(lastAt)}
-          </Typography>
-        )}
-        {unreadCount > 0 && <Badge badgeContent={unreadCount} color="error" sx={{ mt: 0.5 }} />}
-      </Box>
+      <ChatRowTrailing time={lastAt} unread={unreadCount} />
     </ListItemButton>
   );
 }
