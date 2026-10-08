@@ -119,6 +119,10 @@ MEDIA_RETENTION_HOURS = int(os.environ.get("MEDIA_RETENTION_HOURS", "24"))
 MEDIA_PHOTO_MAX_EDGE_PX = int(os.environ.get("MEDIA_PHOTO_MAX_EDGE_PX", "1280"))
 MEDIA_PHOTO_QUALITY = int(os.environ.get("MEDIA_PHOTO_QUALITY", "65"))
 CRON_SECRET = os.environ.get("CRON_SECRET", "").strip()
+AGROLINE_BASE_URL = os.environ.get("AGROLINE_BASE_URL", "https://my.agroline.co.il/v2").strip().rstrip("/")
+AGROLINE_USERNAME = os.environ.get("AGROLINE_USERNAME", "").strip()
+AGROLINE_PASSWORD = os.environ.get("AGROLINE_PASSWORD", "")
+AGROLINE_INTERNAL = os.environ.get("AGROLINE_INTERNAL", "").strip().lower() in {"1", "true", "yes"}
 
 
 def object_storage_enabled() -> bool:

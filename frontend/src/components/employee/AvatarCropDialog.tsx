@@ -6,16 +6,20 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   Slider,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
+import AppDialogTitle from "../ui/AppDialogTitle";
+import { employeePrimaryButtonSx } from "../../styles/employeeUi";
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
 import { blobToFile } from "../../utils/mediaCapture";
 import { cropAvatarToJpeg, avatarPreviewLayout, type AvatarCrop } from "../../utils/cropAvatar";
 import { loadImageElement } from "../../utils/photoAnnotation";
 import { he } from "../../i18n/he";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
-
 type AvatarCropDialogProps = {
   open: boolean;
   file: File | null;
@@ -62,6 +66,8 @@ export default function AvatarCropDialog({
   onClose,
   onConfirm,
 }: AvatarCropDialogProps) {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [crop, setCrop] = useState<AvatarCrop>(DEFAULT_CROP);
   const [saving, setSaving] = useState(false);
   const imageUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
@@ -111,10 +117,10 @@ export default function AvatarCropDialog({
   }, [crop, imageUrl, onConfirm, saving, uploading]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" dir="rtl">
-      <DialogTitle>{he.avatarCropTitle}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-        <Typography variant="body2" color="text.secondary">
+    <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="xs" dir="rtl">
+      <AppDialogTitle title={he.avatarCropTitle} onClose={onClose} closeDisabled={saving || uploading} />
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 1 }}>
+        <Typography variant="body1" fontWeight={600} textAlign="center">
           {he.avatarCropHint}
         </Typography>
         <Box
@@ -144,26 +150,32 @@ export default function AvatarCropDialog({
             }}
           />
         </Box>
-        <Slider
-          aria-label={he.avatarCropZoom}
-          min={1}
-          max={3}
-          step={0.05}
-          value={crop.zoom}
-          onChange={(_, value) =>
-            setCrop((prev) => ({ ...prev, zoom: Array.isArray(value) ? value[0] : value }))
-          }
-        />
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <ZoomOutIcon color="action" />
+          <Slider
+            aria-label={he.avatarCropZoom}
+            min={1}
+            max={3}
+            step={0.05}
+            value={crop.zoom}
+            onChange={(_, value) =>
+              setCrop((prev) => ({ ...prev, zoom: Array.isArray(value) ? value[0] : value }))
+            }
+            sx={{ "& .MuiSlider-thumb": { width: 28, height: 28 }, "& .MuiSlider-rail": { height: 8 }, "& .MuiSlider-track": { height: 8 } }}
+          />
+          <ZoomInIcon color="action" />
+        </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss() }}>
-        <Button onClick={onClose} disabled={saving || uploading}>
+      <DialogActions sx={dialogStackedActionsSx}>
+        <Button onClick={onClose} disabled={saving || uploading} sx={dialogSecondaryActionSx}>
           {he.cancel}
         </Button>
         <Button
           variant="contained"
           onClick={() => void handleConfirm()}
           disabled={!file || saving || uploading}
-          startIcon={saving || uploading ? <CircularProgress size={18} color="inherit" /> : undefined}
+          startIcon={saving || uploading ? <CircularProgress size={20} color="inherit" /> : undefined}
+          sx={employeePrimaryButtonSx}
         >
           {saving || uploading ? busyLabel || he.loading : he.avatarCropConfirm}
         </Button>

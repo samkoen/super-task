@@ -1,28 +1,17 @@
 import { useEffect, useState } from "react";
 import {
+  Button,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import CheckIcon from "@mui/icons-material/Check";
-import CloseIcon from "@mui/icons-material/Close";
-import EditDialogFooterIcons from "./EditDialogFooterIcons";
+import EditDialogFooterButtons from "./EditDialogFooterButtons";
 import { he } from "../../i18n/he";
-
-const confirmButtonSx = {
-  bgcolor: "primary.main",
-  color: "primary.contrastText",
-  "&:hover": { bgcolor: "primary.dark" },
-  "&.Mui-disabled": {
-    bgcolor: "action.disabledBackground",
-    color: "action.disabled",
-  },
-};
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
+import { employeePrimaryButtonSx } from "../../styles/employeeUi";
 
 export function networkSaveNeedsConfirm(applyToNetwork: boolean): boolean {
   return applyToNetwork;
@@ -55,7 +44,7 @@ export default function EditDialogSaveActions({
 
   return (
     <>
-      <EditDialogFooterIcons
+      <EditDialogFooterButtons
         onCancel={onCancel}
         onSubmit={() => {
           if (networkSaveNeedsConfirm(applyToNetwork)) setConfirming(true);
@@ -95,31 +84,19 @@ function NetworkUpdateConfirmDialog({
       dir="rtl"
       transitionDuration={0}
     >
-      <DialogTitle>{he.fixedTaskUpdateAllBranches}</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 800 }}>{he.fixedTaskUpdateAllBranches}</DialogTitle>
       <DialogContent>
-        <Typography variant="body1">{he.fixedTaskUpdateAllBranchesConfirm}</Typography>
+        <Typography variant="body1" sx={{ fontSize: "1.05rem" }}>
+          {he.fixedTaskUpdateAllBranchesConfirm}
+        </Typography>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Tooltip title={he.cancel}>
-          <span>
-            <IconButton onClick={onCancel} disabled={submitting} aria-label={he.cancel}>
-              <CloseIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
-        <Tooltip title={he.confirm}>
-          <span>
-            <IconButton
-              color="primary"
-              onClick={onConfirm}
-              disabled={submitting}
-              aria-label={he.confirm}
-              sx={confirmButtonSx}
-            >
-              {submitting ? <CircularProgress size={18} color="inherit" /> : <CheckIcon />}
-            </IconButton>
-          </span>
-        </Tooltip>
+      <DialogActions sx={dialogStackedActionsSx}>
+        <Button onClick={onCancel} disabled={submitting} sx={dialogSecondaryActionSx}>
+          {he.cancel}
+        </Button>
+        <Button variant="contained" onClick={onConfirm} disabled={submitting} sx={employeePrimaryButtonSx}>
+          {submitting ? <CircularProgress size={24} color="inherit" /> : he.confirm}
+        </Button>
       </DialogActions>
     </Dialog>
   );

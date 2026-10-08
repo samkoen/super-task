@@ -3,16 +3,9 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box,
   Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
   MenuItem,
   Paper,
   TextField,
-  Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
@@ -37,6 +30,7 @@ import {
 } from "../../components/tasks/TaskReferenceMediaEditor";
 import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
 import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
+import ConfirmDeleteDialog from "../../components/ui/ConfirmDeleteDialog";
 import PageHeader from "../../components/ui/PageHeader";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStorage";
@@ -392,6 +386,8 @@ export default function ManagerTasksPage() {
           is_work_start: payload.is_work_start,
           is_work_end: payload.is_work_end,
           start_url: payload.start_url,
+          opened_by_delivery_note: payload.opened_by_delivery_note,
+          delivery_note_task_type: payload.delivery_note_task_type,
           ...media,
         });
         revokeTaskMediaBlobs(formMedia);
@@ -733,6 +729,7 @@ export default function ManagerTasksPage() {
         open={formOpen}
         onClose={closeForm}
         onSubmit={handleCreateTask}
+        forcedTaskKind="ad_hoc"
         branches={branches}
         employees={employees}
         isBranchManager={isBranchManager}
@@ -782,41 +779,22 @@ export default function ManagerTasksPage() {
         }}
       />
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={Boolean(deleting)}
-        onClose={() => !deleteSaving && setDeleting(null)}
-        fullWidth
-        maxWidth="xs"
-        dir="rtl"
-      >
-        <DialogTitle>{he.managerAdHocDelete}</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
-          <Typography>{he.managerAdHocDeleteConfirm}</Typography>
-          {deleting && canPickBranch && isNetworkAdHocOccurrence(deleting, networkIds) && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={deleteAllBranches}
-                  onChange={(e) => setDeleteAllBranches(e.target.checked)}
-                  disabled={deleteSaving}
-                />
-              }
-              label={he.managerFixedTasksDeleteAllBranches}
-            />
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3 }}>
-          <Button onClick={() => setDeleting(null)} disabled={deleteSaving}>{he.cancel}</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void handleConfirmDelete()}
-            disabled={deleteSaving}
-          >
-            {he.taskDeleteConfirm}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title={he.managerAdHocDelete}
+        itemName={deleting?.title}
+        message={he.managerAdHocDeleteConfirm}
+        optionLabel={
+          deleting && canPickBranch && isNetworkAdHocOccurrence(deleting, networkIds)
+            ? he.managerFixedTasksDeleteAllBranches
+            : undefined
+        }
+        optionChecked={deleteAllBranches}
+        onOptionChange={setDeleteAllBranches}
+        saving={deleteSaving}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void handleConfirmDelete()}
+      />
     </Box>
   );
 }

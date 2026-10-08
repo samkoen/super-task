@@ -113,7 +113,13 @@ function ChatThreadFeed({
   }
   if (thread.messages.length === 0) {
     return (
-      <Typography variant="body2" color="text.secondary">{emptyText}</Typography>
+      <Typography
+        color="text.secondary"
+        textAlign="center"
+        sx={{ fontSize: "1.1rem", fontWeight: 600, py: 4, px: 2 }}
+      >
+        {emptyText}
+      </Typography>
     );
   }
   return (

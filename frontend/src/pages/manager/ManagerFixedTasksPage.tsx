@@ -1,66 +1,50 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Checkbox,
-  FormControlLabel,
-  IconButton,
   MenuItem,
-  Paper,
-  Alert,
-  Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
-  Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import RepeatIcon from "@mui/icons-material/Repeat";
 import { ApiError } from "../../services/api";
 import type { User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
-import {
-  taskService,
-  type OpsCategory,
-  type TaskTemplate,
-} from "../../services/taskService";
+import { taskService, type TaskTemplate } from "../../services/taskService";
 import { userService } from "../../services/userService";
-import CompletionRequirementsEditor from "../../components/tasks/CompletionRequirementsEditor";
+import { deliveryNoteService } from "../../services/deliveryNoteService";
+import { DELIVERY_TASK_LINE_CHECK } from "../../utils/deliveryNote";
+import {
+  deliveryNoteNeedsUpdate,
+  deliveryNoteTargetIds,
+  formDeliveryNoteState,
+  savedDeliveryNoteState,
+} from "../../utils/deliveryNoteTemplate";
+import FixedTemplateCard from "../../components/tasks/FixedTemplateCard";
+import FixedTemplateEditDialog, {
+  type FixedTemplateEditForm,
+} from "../../components/tasks/FixedTemplateEditDialog";
 import NewTaskFormDialog, {
   type NewTaskFormSubmitPayload,
 } from "../../components/tasks/NewTaskFormDialog";
-import WeekdayMultiSelect from "../../components/tasks/WeekdayMultiSelect";
-import TaskReferenceMediaEditor, {
+import {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
+import ConfirmDeleteDialog from "../../components/ui/ConfirmDeleteDialog";
 import PageHeader from "../../components/ui/PageHeader";
-import EditDialogSaveActions from "../../components/ui/EditDialogSaveActions";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
+import { employeeFieldSx } from "../../styles/employeeUi";
 import { datetimeLocalForNewTask, todayIso } from "../../utils/dateView";
 import { asList, asText } from "../../utils/asList";
 import {
   asTaskTemplates,
   filterFixedTemplates,
-  formatTemplateSchedule,
-  opsCategoryLabel,
   sortFixedTemplates,
   defaultApplyEditToNetwork,
   isNetworkFixedTemplate,
@@ -70,16 +54,12 @@ import {
 } from "../../utils/fixedTaskTemplates";
 import { applyReferenceTranscript } from "../../utils/applyReferenceTranscript";
 import { he } from "../../i18n/he";
-import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
+import { effectiveRequirements } from "../../utils/completionMedia";
 import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
-import { assigneeOptionLabel, assigneesForBranch, withSelfAssignee } from "../../utils/assigneeOptions";
+import { assigneesForBranch, withSelfAssignee } from "../../utils/assigneeOptions";
 import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
 import { startUrlFieldError } from "../../utils/startUrl";
-
-import {
-  initialWeeklyDays,
-  weeklyDaysPayload,
-} from "../../utils/taskRecurrence";
+import { initialWeeklyDays, weeklyDaysPayload } from "../../utils/taskRecurrence";
 import {
   MANAGER_FIXED_TASKS_DRAFT_KEY,
   readFixedTaskCreateDraft,
@@ -88,20 +68,7 @@ import {
   writeFixedTaskEditDraft,
 } from "../../utils/fixedTaskScreenDraft";
 
-type EditForm = {
-  title: string;
-  description: string;
-  due_time: string;
-  weekly_days: string;
-  assignee_user_id: string;
-  is_active: boolean;
-  ops_category: OpsCategory | "";
-  completion_requirements: CompletionRequirement[];
-  is_work_start: boolean;
-  is_work_end: boolean;
-  start_url: string;
-  apply_to_network: boolean;
-};
+type EditForm = FixedTemplateEditForm;
 
 export default function ManagerFixedTasksPage() {
   const { user } = useAuth();
@@ -196,6 +163,8 @@ export default function ManagerFixedTasksPage() {
       is_work_start: Boolean(tpl.is_work_start),
       is_work_end: Boolean(tpl.is_work_end),
       start_url: tpl.start_url ?? "",
+      opened_by_delivery_note: savedDeliveryNoteState(tpl).opened,
+      delivery_note_task_type: savedDeliveryNoteState(tpl).taskType ?? DELIVERY_TASK_LINE_CHECK,
       apply_to_network: defaultApplyEditToNetwork(tpl, canPickBranch, networkIds),
     });
     setEditMedia({
@@ -225,6 +194,8 @@ export default function ManagerFixedTasksPage() {
         is_work_start: payload.is_work_start,
         is_work_end: payload.is_work_end,
         start_url: payload.start_url,
+        opened_by_delivery_note: payload.opened_by_delivery_note,
+        delivery_note_task_type: payload.delivery_note_task_type,
         ...media,
       });
       setCreateOpen(false);
@@ -264,6 +235,33 @@ export default function ManagerFixedTasksPage() {
     }
   };
 
+  /** Applique le réglage teuda au modèle édité et, en mode réseau, à tous les modèles modifiés. */
+  const saveDeliveryNoteState = async (
+    template: TaskTemplate,
+    form: EditForm,
+    updatedIds: string[] = [],
+  ) => {
+    const wanted = formDeliveryNoteState(form);
+    if (!deliveryNoteNeedsUpdate(savedDeliveryNoteState(template), wanted)) return;
+    for (const id of deliveryNoteTargetIds(template.id, updatedIds)) {
+      await deliveryNoteService.markTemplate(id, wanted.opened, wanted.taskType);
+    }
+  };
+
+  /** Renvoie `true` si le client est lié (le champ n'est vidé qu'à ce moment-là). */
+  const linkAgrolineCustomer = async (customerName: string): Promise<boolean> => {
+    if (!editing || !customerName) return false;
+    try {
+      const linked = await deliveryNoteService.linkCustomer(customerName, editing.branch_id);
+      const opened = linked.opened_occurrence_ids?.length ?? 0;
+      showSuccess(opened ? `${he.deliveryNoteCustomerLinked} (${opened})` : he.deliveryNoteCustomerLinked);
+      return true;
+    } catch (e) {
+      showError(e instanceof ApiError ? e.message : he.errorGeneric);
+      return false;
+    }
+  };
+
   const handleSaveEdit = async () => {
     if (!editing || !editForm) return;
     if (!editForm.assignee_user_id.trim()) {
@@ -297,6 +295,7 @@ export default function ManagerFixedTasksPage() {
         apply_to_network: editForm.apply_to_network,
         ...media,
       });
+      await saveDeliveryNoteState(editing, editForm, res.updated_ids);
       setEditing(null);
       setEditForm(null);
       showSuccess(he.managerFixedTasksSavedNetwork(res.updated_count ?? 1));
@@ -368,41 +367,44 @@ export default function ManagerFixedTasksPage() {
         title={he.managerFixedTasks}
         subtitle={he.managerFixedTasksSubtitle}
         action={
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<AddIcon />}
+            onClick={() => setCreateOpen(true)}
+            sx={{ minHeight: 52, borderRadius: "14px", fontWeight: 800 }}
+          >
             {he.newFixedTask}
           </Button>
         }
       />
 
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
-        <Box display="flex" gap={1.5} flexWrap="wrap" alignItems="center">
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={filter}
-            onChange={(_, v: FixedTemplateFilter | null) => v && setFilter(v)}
+      <Box display="flex" gap={1.5} flexWrap="wrap" alignItems="center" mb={2}>
+        <ToggleButtonGroup
+          exclusive
+          value={filter}
+          onChange={(_, v: FixedTemplateFilter | null) => v && setFilter(v)}
+          sx={{ "& .MuiToggleButton-root": { minHeight: 48, px: 2, fontWeight: 700 } }}
+        >
+          <ToggleButton value="all">{he.managerFixedTasksFilterAll}</ToggleButton>
+          <ToggleButton value="active">{he.managerFixedTasksFilterActive}</ToggleButton>
+          <ToggleButton value="inactive">{he.managerFixedTasksFilterInactive}</ToggleButton>
+        </ToggleButtonGroup>
+        {canPickBranch && (
+          <TextField
+            select
+            label={he.branch}
+            value={filterBranch}
+            onChange={(e) => setFilterBranch(e.target.value)}
+            sx={{ minWidth: 180, ...employeeFieldSx }}
           >
-            <ToggleButton value="all">{he.managerFixedTasksFilterAll}</ToggleButton>
-            <ToggleButton value="active">{he.managerFixedTasksFilterActive}</ToggleButton>
-            <ToggleButton value="inactive">{he.managerFixedTasksFilterInactive}</ToggleButton>
-          </ToggleButtonGroup>
-          {canPickBranch && (
-            <TextField
-              select
-              size="small"
-              label={he.branch}
-              value={filterBranch}
-              onChange={(e) => setFilterBranch(e.target.value)}
-              sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="">{he.all}</MenuItem>
-              {branches.map((b) => (
-                <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
-              ))}
-            </TextField>
-          )}
-        </Box>
-      </Paper>
+            <MenuItem value="">{he.all}</MenuItem>
+            {branches.map((b) => (
+              <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>
+            ))}
+          </TextField>
+        )}
+      </Box>
 
       {loading && templates.length === 0 ? (
         <ListSkeleton variant="table" />
@@ -416,79 +418,21 @@ export default function ManagerFixedTasksPage() {
           onAction={() => setCreateOpen(true)}
         />
       ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>{he.taskTitle}</TableCell>
-                <TableCell>{he.recurrence}</TableCell>
-                <TableCell>{he.assignee}</TableCell>
-                <TableCell>{he.opsCategory}</TableCell>
-                <TableCell>{he.status}</TableCell>
-                <TableCell align="left">{he.actions}</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((tpl) => (
-                <TableRow key={tpl.id} hover>
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                      <Typography fontWeight={700}>{asText(tpl.title)}</Typography>
-                      {isNetworkFixedTemplate(tpl, networkIds) && (
-                        <Chip
-                          size="small"
-                          color="info"
-                          label={networkFixedChipLabel(tpl, templates, branches.length)}
-                        />
-                      )}
-                    </Box>
-                    {asText(tpl.branch_name) && (
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        {asText(tpl.branch_name)}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Box display="flex" alignItems="center" gap={0.5}>
-                      <RepeatIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                      <Typography variant="body2">{formatTemplateSchedule(tpl)}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{asText(tpl.assignee_name) || "—"}</TableCell>
-                  <TableCell>{opsCategoryLabel(tpl.ops_category)}</TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      color={tpl.is_active ? "success" : "default"}
-                      label={tpl.is_active ? he.active : he.inactive}
-                    />
-                  </TableCell>
-                  <TableCell align="left">
-                    <Tooltip title={he.edit}>
-                      <IconButton size="small" onClick={() => openEdit(tpl)}>
-                        <EditOutlinedIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={he.managerFixedTasksDelete}>
-                      <IconButton size="small" onClick={() => openDelete(tpl)}>
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={he.managerFixedTasksToggleActive}>
-                      <span>
-                        <Switch
-                          size="small"
-                          checked={Boolean(tpl.is_active)}
-                          onChange={() => void handleToggleActive(tpl)}
-                        />
-                      </span>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Box display="grid" gap={1.5} gridTemplateColumns={{ xs: "1fr", md: "1fr 1fr" }}>
+          {rows.map((tpl) => (
+            <FixedTemplateCard
+              key={tpl.id}
+              template={tpl}
+              networkChip={
+                isNetworkFixedTemplate(tpl, networkIds)
+                  ? networkFixedChipLabel(tpl, templates, branches.length)
+                  : undefined
+              }
+              onEdit={() => openEdit(tpl)}
+              onToggleActive={() => void handleToggleActive(tpl)}
+            />
+          ))}
+        </Box>
       )}
 
       {createOpen && (
@@ -510,224 +454,40 @@ export default function ManagerFixedTasksPage() {
         />
       )}
 
-      <Dialog
-        open={Boolean(editing && editForm)}
-        onClose={() => !saving && setEditing(null)}
-        fullWidth
-        maxWidth="sm"
-        dir="rtl"
-      >
-        <DialogTitle>{he.managerFixedTasksEdit}</DialogTitle>
-        {editForm && editing && (
-          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              {formatTemplateSchedule(editing)}
-            </Typography>
-            <TextField
-              label={he.taskTitle}
-              value={editForm.title}
-              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label={he.description}
-              value={editForm.description}
-              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-              multiline
-              rows={2}
-              fullWidth
-            />
-            <TextField
-              label={he.dueTime}
-              type="time"
-              value={editForm.due_time}
-              onChange={(e) => setEditForm({ ...editForm, due_time: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              dir="ltr"
-            />
-            {(editing.recurrence === "daily" || editing.recurrence === "weekly") && (
-              <WeekdayMultiSelect
-                value={editForm.weekly_days}
-                onChange={(weekly_days) => setEditForm({ ...editForm, weekly_days })}
-                exclusive={editing.recurrence === "weekly"}
-              />
-            )}
-            <TextField
-              select
-              label={he.assignee}
-              value={editForm.assignee_user_id}
-              onChange={(e) => setEditForm({ ...editForm, assignee_user_id: e.target.value })}
-              fullWidth
-              required
-            >
-              {editEmployees.map((u) => (
-                <MenuItem key={u.id} value={u.id}>{assigneeOptionLabel(u, user?.id)}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label={he.opsCategory}
-              value={editForm.ops_category}
-              onChange={(e) =>
-                setEditForm({ ...editForm, ops_category: e.target.value as OpsCategory | "" })
-              }
-              fullWidth
-            >
-              <MenuItem value="">{he.opsCategoryNone}</MenuItem>
-              {(
-                ["cleaning", "fronts_signage", "orders", "info_collection"] as OpsCategory[]
-              ).map((key) => (
-                <MenuItem key={key} value={key}>
-                  {he.opsCategoryLabels[key]}
-                </MenuItem>
-              ))}
-            </TextField>
-            <CompletionRequirementsEditor
-              value={editForm.completion_requirements}
-              onChange={(completion_requirements) =>
-                setEditForm({ ...editForm, completion_requirements })
-              }
-              disabled={saving}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editForm.is_work_start}
-                  onChange={(e) =>
-                    setEditForm({
-                      ...editForm,
-                      is_work_start: e.target.checked,
-                      is_work_end: e.target.checked ? false : editForm.is_work_end,
-                    })
-                  }
-                />
-              }
-              label={he.workStartTask}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editForm.is_work_end}
-                  onChange={(e) =>
-                    setEditForm({
-                      ...editForm,
-                      is_work_end: e.target.checked,
-                      is_work_start: e.target.checked ? false : editForm.is_work_start,
-                    })
-                  }
-                />
-              }
-              label={he.workEndTask}
-            />
-            <TextField
-              label={he.startUrl}
-              value={editForm.start_url}
-              onChange={(e) => setEditForm({ ...editForm, start_url: e.target.value })}
-              helperText={he.startUrlHint}
-              fullWidth
-              dir="ltr"
-            />
-            {canPickBranch && isNetworkFixedTemplate(editing, networkIds) && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={editForm.apply_to_network}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, apply_to_network: e.target.checked })
-                    }
-                  />
-                }
-                label={he.fixedTaskUpdateAllBranches}
-              />
-            )}
-            {canPickBranch && isNetworkFixedTemplate(editing, networkIds) && editForm.apply_to_network && (
-              <Typography variant="caption" color="text.secondary">
-                {he.fixedTaskUpdateAllBranchesHint}
-              </Typography>
-            )}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={editForm.is_active}
-                  onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
-                />
-              }
-              label={editForm.is_active ? he.active : he.inactive}
-            />
-            <TaskReferenceMediaEditor
-              value={editMedia}
-              onChange={setEditMedia}
-              onDescriptionAppend={(transcript) => {
-                void handleEditTranscript(transcript);
-              }}
-              disabled={saving}
-              onError={showError}
-            />
-          </DialogContent>
-        )}
-        <DialogActions sx={{ px: 3, justifyContent: "space-between" }}>
-          <Tooltip title={he.managerFixedTasksDelete}>
-            <span>
-              <IconButton
-                color="error"
-                onClick={() => editing && openDelete(editing)}
-                disabled={saving}
-                aria-label={he.managerFixedTasksDelete}
-              >
-                <DeleteOutlineIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Box>
-            <EditDialogSaveActions
-              applyToNetwork={Boolean(editForm?.apply_to_network)}
-              resetKey={editing?.id}
-              onCancel={() => setEditing(null)}
-              onSave={() => void handleSaveEdit()}
-              disabled={saving}
-              submitDisabled={!editForm}
-              submitting={saving}
-            />
-          </Box>
-        </DialogActions>
-      </Dialog>
+      <FixedTemplateEditDialog
+        template={editing}
+        form={editForm}
+        onFormChange={setEditForm}
+        media={editMedia}
+        onMediaChange={setEditMedia}
+        employees={editEmployees}
+        currentUserId={user?.id}
+        showNetworkScope={Boolean(canPickBranch && editing && isNetworkFixedTemplate(editing, networkIds))}
+        saving={saving}
+        onClose={() => setEditing(null)}
+        onSave={() => void handleSaveEdit()}
+        onDelete={() => editing && openDelete(editing)}
+        onTranscript={(transcript) => void handleEditTranscript(transcript)}
+        onError={showError}
+        onLinkCustomer={linkAgrolineCustomer}
+      />
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={Boolean(deleting)}
-        onClose={() => !deleteSaving && setDeleting(null)}
-        fullWidth
-        maxWidth="xs"
-        dir="rtl"
-      >
-        <DialogTitle>{he.managerFixedTasksDelete}</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
-          <Typography>{he.managerFixedTasksDeleteConfirm}</Typography>
-          {deleting && canPickBranch && isNetworkFixedTemplate(deleting, networkIds) && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={deleteAllBranches}
-                  onChange={(e) => setDeleteAllBranches(e.target.checked)}
-                  disabled={deleteSaving}
-                />
-              }
-              label={he.managerFixedTasksDeleteAllBranches}
-            />
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3 }}>
-          <Button onClick={() => setDeleting(null)} disabled={deleteSaving}>{he.cancel}</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void handleConfirmDelete()}
-            disabled={deleteSaving}
-          >
-            {he.taskDeleteConfirm}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title={he.managerFixedTasksDelete}
+        itemName={deleting ? asText(deleting.title) : undefined}
+        message={he.managerFixedTasksDeleteConfirm}
+        optionLabel={
+          deleting && canPickBranch && isNetworkFixedTemplate(deleting, networkIds)
+            ? he.managerFixedTasksDeleteAllBranches
+            : undefined
+        }
+        optionChecked={deleteAllBranches}
+        onOptionChange={setDeleteAllBranches}
+        saving={deleteSaving}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void handleConfirmDelete()}
+      />
     </Box>
   );
 }

@@ -1,7 +1,4 @@
 import { type ReactNode } from "react";
-import { Box, Button } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import type { ManagerDashboard } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
 import DashboardSectionAccordion from "./DashboardSectionAccordion";
@@ -19,9 +16,6 @@ export default function ManagerTeamSection({
   onToggleAnalysis,
   onOpenTask,
   onChanged,
-  onNewTask,
-  onGalleryTask,
-  onViewTasks,
 }: {
   data: ManagerDashboard;
   title?: string;
@@ -31,9 +25,6 @@ export default function ManagerTeamSection({
   onToggleAnalysis: () => void;
   onOpenTask: (taskId: string) => void;
   onChanged: () => void;
-  onNewTask: () => void;
-  onGalleryTask: () => void;
-  onViewTasks: () => void;
 }) {
   const teamCount = data.team?.length ?? 0;
   return (
@@ -65,17 +56,6 @@ export default function ManagerTeamSection({
         onOpenTask={(task) => onOpenTask(task.id)}
       />
       <StaffProgressOverview team={data.team ?? []} onChanged={onChanged} />
-      <Box display="flex" gap={2} flexWrap="wrap">
-        <Button variant="contained" startIcon={<AddIcon />} onClick={onNewTask}>
-          {he.newTask}
-        </Button>
-        <Button variant="outlined" startIcon={<AddIcon />} onClick={onGalleryTask}>
-          {he.newTaskFromGallery}
-        </Button>
-        <Button variant="outlined" startIcon={<TaskAltIcon />} onClick={onViewTasks}>
-          {he.dashboardViewTasks}
-        </Button>
-      </Box>
     </DashboardSectionAccordion>
   );
 }

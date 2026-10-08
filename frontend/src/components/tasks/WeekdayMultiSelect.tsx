@@ -1,5 +1,6 @@
 import { ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import { he } from "../../i18n/he";
+import { EMPLOYEE_BRAND } from "../../styles/employeeUi";
 import {
   joinWeeklyDays,
   parseWeeklyDays,
@@ -15,7 +16,22 @@ interface WeekdayMultiSelectProps {
 
 function weekdayButtons() {
   return WEEKDAY_OPTIONS.map((day) => (
-    <ToggleButton key={day.value} value={day.value} sx={{ px: 1.25 }}>
+    <ToggleButton
+      key={day.value}
+      value={day.value}
+      sx={{
+        px: 1.25,
+        minWidth: 48,
+        minHeight: 48,
+        fontWeight: 700,
+        fontSize: "1rem",
+        "&.Mui-selected, &.Mui-selected:hover": {
+          bgcolor: EMPLOYEE_BRAND,
+          color: "#fff",
+          borderColor: EMPLOYEE_BRAND,
+        },
+      }}
+    >
       {day.label}
     </ToggleButton>
   ));

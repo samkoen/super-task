@@ -5,6 +5,12 @@ import { he } from "../../i18n/he";
 import type { TaskStatus } from "../../services/taskService";
 import type { EmployeeTaskCaptureProps } from "./EmployeeTaskDetailDialog";
 
+vi.mock("../../services/deliveryNoteService", () => ({
+  deliveryNoteService: {
+    checkForOccurrence: vi.fn(async () => null),
+  },
+}));
+
 vi.mock("./TaskChatPanel", () => ({
   default: () => <div data-testid="task-chat-panel">{he.taskChatTitle}</div>,
 }));
@@ -344,6 +350,99 @@ describe("EmployeeTaskDetailDialog", () => {
     expect((screen.getByRole("button", { name: he.markDone }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+
+  it("walks the oved through the steps: progress, next step and what is left", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("in_progress"),
+          completion_requirements: [
+            { kind: "photo", title: "חלב" },
+            { kind: "photo", title: "לחם" },
+          ],
+        }}
+        capture={capture({
+          slots: [{ file: null, previewUrl: "", keptUrl: "/a.jpg", capturedAt: "" }, null],
+          slotsFilled: false,
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.completionSlotsProgress(1, 2))).toBeTruthy();
+    expect(screen.getByText(he.captureRemaining(1))).toBeTruthy();
+    const states = screen.getAllByTestId("capture-step").map((el) => el.getAttribute("data-state"));
+    expect(states).toEqual(["done", "next"]);
+  });
+
+  it("tells the oved everything is ready once the last step is done", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{ ...task("in_progress"), completion_requirements: [{ kind: "photo", title: "חלב" }] }}
+        capture={capture({
+          slots: [{ file: null, previewUrl: "", keptUrl: "/a.jpg", capturedAt: "" }],
+          slotsFilled: true,
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.captureAllReady)).toBeTruthy();
+  });
+
+  it("keeps the note and extra files folded until the oved asks for them", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={task("in_progress")}
+        capture={capture()}
+        onClose={vi.fn()}
+      />,
+    );
+    const note = screen.getByRole("button", { name: he.captureNoteToggle });
+    const extras = screen.getByRole("button", { name: he.captureExtrasToggle });
+    expect(note.getAttribute("aria-expanded")).toBe("false");
+    expect(extras.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(note);
+    expect(note.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("opens the note by itself when a note was already written", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={task("in_progress")}
+        capture={capture({ note: "כבר כתבתי" })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: he.captureNoteToggle }).getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("puts the manager's rejection remark before the instructions", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("in_progress"),
+          completion: {
+            id: "c1",
+            occurrence_id: "t1",
+            status: "completed",
+            note: null,
+            photo_path: "/p.jpg",
+            video_path: null,
+            audio_path: null,
+            not_completed_reason: null,
+            completed_by_id: "u1",
+            completed_at: "2026-08-25T12:00:00+03:00",
+            manager_review_status: "rejected",
+            rejection_note: "תקן את התמונה",
+          },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+    const remark = screen.getByText(he.taskRejectedReopen);
+    const description = screen.getByText("לצלם את המדף");
+    expect(remark.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(he.taskWhatToDo)).toBeTruthy();
   });
 
   it("does not show do-task when waiting for manager review", () => {

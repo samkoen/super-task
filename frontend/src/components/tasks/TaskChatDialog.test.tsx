@@ -67,6 +67,31 @@ describe("TaskChatDialog", () => {
     expect(document.querySelector("audio")).toBeNull();
   });
 
+  it("enlarges a photo when it is tapped", async () => {
+    vi.mocked(taskService.getOccurrence).mockResolvedValue({
+      id: "occ-1",
+      completion: {
+        id: "c1",
+        occurrence_id: "occ-1",
+        status: "completed",
+        note: null,
+        photo_path: "/p.jpg",
+        video_path: null,
+        audio_path: null,
+        not_completed_reason: null,
+        completed_by_id: "u1",
+        completed_at: "2026-08-25T12:00:00+03:00",
+      },
+    } as never);
+    render(
+      <TaskChatDialog open occurrenceId="occ-1" title="צילום מדף" status="pending_review" employee={false} onClose={vi.fn()} />,
+    );
+    const enlarge = await screen.findByRole("button", { name: he.completionEnlargeExample });
+    expect(document.querySelectorAll("img[src='/p.jpg']")).toHaveLength(1);
+    fireEvent.click(enlarge);
+    expect(document.querySelectorAll("img[src='/p.jpg']")).toHaveLength(2);
+  });
+
   it("shows a play button and the stored first frame on every video square", async () => {
     vi.mocked(taskService.getOccurrence).mockResolvedValue({
       id: "occ-1",

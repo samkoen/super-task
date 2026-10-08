@@ -91,6 +91,8 @@ export interface TaskTemplate {
   branch_name?: string | null;
   department_name?: string | null;
   assignee_name?: string | null;
+  opened_by_delivery_note?: boolean;
+  delivery_note_task_type?: string | null;
 }
 
 export interface UpdateTaskTemplatePayload {
@@ -205,6 +207,8 @@ export interface CreateTaskTemplatePayload {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  opened_by_delivery_note?: boolean;
+  delivery_note_task_type?: string | null;
 }
 
 export interface CreateAdHocPayload {
@@ -280,6 +284,8 @@ export const taskService = {
       message: string;
       template: TaskTemplate;
       updated_count?: number;
+      /** Tous les modèles modifiés (le modèle édité + ses frères quand `apply_to_network`). */
+      updated_ids?: string[];
     }>(`/tasks/templates/${templateId}`, payload);
     return response.data;
   },

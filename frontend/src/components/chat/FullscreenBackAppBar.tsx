@@ -1,6 +1,7 @@
-import { AppBar, Button, Toolbar, Typography } from "@mui/material";
+import { AppBar, Button, Toolbar, Typography, alpha } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { he } from "../../i18n/he";
+import { EMPLOYEE_BRAND, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
 import { systemTopInsetCss } from "../../utils/systemInsets";
 
 interface FullscreenBackAppBarProps {
@@ -39,18 +40,30 @@ export default function FullscreenBackAppBar({ title, onBack }: FullscreenBackAp
         pt: systemTopInsetCss(),
       }}
     >
-      <Toolbar sx={{ gap: 1, minHeight: 56 }}>
+      <Toolbar sx={{ gap: 1.5, minHeight: 68 }}>
         <Button
           type="button"
-          color="inherit"
-          variant="outlined"
           onClick={onBack}
           startIcon={<ArrowForwardIcon />}
-          sx={{ fontWeight: 700, flexShrink: 0 }}
+          sx={{
+            minHeight: EMPLOYEE_TOUCH_MIN - 8,
+            px: 2,
+            borderRadius: "14px",
+            fontWeight: 800,
+            fontSize: "1.05rem",
+            flexShrink: 0,
+            color: EMPLOYEE_BRAND,
+            bgcolor: alpha(EMPLOYEE_BRAND, 0.1),
+            "&:hover": { bgcolor: alpha(EMPLOYEE_BRAND, 0.18) },
+          }}
         >
           {he.goBack}
         </Button>
-        <Typography variant="h6" noWrap sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          component="h1"
+          noWrap
+          sx={{ flex: 1, minWidth: 0, fontSize: "1.2rem", fontWeight: 800, color: EMPLOYEE_INK }}
+        >
           {title}
         </Typography>
       </Toolbar>

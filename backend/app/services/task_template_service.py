@@ -15,6 +15,7 @@ from app.domain.network_fixed_task import (
 from app.domain.completion_media import packed_media_fields, parse_requirements_input
 from app.domain.ops_category import normalize_ops_category
 from app.domain.start_url import normalize_start_url
+from app.domain.delivery_note import task_type_for_model
 from app.domain.task_kind import FIXED
 from app.domain.work_start import normalize_work_flags
 from app.domain.scope import ActorContext
@@ -96,6 +97,8 @@ class TaskTemplateService:
         is_work_end: bool = False,
         start_url: str | None = None,
         network_group_id: str | None = None,
+        opened_by_delivery_note: bool = False,
+        delivery_note_task_type: str | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
@@ -153,11 +156,10 @@ class TaskTemplateService:
             network_group_id=network_group_id,
             **media_fields,
         )
-        created_occurrence = None
-        if recurrence in task_recurrence.RECURRING:
-            created_occurrence = self._scheduler.generate_from_template(
-                template, on_date=datetime.now(TZ).date()
-            )
+        template = self._with_delivery_note(
+            template, opened_by_delivery_note, delivery_note_task_type
+        )
+        created_occurrence = self._open_today_unless_delivery(template, recurrence)
         result = self._to_api(template)
         if created_occurrence is not None:
             result["_created_occurrence"] = mp.task_occurrence_domain_to_api(created_occurrence)
@@ -184,6 +186,8 @@ class TaskTemplateService:
         is_work_end: bool = False,
         start_url: str | None = None,
         branch_ids: list[str] | None = None,
+        opened_by_delivery_note: bool = False,
+        delivery_note_task_type: str | None = None,
     ) -> dict:
         """Duplique une tâche קבועה (tous les snifim, ou une liste). 1er oved par snif."""
         if actor.role not in {roles.NETWORK_MANAGER, roles.ADMIN}:
@@ -217,6 +221,8 @@ class TaskTemplateService:
                 is_work_end=is_work_end,
                 start_url=start_url,
                 network_group_id=group_id,
+                opened_by_delivery_note=opened_by_delivery_note,
+                delivery_note_task_type=delivery_note_task_type,
             )
             if item is None:
                 skipped.append(
@@ -497,6 +503,7 @@ class TaskTemplateService:
         assert primary is not None
         result = self._to_api(primary)
         result["updated_count"] = len(targets)
+        result["updated_ids"] = [target.id for target in targets]
         return result
 
     def _group_templates_in_scope(self, actor, existing) -> list:
@@ -563,6 +570,24 @@ class TaskTemplateService:
             department = self._department.find_by_id(department_id)
             if not department or department.branch_id != branch_id:
                 raise ValueError("מחלקה לא שייכת לסניף")
+
+    def _with_delivery_note(self, template, opened: bool, task_type):
+        if not opened:
+            return template
+        kind = task_type_for_model(True, task_type)
+        updated = self._templates.set_opened_by_delivery_note(template.id, True, kind)
+        if updated is None:
+            raise ValueError("המשימה הקבועה לא נמצאה")
+        return updated
+
+    def _open_today_unless_delivery(self, template, recurrence: str):
+        if getattr(template, "opened_by_delivery_note", False):
+            return None
+        if recurrence not in task_recurrence.RECURRING:
+            return None
+        return self._scheduler.generate_from_template(
+            template, on_date=datetime.now(TZ).date()
+        )
 
     def _to_api(self, template, **extra) -> dict:
         branch = self._branch.find_by_id(template.branch_id)

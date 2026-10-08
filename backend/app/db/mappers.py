@@ -301,6 +301,8 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
         ),
+        opened_by_delivery_note=bool(getattr(row, "opened_by_delivery_note", False)),
+        delivery_note_task_type=getattr(row, "delivery_note_task_type", None),
     )
 
 

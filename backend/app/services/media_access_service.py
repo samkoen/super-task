@@ -1,4 +1,4 @@
-"""Contrôle d'accès aux URLs média (Blob /uploads) selon le périmètre acteur."""
+﻿"""Contrôle d'accès aux URLs média (Blob /uploads) selon le périmètre acteur."""
 from __future__ import annotations
 
 from sqlalchemy import String, and_ as sa_and, cast, or_, select
@@ -13,11 +13,34 @@ from app.domain.task_scope import visible_branch_ids_for_tasks
 from app.repositories.branch_repository import BranchRepository
 
 
+DELIVERY_NOTE_FOLDER = "delivery_notes/"
+
+
 def actor_can_access_media_url(db: Session, actor: ActorContext, media_url: str) -> bool:
     url = (media_url or "").strip()
     if not url:
         return False
+    if _task_media_allowed(db, actor, url):
+        return True
+    return _delivery_note_pdf_allowed(db, actor, url)
 
+
+def _delivery_note_pdf_allowed(db: Session, actor: ActorContext, url: str) -> bool:
+    """PDF d'une תעודה : snif visible par l'acteur, ou boîte de réception (sans snif)."""
+    if DELIVERY_NOTE_FOLDER not in url:
+        return False
+    row = db.execute(
+        select(orm.DeliveryNote.branch_id).where(orm.DeliveryNote.pdf_url == url).limit(1)
+    ).first()
+    if row is None:
+        return False
+    if row[0] is None:
+        return True
+    visible = visible_branch_ids_for_tasks(actor, BranchRepository(db))
+    return visible is None or str(row[0]) in {str(branch) for branch in visible}
+
+
+def _task_media_allowed(db: Session, actor: ActorContext, url: str) -> bool:
     if _is_own_avatar(db, actor.user_id, url):
         return True
     if _system_bug_media_allowed(db, actor, url):

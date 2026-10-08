@@ -26,6 +26,17 @@ vi.mock("../../context/AuthContext", () => ({
   }),
 }));
 
+vi.mock("../../services/deliveryNoteService", () => ({
+  deliveryNoteService: {
+    account: vi.fn(async () => ({ configured: false, username: "", internal: false })),
+    saveAccount: vi.fn(),
+    syncToday: vi.fn(),
+    inbox: vi.fn(async () => []),
+    markTemplate: vi.fn(),
+    linkCustomer: vi.fn(),
+  },
+}));
+
 vi.mock("../../services/taskService", () => ({
   taskService: {
     listTemplates: vi.fn(),

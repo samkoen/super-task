@@ -29,8 +29,73 @@ describe("NewTaskFormDialog", () => {
     );
     expect(screen.getByText(he.taskKindLabels.ad_hoc)).toBeTruthy();
     expect(screen.queryByText(he.taskVoiceTitle)).toBeNull();
-    const submit = screen.getByRole("button", { name: he.submit });
+    const submit = screen.getByRole("button", { name: he.newTaskCreate });
     expect((submit as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(new RegExp(he.newTaskMissingAssignee))).toBeTruthy();
+  });
+
+  it("hides the kind picker when the kind is forced to ad_hoc", () => {
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        branches={[{ id: "b1", name: "סניף", network_id: "n1" } as never]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        forcedTaskKind="ad_hoc"
+      />,
+    );
+    expect(screen.queryByText(he.taskKindLabels.fixed)).toBeNull();
+    expect(screen.queryByText(he.taskKindLabels.ad_hoc)).toBeNull();
+    expect(screen.getByTestId("due-preview")).toBeTruthy();
+  });
+
+  it("explains each task kind and shows a live schedule summary for a fixed one", () => {
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        branches={[]}
+        employees={[]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+      />,
+    );
+    expect(screen.getByText(he.taskKindHints.ad_hoc)).toBeTruthy();
+    expect(screen.getByText(he.taskKindHints.fixed)).toBeTruthy();
+    expect(screen.getByTestId("due-preview")).toBeTruthy();
+    fireEvent.click(screen.getByText(he.taskKindLabels.fixed));
+    expect(screen.queryByTestId("due-preview")).toBeNull();
+    fireEvent.change(screen.getByLabelText(he.dueTime), { target: { value: "14:30" } });
+    expect(screen.getByTestId("schedule-summary").textContent).toContain("14:30");
+  });
+
+  it("tells the manager when no snif is selected", () => {
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        branches={[{ id: "b1", name: "א", network_id: "n1" } as never]}
+        employees={[]}
+        isBranchManager={false}
+        canPickBranch
+        defaultBranchId=""
+        defaultDueAt="2026-07-20T10:00"
+        forcedTaskKind="fixed"
+      />,
+    );
+    expect(screen.getByText(new RegExp(he.newTaskMissingBranches))).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: he.newTaskCreate }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it("allows switching to fixed kind", () => {
@@ -106,7 +171,7 @@ describe("NewTaskFormDialog", () => {
       within(screen.getByLabelText(he.weekdays)).getByRole("button", { name: he.weekdayMon }),
     );
     fireEvent.click(screen.getByRole("button", { name: he.completionAddAudioReq }));
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toEqual(
       expect.objectContaining({
@@ -137,7 +202,7 @@ describe("NewTaskFormDialog", () => {
     fireEvent.click(screen.getByRole("option", { name: he.assignToGallery }));
     expect(screen.getByText(he.assignToGalleryHint)).toBeTruthy();
     expect(screen.queryByLabelText(he.dueAt)).toBeNull();
-    const submit = screen.getByRole("button", { name: he.submit });
+    const submit = screen.getByRole("button", { name: he.newTaskCreate });
     expect((submit as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -236,7 +301,7 @@ describe("NewTaskFormDialog", () => {
       <NewTaskFormDialog {...baseProps} onSubmit={onOne} />,
     );
     fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "כותרת" } });
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
     await waitFor(() => expect(onOne).toHaveBeenCalled());
     expect(onOne.mock.calls[0][0]).toEqual(
       expect.objectContaining({
@@ -254,7 +319,7 @@ describe("NewTaskFormDialog", () => {
     );
     fireEvent.click(screen.getByRole("checkbox", { name: "ב" }));
     fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "כותרת" } });
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
     await waitFor(() => expect(onSelected).toHaveBeenCalled());
     expect(onSelected.mock.calls[0][0]).toEqual(
       expect.objectContaining({
@@ -269,7 +334,7 @@ describe("NewTaskFormDialog", () => {
     render(<NewTaskFormDialog {...baseProps} onSubmit={onAll} />);
     fireEvent.click(screen.getByRole("checkbox", { name: he.branchesSelectAll }));
     fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "כותרת" } });
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
     await waitFor(() => expect(onAll).toHaveBeenCalled());
     expect(onAll.mock.calls[0][0]).toEqual(
       expect.objectContaining({
@@ -298,12 +363,12 @@ describe("NewTaskFormDialog", () => {
     );
     const url = "https://my.agroline.co.il/main/azmanot/client-orders/create";
     fireEvent.change(screen.getByLabelText(he.startUrl), { target: { value: "not-a-url" } });
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText(he.startUrlInvalid)).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText(he.startUrl), { target: { value: url } });
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0].start_url).toBe(url);
   });
@@ -357,6 +422,68 @@ describe("NewTaskFormDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "מדף: תמונה" }));
     expect(screen.getByAltText("מדף").getAttribute("src")).toBe("blob:http://localhost/ex");
     clearFixedTaskCreateDraft(key);
+  });
+
+  it("sends the delivery-note flag when the create checkbox is checked", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        branches={[{ id: "b1", name: "סניף", network_id: "n1" } as never]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager
+        canPickBranch={false}
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        defaultAssigneeId="u1"
+        forcedTaskKind="fixed"
+      />,
+    );
+    expect(screen.queryByLabelText(he.deliveryNoteTaskType)).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: he.deliveryNoteOpenModel }));
+    expect(screen.getByLabelText(he.deliveryNoteTaskType)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        opened_by_delivery_note: true,
+        delivery_note_task_type: "line_check",
+      }),
+    );
+  });
+
+  it("keeps the delivery-note flag when several snifim are selected", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <NewTaskFormDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        branches={[
+          { id: "b1", name: "א", network_id: "n1" } as never,
+          { id: "b2", name: "ב", network_id: "n1" } as never,
+        ]}
+        employees={[{ id: "u1", full_name: "עובד", branch_id: "b1" } as never]}
+        isBranchManager={false}
+        canPickBranch
+        defaultBranchId="b1"
+        defaultDueAt="2026-07-20T10:00"
+        forcedTaskKind="fixed"
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: he.deliveryNoteOpenModel }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "ב" }));
+    fireEvent.click(screen.getByRole("button", { name: he.newTaskCreate }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        apply_to_network: true,
+        opened_by_delivery_note: true,
+        delivery_note_task_type: "line_check",
+      }),
+    );
   });
 
   it("does not crash when closed with missing employee or branch lists", () => {

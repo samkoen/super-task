@@ -1,12 +1,58 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Alert, Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  IconButton,
+  InputAdornment,
+  TextField,
+  Typography,
+} from "@mui/material";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import {
+  EMPLOYEE_TOUCH_MIN,
+  employeeFieldSx,
+  employeePrimaryButtonSx,
+} from "../../styles/employeeUi";
 import AuthLayout from "../../components/ui/AuthLayout";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../services/api";
 import { authService } from "../../services/authService";
 import { he } from "../../i18n/he";
 import { getHomePath } from "../../config/routes";
+
+function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <TextField
+      label={he.password}
+      type={visible ? "text" : "password"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      required
+      fullWidth
+      dir="ltr"
+      autoComplete="current-password"
+      sx={employeeFieldSx}
+      InputProps={{
+        endAdornment: (
+          <InputAdornment position="end">
+            <IconButton
+              edge="end"
+              aria-label={visible ? he.hidePassword : he.showPassword}
+              onClick={() => setVisible((v) => !v)}
+            >
+              {visible ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
+            </IconButton>
+          </InputAdornment>
+        ),
+      }}
+    />
+  );
+}
 
 export default function LoginPage() {
   const { login, user } = useAuth();
@@ -71,30 +117,35 @@ export default function LoginPage() {
           {resendMessage}
         </Alert>
       )}
-      <Box component="form" onSubmit={handleSubmit} display="flex" flexDirection="column" gap={2}>
+      <Box component="form" onSubmit={handleSubmit} display="flex" flexDirection="column" gap={2.5}>
         <TextField
           label={he.loginIdentifier}
+          helperText={he.loginIdentifierHint}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           fullWidth
           dir="ltr"
           autoComplete="username"
+          sx={employeeFieldSx}
         />
-        <TextField
-          label={he.password}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          fullWidth
-          dir="ltr"
-        />
-        <Button type="submit" variant="contained" size="large" disabled={loading}>
-          {loading ? <CircularProgress size={24} color="inherit" /> : he.login}
+        <PasswordField value={password} onChange={setPassword} />
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={loading}
+          sx={{ ...employeePrimaryButtonSx, mt: 0.5 }}
+        >
+          {loading ? <CircularProgress size={26} color="inherit" /> : he.login}
         </Button>
         {showResend && (
-          <Button variant="outlined" onClick={handleResend} disabled={resendLoading || !email.trim()}>
+          <Button
+            variant="outlined"
+            onClick={handleResend}
+            disabled={resendLoading || !email.trim()}
+            sx={{ minHeight: EMPLOYEE_TOUCH_MIN, borderRadius: "14px", fontWeight: 700 }}
+          >
             {resendLoading ? <CircularProgress size={22} /> : he.resendVerification}
           </Button>
         )}

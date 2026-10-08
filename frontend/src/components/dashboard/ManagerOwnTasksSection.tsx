@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import type { EmployeeTaskCard, ManagerMyWork } from "../../services/dashboardService";
 import EmployeeFinishedTaskSections from "../employee/EmployeeFinishedTaskSections";
 import EmployeeTaskSection from "../employee/EmployeeTaskSection";
 import EmptyState from "../ui/EmptyState";
+import SectionHeading from "../ui/SectionHeading";
 import { he } from "../../i18n/he";
 import { collectUniqueTasks, splitEmployeeWorkLists } from "../../utils/employeeDashboardSections";
 
@@ -29,10 +30,7 @@ export default function ManagerOwnTasksSection({
 
   return (
     <Box mb={3}>
-      <Typography variant="subtitle1" fontWeight={800} mb={1.5}>
-        {he.dashboardMyTasksTitle}
-        {openCount > 0 ? ` (${openCount})` : ""}
-      </Typography>
+      <SectionHeading title={he.dashboardMyTasksTitle} count={openCount} />
       {openCount === 0 ? (
         <EmptyState
           title={he.dashboardMyTasksEmpty}

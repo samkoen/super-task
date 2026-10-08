@@ -38,6 +38,18 @@ def _template(**overrides) -> TaskTemplate:
     return TaskTemplate(**base)
 
 
+def test_generate_from_template_skips_delivery_note_model(monkeypatch):
+    template = _template(opened_by_delivery_note=True)
+    occurrence_repo = MagicMock()
+    scheduler = TaskSchedulerService(MagicMock(), occurrence_repo)
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.task_recurrence.should_generate_on_date",
+        lambda *args, **kwargs: True,
+    )
+    assert scheduler.generate_from_template(template, on_date=date(2026, 10, 2)) is None
+    occurrence_repo.create.assert_not_called()
+
+
 def test_generate_from_template_copies_reference_media(monkeypatch):
     template = _template()
     occurrence_repo = MagicMock()

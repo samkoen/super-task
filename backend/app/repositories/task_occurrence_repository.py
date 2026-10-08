@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -569,6 +569,36 @@ class TaskOccurrenceRepository:
         self._db.delete(row)
         self._db.flush()
         return True
+
+    def delete_without_delivery_note(self, template_id: str) -> list[str]:
+        rows = self._calendar_rows(template_id)
+        removed = [str(row.id) for row in rows]
+        for row in rows:
+            self._clear_occurrence_links(row.id)
+            self._db.delete(row)
+        self._db.flush()
+        return removed
+
+    def _calendar_rows(self, template_id: str) -> list:
+        linked = select(orm.DeliveryNoteOpening.occurrence_id)
+        return list(
+            self._db.scalars(
+                select(orm.TaskOccurrence).where(
+                    orm.TaskOccurrence.template_id == mp.parse_uuid(template_id),
+                    orm.TaskOccurrence.id.not_in(linked),
+                )
+            ).all()
+        )
+
+    def _clear_occurrence_links(self, occurrence_id) -> None:
+        self._db.execute(
+            delete(orm.TaskCompletion).where(orm.TaskCompletion.occurrence_id == occurrence_id)
+        )
+        self._db.execute(
+            update(orm.UserNotification)
+            .where(orm.UserNotification.occurrence_id == occurrence_id)
+            .values(occurrence_id=None)
+        )
 
     def get_branch_name(self, branch_id: str) -> str | None:
         row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))

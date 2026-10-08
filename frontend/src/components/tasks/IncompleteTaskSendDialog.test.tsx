@@ -14,6 +14,22 @@ describe("IncompleteTaskSendDialog", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("lets the oved go back with the X or the cancel button", () => {
+    const onClose = vi.fn();
+    render(<IncompleteTaskSendDialog open onClose={onClose} onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: he.close }));
+    fireEvent.click(screen.getByRole("button", { name: he.cancel }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("cannot be closed while the task is being sent", () => {
+    const onClose = vi.fn();
+    render(<IncompleteTaskSendDialog open saving onClose={onClose} onConfirm={vi.fn()} />);
+    expect((screen.getByRole("button", { name: he.close }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: he.cancel }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("sends the explanation to the manager", () => {
     const onConfirm = vi.fn();
     render(

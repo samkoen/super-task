@@ -37,6 +37,23 @@ describe("BreakAlertDialog", () => {
     });
   });
 
+  it("shows the error and stays open when ringing fails", async () => {
+    vi.mocked(employeeActivityService.ring).mockRejectedValueOnce(new Error("x"));
+    const onClose = vi.fn();
+    render(<BreakAlertDialog target={TARGET} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: he.breakAlertRingAnyway }));
+    expect(await screen.findByText(he.errorGeneric)).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes silently with the X button", () => {
+    const onClose = vi.fn();
+    render(<BreakAlertDialog target={TARGET} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: he.close }));
+    expect(onClose).toHaveBeenCalled();
+    expect(employeeActivityService.ring).not.toHaveBeenCalled();
+  });
+
   it("keeps the message silent when dismissed", () => {
     const onClose = vi.fn();
     render(<BreakAlertDialog target={TARGET} onClose={onClose} />);

@@ -2,10 +2,6 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import {
   Box,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControlLabel,
   MenuItem,
   Switch,
@@ -28,6 +24,12 @@ import TaskReferenceMediaEditor from "./TaskReferenceMediaEditor";
 import CompletionRequirementsEditor from "./CompletionRequirementsEditor";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import EditDialogSaveActions from "../ui/EditDialogSaveActions";
+import FormDialog from "../ui/FormDialog";
+import QuickTimePresets from "../ui/QuickTimePresets";
+import TaskAdvancedFields from "./form/TaskAdvancedFields";
+import TaskFormSection from "./form/TaskFormSection";
+import { EMPLOYEE_BRAND, employeeFieldSx } from "../../styles/employeeUi";
+import { followUpPresets, formatFollowUpPreview } from "../../utils/chatTaskFollowUp";
 import {
   emptyOccurrenceEditForm,
   formFromOccurrence,
@@ -124,18 +126,23 @@ export default function TaskOccurrenceEditDialog({
   };
 
   return (
-    <Dialog
+    <FormDialog
       open={Boolean(occurrenceId)}
-      onClose={() => {
-        if (saving || loading) return;
-        onClose();
-      }}
-      fullWidth
-      maxWidth="sm"
-      dir="rtl"
+      title={he.editTask}
+      onClose={onClose}
+      busy={saving || loading}
+      actions={
+        <EditDialogSaveActions
+          applyToNetwork={form.apply_to_network}
+          resetKey={occurrenceId ?? undefined}
+          onCancel={onClose}
+          onSave={() => void handleSave()}
+          disabled={saving || loading}
+          submitDisabled={!form.title.trim() || !form.due_at}
+          submitting={saving}
+        />
+      }
     >
-      <DialogTitle>{he.editTask}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         {loading || !target ? (
           <Box display="flex" justifyContent="center" py={4}>
             <CircularProgress />
@@ -158,85 +165,161 @@ export default function TaskOccurrenceEditDialog({
               }}
             />
             <SubmittedCompletionMedia task={target} />
-            <CoreEditFields form={form} setForm={setForm} />
-            <AssigneeField
-              target={target}
-              form={form}
-              setForm={setForm}
-              editEmployees={editEmployees}
-              isBranchManager={isBranchManager}
-              currentUserId={user?.id}
-            />
-            <CompletionRequirementsEditor
-              value={form.completion_requirements}
-              onChange={(completion_requirements) =>
-                setForm({ ...form, completion_requirements })
-              }
-              disabled={saving}
-            />
-            {(user?.role === "network_manager" || user?.role === "admin") &&
-              isNetworkAdHocOccurrence(target) && (
-              <>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={form.apply_to_network}
-                      onChange={(e) => setForm({ ...form, apply_to_network: e.target.checked })}
-                    />
-                  }
-                  label={he.fixedTaskUpdateAllBranches}
-                />
-                {form.apply_to_network && (
-                  <Typography variant="caption" color="text.secondary">
-                    {he.fixedTaskUpdateAllBranchesHint}
-                  </Typography>
-                )}
-              </>
-            )}
-            <TaskReferenceMediaEditor
-              key={target.id}
-              value={{
-                reference_photo_url: form.reference_photo_url,
-                reference_video_url: form.reference_video_url,
-                reference_audio_url: form.reference_audio_url,
-                pending_photo: form.pending_photo,
-                pending_video: form.pending_video,
+            <TaskFormSection title={he.taskFormSectionWhat}>
+              <TextField
+                label={he.taskTitle}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+                fullWidth
+                sx={employeeFieldSx}
+              />
+              <TextField
+                label={he.description}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                multiline
+                minRows={2}
+                fullWidth
+                sx={employeeFieldSx}
+              />
+              <TaskReferenceMediaEditor
+                key={target.id}
+                value={{
+                  reference_photo_url: form.reference_photo_url,
+                  reference_video_url: form.reference_video_url,
+                  reference_audio_url: form.reference_audio_url,
+                  pending_photo: form.pending_photo,
+                  pending_video: form.pending_video,
+                }}
+                onChange={(media) => {
+                  setMediaDirty(true);
+                  setForm({
+                    ...form,
+                    reference_photo_url: media.reference_photo_url,
+                    reference_video_url: media.reference_video_url,
+                    reference_audio_url: media.reference_audio_url,
+                    pending_photo: media.pending_photo ?? null,
+                    pending_video: media.pending_video ?? null,
+                  });
+                }}
+                onDescriptionAppend={(transcript) =>
+                  setForm((f) => ({
+                    ...f,
+                    description: appendDescriptionBlock(f.description, transcript),
+                  }))
+                }
+                disabled={saving}
+                onError={showError}
+              />
+            </TaskFormSection>
+            <TaskFormSection title={he.taskFormSectionWho}>
+              <AssigneeField
+                target={target}
+                form={form}
+                setForm={setForm}
+                editEmployees={editEmployees}
+                isBranchManager={isBranchManager}
+                currentUserId={user?.id}
+              />
+              <DueAtField form={form} setForm={setForm} disabled={saving} />
+              <NetworkScopeSwitch
+                visible={
+                  (user?.role === "network_manager" || user?.role === "admin") &&
+                  isNetworkAdHocOccurrence(target)
+                }
+                form={form}
+                setForm={setForm}
+              />
+            </TaskFormSection>
+            <TaskFormSection title={he.taskFormSectionProof}>
+              <CompletionRequirementsEditor
+                value={form.completion_requirements}
+                onChange={(completion_requirements) =>
+                  setForm({ ...form, completion_requirements })
+                }
+                disabled={saving}
+              />
+            </TaskFormSection>
+            <TaskAdvancedFields
+              taskKind="ad_hoc"
+              value={{ startUrl: form.start_url ?? "", opsCategory: "", isWorkStart: false, isWorkEnd: false }}
+              onChange={(patch) => {
+                if (patch.startUrl !== undefined) setForm({ ...form, start_url: patch.startUrl });
               }}
-              onChange={(media) => {
-                setMediaDirty(true);
-                setForm({
-                  ...form,
-                  reference_photo_url: media.reference_photo_url,
-                  reference_video_url: media.reference_video_url,
-                  reference_audio_url: media.reference_audio_url,
-                  pending_photo: media.pending_photo ?? null,
-                  pending_video: media.pending_video ?? null,
-                });
-              }}
-              onDescriptionAppend={(transcript) =>
-                setForm((f) => ({
-                  ...f,
-                  description: appendDescriptionBlock(f.description, transcript),
-                }))
-              }
               disabled={saving}
-              onError={showError}
             />
           </>
         )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3 }}>
-        <EditDialogSaveActions
-          applyToNetwork={form.apply_to_network}
-          resetKey={occurrenceId ?? undefined}
-          onCancel={onClose}
-          onSave={() => void handleSave()}
-          disabled={saving || loading}
-          submitDisabled={!form.title.trim() || !form.due_at}
-          submitting={saving}
-        />
-      </DialogActions>
-    </Dialog>
+    </FormDialog>
+  );
+}
+
+function DueAtField({
+  form,
+  setForm,
+  disabled,
+}: {
+  form: OccurrenceEditForm;
+  setForm: Dispatch<SetStateAction<OccurrenceEditForm>>;
+  disabled: boolean;
+}) {
+  const presets = useMemo(() => followUpPresets(new Date()), []);
+  const preview = formatFollowUpPreview(form.due_at);
+  return (
+    <>
+      <QuickTimePresets
+        presets={presets}
+        selected={form.due_at}
+        onPick={(due_at) => setForm({ ...form, due_at })}
+        disabled={disabled}
+        row
+      />
+      <TextField
+        label={he.dueAt}
+        type="datetime-local"
+        value={form.due_at}
+        onChange={(e) => setForm({ ...form, due_at: e.target.value })}
+        InputLabelProps={{ shrink: true }}
+        required
+        fullWidth
+        dir="ltr"
+        sx={employeeFieldSx}
+      />
+      {preview ? (
+        <Typography fontWeight={800} sx={{ color: EMPLOYEE_BRAND }}>
+          {he.taskDueSummary(preview)}
+        </Typography>
+      ) : null}
+    </>
+  );
+}
+
+function NetworkScopeSwitch({
+  visible,
+  form,
+  setForm,
+}: {
+  visible: boolean;
+  form: OccurrenceEditForm;
+  setForm: Dispatch<SetStateAction<OccurrenceEditForm>>;
+}) {
+  if (!visible) return null;
+  return (
+    <>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={form.apply_to_network}
+            onChange={(e) => setForm({ ...form, apply_to_network: e.target.checked })}
+          />
+        }
+        label={he.fixedTaskUpdateAllBranches}
+      />
+      {form.apply_to_network && (
+        <Typography color="text.secondary">{he.fixedTaskUpdateAllBranchesHint}</Typography>
+      )}
+    </>
   );
 }
 
@@ -281,52 +364,6 @@ function SubmittedCompletionMedia({ task }: { task: TaskOccurrence }) {
   );
 }
 
-function CoreEditFields({
-  form,
-  setForm,
-}: {
-  form: OccurrenceEditForm;
-  setForm: Dispatch<SetStateAction<OccurrenceEditForm>>;
-}) {
-  return (
-    <>
-      <TextField
-        label={he.taskTitle}
-        value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-        required
-        fullWidth
-      />
-      <TextField
-        label={he.description}
-        value={form.description}
-        onChange={(e) => setForm({ ...form, description: e.target.value })}
-        multiline
-        rows={2}
-        fullWidth
-      />
-      <TextField
-        label={he.startUrl}
-        value={form.start_url ?? ""}
-        onChange={(e) => setForm({ ...form, start_url: e.target.value })}
-        helperText={he.startUrlHint}
-        fullWidth
-        dir="ltr"
-      />
-      <TextField
-        label={he.dueAt}
-        type="datetime-local"
-        value={form.due_at}
-        onChange={(e) => setForm({ ...form, due_at: e.target.value })}
-        InputLabelProps={{ shrink: true }}
-        required
-        fullWidth
-        dir="ltr"
-      />
-    </>
-  );
-}
-
 function AssigneeField({
   target,
   form,
@@ -352,6 +389,7 @@ function AssigneeField({
       required={target.task_kind === "ad_hoc"}
       fullWidth
       helperText={isAssignToGallery(form.assignee_user_id) ? he.assignToGalleryHint : undefined}
+      sx={employeeFieldSx}
     >
       {target.can_add_to_gallery !== false && (
         <MenuItem value={ASSIGN_TO_GALLERY}>

@@ -1,6 +1,7 @@
 import { Box, Typography } from "@mui/material";
 import EmployeeTaskRow from "./EmployeeTaskRow";
 import type { EmployeeTaskCard } from "../../services/dashboardService";
+import { employeeSectionTitleSx } from "../../styles/employeeUi";
 
 interface EmployeeTaskSectionProps {
   title: string;
@@ -10,7 +11,7 @@ interface EmployeeTaskSectionProps {
   layout?: "tile" | "list";
 }
 
-/** קבועות : liste. מזדמנות : tuiles photo. */
+/** קבועות : lignes. מזדמנות : cartes avec photo. Toujours une seule colonne. */
 export default function EmployeeTaskSection({
   title,
   tasks,
@@ -20,22 +21,15 @@ export default function EmployeeTaskSection({
 }: EmployeeTaskSectionProps) {
   if (tasks.length === 0) return null;
   return (
-    <Box mb={2}>
-      <Typography
-        variant="subtitle2"
-        fontWeight={800}
-        color={color ?? "text.primary"}
-        mb={0.75}
-      >
-        {title} ({tasks.length})
+    <Box mb={2.5}>
+      <Typography component="h2" sx={{ ...employeeSectionTitleSx, color: color ?? "text.primary" }}>
+        <Box
+          aria-hidden
+          sx={{ width: 8, height: 22, borderRadius: 4, bgcolor: color ?? "primary.main" }}
+        />
+        {`${title} (${tasks.length})`}
       </Typography>
-      <Box
-        sx={
-          layout === "list"
-            ? { display: "flex", flexDirection: "column", gap: 0.75 }
-            : { display: "flex", flexWrap: "wrap", gap: 1.25 }
-        }
-      >
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
         {tasks.map((task) => (
           <EmployeeTaskRow key={task.id} task={task} onOpen={onOpen} layout={layout} />
         ))}

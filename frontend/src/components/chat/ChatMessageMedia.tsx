@@ -38,7 +38,7 @@ export default function ChatMessageMedia({
       {audio ? <CompactAudioPlayer src={audio} /> : null}
       <ChatFileCard href={file} name={fileName} />
       {note ? (
-        <Typography variant="body2" sx={chatBubbleCopySx}>
+        <Typography sx={chatBubbleCopySx}>
           {note}
         </Typography>
       ) : null}
@@ -110,7 +110,7 @@ function ChatPhoto({
         <ChatMediaPending />
       )}
       {reply ? (
-        <Button size="small" onClick={reply} sx={{ alignSelf: "flex-start", minHeight: 36 }}>
+        <Button onClick={reply} sx={{ alignSelf: "flex-start", minHeight: 44, fontWeight: 800 }}>
           {he.chatAnnotateReply}
         </Button>
       ) : null}
@@ -150,8 +150,8 @@ function PaintedMedia({
         onClick={onClick}
         sx={{
           maxWidth: "100%",
-          maxHeight: kind === "photo" ? 180 : 200,
-          borderRadius: 1,
+          maxHeight: kind === "photo" ? 260 : 280,
+          borderRadius: "12px",
           display: painted ? "block" : "none",
           cursor: onClick ? "pointer" : "default",
         }}

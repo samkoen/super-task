@@ -4,32 +4,36 @@ import {
   Box,
   Button,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   TextField,
   Typography,
+  alpha,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { EMPLOYEE_BRAND, EMPLOYEE_CARD_RADIUS, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN, employeeFieldSx } from "../../styles/employeeUi";
+import DeliveryLineCheck from "./DeliveryLineCheck";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
-import CompletionRequirementSlots from "./CompletionRequirementSlots";
+import EmployeeCaptureSteps from "./EmployeeCaptureSteps";
+import EmployeeTaskActionsBar from "./EmployeeTaskActionsBar";
 import ExtraCompletionMedia from "./ExtraCompletionMedia";
-import EmployeeDoTaskButton from "./EmployeeDoTaskButton";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
+import CollapsibleSection from "../ui/CollapsibleSection";
 import { OpenTaskChatButton } from "./TaskChatDialog";
 import TaskStatusChip from "./TaskStatusChip";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { he } from "../../i18n/he";
 import { formatDueAt } from "../../utils/dateView";
 import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { canDoTask } from "../../utils/employeeDoTask";
 import { showsCompletionOutcome } from "../../utils/employeeIncompleteSubmit";
 import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
-import {
-  attachmentsFromCompletion,
-} from "../../utils/completionSlotView";
+import { attachmentsFromCompletion } from "../../utils/completionSlotView";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import type { ExtraSlot } from "../../utils/extraCompletionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
@@ -78,7 +82,7 @@ export interface EmployeeTaskDetailDialogProps {
   chatFirst?: boolean;
 }
 
-/** Ouverture tâche côté oved : cases, capture et chat dans le même écran. */
+/** Ouverture tâche côté oved : consigne, étapes à réaliser, puis un seul gros bouton. */
 export default function EmployeeTaskDetailDialog({
   task,
   titleNode,
@@ -90,6 +94,8 @@ export default function EmployeeTaskDetailDialog({
   capture,
   chatFirst = false,
 }: EmployeeTaskDetailDialogProps) {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   if (!task) return null;
   const liveCapture = capture && canDoTask(task.status) ? capture : undefined;
 
@@ -98,6 +104,7 @@ export default function EmployeeTaskDetailDialog({
       open={Boolean(task)}
       onClose={onClose}
       fullWidth
+      fullScreen={fullScreen}
       maxWidth="sm"
       dir="rtl"
       PaperProps={{ sx: { overflow: "hidden", display: "flex", flexDirection: "column" } }}
@@ -105,48 +112,42 @@ export default function EmployeeTaskDetailDialog({
       disableAutoFocus
       disableRestoreFocus
     >
-      <DialogTitle>{titleNode ?? task.title}</DialogTitle>
+      <TaskDialogHeader onClose={onClose}>{titleNode ?? task.title}</TaskDialogHeader>
       <DialogContent
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: 1.5,
-          pt: 1,
+          gap: 2,
+          pt: 2,
+          px: { xs: 2, sm: 3 },
           flex: "1 1 auto",
           minHeight: 0,
           overflowY: "auto",
+          bgcolor: alpha(EMPLOYEE_INK, 0.03),
         }}
       >
         <TaskStatusRow task={task} />
-        {task.description ? (
-          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
-            {task.description}
-          </Typography>
-        ) : null}
-        <StartUrlButton url={task.start_url} fullWidth />
         <TaskRejectionRemark completion={task.completion} />
-        <TaskDetailChatAndMedia
-          task={task}
-          language={language}
-          liveCapture={liveCapture}
-          onChatUpdated={onChatUpdated}
-          chatFirst={chatFirst}
+        <TaskDescription text={task.description} />
+        <DeliveryLineCheck occurrenceId={task.id} disabled={!canDoTask(task.status)} />
+        <StartUrlButton url={task.start_url} fullWidth />
+        <OpenTaskChatButton
+          occurrenceId={task.id}
+          title={task.title}
+          status={task.status}
+          employee
+          completion={task.completion ?? null}
+          onOccurrenceUpdated={() => onChatUpdated?.()}
+          autoOpen={chatFirst}
         />
+        <TaskDetailMedia task={task} language={language} capture={liveCapture} />
+        {liveCapture ? <OptionalSections capture={liveCapture} /> : null}
       </DialogContent>
-      {liveCapture ? (
-        <Box sx={{ px: 3, pt: 1, flexShrink: 0, borderTop: 1, borderColor: "divider" }}>
-          <ExtraCompletionMedia
-            extras={liveCapture.extras ?? []}
-            onChange={liveCapture.onExtrasChange ?? (() => undefined)}
-            disabled={liveCapture.saving}
-            onAnnotatingChange={liveCapture.onAnnotatingChange}
-          />
-        </Box>
-      ) : null}
-      <TaskDetailActions
-        task={task}
-        onClose={onClose}
+      <EmployeeTaskActionsBar
+        status={task.status}
+        requirements={effectiveRequirements(task)}
         capture={liveCapture}
+        onClose={onClose}
         onDoTask={onDoTask}
         starting={starting}
       />
@@ -154,14 +155,49 @@ export default function EmployeeTaskDetailDialog({
   );
 }
 
+function TaskDialogHeader({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <DialogTitle
+      component="div"
+      sx={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 1,
+        pt: "calc(16px + env(safe-area-inset-top, 0px))",
+        pb: 1.5,
+        flexShrink: 0,
+        borderBottom: 1,
+        borderColor: "divider",
+      }}
+    >
+      <Box flex={1} minWidth={0}>
+        {children}
+      </Box>
+      <IconButton
+        aria-label={he.close}
+        onClick={onClose}
+        sx={{
+          bgcolor: alpha(EMPLOYEE_INK, 0.06),
+          width: EMPLOYEE_TOUCH_MIN - 8,
+          height: EMPLOYEE_TOUCH_MIN - 8,
+          flexShrink: 0,
+        }}
+      >
+        <CloseRoundedIcon />
+      </IconButton>
+    </DialogTitle>
+  );
+}
+
 function TaskRejectionRemark({ completion }: { completion?: TaskCompletion | null }) {
   const remark = rejectionRemark(completion);
   if (!remark) return null;
   return (
-    <Alert severity="warning">
+    <Alert severity="warning" sx={{ borderRadius: "14px", fontSize: "1rem", fontWeight: 700 }}>
       {he.taskRejectedReopen}
       {remark !== he.taskRejectedReopen ? (
-        <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
+        <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap", fontWeight: 400 }}>
           {remark}
         </Typography>
       ) : null}
@@ -169,36 +205,25 @@ function TaskRejectionRemark({ completion }: { completion?: TaskCompletion | nul
   );
 }
 
-function TaskDetailChatAndMedia({
-  task,
-  language,
-  liveCapture,
-  onChatUpdated,
-  chatFirst = false,
-}: {
-  task: EmployeeTaskDetailTask;
-  language: EmployeeLanguage;
-  liveCapture?: EmployeeTaskCaptureProps;
-  onChatUpdated?: () => void;
-  chatFirst?: boolean;
-}) {
-  const chat = (
-    <OpenTaskChatButton
-      occurrenceId={task.id}
-      title={task.title}
-      status={task.status}
-      employee
-      completion={task.completion ?? null}
-      onOccurrenceUpdated={() => onChatUpdated?.()}
-      autoOpen={chatFirst}
-    />
-  );
-  const media = <TaskDetailMedia task={task} language={language} capture={liveCapture} />;
+/** Consigne du manager : carte bien lisible avec filet de couleur. */
+function TaskDescription({ text }: { text?: string | null }) {
+  if (!text) return null;
   return (
-    <>
-      {chat}
-      {media}
-    </>
+    <Box
+      sx={{
+        p: 2,
+        bgcolor: "background.paper",
+        borderRadius: EMPLOYEE_CARD_RADIUS,
+        borderInlineStart: `6px solid ${EMPLOYEE_BRAND}`,
+      }}
+    >
+      <Typography variant="caption" sx={{ fontWeight: 800, color: EMPLOYEE_BRAND }}>
+        {he.taskWhatToDo}
+      </Typography>
+      <Typography sx={{ whiteSpace: "pre-wrap", fontSize: "1.1rem", lineHeight: 1.6, mt: 0.25 }}>
+        {text}
+      </Typography>
+    </Box>
   );
 }
 
@@ -209,7 +234,7 @@ function TaskStatusRow({ task }: { task: EmployeeTaskDetailTask }) {
       {task.completion && showsCompletionOutcome(task.status) ? (
         <CompletionOutcomeChip status={task.completion.status} />
       ) : null}
-      <Typography variant="caption" color="text.secondary" dir="ltr">
+      <Typography variant="body2" color="text.secondary" dir="ltr" sx={{ fontWeight: 600 }}>
         {he.dueAt}: {formatDueAt(task.due_at)}
       </Typography>
     </Box>
@@ -226,11 +251,10 @@ function TaskDetailMedia({
   capture?: EmployeeTaskCaptureProps;
 }) {
   const requirements = effectiveRequirements(task);
-  const attachments = attachmentsFromCompletion(task.completion);
   const hasRef = Boolean(
     task.reference_photo_url || task.reference_video_url || task.reference_audio_url,
   );
-  const hasCompletionMedia = attachments.length > 0;
+  const hasCompletionMedia = attachmentsFromCompletion(task.completion).length > 0;
 
   return (
     <>
@@ -240,7 +264,14 @@ function TaskDetailMedia({
         reference_audio_url={task.reference_audio_url}
       />
       {capture ? (
-        <TaskLiveCapture requirements={requirements} capture={capture} language={language} />
+        <EmployeeCaptureSteps
+          requirements={requirements}
+          slots={capture.slots}
+          onChange={capture.onSlotsChange}
+          disabled={capture.saving}
+          language={language}
+          onAnnotatingChange={capture.onAnnotatingChange}
+        />
       ) : (
         <CompletionMediaPreview
           viewer="employee"
@@ -262,70 +293,32 @@ function TaskDetailMedia({
   );
 }
 
-function TaskLiveCapture({
-  requirements,
-  capture,
-  language,
-}: {
-  requirements: CompletionRequirement[];
-  capture: EmployeeTaskCaptureProps;
-  language: EmployeeLanguage;
-}) {
+/** Note et fichiers en plus : repliés, pour ne pas encombrer l'écran. */
+function OptionalSections({ capture }: { capture: EmployeeTaskCaptureProps }) {
+  const extras = capture.extras ?? [];
   return (
-    <>
-      <CompletionRequirementSlots
-        requirements={requirements}
-        slots={capture.slots}
-        onChange={capture.onSlotsChange}
-        disabled={capture.saving}
-        language={language}
-        onAnnotatingChange={capture.onAnnotatingChange}
-      />
-      <TextField
-        label={he.note}
-        value={capture.note}
-        onChange={(e) => capture.onNoteChange(e.target.value)}
-        fullWidth
-        multiline
-        rows={2}
-        placeholder={he.completionMediaHint}
-      />
-      {capture.slotsFilled === false && (
-        <Typography variant="caption" color="warning.main">
-          {he.completionFillSlotsHint}
-        </Typography>
-      )}
-    </>
-  );
-}
-
-function TaskDetailActions({
-  task,
-  onClose,
-  capture,
-  onDoTask,
-  starting,
-}: {
-  task: EmployeeTaskDetailTask;
-  onClose: () => void;
-  capture?: EmployeeTaskCaptureProps;
-  onDoTask?: () => void;
-  starting: boolean;
-}) {
-  return (
-    <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1, flexShrink: 0 }}>
-      <Button onClick={onClose}>{he.close}</Button>
-      {capture ? (
-        <EmployeeDoTaskButton
-          status={task.status}
-          starting={capture.saving}
-          disabled={!capture.canSubmit}
-          onClick={capture.onSubmit}
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+      <CollapsibleSection label={he.captureNoteToggle} defaultOpen={Boolean(capture.note.trim())}>
+        <TextField
+          label={he.note}
+          value={capture.note}
+          onChange={(e) => capture.onNoteChange(e.target.value)}
+          fullWidth
+          multiline
+          minRows={3}
+          placeholder={he.completionMediaHint}
+          sx={employeeFieldSx}
         />
-      ) : onDoTask ? (
-        <EmployeeDoTaskButton status={task.status} starting={starting} onClick={onDoTask} />
-      ) : null}
-    </DialogActions>
+      </CollapsibleSection>
+      <CollapsibleSection label={he.captureExtrasToggle} defaultOpen={extras.length > 0}>
+        <ExtraCompletionMedia
+          extras={extras}
+          onChange={capture.onExtrasChange ?? (() => undefined)}
+          disabled={capture.saving}
+          onAnnotatingChange={capture.onAnnotatingChange}
+        />
+      </CollapsibleSection>
+    </Box>
   );
 }
 
@@ -345,6 +338,7 @@ function StartUrlButton({
       fullWidth={fullWidth}
       startIcon={<OpenInNewIcon />}
       onClick={() => openExternalUrl(clean)}
+      sx={{ minHeight: 52, borderRadius: "14px", fontSize: "1.05rem", fontWeight: 800 }}
     >
       {he.openStartUrl}
     </Button>

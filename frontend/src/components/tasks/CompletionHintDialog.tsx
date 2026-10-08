@@ -1,5 +1,5 @@
-import { Dialog, DialogContent, DialogTitle, IconButton, Typography } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Dialog, DialogContent, Typography } from "@mui/material";
+import AppDialogTitle from "../ui/AppDialogTitle";
 import { he } from "../../i18n/he";
 
 export default function CompletionHintDialog({
@@ -13,14 +13,9 @@ export default function CompletionHintDialog({
 }) {
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="xs" dir="rtl">
-      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 1 }}>
-        {title || he.completionHintTitle}
-        <IconButton aria-label={he.close} onClick={onClose} sx={{ mr: "auto" }} size="small">
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
+      <AppDialogTitle title={title || he.completionHintTitle} onClose={onClose} />
       <DialogContent>
-        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+        <Typography sx={{ whiteSpace: "pre-wrap", fontSize: "1.1rem", lineHeight: 1.7, pb: 1 }}>
           {text}
         </Typography>
       </DialogContent>

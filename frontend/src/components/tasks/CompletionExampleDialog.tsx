@@ -1,5 +1,5 @@
-import { Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Dialog, DialogContent } from "@mui/material";
+import AppDialogTitle from "../ui/AppDialogTitle";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { ReviewableVideo } from "./MarkVideoFrameButton";
@@ -20,12 +20,7 @@ export default function CompletionExampleDialog({
   const media = useResolvedMediaSrc(src, Boolean(src && !src.startsWith("blob:")));
   return (
     <Dialog open={Boolean(src)} onClose={onClose} fullWidth maxWidth="sm" dir="rtl">
-      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 1 }}>
-        {title || he.completionEnlargeExample}
-        <IconButton aria-label={he.close} onClick={onClose} sx={{ mr: "auto" }} size="small">
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
+      <AppDialogTitle title={title || he.completionEnlargeExample} onClose={onClose} />
       <DialogContent>
         <ExampleBody playSrc={media.src} title={title} kind={kind} onMarkFrame={onMarkFrame} />
       </DialogContent>

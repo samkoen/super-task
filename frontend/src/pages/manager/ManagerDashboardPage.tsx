@@ -50,6 +50,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
 import { findQueuedTask } from "../../utils/dashboardCarousels";
+import { employeeGreeting } from "../../utils/employeeNextTask";
 import { todayIso } from "../../utils/dateView";
 import {
   bindNotificationAudioUnlock,
@@ -242,7 +243,9 @@ export default function ManagerDashboardPage() {
   return (
     <Box>
       <EmployeeShiftHeader
-        dateNav={<DashboardDayNav day={viewDay} onChange={setViewDay} />}
+        hero
+        greeting={employeeGreeting(new Date().getHours())}
+        dateNav={<DashboardDayNav day={viewDay} onChange={setViewDay} onDark />}
         name={user?.full_name}
         photoUrl={photoUrl}
         photoEditable
@@ -419,7 +422,12 @@ function ManagerBranchPicker({
       label={he.dashboardSelectBranch}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      sx={{ minWidth: 180 }}
+      sx={{
+        minWidth: { xs: "100%", md: 220 },
+        bgcolor: "#fff",
+        borderRadius: "12px",
+        "& .MuiOutlinedInput-root": { borderRadius: "12px", fontWeight: 700 },
+      }}
     >
       <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
       {branches.map((b) => (

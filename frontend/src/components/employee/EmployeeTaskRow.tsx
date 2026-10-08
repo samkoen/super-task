@@ -1,5 +1,12 @@
+import type { ElementType, ReactNode } from "react";
 import { Box, Chip, Paper, Typography, alpha } from "@mui/material";
-import type { ReactNode } from "react";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import TaskPhotoThumb from "../tasks/TaskPhotoThumb";
 import { taskSquareClickProps } from "../tasks/taskSquareClick";
 import { taskStatusChipColor, taskStatusVisual } from "../../constants/taskStatusVisual";
@@ -8,6 +15,7 @@ import { formatDueAt } from "../../utils/dateView";
 import { shouldHighlightEmployeeTask } from "../../utils/employeeDashboardSections";
 import type { EmployeeTaskCard } from "../../services/dashboardService";
 import type { TaskStatus } from "../../services/taskService";
+import { employeeCardSx } from "../../styles/employeeUi";
 
 export type EmployeeTaskRowLayout = "tile" | "list";
 
@@ -17,10 +25,19 @@ interface EmployeeTaskRowProps {
   layout?: EmployeeTaskRowLayout;
 }
 
-const TILE = 120;
-const chipLabelSx = { height: 20, "& .MuiChip-label": { px: 0.75, fontSize: 11 } };
+const PHOTO = 88;
+const chipLabelSx = { height: 26, "& .MuiChip-label": { px: 1, fontSize: 12.5, fontWeight: 700 } };
 
-/** Tuile photo (מזדמנות) ou ligne sans image (קבועות). */
+const STATUS_ICON: Partial<Record<TaskStatus, ElementType>> = {
+  pending: ScheduleIcon,
+  in_progress: PlayCircleOutlineIcon,
+  awaiting_response: ChatBubbleOutlineIcon,
+  pending_review: HourglassTopIcon,
+  completed: CheckCircleOutlineIcon,
+  overdue: ErrorOutlineIcon,
+};
+
+/** Carte photo (מזדמנות) ou ligne sans image (קבועות). */
 export default function EmployeeTaskRow({
   task,
   onOpen,
@@ -47,95 +64,128 @@ function StatusChip({ status }: { status: TaskStatus }) {
   );
 }
 
-function EmployeeTaskTile({
-  task,
-  onOpen,
-}: Omit<EmployeeTaskRowProps, "layout">) {
-  const highlight = shouldHighlightEmployeeTask(task.status);
-  const visual = taskStatusVisual(task.status);
+function StatusBadge({ status }: { status: TaskStatus }) {
+  const visual = taskStatusVisual(status);
+  const Icon = STATUS_ICON[status] ?? ScheduleIcon;
   return (
-    <Paper
-      variant="outlined"
-      {...taskSquareClickProps(`${he.openTask}: ${task.title}`, () => onOpen(task))}
+    <Box
+      aria-hidden
       sx={{
-        width: TILE,
-        flex: "0 0 auto",
-        p: 0,
-        overflow: "hidden",
-        cursor: "pointer",
-        borderColor: alpha(visual.bar, highlight ? 0.7 : 0.35),
-        borderInlineStartWidth: 3,
-        borderInlineStartColor: visual.bar,
-        "&:hover": { bgcolor: "action.hover" },
+        width: 46,
+        height: 46,
+        flexShrink: 0,
+        borderRadius: "14px",
+        display: "grid",
+        placeItems: "center",
+        color: visual.bar,
+        bgcolor: alpha(visual.bar, 0.12),
       }}
     >
-      <Box sx={{ height: TILE, bgcolor: alpha(visual.bar, 0.06) }}>
-        <TaskPhotoThumb
-          photoUrl={task.reference_photo_url}
-          title={task.title}
-          accent={visual.bar}
-          height={TILE}
-        />
-      </Box>
-      <TileCaption task={task} />
-    </Paper>
+      <Icon sx={{ fontSize: 26 }} />
+    </Box>
   );
 }
 
-function TileCaption({ task }: { task: EmployeeTaskCard }) {
+function cardSx(task: EmployeeTaskCard) {
+  const visual = taskStatusVisual(task.status);
+  const highlight = shouldHighlightEmployeeTask(task.status);
+  return {
+    ...employeeCardSx,
+    width: "100%",
+    overflow: "hidden",
+    borderRadius: "18px",
+    borderInlineStart: `6px solid ${visual.bar}`,
+    ...(highlight ? { borderColor: alpha(visual.bar, 0.5), bgcolor: alpha(visual.bar, 0.03) } : {}),
+    transition: "box-shadow 0.15s, transform 0.12s",
+    "&:active": { transform: "scale(0.99)" },
+  } as const;
+}
+
+function TaskTexts({ task }: { task: EmployeeTaskCard }) {
   return (
-    <Box sx={{ p: 0.75, textAlign: "start" }}>
-      <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
+    <Box sx={{ flex: 1, minWidth: 0, textAlign: "start" }}>
+      <Typography
+        variant="body1"
+        fontWeight={800}
+        title={task.title}
+        sx={{
+          lineHeight: 1.3,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {task.title}
       </Typography>
-      <Typography variant="caption" color="text.secondary" dir="ltr" noWrap display="block">
-        {formatDueAt(task.due_at)}
-      </Typography>
-      <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.5}>
+      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mt={0.5}>
+        <Typography variant="body2" color="text.secondary" dir="ltr" fontWeight={600}>
+          {formatDueAt(task.due_at)}
+        </Typography>
         <StatusChip status={task.status} />
       </Box>
     </Box>
   );
 }
 
-function EmployeeTaskListRow({
-  task,
-  onOpen,
-}: Omit<EmployeeTaskRowProps, "layout">) {
-  const highlight = shouldHighlightEmployeeTask(task.status);
+function EmployeeTaskTile({ task, onOpen }: Omit<EmployeeTaskRowProps, "layout">) {
   const visual = taskStatusVisual(task.status);
   return (
     <Paper
       variant="outlined"
+      {...taskSquareClickProps(`${he.openTask}: ${task.title}`, () => onOpen(task))}
       sx={{
-        width: "100%",
-        overflow: "hidden",
-        borderColor: alpha(visual.bar, highlight ? 0.7 : 0.35),
-        borderInlineStartWidth: 3,
-        borderInlineStartColor: visual.bar,
+        ...cardSx(task),
+        p: 1.25,
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        cursor: "pointer",
+        "&:hover": { bgcolor: "action.hover" },
       }}
     >
+      <Box
+        sx={{
+          width: PHOTO,
+          height: PHOTO,
+          flexShrink: 0,
+          borderRadius: "14px",
+          overflow: "hidden",
+          bgcolor: alpha(visual.bar, 0.08),
+        }}
+      >
+        <TaskPhotoThumb
+          photoUrl={task.reference_photo_url}
+          title={task.title}
+          accent={visual.bar}
+          height={PHOTO}
+        />
+      </Box>
+      <TaskTexts task={task} />
+      <ChevronLeftIcon sx={{ color: "text.disabled", flexShrink: 0 }} />
+    </Paper>
+  );
+}
+
+function EmployeeTaskListRow({ task, onOpen }: Omit<EmployeeTaskRowProps, "layout">) {
+  return (
+    <Paper variant="outlined" sx={cardSx(task)}>
       <OpenTaskButton
         task={task}
         onOpen={onOpen}
         sx={{
-          px: 1.25,
-          py: 1,
+          px: 1.5,
+          py: 1.5,
+          minHeight: 76,
           display: "flex",
           alignItems: "center",
-          gap: 1,
+          gap: 1.5,
           minWidth: 0,
         }}
       >
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" fontWeight={800} noWrap title={task.title}>
-            {task.title}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" dir="ltr" noWrap display="block">
-            {formatDueAt(task.due_at)}
-          </Typography>
-        </Box>
-        <StatusChip status={task.status} />
+        <StatusBadge status={task.status} />
+        <TaskTexts task={task} />
+        <ChevronLeftIcon sx={{ color: "text.disabled", flexShrink: 0 }} />
       </OpenTaskButton>
     </Paper>
   );

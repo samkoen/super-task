@@ -25,23 +25,25 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
       variant="outlined"
       {...openProps}
       sx={{
-        minWidth: 120,
-        maxWidth: 130,
-        width: 120,
+        minWidth: 150,
+        maxWidth: 170,
+        width: 160,
+        borderRadius: "16px",
+        boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
         flex: "0 0 auto",
         p: 0,
         overflow: "hidden",
         scrollSnapAlign: "start",
         cursor: onOpen ? "pointer" : "default",
         borderColor: alpha(border, 0.45),
-        borderInlineStartWidth: 3,
+        borderInlineStartWidth: 5,
         borderInlineStartColor: border,
         "&:hover": onOpen ? { bgcolor: "action.hover" } : undefined,
       }}
     >
       <Box
         sx={{
-          height: 60,
+          height: 88,
           bgcolor: alpha(border, 0.06),
           borderBottom: "1px solid",
           borderColor: "divider",
@@ -51,11 +53,11 @@ export default function PendingTaskMediaCard({ task, onOpen }: PendingTaskMediaC
           photoUrl={task.reference_photo_url}
           title={task.title}
           accent={border}
-          height={60}
+          height={88}
         />
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "start" }}>
-        <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
+      <Box sx={{ p: 1.25, textAlign: "start" }}>
+        <Typography variant="body2" fontWeight={800} display="block" noWrap title={task.title}>
           {task.title}
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap display="block">

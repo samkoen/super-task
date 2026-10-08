@@ -23,4 +23,8 @@ describe("SystemBugLauncher", () => {
     expect(systemBugLauncherBottom(true)).toContain("76px");
     expect(systemBugLauncherBottom(false)).toContain("16px");
   });
+
+  it("sits above the oved bottom nav", () => {
+    expect(systemBugLauncherBottom(false, true)).toContain("84px");
+  });
 });

@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Badge,
-  Box,
-  Dialog,
-  List,
-  ListItemButton,
-  ListItemText,
-  Typography,
-} from "@mui/material";
+import { Box, Dialog, List } from "@mui/material";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import EmployeeChatRowItem from "../../components/chat/EmployeeChatRowItem";
+import ManagerPickerDialog from "../../components/chat/ManagerPickerDialog";
 import { ApiError } from "../../services/api";
 import { useFeedback } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
@@ -23,7 +17,6 @@ import FullscreenBackAppBar, {
 import TaskChatDialog from "../../components/tasks/TaskChatDialog";
 import { directChatService, type DirectChatCard } from "../../services/directChatService";
 import { taskService, type EmployeeTaskChat } from "../../services/taskService";
-import { formatTime } from "../../utils/dashboardTime";
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import {
@@ -152,26 +145,14 @@ export default function EmployeeChatsPage() {
         onOccurrenceUpdated={() => void load()}
       />
 
-      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="xs" dir="rtl">
-        <List>
-          {managers.map((card) => (
-            <ListItemButton
-              key={`${card.scope}-${card.counterpart_user_id}`}
-              onClick={() =>
-                void openGeneral(
-                  card.scope === "network" ? "network" : "branch",
-                  employeeManagerLabel(card),
-                )
-              }
-            >
-              <ListItemText
-                primary={employeeManagerLabel(card)}
-                secondary={card.unread_count ? String(card.unread_count) : undefined}
-              />
-            </ListItemButton>
-          ))}
-        </List>
-      </Dialog>
+      <ManagerPickerDialog
+        open={pickerOpen}
+        managers={managers}
+        onClose={() => setPickerOpen(false)}
+        onPick={(card) =>
+          void openGeneral(card.scope === "network" ? "network" : "branch", employeeManagerLabel(card))
+        }
+      />
     </Box>
   );
 }
@@ -187,32 +168,9 @@ function ChatRows({
     return <EmptyState title={he.directChatEmpty} icon={<ChatOutlinedIcon fontSize="inherit" />} />;
   }
   return (
-    <List disablePadding>
+    <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
       {rows.map((row) => (
-        <ListItemButton
-          key={row.kind === "general" ? "general" : row.id}
-          onClick={() => onRow(row)}
-          sx={{ borderBottom: "1px solid", borderColor: "divider", py: 1.25 }}
-        >
-          <ListItemText
-            primary={row.title}
-            secondary={row.last_preview || he.directChatEmpty}
-            primaryTypographyProps={{
-              fontWeight: row.kind === "general" && row.unread_count ? 800 : 600,
-            }}
-            secondaryTypographyProps={{ noWrap: true }}
-          />
-          <Box textAlign="left" minWidth={56}>
-            {row.last_at && (
-              <Typography variant="caption" color="text.secondary" display="block">
-                {formatTime(row.last_at)}
-              </Typography>
-            )}
-            {row.kind === "general" && row.unread_count > 0 && (
-              <Badge badgeContent={row.unread_count} color="error" sx={{ mt: 0.5 }} />
-            )}
-          </Box>
-        </ListItemButton>
+        <EmployeeChatRowItem key={row.kind === "general" ? "general" : row.id} row={row} onRow={onRow} />
       ))}
     </List>
   );

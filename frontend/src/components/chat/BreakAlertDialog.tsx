@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
-import {
-  Alert,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Typography,
-} from "@mui/material";
+import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, Typography } from "@mui/material";
 import { ApiError } from "../../services/api";
 import { employeeActivityService } from "../../services/employeeActivityService";
 import { he } from "../../i18n/he";
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
+import { employeePrimaryButtonSx } from "../../styles/employeeUi";
 import { formatTime } from "../../utils/dashboardTime";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { formatBreakElapsed, type BreakAlertTarget } from "../../utils/breakAlert";
+import AppDialogTitle from "../ui/AppDialogTitle";
 
+/**
+ * Le salarié est en pause : le choix sûr (rester silencieux) est le gros bouton principal,
+ * l'envoi avec sonnerie (urgence) est une action volontaire en dessous.
+ */
 export default function BreakAlertDialog({
   target,
   onClose,
@@ -29,7 +26,7 @@ export default function BreakAlertDialog({
 
   return (
     <Dialog open={Boolean(target)} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" dir="rtl">
-      <DialogTitle>{he.breakAlertTitle}</DialogTitle>
+      <AppDialogTitle title={he.breakAlertTitle} onClose={onClose} closeDisabled={busy} />
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 1 }}>
         {target ? <BreakAlertCopy alert={target.alert} /> : null}
         {error ? <Alert severity="error">{error}</Alert> : null}
@@ -46,9 +43,11 @@ export default function BreakAlertDialog({
 function BreakAlertCopy({ alert }: { alert: BreakAlertTarget["alert"] }) {
   return (
     <>
-      <Typography>{he.breakAlertSince(formatTime(alert.on_break_since))}</Typography>
-      <Typography>{he.breakAlertElapsed(formatBreakElapsed(alert.elapsed_seconds))}</Typography>
-      <Typography fontWeight={700}>{he.breakAlertQuestion}</Typography>
+      <Typography sx={{ fontSize: "1.05rem" }}>{he.breakAlertSince(formatTime(alert.on_break_since))}</Typography>
+      <Typography sx={{ fontSize: "1.05rem" }}>
+        {he.breakAlertElapsed(formatBreakElapsed(alert.elapsed_seconds))}
+      </Typography>
+      <Typography fontWeight={800} sx={{ fontSize: "1.05rem" }}>{he.breakAlertQuestion}</Typography>
     </>
   );
 }
@@ -63,16 +62,18 @@ function BreakAlertActions({
   onRing: () => void;
 }) {
   return (
-    <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
-      <Button onClick={onKeepSilent} disabled={busy}>{he.breakAlertKeepSilent}</Button>
+    <DialogActions sx={dialogStackedActionsSx}>
       <Button
-        variant="contained"
+        variant="outlined"
         color="warning"
         onClick={onRing}
         disabled={busy}
-        startIcon={busy ? <CircularProgress size={16} color="inherit" /> : undefined}
+        sx={dialogSecondaryActionSx}
       >
-        {he.breakAlertRingAnyway}
+        {busy ? <CircularProgress size={22} color="inherit" /> : he.breakAlertRingAnyway}
+      </Button>
+      <Button variant="contained" onClick={onKeepSilent} disabled={busy} sx={employeePrimaryButtonSx}>
+        {he.breakAlertKeepSilent}
       </Button>
     </DialogActions>
   );

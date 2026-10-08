@@ -116,7 +116,31 @@ describe("EmployeeChatsPage", () => {
     });
     render(<EmployeeChatsPage />);
     expect(await screen.findByText(taskChatListTitle("ניקיון", "2026-10-03T08:00:00+03:00"))).toBeTruthy();
-    expect(screen.getByText(he.directChatEmpty)).toBeTruthy();
+    expect(screen.getByText(he.chatRowEmpty)).toBeTruthy();
+  });
+
+  it("asks which manager to talk to when there are several", async () => {
+    const card = {
+      kind: "up" as const,
+      counterpart_role: "branch_manager",
+      last_preview: null,
+      last_at: null,
+      unread_count: 0,
+    };
+    vi.mocked(directChatService.inbox).mockResolvedValue({
+      items: [],
+      up: null,
+      unread_count: 0,
+      managers: [
+        { ...card, id: "c1", counterpart_user_id: "m1", counterpart_name: "דנה", scope: "branch" },
+        { ...card, id: "c2", counterpart_user_id: "m2", counterpart_name: "רון", scope: "network" },
+      ],
+    });
+    vi.mocked(directChatService.openMine).mockClear();
+    render(<EmployeeChatsPage />);
+    fireEvent.click(await screen.findByText(he.employeeGeneralChat));
+    expect(await screen.findByText(he.chatPickManager)).toBeTruthy();
+    expect(directChatService.openMine).not.toHaveBeenCalled();
   });
 
   it("opens the task chat", async () => {

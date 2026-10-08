@@ -14,7 +14,9 @@ import {
   groupPendingTasks,
   type PendingGroupMode,
 } from "../../utils/storeStatusAnalysis";
+import SectionHeading from "../ui/SectionHeading";
 import PendingTaskMediaCard from "./PendingTaskMediaCard";
+import { EMPLOYEE_CARD_RADIUS } from "../../styles/employeeUi";
 
 export type ManagerTaskCarouselKind = "pending" | "completed";
 
@@ -58,52 +60,42 @@ export default function PendingTasksCarousel({
       sx={{
         border: 1,
         borderColor: "divider",
-        borderRadius: 1,
-        p: 1.5,
+        borderRadius: EMPLOYEE_CARD_RADIUS,
+        p: 2,
         bgcolor: "background.paper",
+        boxShadow: "0 2px 10px rgba(15, 23, 42, 0.05)",
       }}
     >
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        flexWrap="wrap"
-        gap={1}
-        mb={1.5}
-      >
-        <Box display="flex" alignItems="baseline" gap={1}>
-          <Typography variant="subtitle1" fontWeight={700}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            ({all.length})
-          </Typography>
-        </Box>
-        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-          <TextField
-            select
-            size="small"
-            label={he.dashboardGroupBy}
-            value={groupMode}
-            onChange={(e) => setGroupMode(e.target.value as PendingGroupMode)}
-            sx={{ minWidth: 160 }}
-          >
-            <MenuItem value="assignee">{he.dashboardGroupByAssignee}</MenuItem>
-            <MenuItem value="department">{he.dashboardGroupByDepartment}</MenuItem>
-            <MenuItem value="promotion_stage">{he.dashboardGroupByStage}</MenuItem>
-          </TextField>
-          {onOpenStatusAnalysis && (
-            <Button
+      <SectionHeading
+        title={title}
+        count={all.length}
+        trailing={
+          <>
+            <TextField
+              select
               size="small"
-              variant="outlined"
-              startIcon={<AnalyticsIcon />}
-              onClick={onOpenStatusAnalysis}
+              label={he.dashboardGroupBy}
+              value={groupMode}
+              onChange={(e) => setGroupMode(e.target.value as PendingGroupMode)}
+              sx={{ minWidth: 160 }}
             >
-              {he.dashboardStatusAnalysis}
-            </Button>
-          )}
-        </Box>
-      </Box>
+              <MenuItem value="assignee">{he.dashboardGroupByAssignee}</MenuItem>
+              <MenuItem value="department">{he.dashboardGroupByDepartment}</MenuItem>
+              <MenuItem value="promotion_stage">{he.dashboardGroupByStage}</MenuItem>
+            </TextField>
+            {onOpenStatusAnalysis && (
+              <Button
+                variant="outlined"
+                startIcon={<AnalyticsIcon />}
+                onClick={onOpenStatusAnalysis}
+                sx={{ minHeight: 40, borderRadius: "12px", fontWeight: 700 }}
+              >
+                {he.dashboardStatusAnalysis}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {all.length === 0 ? (
         <Typography variant="body2" color="text.secondary">

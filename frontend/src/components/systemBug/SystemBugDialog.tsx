@@ -6,12 +6,15 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   TextField,
   Typography,
+  alpha,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import StopIcon from "@mui/icons-material/Stop";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { he } from "../../i18n/he";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { submitSystemBug } from "../../services/systemBugService";
@@ -20,6 +23,9 @@ import { toMailSafeAudio } from "../../utils/audioToMailSafe";
 import PhotoAnnotationCanvas, {
   type PhotoAnnotationCanvasHandle,
 } from "../media/PhotoAnnotationCanvas";
+import AppDialogTitle from "../ui/AppDialogTitle";
+import { EMPLOYEE_BRAND, EMPLOYEE_TOUCH_MIN, employeeFieldSx, employeePrimaryButtonSx } from "../../styles/employeeUi";
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
 
 const AUDIO_MAX_MS = 30_000;
 
@@ -37,6 +43,8 @@ export type SystemBugDialogProps = {
 };
 
 export default function SystemBugDialog(props: SystemBugDialogProps) {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const audio = useAudioRecorder();
@@ -54,16 +62,34 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
     return () => window.clearTimeout(timer);
   }, [audio.recording, audio.stop]);
 
+  const send = () =>
+    void sendSystemBug({
+      ...props,
+      note,
+      sending,
+      setSending,
+      audioBlob: audio.blob,
+      recording: audio.recording,
+      stopAndWait: audio.stopAndWait,
+      annotate: annotateRef.current,
+    });
+
   return (
     <Dialog
       open={props.open}
       onClose={sending ? undefined : props.onClose}
       fullWidth
+      fullScreen={fullScreen}
       maxWidth="md"
       dir="rtl"
       disableEnforceFocus
     >
-      <DialogTitle data-system-bug-dialog="">{he.systemBug}</DialogTitle>
+      <AppDialogTitle
+        data-system-bug-dialog=""
+        title={he.systemBug}
+        onClose={props.onClose}
+        closeDisabled={sending}
+      />
       <DialogContent sx={{ overflowY: "auto" }}>
         <SystemBugFields
           note={note}
@@ -77,44 +103,19 @@ export default function SystemBugDialog(props: SystemBugDialogProps) {
           onToggleRecord={() => (audio.recording ? audio.stop() : void audio.start())}
         />
       </DialogContent>
-      <DialogActions>
-        <Button onClick={props.onClose} disabled={sending}>
-          {he.close}
+      <DialogActions sx={dialogStackedActionsSx}>
+        <Button onClick={props.onClose} disabled={sending} sx={dialogSecondaryActionSx}>
+          {he.cancel}
         </Button>
-        <Button
-          variant="contained"
-          disabled={sending}
-          onClick={() =>
-            void sendSystemBug({
-              ...props,
-              note,
-              sending,
-              setSending,
-              audioBlob: audio.blob,
-              recording: audio.recording,
-              stopAndWait: audio.stopAndWait,
-              annotate: annotateRef.current,
-            })
-          }
-        >
-          {sending ? <CircularProgress size={22} color="inherit" /> : he.systemBugSend}
+        <Button variant="contained" disabled={sending} onClick={send} sx={employeePrimaryButtonSx}>
+          {sending ? <CircularProgress size={24} color="inherit" /> : he.systemBugSend}
         </Button>
       </DialogActions>
     </Dialog>
   );
 }
 
-function SystemBugFields({
-  note,
-  setNote,
-  screenshot,
-  annotateRef,
-  sending,
-  recording,
-  hasAudio,
-  canRecord,
-  onToggleRecord,
-}: {
+interface SystemBugFieldsProps {
   note: string;
   setNote: (value: string) => void;
   screenshot: Blob | null;
@@ -124,57 +125,110 @@ function SystemBugFields({
   hasAudio: boolean;
   canRecord: boolean;
   onToggleRecord: () => void;
-}) {
+}
+
+function SystemBugFields(props: SystemBugFieldsProps) {
   return (
-    <>
-      <Typography variant="body2" color="text.secondary" mb={1.5}>
-        {screenshot ? he.systemBugHint : he.systemBugCaptureFailed}
+    <Box display="flex" flexDirection="column" gap={2.5}>
+      <Typography variant="body1" fontWeight={600}>
+        {he.systemBugSimpleHint}
       </Typography>
-      {screenshot ? (
-        <SystemBugScreenshot screenshot={screenshot} annotateRef={annotateRef} />
-      ) : null}
+      <RecordButton
+        recording={props.recording}
+        disabled={props.sending || !props.canRecord}
+        onToggle={props.onToggleRecord}
+      />
+      {props.hasAudio ? <AudioReadyBadge /> : null}
       <TextField
         label={he.systemBugNote}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
+        helperText={he.systemBugOrWrite}
+        value={props.note}
+        onChange={(e) => props.setNote(e.target.value)}
         fullWidth
         multiline
         minRows={3}
-        disabled={sending}
+        disabled={props.sending}
+        sx={employeeFieldSx}
       />
-      <Box mt={1.5}>
-        <Button
-          variant="outlined"
-          onClick={onToggleRecord}
-          startIcon={recording ? <StopIcon /> : <MicIcon />}
-          disabled={sending || !canRecord}
-        >
-          {recording ? he.systemBugStop : he.systemBugRecord}
-        </Button>
-        {hasAudio ? (
-          <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
-            {he.systemBugAudioReady}
-          </Typography>
-        ) : null}
-      </Box>
-    </>
+      <ScreenshotSection screenshot={props.screenshot} annotateRef={props.annotateRef} />
+    </Box>
   );
 }
 
-function SystemBugScreenshot({
+function RecordButton({
+  recording,
+  disabled,
+  onToggle,
+}: {
+  recording: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      variant={recording ? "contained" : "outlined"}
+      color={recording ? "error" : "primary"}
+      onClick={onToggle}
+      disabled={disabled}
+      startIcon={recording ? <StopIcon /> : <MicIcon />}
+      sx={{
+        minHeight: EMPLOYEE_TOUCH_MIN + 8,
+        borderRadius: "16px",
+        fontSize: "1.15rem",
+        fontWeight: 800,
+        borderWidth: 2,
+        "&:hover": { borderWidth: 2 },
+      }}
+    >
+      {recording ? he.systemBugStop : he.systemBugRecord}
+    </Button>
+  );
+}
+
+function AudioReadyBadge() {
+  return (
+    <Box
+      role="status"
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        px: 1.5,
+        py: 1,
+        borderRadius: "12px",
+        color: EMPLOYEE_BRAND,
+        bgcolor: alpha(EMPLOYEE_BRAND, 0.1),
+      }}
+    >
+      <CheckCircleRoundedIcon />
+      <Typography fontWeight={700}>{he.systemBugAudioReady}</Typography>
+    </Box>
+  );
+}
+
+function ScreenshotSection({
   screenshot,
   annotateRef,
 }: {
-  screenshot: Blob;
+  screenshot: Blob | null;
   annotateRef: RefObject<PhotoAnnotationCanvasHandle>;
 }) {
+  if (!screenshot) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {he.systemBugCaptureFailed}
+      </Typography>
+    );
+  }
   return (
-    <Box mb={1.5}>
-      <PhotoAnnotationCanvas
-        ref={annotateRef}
-        image={screenshot}
-        hint={he.systemBugAnnotateHint}
-      />
+    <Box>
+      <Typography variant="subtitle1" fontWeight={800} mb={0.5}>
+        {he.systemBugScreenshotTitle}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={1.5}>
+        {he.systemBugHint}
+      </Typography>
+      <PhotoAnnotationCanvas ref={annotateRef} image={screenshot} hint={he.systemBugAnnotateHint} />
     </Box>
   );
 }

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -63,6 +63,7 @@ class TaskTemplateRepository:
             .where(orm.TaskTemplate.is_active.is_(True))
             .where(orm.TaskTemplate.task_kind == "fixed")
             .where(orm.TaskTemplate.recurrence.in_(["daily", "weekly", "biweekly", "monthly"]))
+            .where(orm.TaskTemplate.opened_by_delivery_note.is_(False))
         )
         rows = self._db.execute(q).scalars().all()
         return [t for row in rows if (t := mp.task_template_orm_to_domain(row))]
@@ -201,10 +202,30 @@ class TaskTemplateRepository:
         self._db.flush()
         return mp.task_template_orm_to_domain(row)
 
+    def set_opened_by_delivery_note(
+        self, id_: str, opened: bool, task_type: str | None
+    ) -> TaskTemplate | None:
+        row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.opened_by_delivery_note = bool(opened)
+        row.delivery_note_task_type = task_type
+        self._db.flush()
+        return mp.task_template_orm_to_domain(row)
+
     def delete(self, id_: str) -> bool:
         row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
         if not row:
             return False
+        self._drop_delivery_openings(row.id)
         self._db.delete(row)
         self._db.flush()
         return True
+
+    def _drop_delivery_openings(self, template_id) -> None:
+        self._db.execute(
+            delete(orm.DeliveryNoteOpening).where(
+                orm.DeliveryNoteOpening.template_id == template_id
+            )
+        )
+        self._db.flush()

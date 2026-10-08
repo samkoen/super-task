@@ -12,6 +12,8 @@ interface EmployeeAvatarProps {
   editable?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** Liseré blanc : pour poser l'avatar sur un fond de couleur. */
+  ring?: boolean;
 }
 
 export default function EmployeeAvatar({
@@ -21,6 +23,7 @@ export default function EmployeeAvatar({
   editable = false,
   onEdit,
   onDelete,
+  ring = false,
 }: EmployeeAvatarProps) {
   const src = mediaUrl(photoUrl) ?? undefined;
   const canDelete = Boolean(src && onDelete);
@@ -30,8 +33,15 @@ export default function EmployeeAvatar({
   };
   return (
     <Box position="relative" flexShrink={0} width={size} height={size} zIndex={2} sx={{ overflow: "visible" }}>
-      <AvatarFace name={name} src={src} size={size} clickable={editable || canDelete} onClick={onPhotoActivate} />
-      {editable ? <AvatarCameraBadge onClick={onPhotoActivate} /> : null}
+      <AvatarFace
+        name={name}
+        src={src}
+        size={size}
+        ring={ring}
+        clickable={editable || canDelete}
+        onClick={onPhotoActivate}
+      />
+      {editable ? <AvatarCameraBadge onClick={onPhotoActivate} avatarSize={size} /> : null}
       <AvatarPhotoMenu
         anchor={menuAnchor}
         editable={editable}
@@ -63,12 +73,14 @@ function AvatarFace({
   name,
   src,
   size,
+  ring,
   clickable,
   onClick,
 }: {
   name?: string;
   src?: string;
   size: number;
+  ring: boolean;
   clickable: boolean;
   onClick: (event: MouseEvent<HTMLElement>) => void;
 }) {
@@ -83,6 +95,9 @@ function AvatarFace({
         fontSize: size * 0.36,
         fontWeight: 800,
         cursor: clickable ? "pointer" : "default",
+        ...(ring
+          ? { border: "3px solid #fff", boxShadow: "0 6px 18px rgba(0,0,0,0.25)" }
+          : {}),
       }}
     >
       {avatarInitials(name)}
@@ -90,7 +105,19 @@ function AvatarFace({
   );
 }
 
-function AvatarCameraBadge({ onClick }: { onClick: (event: MouseEvent<HTMLElement>) => void }) {
+/** Taille du badge appareil photo : proportionnelle à l'avatar, 30 px minimum. */
+export function cameraBadgeSize(avatarSize: number): number {
+  return Math.max(30, Math.round(avatarSize * 0.3));
+}
+
+function AvatarCameraBadge({
+  onClick,
+  avatarSize,
+}: {
+  onClick: (event: MouseEvent<HTMLElement>) => void;
+  avatarSize: number;
+}) {
+  const dim = cameraBadgeSize(avatarSize);
   return (
     <IconButton
       size="small"
@@ -103,13 +130,14 @@ function AvatarCameraBadge({ onClick }: { onClick: (event: MouseEvent<HTMLElemen
         zIndex: 3,
         bgcolor: "primary.main",
         color: "primary.contrastText",
-        width: 28,
-        height: 28,
+        width: dim,
+        height: dim,
+        border: "2px solid #fff",
         boxShadow: 1,
         "&:hover": { bgcolor: "primary.main", filter: "brightness(0.9)" },
       }}
     >
-      <PhotoCameraIcon sx={{ fontSize: 16 }} />
+      <PhotoCameraIcon sx={{ fontSize: Math.round(dim * 0.53) }} />
     </IconButton>
   );
 }
@@ -141,9 +169,13 @@ function AvatarPhotoMenu({
       anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       transformOrigin={{ vertical: "top", horizontal: "center" }}
     >
-      {editable ? <MenuItem onClick={() => pick(onEdit)}>{he.employeeChangePhoto}</MenuItem> : null}
+      {editable ? (
+        <MenuItem onClick={() => pick(onEdit)} sx={{ minHeight: 48 }}>
+          {he.employeeChangePhoto}
+        </MenuItem>
+      ) : null}
       {canDelete ? (
-        <MenuItem onClick={() => pick(onDelete)} sx={{ color: "error.main" }}>
+        <MenuItem onClick={() => pick(onDelete)} sx={{ color: "error.main", minHeight: 48 }}>
           {he.employeeDeletePhoto}
         </MenuItem>
       ) : null}

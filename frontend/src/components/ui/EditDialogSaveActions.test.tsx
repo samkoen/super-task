@@ -24,7 +24,7 @@ describe("EditDialogSaveActions", () => {
         onSave={onSave}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.saveChanges }));
     expect(onSave).toHaveBeenCalledOnce();
     expect(screen.queryByRole("dialog", { name: he.fixedTaskUpdateAllBranches })).toBeNull();
   });
@@ -38,7 +38,7 @@ describe("EditDialogSaveActions", () => {
         onSave={onSave}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.saveChanges }));
     expect(onSave).not.toHaveBeenCalled();
     const dialog = confirmDialog();
     expect(within(dialog).getByText(he.fixedTaskUpdateAllBranchesConfirm)).toBeTruthy();
@@ -56,13 +56,13 @@ describe("EditDialogSaveActions", () => {
         onSave={onSave}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: he.submit }));
+    fireEvent.click(screen.getByRole("button", { name: he.saveChanges }));
     fireEvent.click(within(confirmDialog()).getByRole("button", { name: he.cancel }));
     expect(onSave).not.toHaveBeenCalled();
     expect(onCancel).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: he.fixedTaskUpdateAllBranches })).toBeNull();
     });
-    expect(screen.getByRole("button", { name: he.submit })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.saveChanges })).toBeTruthy();
   });
 });

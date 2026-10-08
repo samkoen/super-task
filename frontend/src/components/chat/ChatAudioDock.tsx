@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Box, Button, IconButton, Typography } from "@mui/material";
+import { Alert, Box, Button, IconButton, Typography, alpha } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -8,7 +8,15 @@ import { he } from "../../i18n/he";
 import { formatAudioElapsed } from "../../utils/formatAudioElapsed";
 import type { useAudioRecorder } from "../../hooks/useAudioRecorder";
 
+import {
+  EMPLOYEE_BRAND,
+  EMPLOYEE_TOUCH_MIN,
+  employeePrimaryButtonSx,
+} from "../../styles/employeeUi";
+
 type AudioRecorder = ReturnType<typeof useAudioRecorder>;
+
+const secondaryActionSx = { minHeight: 52, borderRadius: "14px", fontWeight: 800, fontSize: "1rem" } as const;
 
 export default function ChatAudioDock({
   audio,
@@ -24,16 +32,28 @@ export default function ChatAudioDock({
   return (
     <Box display="flex" flexDirection="column" gap={1} dir="rtl">
       {audio.error ? <Alert severity="warning">{he.mediaCapturePermission}</Alert> : null}
-      <Box display="flex" alignItems="center" gap={1}>
+      <Box display="flex" alignItems="center" gap={1.5}>
         <ChatAudioPlay audio={audio} disabled={sending} />
-        <Typography variant="h6" fontWeight={800} sx={{ minWidth: 56, fontVariantNumeric: "tabular-nums" }}>
+        <Typography
+          fontWeight={800}
+          sx={{ minWidth: 72, fontSize: "1.75rem", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}
+        >
           {formatAudioElapsed(audio.elapsedSeconds)}
         </Typography>
-        {audio.paused ? null : (
-          <Typography variant="body2" color="error.main">{he.mediaCaptureRecording}</Typography>
-        )}
+        {audio.paused ? null : <RecordingBadge />}
       </Box>
       <ChatAudioDockActions audio={audio} sending={sending} onSend={onSend} onDelete={onDelete} />
+    </Box>
+  );
+}
+
+function RecordingBadge() {
+  return (
+    <Box display="flex" alignItems="center" gap={0.75} color="error.main">
+      <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: "error.main" }} />
+      <Typography fontWeight={800} sx={{ fontSize: "1rem", color: "inherit" }}>
+        {he.mediaCaptureRecording}
+      </Typography>
     </Box>
   );
 }
@@ -50,33 +70,39 @@ function ChatAudioDockActions({
   onDelete: () => void;
 }) {
   return (
-    <Box display="flex" alignItems="center" justifyContent="space-around" gap={1}>
-      <IconButton
-        color="primary"
+    <Box display="flex" flexDirection="column" gap={1}>
+      <Button
+        variant="contained"
+        fullWidth
         aria-label={he.chatAudioSend}
         disabled={sending || Boolean(audio.error)}
         onClick={onSend}
-        sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "primary.main" }}
+        startIcon={<SendIcon sx={{ transform: "scaleX(-1)" }} />}
+        sx={employeePrimaryButtonSx}
       >
-        <SendIcon />
-      </IconButton>
-      <Button
-        variant="outlined"
-        disabled={sending || !audio.recording}
-        onClick={() => (audio.paused ? audio.resume() : audio.pause())}
-        sx={{ minHeight: 48, fontWeight: 800, px: 2 }}
-      >
-        {audio.paused ? he.chatAudioResume : he.chatAudioPause}
+        {he.chatAudioSend}
       </Button>
-      <IconButton
-        color="error"
-        aria-label={he.chatAudioDiscard}
-        disabled={sending}
-        onClick={onDelete}
-        sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "error.main" }}
-      >
-        <DeleteOutlineIcon />
-      </IconButton>
+      <Box display="flex" gap={1}>
+        <Button
+          variant="outlined"
+          disabled={sending || !audio.recording}
+          onClick={() => (audio.paused ? audio.resume() : audio.pause())}
+          sx={{ ...secondaryActionSx, flex: 1 }}
+        >
+          {audio.paused ? he.chatAudioResume : he.chatAudioPause}
+        </Button>
+        <Button
+          variant="outlined"
+          color="error"
+          aria-label={he.chatAudioDiscard}
+          disabled={sending}
+          onClick={onDelete}
+          startIcon={<DeleteOutlineIcon />}
+          sx={{ ...secondaryActionSx, flex: 1 }}
+        >
+          {he.chatAudioDiscard}
+        </Button>
+      </Box>
     </Box>
   );
 }
@@ -94,7 +120,13 @@ function ChatAudioPlay({ audio, disabled }: { audio: AudioRecorder; disabled: bo
         aria-label={he.chatAudioPlay}
         disabled={disabled}
         onClick={() => toggleChatAudioPlay(audio, player)}
-        sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
+        sx={{
+          minWidth: EMPLOYEE_TOUCH_MIN,
+          minHeight: EMPLOYEE_TOUCH_MIN,
+          color: EMPLOYEE_BRAND,
+          bgcolor: alpha(EMPLOYEE_BRAND, 0.1),
+          "&:hover": { bgcolor: alpha(EMPLOYEE_BRAND, 0.18) },
+        }}
       >
         {player.playing ? <PauseIcon /> : <PlayArrowIcon />}
       </IconButton>

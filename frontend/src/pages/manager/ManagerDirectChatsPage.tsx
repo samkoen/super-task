@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Button, Chip, Dialog, List, ListItemAvatar, TextField } from "@mui/material";
+import { Box, Button, Chip, Dialog, InputAdornment, List, ListItemAvatar, TextField } from "@mui/material";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import SearchIcon from "@mui/icons-material/Search";
+import { ChatRowAvatar } from "../../components/chat/EmployeeChatRowItem";
+import { employeeBigButtonSx, employeeFieldSx } from "../../styles/employeeUi";
 import { ApiError } from "../../services/api";
 import { useFeedback } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
@@ -27,6 +30,8 @@ import {
 import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 
+const chatListSx = { display: "flex", flexDirection: "column", gap: 1.25 } as const;
+
 async function fetchDirectThread(card: DirectChatCard) {
   const opened = card.kind === "up"
     ? await directChatService.openMine()
@@ -51,6 +56,7 @@ export default function ManagerDirectChatsPage() {
             startIcon={<CampaignOutlinedIcon />}
             onClick={() => state.setBroadcastOpen(true)}
             disabled={state.items.length === 0}
+            sx={{ ...employeeBigButtonSx, minHeight: 52, fontSize: "1.05rem" }}
           >
             {he.directChatBroadcast}
           </Button>
@@ -58,12 +64,18 @@ export default function ManagerDirectChatsPage() {
       />
       <TextField
         fullWidth
-        size="small"
         value={state.query}
         onChange={(e) => state.setQuery(e.target.value)}
         placeholder={he.directChatSearch}
-        sx={{ mb: 1.5 }}
+        sx={{ ...employeeFieldSx, mb: 2 }}
         inputProps={{ "aria-label": he.directChatSearch }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          ),
+        }}
       />
       <ContactsBody state={state} />
       <EmployeeChatsDialog state={state} />
@@ -166,22 +178,24 @@ function ContactsBody({ state }: { state: ReturnType<typeof useManagerChatsState
     );
   }
   return (
-    <List disablePadding>
+    <List disablePadding sx={chatListSx}>
       {state.visible.map((card) => (
         <ChatInboxRow
           key={`${card.kind}-${card.counterpart_user_id}`}
           title={directChatTitle(card)}
-          preview={card.last_preview || he.directChatEmpty}
+          preview={card.last_preview || he.chatRowEmpty}
           lastAt={card.last_at}
           unreadCount={card.unread_count}
           onClick={() => void state.onContact(card)}
           leading={
             <ListItemAvatar>
-              <EmployeeAvatar name={card.counterpart_name} photoUrl={card.counterpart_avatar_url} size={44} />
+              <EmployeeAvatar name={card.counterpart_name} photoUrl={card.counterpart_avatar_url} size={56} />
             </ListItemAvatar>
           }
           titleExtra={
-            card.kind === "down" && card.branch_name ? <Chip size="small" label={card.branch_name} /> : null
+            card.kind === "down" && card.branch_name ? (
+              <Chip label={card.branch_name} sx={{ fontWeight: 700, fontSize: "0.9rem" }} />
+            ) : null
           }
         />
       ))}
@@ -205,8 +219,8 @@ function EmployeeChatsDialog({ state }: { state: ReturnType<typeof useManagerCha
       PaperProps={{ sx: fullscreenChatDialogPaperSx }}
     >
       <FullscreenBackAppBar title={state.selected?.counterpart_name ?? ""} onBack={onBack} />
-      <Box sx={fullscreenChatBodySx}>
-        <List disablePadding>
+      <Box sx={{ ...fullscreenChatBodySx, overflowY: "auto" }}>
+        <List disablePadding sx={chatListSx}>
           {rows.map((row) => (
             <EmployeeRow
               key={row.kind === "general" ? "general" : row.id}
@@ -247,10 +261,11 @@ function EmployeeRow({
   return (
     <ChatInboxRow
       title={row.title}
-      preview={row.last_preview || he.directChatEmpty}
+      preview={row.last_preview || he.chatRowEmpty}
       lastAt={row.last_at}
       unreadCount={row.unread_count}
       onClick={onClick}
+      leading={<ChatRowAvatar general={row.kind === "general"} />}
     />
   );
 }

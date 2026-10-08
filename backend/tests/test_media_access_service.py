@@ -1,4 +1,4 @@
-"""ACL proxy média — périmètre branche."""
+﻿"""ACL proxy média — périmètre branche."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -185,3 +185,53 @@ def test_system_bug_media_allowed_for_yitzhak_only():
             ),
             url,
         )
+
+
+_PDF = "https://bucket.r2.test/delivery_notes/a.pdf"
+_BRANCH = "11111111-1111-1111-1111-111111111111"
+
+
+def test_delivery_pdf_without_snif_is_visible_to_any_oved():
+    db = MagicMock()
+    row = MagicMock()
+    row.first.return_value = (None,)
+    db.execute.return_value = row
+    with patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=[],
+    ):
+        assert actor_can_access_media_url(db, _actor(roles.EMPLOYEE), _PDF) is True
+
+def test_delivery_pdf_follows_the_snif_scope():
+    import uuid
+
+    note_branch = uuid.UUID(_BRANCH)
+    db = MagicMock()
+    row = MagicMock()
+    row.first.return_value = (note_branch,)
+    db.execute.return_value = row
+    with patch(
+        "app.services.media_access_service._task_media_allowed", return_value=False
+    ), patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=[_BRANCH],
+    ):
+        assert actor_can_access_media_url(db, _actor(roles.EMPLOYEE), _PDF) is True
+    with patch(
+        "app.services.media_access_service._task_media_allowed", return_value=False
+    ), patch(
+        "app.services.media_access_service.visible_branch_ids_for_tasks",
+        return_value=["99999999-9999-9999-9999-999999999999"],
+    ):
+        assert actor_can_access_media_url(db, _actor(roles.EMPLOYEE), _PDF) is False
+
+
+def test_unknown_delivery_pdf_is_denied():
+    db = MagicMock()
+    miss = MagicMock()
+    miss.first.return_value = None
+    db.execute.return_value = miss
+    with patch(
+        "app.services.media_access_service._task_media_allowed", return_value=False
+    ):
+        assert actor_can_access_media_url(db, _actor(roles.ADMIN), _PDF) is False

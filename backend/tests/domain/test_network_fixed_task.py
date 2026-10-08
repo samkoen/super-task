@@ -14,6 +14,7 @@ from app.domain.scope import ActorContext
 from app.models.branch import Branch
 from app.models.task_template import TaskTemplate
 from app.models.user import User
+from app.repositories.task_template_repository import TaskTemplateRepository
 from app.services.task_template_service import TaskTemplateService
 
 
@@ -241,6 +242,72 @@ def test_create_template_one_branch_has_no_network_group(monkeypatch):
     assert templates.create.call_args.kwargs["branch_id"] == "b1"
 
 
+def test_delivery_note_model_does_not_open_a_task_today(monkeypatch):
+    branches = [Branch(id="b1", network_id="n1", name="א")]
+    emps = {"b1": [_emp("e1", created_at="2026-01-01T00:00:00")]}
+    emps["b1"][0].branch_id = "b1"
+    svc, templates = _template_service(branches, emps)
+    plain = _domain_tpl(
+        id="t-local", branch_id="b1", assignee_user_id="e1", title="תעודה", network_group_id=None
+    )
+    marked = _domain_tpl(
+        id="t-local",
+        branch_id="b1",
+        assignee_user_id="e1",
+        title="תעודה",
+        network_group_id=None,
+        opened_by_delivery_note=True,
+        delivery_note_task_type="line_check",
+    )
+    templates.create.return_value = plain
+    templates.set_opened_by_delivery_note.return_value = marked
+    monkeypatch.setattr(
+        "app.services.task_template_service.UserBranchMembershipRepository",
+        lambda db: MagicMock(list_branch_ids_for_user=lambda uid: []),
+    )
+    actor = ActorContext(
+        user_id="m1", role=roles.NETWORK_MANAGER, network_id="n1", branch_id=None
+    )
+    svc.create_template(
+        actor,
+        branch_id="b1",
+        title="תעודה",
+        recurrence="daily",
+        due_time="09:00",
+        assignee_user_id="e1",
+        opened_by_delivery_note=True,
+    )
+    svc._scheduler.generate_from_template.assert_not_called()
+    templates.set_opened_by_delivery_note.assert_called_once_with("t-local", True, "line_check")
+
+
+def test_unknown_delivery_task_type_is_rejected_on_create(monkeypatch):
+    branches = [Branch(id="b1", network_id="n1", name="א")]
+    emps = {"b1": [_emp("e1", created_at="2026-01-01T00:00:00")]}
+    emps["b1"][0].branch_id = "b1"
+    svc, templates = _template_service(branches, emps)
+    templates.create.return_value = _domain_tpl(
+        id="t-local", branch_id="b1", assignee_user_id="e1", network_group_id=None
+    )
+    monkeypatch.setattr(
+        "app.services.task_template_service.UserBranchMembershipRepository",
+        lambda db: MagicMock(list_branch_ids_for_user=lambda uid: []),
+    )
+    actor = ActorContext(
+        user_id="m1", role=roles.NETWORK_MANAGER, network_id="n1", branch_id=None
+    )
+    with pytest.raises(ValueError, match="סוג"):
+        svc.create_template(
+            actor,
+            branch_id="b1",
+            title="תעודה",
+            recurrence="daily",
+            assignee_user_id="e1",
+            opened_by_delivery_note=True,
+            delivery_note_task_type="photo",
+        )
+
+
 def test_create_templates_for_network_skips_empty_snif(monkeypatch):
     branches = [
         Branch(id="b1", network_id="n1", name="א"),
@@ -386,6 +453,7 @@ def test_update_network_keeps_per_branch_assignee(monkeypatch):
     svc, templates, actor = _network_update_setup(monkeypatch)
     result = svc.update_template(actor, "t1", **_edit_kwargs())
     assert result["updated_count"] == 2
+    assert sorted(result["updated_ids"]) == ["t1", "t2"]
     by_id = {c.args[0]: c.kwargs for c in templates.update.call_args_list}
     assert by_id["t1"]["assignee_user_id"] == "e1"
     assert by_id["t2"]["assignee_user_id"] == "e2a"
@@ -524,3 +592,10 @@ def test_delete_template_purges_open_occurrences(monkeypatch):
     notifs.clear_occurrence_links.assert_called_once_with("o1")
     occ_repo.clear_template_id.assert_called_once_with("t1")
     assert result["cancelled_occurrences"][0]["id"] == "o1"
+
+
+def test_deleting_a_template_drops_its_delivery_openings():
+    db = MagicMock()
+    db.get.return_value = MagicMock()
+    assert TaskTemplateRepository(db).delete("cddfd2b4-2428-4e5c-9172-b8484550197f")
+    assert "delivery_note_openings" in str(db.execute.call_args.args[0])

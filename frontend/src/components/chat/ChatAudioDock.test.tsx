@@ -56,6 +56,21 @@ describe("ChatAudioDock", () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
+  it("shows the send action as a big labelled button", () => {
+    render(<ChatAudioDock audio={recorder()} sending={false} onSend={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByLabelText(he.chatAudioSend).textContent).toContain(he.chatAudioSend);
+    expect(screen.getByLabelText(he.chatAudioDiscard).textContent).toContain(he.chatAudioDiscard);
+  });
+
+  it("blocks every action while the recording is being sent", () => {
+    const onSend = vi.fn();
+    render(<ChatAudioDock audio={recorder()} sending onSend={onSend} onDelete={vi.fn()} />);
+    expect((screen.getByLabelText(he.chatAudioSend) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText(he.chatAudioDiscard) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText(he.chatAudioSend));
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
   it("resumes when already paused", () => {
     const audio = recorder({ paused: true });
     render(<ChatAudioDock audio={audio} sending={false} onSend={vi.fn()} onDelete={vi.fn()} />);

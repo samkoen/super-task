@@ -1,9 +1,11 @@
-import { Accordion, AccordionDetails, AccordionSummary, Box, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Typography, alpha } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { he } from "../../i18n/he";
 import type { EmployeeTaskCard } from "../../services/dashboardService";
 import { mergeEmployeeFinishedTasks } from "../../utils/employeeDashboardSections";
 import EmployeeTaskRow from "./EmployeeTaskRow";
+import { employeeCardSx } from "../../styles/employeeUi";
 
 export default function EmployeeFinishedTaskSections({
   pendingReviewTasks,
@@ -30,6 +32,8 @@ export default function EmployeeFinishedTaskSections({
   );
 }
 
+const SUCCESS = "#15803D";
+
 function CompletedTasksAccordion({
   tasks,
   expanded,
@@ -45,15 +49,29 @@ function CompletedTasksAccordion({
     <Accordion
       expanded={expanded}
       onChange={onToggle}
-      sx={{ mt: 1, mb: 2, boxShadow: 0, border: 1, borderColor: "divider" }}
+      disableGutters
+      sx={{
+        ...employeeCardSx,
+        mt: 1,
+        mb: 2.5,
+        overflow: "hidden",
+        "&::before": { display: "none" },
+        "&.Mui-expanded": { mt: 1, mb: 2.5 },
+      }}
     >
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography fontWeight={700}>
-          {expanded ? he.employeeHideCompleted : he.employeeShowCompleted} ({tasks.length})
-        </Typography>
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        sx={{ minHeight: 64, px: 2, bgcolor: alpha(SUCCESS, 0.05) }}
+      >
+        <Box display="flex" alignItems="center" gap={1.25}>
+          <CheckCircleIcon sx={{ color: SUCCESS }} />
+          <Typography fontWeight={800}>
+            {`${expanded ? he.employeeHideCompleted : he.employeeShowCompleted} (${tasks.length})`}
+          </Typography>
+        </Box>
       </AccordionSummary>
-      <AccordionDetails sx={{ pt: 1, px: 1.5 }}>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+      <AccordionDetails sx={{ pt: 1.5, px: 1.5, pb: 1.5 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {tasks.map((task) => (
             <EmployeeTaskRow key={task.id} task={task} onOpen={onOpen} layout="list" />
           ))}
