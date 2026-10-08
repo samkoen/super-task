@@ -53,8 +53,8 @@ class DeliveryNoteRepository:
         ).all()
         return [item for row in rows if (item := _note_dict(row))]
 
-    def notes_for_branch(self, branch_id: str) -> list[dict]:
-        return self.list_notes(document_date=None, branch_id=branch_id)
+    def notes_for_branch(self, branch_id: str, document_date: str | None = None) -> list[dict]:
+        return self.list_notes(document_date=document_date, branch_id=branch_id)
 
     def set_branch(self, note_id: str, branch_id: str) -> dict:
         row = self._db.get(orm.DeliveryNote, mp.parse_uuid(note_id))

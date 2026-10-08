@@ -1,7 +1,8 @@
 """Ouvre une occurrence par modèle quand une תעודה est connue."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from app.domain import roles
 from app.domain.delivery_note import (
@@ -26,6 +27,11 @@ from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 
 _MANAGERS = {roles.ADMIN, roles.NETWORK_MANAGER, roles.BRANCH_MANAGER}
+_TZ = ZoneInfo("Asia/Jerusalem")
+
+
+def _israel_today() -> str:
+    return datetime.now(_TZ).date().isoformat()
 
 
 def _account_view(row: dict, *, configured: bool) -> dict:
@@ -267,7 +273,8 @@ class DeliveryNoteService:
         opened: list[str] = []
         if not template.assignee_user_id:
             return opened
-        for note in self._notes.notes_for_branch(template.branch_id):
+        today = _israel_today()
+        for note in self._notes.notes_for_branch(template.branch_id, today):
             opened.extend(self._open_models(note))
         return opened
 

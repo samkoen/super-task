@@ -126,8 +126,11 @@ class FakeNotes:
     def notes_for_customer(self, name):
         return [note for note in self.notes.values() if note.get("customer_name") == name]
 
-    def notes_for_branch(self, branch_id):
-        return [note for note in self.notes.values() if note.get("branch_id") == branch_id]
+    def notes_for_branch(self, branch_id, document_date=None):
+        rows = [note for note in self.notes.values() if note.get("branch_id") == branch_id]
+        if document_date is None:
+            return rows
+        return [note for note in rows if note.get("document_date") == document_date]
 
     def refresh_line_origins(self, note_id, lines):
         note = next(item for item in self.notes.values() if item["id"] == note_id)
@@ -411,6 +414,29 @@ def test_line_answers_stay_on_the_line_check_type():
             opened["opened_occurrence_ids"][0],
             {"lines": [{"line_id": "line-1", "arrival": "ok"}]},
         )
+
+
+def test_marking_the_model_opens_only_todays_teudot(monkeypatch):
+    monkeypatch.setattr("app.services.delivery_note_service._israel_today", lambda: "2026-10-08")
+    template = _template("tpl-a")
+    template.opened_by_delivery_note = False
+    service, notes, occurrences = _service([template])
+    notes.notes["old"] = _stored_note("2317000", "2026-10-01")
+    notes.notes["today"] = _stored_note("2318018", "2026-10-08")
+    service.mark_opened_by_delivery_note(_actor(), "tpl-a", True)
+    assert len(occurrences.created) == 1
+    assert "2318018" in occurrences.created[0].title
+
+
+def _stored_note(number: str, document_date: str) -> dict:
+    return {
+        "id": f"note-{number}",
+        "branch_id": "snif-1",
+        "agroline_number": number,
+        "customer_name": "יד השם",
+        "document_date": document_date,
+        "lines": [{"id": "line-1", "quantity": 1, "product_name": "תפוח נאשי", "unit": "קרטון"}],
+    }
 
 
 def test_marking_the_model_drops_the_task_opened_without_a_teuda():

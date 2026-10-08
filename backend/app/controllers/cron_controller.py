@@ -5,9 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.core import config
-from app.controllers.delivery_note_controller import _read_agroline, _sync_day, get_service
 from app.dependencies import get_db
-from app.domain.scope import ActorContext
 from app.domain.notification_retention import notification_purge_cutoff
 from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
@@ -134,17 +132,3 @@ def scan_employee_inactivity(
     db.commit()
     NotificationService.push_task_event_sse(pending)
     return {"ok": True, **result}
-
-
-@router.post("/agroline-sync")
-def agroline_sync(
-    db: Session = Depends(get_db),
-    authorization: str | None = Header(default=None),
-):
-    """Lit les תעודות du jour. À appeler plusieurs fois pendant les heures d'ouverture."""
-    _assert_cron_authorized(authorization)
-    service = get_service(db)
-    fetched, read_errors = _read_agroline(service, _sync_day(None))
-    opened = service.pull_documents(ActorContext(user_id="system", role="admin"), fetched)
-    db.commit()
-    return {"ok": True, "results": opened["results"], "errors": read_errors + opened["errors"]}
