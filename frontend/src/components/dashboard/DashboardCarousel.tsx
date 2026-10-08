@@ -1,5 +1,6 @@
 import { Box, Typography } from "@mui/material";
 import type { ReactNode } from "react";
+import SectionHeading from "../ui/SectionHeading";
 
 export const dashboardCarouselRowSx = {
   display: "flex",
@@ -35,14 +36,7 @@ export default function DashboardCarousel({
   return (
     <Box mb={showHeading ? 3 : 1}>
       {showHeading ? (
-        <Box display="flex" alignItems="baseline" gap={1} mb={1.5}>
-          <Typography variant="subtitle1" fontWeight={700}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            ({count})
-          </Typography>
-        </Box>
+        <SectionHeading title={title} count={count} />
       ) : null}
       {count === 0 ? (
         <Typography variant="body2" color="text.secondary">

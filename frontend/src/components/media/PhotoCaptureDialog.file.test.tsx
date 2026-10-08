@@ -43,6 +43,37 @@ describe("new task photo step file pick", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  it("shows a face guide and instruction for avatar capture only", () => {
+    const { unmount } = render(
+      <PhotoCaptureDialog
+        open
+        uploading={false}
+        camera={camera()}
+        onClose={vi.fn()}
+        onCapture={vi.fn()}
+        annotate={false}
+        faceGuide
+      />,
+    );
+    expect(screen.getByText(he.avatarCaptureHint)).toBeTruthy();
+    expect(screen.getByTestId("face-guide")).toBeTruthy();
+    unmount();
+    render(
+      <PhotoCaptureDialog open uploading={false} camera={camera()} onClose={vi.fn()} onCapture={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("face-guide")).toBeNull();
+    expect(screen.queryByText(he.avatarCaptureHint)).toBeNull();
+  });
+
+  it("closes from the X button", () => {
+    const onClose = vi.fn();
+    render(
+      <PhotoCaptureDialog open uploading={false} camera={camera()} onClose={onClose} onCapture={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.close }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("does not offer a file when there is no skip action", () => {
     render(
       <PhotoCaptureDialog

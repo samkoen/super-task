@@ -38,4 +38,28 @@ describe("ManagerBottomNav", () => {
     expect(navigate).toHaveBeenCalledWith("/manager/tasks?branch=b42");
     sessionStorage.removeItem("super.managerScopeBranch");
   });
+
+  it("marks the current tab as selected and exposes a nav landmark", () => {
+    render(
+      <MemoryRouter initialEntries={["/manager/tasks"]}>
+        <ManagerBottomNav forceVisible />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("navigation", { name: he.employeeBottomNavLabel })).toBeTruthy();
+    const tasks = screen.getByRole("button", { name: he.managerBottomNavTasks });
+    expect(tasks.className).toContain("Mui-selected");
+    const home = screen.getByRole("button", { name: he.managerBottomNavHome });
+    expect(home.className).not.toContain("Mui-selected");
+  });
+
+  it("keeps every tab unselected on other manager pages", () => {
+    render(
+      <MemoryRouter initialEntries={["/manager/employees"]}>
+        <ManagerBottomNav forceVisible />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: he.managerBottomNavHome }).className).not.toContain(
+      "Mui-selected",
+    );
+  });
 });

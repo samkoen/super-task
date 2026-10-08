@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import ManagerTodayBoard from "./ManagerTodayBoard";
 import { he } from "../../i18n/he";
 import type { ManagerDashboard } from "../../services/dashboardService";
@@ -68,6 +68,26 @@ describe("ManagerTodayBoard", () => {
     expect(screen.getByText("actions-section")).toBeTruthy();
     expect(screen.getByText("own-tasks-section")).toBeTruthy();
     expect(screen.getByText(he.dashboardAllWorkers)).toBeTruthy();
+  });
+
+  it("shows the summary strip and wires the quick actions", () => {
+    const onNewTask = vi.fn();
+    render(
+      <ManagerTodayBoard
+        data={dash({ branch: { id: "b1", name: "סניף" } as ManagerDashboard["branch"] })}
+        {...boardProps}
+        onNewTask={onNewTask}
+      />,
+    );
+    expect(screen.getByRole("region", { name: he.managerSummaryLabel })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.newTask }));
+    expect(onNewTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides quick actions on a network overview without a team", () => {
+    render(<ManagerTodayBoard data={dash({ manages_all_workers: false })} {...boardProps} />);
+    expect(screen.getByRole("region", { name: he.managerSummaryLabel })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.newTask })).toBeNull();
   });
 
   it("hides the team section on a network overview without all-workers", () => {

@@ -42,7 +42,7 @@ export default function ChatMessageList({
   return (
     <Box sx={chatMessageListSx(layout, compact)}>
       {hasMore && (
-        <Button type="button" size="small" onClick={onLoadOlder} disabled={loadingOlder}>
+        <Button type="button" onClick={onLoadOlder} disabled={loadingOlder} sx={{ minHeight: 44, fontWeight: 700 }}>
           {loadingOlder ? <CircularProgress size={16} /> : he.chatLoadOlder}
         </Button>
       )}
@@ -71,13 +71,13 @@ function ChatDayChip({ label }: { label: string }) {
       role="separator"
       aria-label={label}
       alignSelf="center"
-      px={1.25}
-      py={0.25}
-      borderRadius={2}
+      px={1.75}
+      py={0.5}
+      borderRadius={3}
       bgcolor="background.paper"
       boxShadow="0 1px 1px rgba(0,0,0,0.08)"
     >
-      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+      <Typography variant="body2" color="text.secondary" fontWeight={700}>
         {label}
       </Typography>
     </Box>
@@ -115,7 +115,7 @@ function ChatMessageBubble({
         {msg.sender_name || "—"} · {formatTime(msg.created_at)}
       </Typography>
       {text ? (
-        <Typography variant="body2" fontWeight={fromEmployee && !mine ? 600 : 400} sx={chatBubbleCopySx}>
+        <Typography fontWeight={fromEmployee && !mine ? 600 : 400} sx={chatBubbleCopySx}>
           {text}
         </Typography>
       ) : null}

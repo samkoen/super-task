@@ -54,7 +54,7 @@ import ManagerBottomNav from "./ManagerBottomNav";
 import ManagerNewTaskFab from "./ManagerNewTaskFab";
 import MobileMenuTopBar from "./MobileMenuTopBar";
 import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
-import EmployeeChromeChatButton from "./EmployeeChromeChatButton";
+import EmployeeBottomNav from "./EmployeeBottomNav";
 import EmployeeChromeMenu from "./EmployeeChromeMenu";
 import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
@@ -66,6 +66,10 @@ import {
 } from "../../utils/managerBottomNav";
 import { dialogActionsPbCss, systemTopInsetCss } from "../../utils/systemInsets";
 import { usesEmployeeChrome } from "../../utils/employeeSurface";
+import {
+  employeeBottomContentPadCss,
+  shouldShowEmployeeBack,
+} from "../../utils/employeeBottomNav";
 
 const SIDEBAR_BG = "#0B1220";
 const SIDEBAR_ACCENT = "#1A9B86";
@@ -374,7 +378,6 @@ function Layout() {
           </Box>
           <Box display="flex" alignItems="center" gap={0.25}>
             <NotificationBell muteIncoming={breakMuted} />
-            <EmployeeChromeChatButton />
             <EmployeeChromeMenu onLogout={handleLogout} />
           </Box>
         </Box>
@@ -390,10 +393,20 @@ function Layout() {
             <EmployeeBranchSwitcher dense />
           </Box>
         )}
-        <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 2.5 }, maxWidth: 960, mx: "auto" }}>
-          {showBack && <BackButton />}
+        <Box
+          component="main"
+          sx={{
+            px: { xs: 1.5, sm: 2.5 },
+            pt: { xs: 2, sm: 2.5 },
+            pb: employeeBottomContentPadCss(),
+            maxWidth: 960,
+            mx: "auto",
+          }}
+        >
+          {shouldShowEmployeeBack(location.pathname, showBack) && <BackButton />}
           <OutletSuspense />
         </Box>
+        <EmployeeBottomNav />
         <ChatAlertBanner
           alert={chatAlerts.banner}
           onOpen={chatAlerts.open}

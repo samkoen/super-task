@@ -15,6 +15,7 @@ import {
   shouldShowManagerChrome,
 } from "../../utils/managerBottomNav";
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
+import { employeeBottomNavFabBottomCss } from "../../utils/employeeBottomNav";
 import { pushRouteTrail, readRouteTrail } from "../../utils/routeTrail";
 import { captureViewportPng } from "../../utils/systemBugCapture";
 import { pickSystemBugPortalHost } from "../../utils/systemBugPortal";
@@ -28,7 +29,8 @@ export function systemBugLauncherLeft(besideSidebar: boolean) {
 }
 
 /** Au-dessus de la bottom nav menahel, sinon juste au-dessus du bord. */
-export function systemBugLauncherBottom(managerChrome: boolean) {
+export function systemBugLauncherBottom(managerChrome: boolean, employeeNav = false) {
+  if (employeeNav) return employeeBottomNavFabBottomCss();
   return managerChrome ? managerFabBottomCss() : withSystemBottomInsetCss("16px");
 }
 
@@ -50,10 +52,12 @@ export const systemBugLauncherSx = {
 function SystemBugTrigger({
   besideSidebar,
   managerChrome,
+  employeeNav,
   onClick,
 }: {
   besideSidebar: boolean;
   managerChrome: boolean;
+  employeeNav: boolean;
   onClick: () => void;
 }) {
   return (
@@ -69,7 +73,7 @@ function SystemBugTrigger({
       sx={{
         ...systemBugLauncherSx,
         left: systemBugLauncherLeft(besideSidebar),
-        bottom: systemBugLauncherBottom(managerChrome),
+        bottom: systemBugLauncherBottom(managerChrome, employeeNav),
       }}
     >
       <BugReportOutlinedIcon sx={{ fontSize: 18 }} />
@@ -123,6 +127,7 @@ export default function SystemBugLauncher() {
     <SystemBugTrigger
       besideSidebar={besideSidebar}
       managerChrome={managerChrome}
+      employeeNav={employeeChrome}
       onClick={() => void startReport()}
     />
   );

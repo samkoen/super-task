@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Box, IconButton } from "@mui/material";
 import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 import { he } from "../../i18n/he";
@@ -8,6 +9,8 @@ type CameraFacingPreviewProps = {
   facing: CameraFacing;
   onFlip: () => void;
   flipDisabled?: boolean;
+  /** Calque par-dessus le viseur (ex. cercle de cadrage du visage). */
+  overlay?: ReactNode;
 };
 
 /** Viseur photo/vidéo avec bouton החלף מצלמה. Le selfie est mirroir à l’écran seulement. */
@@ -16,6 +19,7 @@ export default function CameraFacingPreview({
   facing,
   onFlip,
   flipDisabled = false,
+  overlay,
 }: CameraFacingPreviewProps) {
   return (
     <Box sx={{ position: "relative", width: "100%" }}>
@@ -35,6 +39,7 @@ export default function CameraFacingPreview({
           transform: facing === "user" ? "scaleX(-1)" : "none",
         }}
       />
+      {overlay}
       <IconButton
         aria-label={he.mediaCaptureFlipCamera}
         onClick={onFlip}
@@ -43,6 +48,8 @@ export default function CameraFacingPreview({
           position: "absolute",
           top: 8,
           insetInlineEnd: 8,
+          width: 52,
+          height: 52,
           bgcolor: "rgba(0,0,0,0.45)",
           color: "#fff",
           "&:hover": { bgcolor: "rgba(0,0,0,0.6)" },

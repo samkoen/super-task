@@ -1,4 +1,4 @@
-export type ChatMessageView = {
+﻿export type ChatMessageView = {
   id: string;
   sender_user_id: string;
   sender_name?: string | null;
@@ -42,7 +42,7 @@ export type ChatMessageListSx = {
   gap: number;
   p: number;
   bgcolor: string;
-  borderRadius: number;
+  borderRadius: number | string;
   flex?: number;
   minHeight?: number;
   maxHeight?: number;
@@ -55,10 +55,10 @@ export function chatMessageListSx(layout: "fill" | "bounded", compact: boolean):
     overflowY: "auto" as const,
     display: "flex" as const,
     flexDirection: "column" as const,
-    gap: 1,
-    p: 1.25,
+    gap: 1.25,
+    p: 1.5,
     bgcolor: "grey.100",
-    borderRadius: 2,
+    borderRadius: "16px",
   };
   if (layout === "fill") {
     return { ...base, flex: 1, minHeight: 220 };

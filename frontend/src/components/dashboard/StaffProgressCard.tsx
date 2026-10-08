@@ -147,7 +147,10 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
   };
 
   return (
-    <Paper variant="outlined" sx={{ mb: 1.5, overflow: "hidden" }}>
+    <Paper
+      variant="outlined"
+      sx={{ mb: 1.5, overflow: "hidden", borderRadius: "16px", boxShadow: "0 2px 8px rgba(15, 23, 42, 0.05)" }}
+    >
       <Box
         role="button"
         tabIndex={0}

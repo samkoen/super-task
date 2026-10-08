@@ -1,6 +1,7 @@
 import { Box, Typography } from "@mui/material";
 import type { TeamMember } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
+import SectionHeading from "../ui/SectionHeading";
 import StaffProgressCard from "./StaffProgressCard";
 
 interface StaffProgressOverviewProps {
@@ -15,14 +16,7 @@ export default function StaffProgressOverview({ team, onChanged }: StaffProgress
 
   return (
     <Box mb={3}>
-      <Box display="flex" alignItems="baseline" gap={1} mb={0.5}>
-        <Typography variant="subtitle1" fontWeight={700}>
-          {he.dashboardStaffOverview}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          ({team.length})
-        </Typography>
-      </Box>
+      <SectionHeading title={he.dashboardStaffOverview} count={team.length} mb={0.5} />
       <Typography variant="body2" color="text.secondary" mb={1.5}>
         {team.length === 0
           ? he.dashboardStaffOverviewEmpty

@@ -5,12 +5,15 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   TextField,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
+import AppDialogTitle from "../ui/AppDialogTitle";
 import { he } from "../../i18n/he";
 import { incompleteReasonError } from "../../utils/employeeIncompleteSubmit";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
+import { employeeBigButtonSx, employeeFieldSx } from "../../styles/employeeUi";
 
 type IncompleteTaskSendDialogProps = {
   open: boolean;
@@ -26,6 +29,8 @@ export default function IncompleteTaskSendDialog({
   onClose,
   onConfirm,
 }: IncompleteTaskSendDialogProps) {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
 
@@ -52,10 +57,12 @@ export default function IncompleteTaskSendDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" dir="rtl">
-      <DialogTitle>{he.incompleteTaskTitle}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
-        <Alert severity="warning">{he.incompleteTaskBody}</Alert>
+    <Dialog open={open} onClose={handleClose} fullWidth fullScreen={fullScreen} maxWidth="sm" dir="rtl">
+      <AppDialogTitle title={he.incompleteTaskTitle} onClose={handleClose} closeDisabled={saving} />
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        <Alert severity="warning" sx={{ borderRadius: "14px", fontSize: "1rem", fontWeight: 600 }}>
+          {he.incompleteTaskBody}
+        </Alert>
         <TextField
           label={he.incompleteTaskReasonLabel}
           value={reason}
@@ -66,17 +73,24 @@ export default function IncompleteTaskSendDialog({
           placeholder={he.incompleteTaskReasonHint}
           fullWidth
           multiline
-          minRows={2}
+          minRows={3}
           disabled={saving}
           error={Boolean(error)}
           helperText={error || he.incompleteTaskReasonHint}
+          sx={employeeFieldSx}
         />
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
-        <Button onClick={handleClose} disabled={saving}>
+      <DialogActions sx={dialogStackedActionsSx}>
+        <Button onClick={handleClose} disabled={saving} sx={dialogSecondaryActionSx}>
           {he.cancel}
         </Button>
-        <Button variant="contained" color="warning" onClick={handleConfirm} disabled={saving}>
+        <Button
+          variant="contained"
+          color="warning"
+          onClick={handleConfirm}
+          disabled={saving}
+          sx={employeeBigButtonSx}
+        >
           {he.incompleteTaskSendAnyway}
         </Button>
       </DialogActions>

@@ -6,33 +6,53 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { he } from "../../i18n/he";
 import { formatHebrewDay, shiftDay } from "../../utils/dateView";
 
-export default function DashboardDayNav({
-  day,
-  onChange,
-}: {
+interface DashboardDayNavProps {
   day: string;
   onChange: (iso: string) => void;
-}) {
+  /** Sur fond sombre (hero) : texte et icônes en blanc. */
+  onDark?: boolean;
+}
+
+export default function DashboardDayNav({ day, onChange, onDark = false }: DashboardDayNavProps) {
+  const tone = onDark ? { color: "#fff" } : undefined;
   return (
     <Box display="flex" alignItems="center" gap={0.25} mb={0.75}>
-      <IconButton size="small" aria-label={he.tasksPreviousDay} onClick={() => onChange(shiftDay(day, -1))}>
+      <IconButton size="small" sx={tone} aria-label={he.tasksPreviousDay} onClick={() => onChange(shiftDay(day, -1))}>
         <ChevronRightIcon fontSize="small" />
       </IconButton>
-      <Typography variant="caption" color="text.secondary">
+      <Typography
+        variant={onDark ? "body2" : "caption"}
+        fontWeight={onDark ? 700 : undefined}
+        color={onDark ? "inherit" : "text.secondary"}
+        sx={tone}
+      >
         {formatHebrewDay(day)}
       </Typography>
-      <DayPickerButton day={day} onChange={onChange} />
-      <IconButton size="small" aria-label={he.tasksNextDay} onClick={() => onChange(shiftDay(day, 1))}>
+      <DayPickerButton day={day} onChange={onChange} tone={tone} />
+      <IconButton size="small" sx={tone} aria-label={he.tasksNextDay} onClick={() => onChange(shiftDay(day, 1))}>
         <ChevronLeftIcon fontSize="small" />
       </IconButton>
     </Box>
   );
 }
 
-function DayPickerButton({ day, onChange }: { day: string; onChange: (iso: string) => void }) {
+function DayPickerButton({
+  day,
+  onChange,
+  tone,
+}: {
+  day: string;
+  onChange: (iso: string) => void;
+  tone?: { color: string };
+}) {
   return (
     <Box sx={{ position: "relative", width: 40, height: 40, flex: "0 0 auto" }}>
-      <IconButton size="small" tabIndex={-1} aria-hidden sx={{ width: 40, height: 40, pointerEvents: "none" }}>
+      <IconButton
+        size="small"
+        tabIndex={-1}
+        aria-hidden
+        sx={{ width: 40, height: 40, pointerEvents: "none", ...tone }}
+      >
         <CalendarMonthIcon fontSize="small" />
       </IconButton>
       <Box

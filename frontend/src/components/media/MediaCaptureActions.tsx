@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   IconButton,
   Tooltip,
   Typography,
@@ -18,22 +17,28 @@ import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MicIcon from "@mui/icons-material/Mic";
-import StopIcon from "@mui/icons-material/Stop";
-import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { useCameraStream } from "../../hooks/useCameraStream";
 import { useVideoRecorder } from "../../hooks/useVideoRecorder";
 import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./PhotoAnnotationCanvas";
 import CameraFacingPreview from "./CameraFacingPreview";
+import VideoCaptureDialog from "./VideoCaptureDialog";
+import AudioCaptureDialog from "./AudioCaptureDialog";
+import {
+  captureErrorMessage,
+  scheduleAfterDialogPaint,
+  useBlobPreviewUrl,
+} from "./captureDialogShared";
 import { he } from "../../i18n/he";
 import { blobToFile, capturePhotoFromVideo, isMediaCaptureSupported, normalizePhotoOrientation } from "../../utils/mediaCapture";
-import { snapshotMediaFile } from "../../utils/videoUpload";
 import { canUseNativePhotoCapture } from "../../plugins/nativePhotoCapture";
 import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
 import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
+import CaptureActionButtons from "./CaptureActionButtons";
+import AppDialogTitle from "../ui/AppDialogTitle";
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
+import { employeePrimaryButtonSx } from "../../styles/employeeUi";
 import { referenceFileKind } from "../../utils/referenceMediaFile";
-import { videoElapsedLabel } from "../../utils/videoElapsedLabel";
 
 export type MediaKind = "photo" | "video" | "audio";
 
@@ -51,38 +56,15 @@ interface MediaCaptureActionsProps {
   videoLabel?: string;
   photoDoneLabel?: string;
   videoDoneLabel?: string;
+  audioLabel?: string;
+  audioDoneLabel?: string;
+  /** Gros boutons pleine largeur, un par type : pour l'écran de la tâche. */
+  prominent?: boolean;
+  /** Avec `prominent` : grands boutons contourés, pour les ajouts facultatifs. */
+  quiet?: boolean;
   onAudioStart?: () => void;
   onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
   onAnnotatingChange?: (busy: boolean) => void;
-}
-
-function errorMessage(error: string): string {
-  if (error === "permission") return he.mediaCapturePermission;
-  if (error === "device") return he.mediaCaptureDevice;
-  if (error === "unsupported") return he.mediaCaptureUnsupported;
-  if (error === "unknown") return he.mediaCaptureUnknown;
-  return "";
-}
-
-function scheduleAfterDialogPaint(run: () => void) {
-  if (typeof requestAnimationFrame === "function") {
-    requestAnimationFrame(() => requestAnimationFrame(run));
-    return;
-  }
-  run();
-}
-
-function useBlobPreviewUrl(blob: Blob | null) {
-  const previewUrl = useMemo(
-    () => (blob && blob.size > 0 ? URL.createObjectURL(blob) : null),
-    [blob]
-  );
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-  return previewUrl;
 }
 
 function takePhotoFile(
@@ -123,6 +105,7 @@ function PhotoFromFileButton({
         startIcon={<AttachFileIcon />}
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
+        sx={{ minHeight: 48, borderRadius: "14px", fontWeight: 700 }}
       >
         {he.addReferenceFromFile}
       </Button>
@@ -132,6 +115,35 @@ function PhotoFromFileButton({
         </Typography>
       ) : null}
     </>
+  );
+}
+
+const stackedActionsSx = dialogStackedActionsSx;
+const secondaryActionSx = dialogSecondaryActionSx;
+
+function FaceGuideOverlay() {
+  return (
+    <Box
+      aria-hidden
+      data-testid="face-guide"
+      sx={{
+        position: "absolute",
+        inset: 0,
+        display: "grid",
+        placeItems: "center",
+        pointerEvents: "none",
+      }}
+    >
+      <Box
+        sx={{
+          height: "88%",
+          aspectRatio: "1",
+          borderRadius: "50%",
+          border: "3px dashed rgba(255,255,255,0.9)",
+          boxShadow: "0 0 0 999px rgba(0,0,0,0.35)",
+        }}
+      />
+    </Box>
   );
 }
 
@@ -146,6 +158,7 @@ export function PhotoCaptureDialog({
   annotate = true,
   seedBlob = null,
   preparing = false,
+  faceGuide = false,
 }: {
   open: boolean;
   uploading: boolean;
@@ -160,6 +173,8 @@ export function PhotoCaptureDialog({
   /** Photo déjà prise (CameraX Android) — saute le live WebView. */
   seedBlob?: Blob | null;
   preparing?: boolean;
+  /** Avatar : cercle de cadrage sur le viseur + consigne « regardez la caméra ». */
+  faceGuide?: boolean;
 }) {
   const { supported, active, starting, error, facing, onVideoRef, start, flip } = camera;
   const theme = useTheme();
@@ -217,8 +232,13 @@ export function PhotoCaptureDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="sm" dir="rtl" disableEnforceFocus>
-      <DialogTitle>{title ?? he.mediaCapturePhotoTitle}</DialogTitle>
+      <AppDialogTitle title={title ?? he.mediaCapturePhotoTitle} onClose={onClose} closeDisabled={capturing || confirming} />
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1, overflowY: "auto" }}>
+        {faceGuide && !hasPreview ? (
+          <Typography variant="body1" fontWeight={700} textAlign="center">
+            {he.avatarCaptureHint}
+          </Typography>
+        ) : null}
         {hasPreview && previewBlob ? (
           annotate ? (
             <PhotoAnnotationCanvas ref={annotationRef} image={previewBlob} />
@@ -243,10 +263,11 @@ export function PhotoCaptureDialog({
             facing={facing}
             onFlip={flip}
             flipDisabled={starting || capturing}
+            overlay={faceGuide ? <FaceGuideOverlay /> : undefined}
           />
         )}
         {!supported && !hasPreview && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
-        {errorMessage(error) && <Alert severity="warning">{errorMessage(error)}</Alert>}
+        {captureErrorMessage(error) && <Alert severity="warning">{captureErrorMessage(error)}</Alert>}
         {starting && (
           <Box display="flex" justifyContent="center" py={1}>
             <CircularProgress size={28} />
@@ -263,13 +284,17 @@ export function PhotoCaptureDialog({
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
-        <Button onClick={onClose} disabled={capturing || uploading || confirming || preparing}>
+      <DialogActions sx={stackedActionsSx}>
+        <Button
+          onClick={onClose}
+          disabled={capturing || uploading || confirming || preparing}
+          sx={secondaryActionSx}
+        >
           {he.cancel}
         </Button>
         {onSkip && !hasPreview && (
           <>
-            <Button onClick={onSkip} disabled={capturing || uploading || confirming}>
+            <Button onClick={onSkip} disabled={capturing || uploading || confirming} sx={secondaryActionSx}>
               {he.newTaskSkipPhoto}
             </Button>
             <PhotoFromFileButton
@@ -282,20 +307,25 @@ export function PhotoCaptureDialog({
           </>
         )}
         {error && !hasPreview && (
-          <Button onClick={() => void start()} disabled={capturing || uploading || confirming}>
+          <Button
+            onClick={() => void start()}
+            disabled={capturing || uploading || confirming}
+            sx={secondaryActionSx}
+          >
             {he.mediaCaptureRetry}
           </Button>
         )}
         {hasPreview ? (
           <>
-            <Button onClick={handleRetry} disabled={uploading || confirming}>
+            <Button onClick={handleRetry} disabled={uploading || confirming} sx={secondaryActionSx}>
               {he.mediaCaptureRetry}
             </Button>
             <Button
               variant="contained"
               onClick={() => void handleConfirm()}
               disabled={uploading || confirming}
-              startIcon={uploading || confirming ? <CircularProgress size={18} color="inherit" /> : undefined}
+              startIcon={uploading || confirming ? <CircularProgress size={20} color="inherit" /> : undefined}
+              sx={employeePrimaryButtonSx}
             >
               {uploading || confirming ? he.loading : he.mediaCaptureUseRecording}
             </Button>
@@ -303,283 +333,12 @@ export function PhotoCaptureDialog({
         ) : (
           <Button
             variant="contained"
-            startIcon={capturing || uploading ? <CircularProgress size={18} color="inherit" /> : <PhotoCameraIcon />}
+            startIcon={capturing || uploading ? <CircularProgress size={20} color="inherit" /> : <PhotoCameraIcon />}
             onClick={() => void handleCapture()}
             disabled={!active || capturing || uploading}
+            sx={employeePrimaryButtonSx}
           >
             {capturing || uploading ? he.loading : he.mediaCaptureTakePhoto}
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function useRecordedVideoRef(previewUrl: string | null) {
-  return useCallback(
-    (node: HTMLVideoElement | null) => {
-      if (!node) return;
-      node.srcObject = null;
-      if (previewUrl) {
-        node.src = previewUrl;
-        node.load();
-      }
-    },
-    [previewUrl]
-  );
-}
-
-function VideoCaptureDialog({
-  open,
-  uploading,
-  recorder,
-  minSeconds,
-  onClose,
-  onCapture,
-}: {
-  open: boolean;
-  uploading: boolean;
-  recorder: ReturnType<typeof useVideoRecorder>;
-  minSeconds: number | null;
-  onClose: () => void;
-  onCapture: (file: File, durationSeconds: number) => void | Promise<void>;
-}) {
-  const {
-    supported,
-    previewReady,
-    starting,
-    recording,
-    blob,
-    elapsedSeconds,
-    error,
-    onVideoRef,
-    startPreview,
-    startRecording,
-    stopRecording,
-    reset,
-    facing,
-    flip,
-  } = recorder;
-  const previewUrl = useBlobPreviewUrl(blob);
-  const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
-  const onRecordedVideoRef = useRecordedVideoRef(previewUrl);
-  const [confirming, setConfirming] = useState(false);
-  const tooShort = Boolean(minSeconds && elapsedSeconds < minSeconds);
-
-  const handleConfirm = async () => {
-    if (!blob || blob.size === 0 || uploading || confirming || tooShort) return;
-    setConfirming(true);
-    try {
-      const file = blobToFile(
-        blob,
-        `task-video-${Date.now()}.webm`,
-        (blob.type || "video/webm").split(";")[0].trim() || "video/webm",
-      );
-      const durationSeconds = elapsedSeconds;
-      const frozen = await snapshotMediaFile(file);
-      await onCapture(frozen, durationSeconds);
-      onClose();
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const handleRetry = () => {
-    reset();
-    scheduleAfterDialogPaint(() => {
-      void startPreview();
-    });
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" dir="rtl" disableEnforceFocus>
-      <DialogTitle>{he.mediaCaptureVideoTitle}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-        {hasPreview ? (
-          <Box
-            key="recorded-preview"
-            component="video"
-            ref={onRecordedVideoRef}
-            controls
-            playsInline
-            sx={{ width: "100%", borderRadius: 1, bgcolor: "black", minHeight: 200, maxHeight: "45vh", objectFit: "contain" }}
-          />
-        ) : (
-          <CameraFacingPreview
-            onVideoRef={onVideoRef}
-            facing={facing}
-            onFlip={flip}
-            flipDisabled={starting}
-          />
-        )}
-        {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
-        {errorMessage(error) && <Alert severity="warning">{errorMessage(error)}</Alert>}
-        {recording && (
-          <Typography variant="body2" color="error.main">
-            {he.mediaCaptureRecording}
-            {` · ${videoElapsedLabel(elapsedSeconds, minSeconds)} ${he.secondsShort}`}
-          </Typography>
-        )}
-        {hasPreview && tooShort && minSeconds && (
-          <Alert severity="warning">{he.videoTooShort(minSeconds)}</Alert>
-        )}
-        {hasPreview && (
-          <Typography variant="body2" color="text.secondary">
-            {he.mediaCapturePreviewHint}
-          </Typography>
-        )}
-        {starting && (
-          <Box display="flex" justifyContent="center" py={1}>
-            <CircularProgress size={28} />
-          </Box>
-        )}
-        {!hasPreview && !previewReady && !starting && !error && supported && (
-          <Box display="flex" flexDirection="column" gap={1} alignItems="flex-start">
-            <Typography variant="body2" color="text.secondary">
-              {he.mediaCaptureEnableHint}
-            </Typography>
-            <Button variant="outlined" startIcon={<VideocamIcon />} onClick={() => void startPreview()}>
-              {he.mediaCaptureEnableCamera}
-            </Button>
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
-        <Button onClick={onClose} disabled={uploading || recording || confirming}>
-          {he.cancel}
-        </Button>
-        {error && !hasPreview && (
-          <Button onClick={() => void startPreview()} disabled={uploading || recording || confirming}>
-            {he.mediaCaptureRetry}
-          </Button>
-        )}
-        {hasPreview ? (
-          <>
-            <Button onClick={handleRetry} disabled={uploading || confirming}>
-              {he.mediaCaptureRetry}
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => void handleConfirm()}
-              disabled={uploading || confirming || tooShort}
-              startIcon={uploading || confirming ? <CircularProgress size={18} color="inherit" /> : undefined}
-            >
-              {uploading || confirming ? he.loading : he.mediaCaptureUseRecording}
-            </Button>
-          </>
-        ) : !recording ? (
-          <Button
-            variant="contained"
-            startIcon={uploading ? <CircularProgress size={18} color="inherit" /> : <VideocamIcon />}
-            onClick={startRecording}
-            disabled={!previewReady || uploading}
-          >
-            {uploading ? he.loading : he.mediaCaptureRecord}
-          </Button>
-        ) : (
-          <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={stopRecording}>
-            {he.mediaCaptureStop}
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function AudioCaptureDialog({
-  open,
-  uploading,
-  onClose,
-  onCapture,
-}: {
-  open: boolean;
-  uploading: boolean;
-  onClose: () => void;
-  onCapture: (file: File) => void | Promise<void>;
-}) {
-  const { supported, recording, blob, error, start, stop, reset } = useAudioRecorder();
-  const previewUrl = useBlobPreviewUrl(blob);
-  const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
-  const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    if (!open) {
-      stop();
-      reset();
-    }
-  }, [open, reset, stop]);
-
-  const handleConfirm = async () => {
-    if (!blob || blob.size === 0 || uploading || confirming) return;
-    setConfirming(true);
-    try {
-      await onCapture(blobToFile(blob, `task-audio-${Date.now()}.webm`, blob.type || "audio/webm"));
-      onClose();
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const recorderMessage = errorMessage(error);
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" dir="rtl" disableEnforceFocus>
-      <DialogTitle>{he.mediaCaptureAudioTitle}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-        <Typography variant="body2" color="text.secondary">
-          {he.mediaCaptureAudioHint}
-        </Typography>
-        {!supported && <Alert severity="warning">{he.mediaCaptureUnsupported}</Alert>}
-        {recorderMessage && <Alert severity="warning">{recorderMessage}</Alert>}
-        {recording && (
-          <Typography variant="body2" color="error.main">
-            {he.mediaCaptureRecording}
-          </Typography>
-        )}
-        {hasPreview && (
-          <>
-            <Typography variant="body2" color="text.secondary">
-              {he.mediaCapturePreviewHint}
-            </Typography>
-            <Box component="audio" src={previewUrl ?? undefined} controls sx={{ width: "100%" }} />
-          </>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
-        <Button onClick={onClose} disabled={uploading || recording || confirming}>
-          {he.cancel}
-        </Button>
-        {error && !hasPreview && (
-          <Button onClick={() => void start()} disabled={uploading || recording || confirming}>
-            {he.mediaCaptureRetry}
-          </Button>
-        )}
-        {hasPreview ? (
-          <>
-            <Button onClick={reset} disabled={uploading || confirming}>
-              {he.mediaCaptureRetry}
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => void handleConfirm()}
-              disabled={uploading || confirming}
-              startIcon={uploading || confirming ? <CircularProgress size={18} color="inherit" /> : undefined}
-            >
-              {uploading || confirming ? he.loading : he.mediaCaptureUseRecording}
-            </Button>
-          </>
-        ) : !recording ? (
-          <Button
-            variant="contained"
-            startIcon={uploading ? <CircularProgress size={18} color="inherit" /> : <MicIcon />}
-            onClick={() => void start()}
-            disabled={!supported || uploading}
-          >
-            {uploading ? he.loading : he.mediaCaptureRecord}
-          </Button>
-        ) : (
-          <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={stop}>
-            {he.mediaCaptureStop}
           </Button>
         )}
       </DialogActions>
@@ -600,6 +359,10 @@ export default function MediaCaptureActions({
   videoLabel,
   photoDoneLabel,
   videoDoneLabel,
+  audioLabel,
+  audioDoneLabel,
+  prominent = false,
+  quiet = false,
   onAudioStart,
   onCapture,
   onAnnotatingChange,
@@ -757,47 +520,37 @@ export default function MediaCaptureActions({
     </Box>
   );
 
+  const openAudio = () => (onAudioStart ? onAudioStart() : setAudioOpen(true));
   const defaultActions = (
-    <Box display="flex" flexWrap="wrap" gap={1}>
-      {showPhoto && (
-      <Button
-        startIcon={<PhotoCameraIcon />}
-        variant={photoAdded ? "contained" : "outlined"}
-        onClick={openPhotoCapture}
-        disabled={photoDisabled}
-      >
-        {uploadingKind === "photo"
-          ? he.loading
-          : photoAdded
-            ? photoDoneLabel ?? he.photoAdded
-            : photoLabel ?? he.addPhoto}
-      </Button>
-      )}
-      {showVideo && (
-      <Button
-        startIcon={<VideocamIcon />}
-        variant={videoAdded ? "contained" : "outlined"}
-        onClick={openVideoCapture}
-        disabled={videoDisabled}
-      >
-        {uploadingKind === "video"
-          ? he.loading
-          : videoAdded
-            ? videoDoneLabel ?? he.videoAdded
-            : videoLabel ?? he.addVideo}
-      </Button>
-      )}
-      {showAudio && (
-      <Button
-        startIcon={<MicIcon />}
-        variant={audioAdded ? "contained" : "outlined"}
-        onClick={() => (onAudioStart ? onAudioStart() : setAudioOpen(true))}
-        disabled={captureDisabled}
-      >
-        {uploadingKind === "audio" ? he.loading : audioAdded ? he.audioAdded : he.addAudio}
-      </Button>
-      )}
-    </Box>
+    <CaptureActionButtons
+      uploadingKind={uploadingKind}
+      prominent={prominent}
+      quiet={quiet}
+      photo={{
+        show: showPhoto,
+        added: photoAdded,
+        disabled: photoDisabled,
+        label: photoLabel,
+        doneLabel: photoDoneLabel,
+        onClick: openPhotoCapture,
+      }}
+      video={{
+        show: showVideo,
+        added: videoAdded,
+        disabled: videoDisabled,
+        label: videoLabel,
+        doneLabel: videoDoneLabel,
+        onClick: openVideoCapture,
+      }}
+      audio={{
+        show: showAudio,
+        added: audioAdded,
+        disabled: captureDisabled,
+        label: audioLabel,
+        doneLabel: audioDoneLabel,
+        onClick: openAudio,
+      }}
+    />
   );
 
   return (
@@ -810,7 +563,7 @@ export default function MediaCaptureActions({
       )}
       {nativeError ? (
         <Typography variant="caption" color="warning.main">
-          {errorMessage(nativeError)}
+          {captureErrorMessage(nativeError)}
         </Typography>
       ) : null}
       <PhotoCaptureDialog

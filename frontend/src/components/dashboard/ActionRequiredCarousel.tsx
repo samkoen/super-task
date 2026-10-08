@@ -10,6 +10,7 @@ import {
   type ActionQueueItem,
 } from "../../utils/dashboardCarousels";
 import DashboardCarousel from "./DashboardCarousel";
+import { actionCardButtonSx, actionCardSx, clampSx } from "./actionCardStyle";
 
 const BORDER: Record<ActionQueueItem["reason"], string> = {
   awaiting_response: "#c62828",
@@ -99,78 +100,53 @@ function ActionQueueCard({
   return (
     <Box
       {...(openReview ? reviewSquareButton(task.title, openReview) : {})}
-      sx={{
-        minWidth: 110,
-        maxWidth: 130,
-        width: 120,
-        flex: "0 0 auto",
-        p: 0.75,
-        scrollSnapAlign: "start",
-        borderWidth: 2,
-        borderStyle: "solid",
-        borderColor: border,
-        borderRadius: 1,
-        bgcolor: alpha(border, 0.04),
-        cursor: openReview ? "pointer" : undefined,
-        textAlign: "start",
-        font: "inherit",
-        color: "inherit",
-        "&:hover": openReview ? { bgcolor: alpha(border, 0.1) } : undefined,
-      }}
+      sx={actionCardSx(border, Boolean(openReview))}
     >
-            <Box display="flex" gap={0.5} flexWrap="wrap" mb={0.5}>
-              <Chip
-                size="small"
-                label={
-                  reason === "awaiting_response"
-                    ? he.dashboardActionAwaitingResponse
-                    : he.dashboardQueuePendingReview
-                }
-                sx={{
-                  bgcolor: alpha(border, 0.12),
-                  color: border,
-                  fontWeight: 700,
-                  height: 20,
-                  "& .MuiChip-label": { px: 0.75, fontSize: 11 },
-                }}
-              />
-            </Box>
-            <Typography variant="caption" fontWeight={800} display="block" noWrap title={task.title}>
-              {reason === "awaiting_response"
-                ? he.dashboardQuestionCard(task.assignee_name || task.title)
-                : task.title}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block" mb={0.75} noWrap>
-              {[
-                reason === "awaiting_response" ? task.title : task.assignee_name,
-                task.department_name,
-                task.completed_at ? formatTime(task.completed_at) : formatDueAt(task.due_at),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Typography>
-            {openReview && (
-              <Typography variant="caption" fontWeight={800} sx={{ color: border }}>
-                {he.taskReviewAction}
-              </Typography>
-            )}
-            {reason === "awaiting_response" && (onOpenChat || onReviewTask) && (
-              <Button
-                size="small"
-                variant="contained"
-                onClick={() => (onOpenChat ?? onReviewTask)?.(task.id)}
-                sx={{
-                  bgcolor: border,
-                  "&:hover": { bgcolor: border },
-                  minWidth: 0,
-                  px: 0.75,
-                  py: 0.15,
-                  fontSize: 11,
-                }}
-              >
-                {he.taskChatOpen}
-              </Button>
-            )}
+      <Box display="flex" gap={0.5} flexWrap="wrap">
+        <Chip
+          size="small"
+          label={
+            reason === "awaiting_response"
+              ? he.dashboardActionAwaitingResponse
+              : he.dashboardQueuePendingReview
+          }
+          sx={{
+            bgcolor: alpha(border, 0.14),
+            color: border,
+            fontWeight: 800,
+            height: 26,
+            "& .MuiChip-label": { px: 1.25, fontSize: 13 },
+          }}
+        />
+      </Box>
+      <Typography fontWeight={800} sx={clampSx(2)} title={task.title}>
+        {reason === "awaiting_response"
+          ? he.dashboardQuestionCard(task.assignee_name || task.title)
+          : task.title}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={clampSx(2)}>
+        {[
+          reason === "awaiting_response" ? task.title : task.assignee_name,
+          task.department_name,
+          task.completed_at ? formatTime(task.completed_at) : formatDueAt(task.due_at),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </Typography>
+      {openReview && (
+        <Typography fontWeight={800} sx={{ color: border, mt: "auto", pt: 0.5 }}>
+          {he.taskReviewAction}
+        </Typography>
+      )}
+      {reason === "awaiting_response" && (onOpenChat || onReviewTask) && (
+        <Button
+          variant="contained"
+          onClick={() => (onOpenChat ?? onReviewTask)?.(task.id)}
+          sx={{ ...actionCardButtonSx(border), mt: "auto" }}
+        >
+          {he.taskChatOpen}
+        </Button>
+      )}
     </Box>
   );
 }

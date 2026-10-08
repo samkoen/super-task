@@ -85,6 +85,45 @@ describe("SystemBugDialog", () => {
     });
   });
 
+  it("closes from the X button", () => {
+    const onClose = vi.fn();
+    render(
+      <SystemBugDialog
+        open
+        screenshot={null}
+        route="/employee"
+        trail={["/employee"]}
+        appVersion="0.1.0"
+        preview=""
+        branchName=""
+        onClose={onClose}
+        onSent={vi.fn()}
+        onError={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.close }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts the voice recording first, with a big record button", () => {
+    render(
+      <SystemBugDialog
+        open
+        screenshot={null}
+        route="/employee"
+        trail={["/employee"]}
+        appVersion="0.1.0"
+        preview=""
+        branchName=""
+        onClose={vi.fn()}
+        onSent={vi.fn()}
+        onError={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.systemBugSimpleHint)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.systemBugRecord })).toBeTruthy();
+  });
+
   it("hides annotate tools when capture failed", () => {
     render(
       <SystemBugDialog

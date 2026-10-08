@@ -80,6 +80,7 @@ export default function EmployeeAvatarCapture({
         onCapture={handlePhotoTaken}
         title={he.employeeChangePhoto}
         annotate={false}
+        faceGuide
       />
       <AvatarCropDialog
         open={Boolean(cropFile)}

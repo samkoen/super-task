@@ -4,7 +4,10 @@ import type { DirectChatCard } from "../../services/directChatService";
 import { emptyManagerMyWork } from "../../utils/managerUnreadChats";
 import { showAllWorkersDashboard } from "../../utils/networkDashboard";
 import ManagerActionsSection from "./ManagerActionsSection";
+import { buildManagerSummary } from "../../utils/managerSummary";
 import ManagerOwnTasksSection from "./ManagerOwnTasksSection";
+import ManagerQuickActions from "./ManagerQuickActions";
+import ManagerSummaryStrip from "./ManagerSummaryStrip";
 import ManagerTeamSection from "./ManagerTeamSection";
 
 export default function ManagerTodayBoard({
@@ -46,6 +49,14 @@ export default function ManagerTodayBoard({
   const showTeam = Boolean(data.branch) || showAllWorkersDashboard(data);
   return (
     <>
+      <ManagerSummaryStrip summary={buildManagerSummary(data, chats.length)} />
+      {showTeam ? (
+        <ManagerQuickActions
+          onNewTask={onNewTask}
+          onGalleryTask={onGalleryTask}
+          onViewTasks={onViewTasks}
+        />
+      ) : null}
       <ManagerActionsSection
         queues={data.task_queues}
         chats={chats}
@@ -64,9 +75,6 @@ export default function ManagerTodayBoard({
           onToggleAnalysis={onToggleAnalysis}
           onOpenTask={onOpenTask}
           onChanged={onChanged}
-          onNewTask={onNewTask}
-          onGalleryTask={onGalleryTask}
-          onViewTasks={onViewTasks}
         />
       ) : null}
     </>

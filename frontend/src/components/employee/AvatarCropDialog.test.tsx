@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ThemeProvider } from "@mui/material/styles";
 import AvatarCropDialog from "./AvatarCropDialog";
 import { he } from "../../i18n/he";
@@ -22,6 +22,35 @@ describe("AvatarCropDialog", () => {
     expect(screen.getByText(he.avatarCropTitle)).toBeTruthy();
     expect(screen.getByText(he.avatarCropHint)).toBeTruthy();
     expect(screen.getByRole("slider", { name: he.avatarCropZoom })).toBeTruthy();
+  });
+
+  it("closes from the X button and the cancel button", () => {
+    URL.createObjectURL = vi.fn(() => "blob:avatar");
+    URL.revokeObjectURL = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <ThemeProvider theme={theme}>
+        <AvatarCropDialog
+          open
+          file={new File(["x"], "face.jpg", { type: "image/jpeg" })}
+          onClose={onClose}
+          onConfirm={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.close }));
+    fireEvent.click(screen.getByRole("button", { name: he.cancel }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("disables the confirm button until a file is chosen", () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <AvatarCropDialog open file={null} onClose={vi.fn()} onConfirm={vi.fn()} />
+      </ThemeProvider>,
+    );
+    const confirm = screen.getByRole("button", { name: he.avatarCropConfirm }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
   });
 
   it("shows the Super-Man stylizing label while uploading", () => {

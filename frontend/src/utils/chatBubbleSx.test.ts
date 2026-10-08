@@ -9,6 +9,16 @@ describe("chatBubbleSx", () => {
     expect(chatBubbleCopySx.color).toBe("inherit");
   });
 
+  it("puts the small bubble tail on the sender side only", () => {
+    expect(chatBubbleSx({ mine: true })).toMatchObject({ borderEndEndRadius: "4px" });
+    expect(chatBubbleSx({ mine: false })).toMatchObject({ borderEndStartRadius: "4px" });
+    expect(chatBubbleSx({ mine: false, audioOnly: true })).not.toHaveProperty("borderEndStartRadius");
+  });
+
+  it("keeps message text large enough to read at a glance", () => {
+    expect(chatBubbleCopySx.fontSize).toBe("1.05rem");
+  });
+
   it("stretches an audio-only line across the chat width", () => {
     const audio = chatBubbleSx({ mine: false, audioOnly: true });
     expect(audio.alignSelf).toBe("stretch");

@@ -102,7 +102,7 @@ function TaskChatHeader({
 }) {
   return (
     <>
-      <Typography variant="subtitle2" fontWeight={700}>{he.taskChatTitle}</Typography>
+      <Typography fontWeight={800} sx={{ fontSize: "1.1rem" }}>{he.taskChatTitle}</Typography>
       {showActions && (
         <ChatTaskActions disabled={sending} onComplete={onComplete} onRemind={onRemind} />
       )}

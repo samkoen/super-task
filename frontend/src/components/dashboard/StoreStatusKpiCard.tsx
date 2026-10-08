@@ -1,4 +1,4 @@
-import { Box, Paper, Typography, alpha } from "@mui/material";
+import { Box, LinearProgress, Paper, Typography, alpha } from "@mui/material";
 import type { ReactNode } from "react";
 import { formatKpiPercent } from "../../utils/storeKpis";
 
@@ -52,7 +52,8 @@ export default function StoreStatusKpiCard({
         height: "100%",
         position: "relative",
         overflow: "hidden",
-        borderRadius: 3,
+        borderRadius: "20px",
+        boxShadow: disabled ? "none" : "0 2px 10px rgba(15, 23, 42, 0.06)",
         opacity: disabled ? 0.55 : 1,
         cursor: clickable ? "pointer" : "default",
         bgcolor: disabled ? alpha("#9e9e9e", 0.06) : undefined,
@@ -70,9 +71,8 @@ export default function StoreStatusKpiCard({
           insetInlineStart: 0,
           top: 0,
           bottom: 0,
-          width: 4,
+          width: 6,
           bgcolor: tone,
-          borderRadius: "0 3px 3px 0",
         },
       }}
     >
@@ -95,7 +95,19 @@ export default function StoreStatusKpiCard({
               >
                 {formatKpiPercent(approvalPct)}
               </Typography>
-              <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+              <LinearProgress
+                variant="determinate"
+                value={Math.min(100, Math.max(0, approvalPct))}
+                aria-hidden
+                sx={{
+                  mt: 1,
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: alpha(tone, 0.14),
+                  "& .MuiLinearProgress-bar": { borderRadius: 4, bgcolor: tone },
+                }}
+              />
+              <Typography variant="body2" color="text.secondary" display="block" mt={0.5}>
                 {approvalLabel}
               </Typography>
               <Typography variant="body2" fontWeight={700} mt={1.25}>

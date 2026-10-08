@@ -106,6 +106,34 @@ describe("EmployeeShiftHeader", () => {
     expect(screen.queryByRole("button", { name: he.employeeBreakStart })).toBeNull();
   });
 
+  it("greets the oved and spells out progress in hero mode", () => {
+    render(
+      <EmployeeShiftHeader
+        hero
+        greeting={he.employeeGreetingMorning}
+        name="דני כהן"
+        onShift
+        onBreak={false}
+        progress={38}
+        completedCount={3}
+        totalCount={8}
+        onToggleBreak={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(he.employeeGreetingMorning)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "דני כהן" })).toBeTruthy();
+    expect(
+      screen.getByText(`${he.employeeProgressOf(3, 8)} ${he.employeeProgressDoneLabel}`),
+    ).toBeTruthy();
+    expect(screen.getByText("38%")).toBeTruthy();
+  });
+
+  it("shows plain percent without counts outside hero mode", () => {
+    render(<EmployeeShiftHeader name="דני כהן" progress={40} onToggleBreak={vi.fn()} />);
+    expect(screen.getByText("40%")).toBeTruthy();
+    expect(screen.queryByText(he.employeeProgressDoneLabel, { exact: false })).toBeNull();
+  });
+
   it("shows the excellence slogan under the name", () => {
     render(
       <EmployeeShiftHeader

@@ -24,11 +24,13 @@ export default function ExtraCompletionMedia({
   const canAdd = canAddExtraMedia(extras);
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <Typography variant="subtitle2">{he.extraCompletionTitle}</Typography>
+      <Typography sx={{ fontSize: "1.05rem", fontWeight: 800 }}>{he.extraCompletionTitle}</Typography>
       <Typography variant="caption" color="text.secondary">
         {canAdd ? he.extraCompletionHint : he.extraCompletionLimit}
       </Typography>
       <MediaCaptureActions
+        prominent
+        quiet
         photoAdded={false}
         videoAdded={false}
         audioAdded={false}
@@ -67,7 +69,7 @@ function ExtraMediaRow({
         {extraKindLabel(item.kind)}
       </Typography>
       {src ? <ExtraMediaBody kind={item.kind} src={src} /> : null}
-      <Button size="small" color="inherit" disabled={disabled} onClick={onRemove} sx={{ mt: 0.5 }}>
+      <Button color="inherit" disabled={disabled} onClick={onRemove} sx={{ mt: 0.5, minHeight: 44, fontWeight: 700 }}>
         {he.removeMedia}
       </Button>
     </Box>

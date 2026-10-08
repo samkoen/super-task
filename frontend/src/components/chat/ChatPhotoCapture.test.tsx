@@ -107,6 +107,18 @@ describe("ChatPhotoCapture", () => {
     expect(screen.getAllByTestId("camera-preview")).toHaveLength(2);
   });
 
+  it("closes from the X in the title", () => {
+    const onClose = vi.fn();
+    render(<ChatPhotoCapture open uploading={false} onClose={onClose} onSend={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: he.close }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("cannot be closed with the X while a file is uploading", () => {
+    render(<ChatPhotoCapture open uploading onClose={vi.fn()} onSend={vi.fn()} />);
+    expect((screen.getByRole("button", { name: he.close }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("offers ellipse and arrow tools after taking a photo", async () => {
     render(
       <ChatPhotoCapture open uploading={false} onClose={vi.fn()} onSend={vi.fn()} />,

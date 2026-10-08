@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   FormControlLabel,
   Switch,
   Typography,
@@ -26,8 +25,10 @@ import {
   normalizePhotoOrientation,
 } from "../../utils/mediaCapture";
 import { stitchPhotoBlobs } from "../../utils/stitchPhotos";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
+import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
+import { employeePrimaryButtonSx } from "../../styles/employeeUi";
 import { videoElapsedLabel } from "../../utils/videoElapsedLabel";
+import AppDialogTitle from "../ui/AppDialogTitle";
 import CameraFacingPreview from "../media/CameraFacingPreview";
 import PhotoAnnotationCanvas, {
   type PhotoAnnotationCanvasHandle,
@@ -67,13 +68,15 @@ export default function ChatPhotoCapture({
       container={chatPhotoDialogContainer}
       sx={{ zIndex: (t) => t.zIndex.modal + 10 }}
     >
-      <DialogTitle>
-        {session.videoMode ? he.mediaCaptureVideoTitle : he.mediaCapturePhotoTitle}
-      </DialogTitle>
+      <AppDialogTitle
+        title={session.videoMode ? he.mediaCaptureVideoTitle : he.mediaCapturePhotoTitle}
+        onClose={onClose}
+        closeDisabled={busy}
+      />
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1, overflowY: "auto" }}>
         <ChatPhotoDialogBody session={session} previewing={previewing} busy={busy} />
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: dialogActionsPbCss(), flexWrap: "wrap", gap: 1 }}>
+      <DialogActions sx={dialogStackedActionsSx}>
         <ChatPhotoDialogActions
           session={session}
           previewing={previewing}
@@ -237,6 +240,7 @@ function ChatPhotoDialogBody({
         <FormControlLabel
           control={<Switch checked={session.dual} onChange={(e) => session.setDual(e.target.checked)} />}
           label={he.chatDualCameras}
+          sx={{ minHeight: 48 }}
         />
       )}
       {session.back.error || session.video.error ? (
@@ -249,7 +253,7 @@ function ChatPhotoDialogBody({
 function VideoStatus({ session }: { session: ReturnType<typeof useChatPhotoSession> }) {
   if (!session.video.recording) return null;
   return (
-    <Typography variant="body2" color="error.main">
+    <Typography fontWeight={800} color="error.main" sx={{ fontSize: "1.1rem" }}>
       {he.mediaCaptureRecording}
       {` · ${videoElapsedLabel(session.video.elapsedSeconds)} ${he.secondsShort}`}
     </Typography>
@@ -294,12 +298,13 @@ function ChatPhotoDialogActions({
   if (session.videoMode && session.video.recording) {
     return (
       <>
-        <Button onClick={onClose} disabled={busy}>{he.cancel}</Button>
+        <Button onClick={onClose} disabled={busy} sx={dialogSecondaryActionSx}>{he.cancel}</Button>
         <Button
           variant="contained"
           color="error"
           startIcon={<StopIcon />}
           onClick={() => session.video.stopRecording()}
+          sx={{ ...employeePrimaryButtonSx, background: "none", bgcolor: "error.main", "&:hover": { background: "none", bgcolor: "error.dark" } }}
         >
           {he.mediaCaptureStop}
         </Button>
@@ -321,23 +326,24 @@ function LiveCaptureActions({
   const liveReady = session.videoMode ? session.video.previewReady : session.back.active;
   return (
     <>
-      <Button onClick={onClose} disabled={busy}>{he.cancel}</Button>
+      <Button onClick={onClose} disabled={busy} sx={dialogSecondaryActionSx}>{he.cancel}</Button>
+      <Button
+        variant="outlined"
+        startIcon={<VideocamIcon />}
+        disabled={busy || session.videoMode}
+        onClick={() => void startChatVideo(session)}
+        sx={{ ...dialogSecondaryActionSx, minHeight: 52 }}
+      >
+        {he.chatCaptureVideo}
+      </Button>
       <Button
         variant="contained"
         startIcon={busy ? <CircularProgress size={18} color="inherit" /> : <PhotoCameraIcon />}
         disabled={!liveReady || busy || session.videoMode}
         onClick={() => void snapToPreview(session)}
+        sx={employeePrimaryButtonSx}
       >
         {he.mediaCaptureTakePhoto}
-      </Button>
-      <Button
-        variant="contained"
-        color="secondary"
-        startIcon={<VideocamIcon />}
-        disabled={busy || session.videoMode}
-        onClick={() => void startChatVideo(session)}
-      >
-        {he.chatCaptureVideo}
       </Button>
     </>
   );
@@ -358,13 +364,14 @@ function PhotoConfirmActions({
 }) {
   return (
     <>
-      <Button onClick={onClose} disabled={busy}>{he.cancel}</Button>
-      <Button onClick={session.retake} disabled={busy}>{he.mediaCaptureRetry}</Button>
+      <Button onClick={onClose} disabled={busy} sx={dialogSecondaryActionSx}>{he.cancel}</Button>
+      <Button variant="outlined" onClick={session.retake} disabled={busy} sx={dialogSecondaryActionSx}>{he.mediaCaptureRetry}</Button>
       <Button
         variant="contained"
         disabled={busy}
         startIcon={busy ? <CircularProgress size={18} color="inherit" /> : undefined}
         onClick={() => void confirmAnnotatedChatPhoto({ session, uploading, onSend, onClose })}
+        sx={employeePrimaryButtonSx}
       >
         {busy ? he.loading : he.mediaCaptureUseRecording}
       </Button>
@@ -387,12 +394,13 @@ function VideoConfirmActions({
 }) {
   return (
     <>
-      <Button onClick={onClose} disabled={busy}>{he.cancel}</Button>
-      <Button onClick={session.retake} disabled={busy}>{he.mediaCaptureRetry}</Button>
+      <Button onClick={onClose} disabled={busy} sx={dialogSecondaryActionSx}>{he.cancel}</Button>
+      <Button variant="outlined" onClick={session.retake} disabled={busy} sx={dialogSecondaryActionSx}>{he.mediaCaptureRetry}</Button>
       <Button
         variant="contained"
         disabled={busy || uploading}
         onClick={() => void confirmChatVideo({ session, uploading, onSend, onClose })}
+        sx={employeePrimaryButtonSx}
       >
         {busy ? he.loading : he.mediaCaptureUseRecording}
       </Button>

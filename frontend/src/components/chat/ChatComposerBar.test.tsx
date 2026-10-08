@@ -130,6 +130,36 @@ describe("ChatComposerBar", () => {
     expect(screen.getByLabelText(he.chatAttachFile)).toBeTruthy();
   });
 
+  it("labels the three capture actions with visible words, not only icons", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending={false}
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: he.chatRecordAudio }).textContent).toContain(he.chatRecordAudio);
+    expect(screen.getByRole("button", { name: he.chatCameraAction }).textContent).toContain(he.chatCameraAction);
+    expect(screen.getByRole("button", { name: he.chatAttachFile }).textContent).toContain(he.chatAttachShort);
+  });
+
+  it("disables every capture action while a message is being sent", () => {
+    render(
+      <ChatComposerBar
+        body=""
+        onBodyChange={vi.fn()}
+        sending
+        onSendText={vi.fn()}
+        onSendMedia={vi.fn()}
+      />,
+    );
+    for (const name of [he.chatRecordAudio, he.chatCameraAction, he.chatAttachFile]) {
+      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
   it("starts recording immediately on mic tap without a dialog", () => {
     render(
       <ChatComposerBar

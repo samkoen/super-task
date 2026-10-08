@@ -11,10 +11,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { apiErrorMessage } from "../../utils/apiErrorMessage";
 import { useFeedback } from "../../context/FeedbackContext";
-import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import {
   dashboardService,
@@ -47,6 +45,9 @@ import EmployeePunchDoor from "../../components/employee/EmployeePunchDoor";
 import EmployeeFinishedTaskSections from "../../components/employee/EmployeeFinishedTaskSections";
 import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
 import EmployeeManagerWaitingSection from "../../components/employee/EmployeeManagerWaitingSection";
+import EmployeeNextTaskCard from "../../components/employee/EmployeeNextTaskCard";
+import EmployeeAllDone from "../../components/employee/EmployeeAllDone";
+import { employeeGreeting, pickNextTask, withoutTask } from "../../utils/employeeNextTask";
 import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
@@ -105,39 +106,36 @@ function EmployeeOpenWorkLists({
   workLists: { dynamic: EmployeeTaskCard[]; routine: EmployeeTaskCard[] };
   onOpen: (task: EmployeeTaskCard) => void;
 }) {
+  const nextTask = pickNextTask(workLists);
+  const rest = withoutTask(workLists, nextTask?.id);
   return (
     <>
+      {nextTask ? <EmployeeNextTaskCard task={nextTask} onOpen={onOpen} /> : null}
+      {openCount === 0 ? <EmployeeAllDone /> : null}
+      <EmployeeTaskSection
+        title={he.employeeRoutineTasks}
+        tasks={rest.routine}
+        onOpen={onOpen}
+        layout="list"
+      />
+      <EmployeeTaskSection
+        title={he.employeeDynamicTasks}
+        tasks={rest.dynamic}
+        onOpen={onOpen}
+        layout="tile"
+        color="error.main"
+      />
       {punchEnd ? (
-        <Box sx={{ mb: 1.5, display: "flex", justifyContent: "center" }}>
-          <Button variant="outlined" color="error" onClick={onRequestEnd}>
-            {he.punchOpenEndEarly}
-          </Button>
-        </Box>
+        <Button
+          fullWidth
+          variant="outlined"
+          color="error"
+          onClick={onRequestEnd}
+          sx={{ mb: 2.5, minHeight: 56, fontSize: "1.05rem", fontWeight: 800, borderRadius: "16px" }}
+        >
+          {he.punchOpenEndEarly}
+        </Button>
       ) : null}
-      {openCount === 0 ? (
-        <EmptyState
-          title={he.noTasksToday}
-          description={he.noTasksHint}
-          icon={<TaskAltOutlinedIcon fontSize="inherit" />}
-          compact
-        />
-      ) : (
-        <>
-          <EmployeeTaskSection
-            title={he.employeeRoutineTasks}
-            tasks={workLists.routine}
-            onOpen={onOpen}
-            layout="list"
-          />
-          <EmployeeTaskSection
-            title={he.employeeDynamicTasks}
-            tasks={workLists.dynamic}
-            onOpen={onOpen}
-            layout="tile"
-            color="error.main"
-          />
-        </>
-      )}
     </>
   );
 }
@@ -730,6 +728,10 @@ export default function EmployeeTasksPage() {
         progress={progress}
         onToggleBreak={() => void handleToggleBreak()}
         qualityRating={dashboard?.employee?.quality_rating}
+        hero
+        greeting={employeeGreeting(new Date().getHours())}
+        completedCount={dashboard?.counts?.tasks_completed}
+        totalCount={dashboard?.counts?.tasks_total}
       />
 
       <EmployeeAvatarCapture

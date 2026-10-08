@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Alert, Box, CircularProgress, IconButton, TextField } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, IconButton, TextField, alpha } from "@mui/material";
+import { EMPLOYEE_BRAND, EMPLOYEE_BRAND_GRADIENT, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
@@ -178,9 +179,8 @@ function ComposerRow({
   onBlur: () => void;
 }) {
   return (
-    <Box display="flex" alignItems="flex-end" gap={0.75} dir="rtl">
-      {expanded ? null : <MicStartButton busy={busy} onStart={media.startAudio} />}
-      <Box display="flex" alignItems="flex-end" gap={0.75} flex={1} minWidth={0}>
+    <Box display="flex" flexDirection="column" gap={1} dir="rtl">
+      <Box display="flex" alignItems="flex-end" gap={1}>
         <TextField
           value={body}
           onChange={(e) => onBodyChange(e.target.value)}
@@ -192,29 +192,40 @@ function ComposerRow({
           minRows={1}
           maxRows={4}
           disabled={busy}
+          sx={composerFieldSx}
         />
         <SendTextButton sendLabel={sendLabel} sending={sending} disabled={busy} onSend={onSendText} />
       </Box>
-      {expanded ? null : <IdleMediaEnd busy={busy} media={media} onSendMedia={onSendMedia} />}
+      {expanded ? null : <MediaActionRow busy={busy} media={media} onSendMedia={onSendMedia} />}
     </Box>
   );
 }
 
-function MicStartButton({ busy, onStart }: { busy: boolean; onStart: () => void }) {
-  return (
-    <IconButton
-      aria-label={he.chatRecordAudio}
-      color="primary"
-      disabled={busy}
-      onClick={onStart}
-      sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
-    >
-      <MicIcon />
-    </IconButton>
-  );
-}
+const composerFieldSx = {
+  "& .MuiOutlinedInput-root": {
+    minHeight: EMPLOYEE_TOUCH_MIN,
+    borderRadius: "28px",
+    fontSize: "1.05rem",
+    bgcolor: "background.paper",
+  },
+} as const;
 
-function IdleMediaEnd({
+const mediaButtonSx = {
+  flex: 1,
+  minHeight: EMPLOYEE_TOUCH_MIN,
+  minWidth: 0,
+  px: 1,
+  borderRadius: "16px",
+  fontSize: "1rem",
+  fontWeight: 800,
+  color: EMPLOYEE_BRAND,
+  bgcolor: alpha(EMPLOYEE_BRAND, 0.1),
+  "&:hover": { bgcolor: alpha(EMPLOYEE_BRAND, 0.18) },
+  "&.Mui-disabled": { opacity: 0.5 },
+} as const;
+
+/** Trois grandes actions avec icône ET texte : micro, caméra, fichier. */
+function MediaActionRow({
   busy,
   media,
   onSendMedia,
@@ -224,18 +235,27 @@ function IdleMediaEnd({
   onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
 }) {
   return (
-    <>
-      <IconButton
+    <Box display="flex" gap={1}>
+      <Button
+        aria-label={he.chatRecordAudio}
+        disabled={busy}
+        onClick={media.startAudio}
+        startIcon={<MicIcon />}
+        sx={mediaButtonSx}
+      >
+        {he.chatRecordAudio}
+      </Button>
+      <Button
         aria-label={he.chatCameraAction}
-        color="primary"
         disabled={busy}
         onClick={media.openCamera}
-        sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
+        startIcon={<PhotoCameraIcon />}
+        sx={mediaButtonSx}
       >
-        <PhotoCameraIcon />
-      </IconButton>
+        {he.chatCameraAction}
+      </Button>
       <ChatFileAttach disabled={busy} onPick={(file) => void onSendMedia(file, "file")} />
-    </>
+    </Box>
   );
 }
 
@@ -258,17 +278,17 @@ function SendTextButton({
       disabled={disabled}
       onClick={onSend}
       sx={{
-        minWidth: 48,
-        minHeight: 48,
+        minWidth: EMPLOYEE_TOUCH_MIN,
+        minHeight: EMPLOYEE_TOUCH_MIN,
         flexShrink: 0,
         borderRadius: "50%",
-        bgcolor: "primary.main",
-        color: "primary.contrastText",
-        "&:hover": { bgcolor: "primary.dark" },
-        "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "action.disabled" },
+        background: EMPLOYEE_BRAND_GRADIENT,
+        color: "#fff",
+        "&:hover": { background: EMPLOYEE_BRAND_GRADIENT, filter: "brightness(0.95)" },
+        "&.Mui-disabled": { background: "none", bgcolor: "action.disabledBackground", color: "action.disabled" },
       }}
     >
-      {sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon sx={{ transform: "scaleX(-1)" }} />}
+      {sending ? <CircularProgress size={22} color="inherit" /> : <SendIcon sx={{ transform: "scaleX(-1)" }} />}
     </IconButton>
   );
 }
@@ -357,15 +377,15 @@ function ChatFileAttach({
           if (file) onPick(file);
         }}
       />
-      <IconButton
+      <Button
         aria-label={he.chatAttachFile}
-        color="primary"
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
-        sx={{ minWidth: 48, minHeight: 48, border: 1, borderColor: "divider" }}
+        startIcon={<AttachFileIcon />}
+        sx={mediaButtonSx}
       >
-        <AttachFileIcon />
-      </IconButton>
+        {he.chatAttachShort}
+      </Button>
     </>
   );
 }
