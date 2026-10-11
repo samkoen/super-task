@@ -33,6 +33,7 @@ LINE_FIELDS = (
     "rejected_qty",
     "note",
     "photo_url",
+    "audio_url",
 )
 
 
@@ -150,7 +151,7 @@ def validate_line_answer(raw: object, *, expected_qty: float) -> dict:
     status = str(raw.get("arrival") or "").strip()
     if status not in LINE_STATUSES:
         raise ValueError("יש לסמן אם השורה תקינה")
-    return _status_answer(status, _note(raw), _photo(raw))
+    return _status_answer(status, _note(raw), _photo(raw), _audio(raw))
 
 
 def line_is_fully_ok(answer: dict, expected_qty: float) -> bool:
@@ -292,11 +293,13 @@ def _image_url(value: object) -> str | None:
     return text[:1024]
 
 
-def _status_answer(status: str, note: str | None, photo: str | None) -> dict:
+def _status_answer(
+    status: str, note: str | None, photo: str | None, audio: str | None
+) -> dict:
     if status == LINE_OK:
-        if note or photo:
-            raise ValueError("הערה ותמונה רק כשיש בעיה")
-        note, photo = None, None
+        if note or photo or audio:
+            raise ValueError("הערה, תמונה ושמע רק כשיש בעיה")
+        note, photo, audio = None, None, None
     elif not note:
         raise ValueError("חסרה הערה")
     return {
@@ -306,6 +309,7 @@ def _status_answer(status: str, note: str | None, photo: str | None) -> dict:
         "rejected_qty": None,
         "note": note,
         "photo_url": photo,
+        "audio_url": audio,
         "gap": None,
         "fully_ok": status == LINE_OK,
     }
@@ -335,5 +339,13 @@ def _note(raw: dict) -> str | None:
 
 
 def _photo(raw: dict) -> str | None:
-    url = str(raw.get("photo_url") or "").strip()
+    return _media_url(raw.get("photo_url"))
+
+
+def _audio(raw: dict) -> str | None:
+    return _media_url(raw.get("audio_url"))
+
+
+def _media_url(value: object) -> str | None:
+    url = str(value or "").strip()
     return url[:1024] or None

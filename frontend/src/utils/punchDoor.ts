@@ -40,15 +40,19 @@ export function findOpenPunchTask<T extends PunchTask>(tasks: T[], kind: PunchKi
   return open.slice().sort((a, b) => a.due_at.localeCompare(b.due_at))[0];
 }
 
+export function hasOpenWorkTasks<
+  T extends { status: string; is_work_start?: boolean; is_work_end?: boolean },
+>(tasks: T[]): boolean {
+  return excludeAttendancePunch(tasks).some((task) => isOpenPunchStatus(task.status));
+}
+
+/** Écran יציאה seulement quand la כניסה est faite et qu'il ne reste plus de tâche. */
 export function shouldShowEndDoor(opts: {
   startOpen: boolean;
   end: PunchTask | null;
   inTask: boolean;
-  due: boolean;
-  requested: boolean;
-  dismissed: boolean;
+  hasOpenWork: boolean;
 }): boolean {
-  if (opts.startOpen || !opts.end || opts.inTask) return false;
-  if (opts.requested) return true;
-  return opts.due && !opts.dismissed;
+  if (opts.startOpen || !opts.end || opts.inTask || opts.hasOpenWork) return false;
+  return true;
 }

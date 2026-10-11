@@ -39,30 +39,45 @@ vi.mock("../media/MediaCaptureActions", () => ({
   default: ({
     photoLabel,
     videoLabel,
+    audioLabel,
     photoDoneLabel,
     videoDoneLabel,
     photoAdded,
     videoAdded,
     allowedKinds,
+    onCapture,
   }: {
     photoLabel?: string;
     videoLabel?: string;
+    audioLabel?: string;
     photoDoneLabel?: string;
     videoDoneLabel?: string;
     photoAdded?: boolean;
     videoAdded?: boolean;
     allowedKinds?: string[];
-  }) => (
-    <button type="button">
-      {allowedKinds?.[0] === "video"
-        ? videoAdded
-          ? videoDoneLabel ?? "video-done"
-          : videoLabel ?? "video"
-        : photoAdded
-          ? photoDoneLabel ?? "photo-done"
-          : photoLabel ?? "photo"}
-    </button>
-  ),
+    onCapture?: (file: File, kind: "photo" | "video" | "audio") => void;
+  }) => {
+    const kinds = allowedKinds ?? ["photo", "video", "audio"];
+    return (
+      <div>
+        {kinds.includes("photo") ? (
+          <button type="button" onClick={() => onCapture?.(new File(["a"], "a.jpg"), "photo")}>
+            {photoAdded ? photoDoneLabel ?? "photo-done" : photoLabel ?? he.addPhoto}
+          </button>
+        ) : null}
+        {kinds.includes("video") ? (
+          <button type="button" onClick={() => onCapture?.(new File(["v"], "v.webm"), "video")}>
+            {videoAdded ? videoDoneLabel ?? "video-done" : videoLabel ?? he.addVideo}
+          </button>
+        ) : null}
+        {kinds.includes("audio") ? (
+          <button type="button" onClick={() => onCapture?.(new File(["s"], "s.webm"), "audio")}>
+            {audioLabel ?? he.addAudio}
+          </button>
+        ) : null}
+      </div>
+    );
+  },
 }));
 
 function task(status: TaskStatus = "pending") {
@@ -308,7 +323,8 @@ describe("EmployeeTaskDetailDialog", () => {
       />,
     );
     expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
-    expect(screen.getByText(he.extraCompletionTitle)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.captureOptionalToggle })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.captureAddText })).toBeTruthy();
     expect(screen.getByRole("button", { name: he.markDone })).toBeTruthy();
   });
 
@@ -323,8 +339,10 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(he.extraCompletionTitle)).toBeTruthy();
-    expect(screen.getByText(he.extraCompletionHint)).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.captureOptionalToggle })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.addPhoto })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.addVideo })).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.addAudio })).toBeTruthy();
     expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
   });
 
@@ -397,12 +415,12 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    const note = screen.getByRole("button", { name: he.captureNoteToggle });
-    const extras = screen.getByRole("button", { name: he.captureExtrasToggle });
-    expect(note.getAttribute("aria-expanded")).toBe("false");
+    const extras = screen.getByRole("button", { name: he.captureOptionalToggle });
     expect(extras.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(note);
-    expect(note.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.queryByRole("button", { name: he.captureNoteToggle })).toBeNull();
+    expect(screen.queryByRole("button", { name: he.captureExtrasToggle })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: he.captureAddText }));
+    expect(extras.getAttribute("aria-expanded")).toBe("true");
   });
 
   it("opens the note by itself when a note was already written", () => {
@@ -413,7 +431,9 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: he.captureNoteToggle }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: he.captureOptionalToggle }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
   });
 
   it("puts the manager's rejection remark before the instructions", () => {

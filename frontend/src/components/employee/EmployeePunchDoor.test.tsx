@@ -14,14 +14,9 @@ describe("EmployeePunchDoor", () => {
     expect(screen.queryByRole("button", { name: he.punchBackToTasks })).toBeNull();
   });
 
-  it("lets the oved leave the end door back to remaining tasks", () => {
-    const onBack = vi.fn();
-    render(
-      <EmployeePunchDoor kind="end" name="דני עובד" remainingCount={2} onOpen={vi.fn()} onBack={onBack} />,
-    );
+  it("shows the exit screen without a way back to the task list", () => {
+    render(<EmployeePunchDoor kind="end" name="דני עובד" onOpen={vi.fn()} />);
     expect(screen.getByText(he.punchClockOut)).toBeTruthy();
-    expect(screen.getByText(he.punchRemainingHint(2))).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: he.punchBackToTasks }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: he.punchBackToTasks })).toBeNull();
   });
 });

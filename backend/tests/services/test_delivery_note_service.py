@@ -297,6 +297,7 @@ def test_assignee_saves_a_problem_with_one_note():
     assert answer["arrival"] == "problem"
     assert answer["note"] == "רקוב"
     assert answer["photo_url"] is None
+    assert answer["audio_url"] is None
 
 
 def test_other_employee_cannot_answer():

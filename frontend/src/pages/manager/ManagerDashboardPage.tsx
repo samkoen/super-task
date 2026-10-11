@@ -50,6 +50,7 @@ import { useFeedback } from "../../context/FeedbackContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { he } from "../../i18n/he";
 import { findQueuedTask } from "../../utils/dashboardCarousels";
+import { dashboardTaskUsesReview } from "../../utils/dashboardTaskOpen";
 import { employeeGreeting } from "../../utils/employeeNextTask";
 import { todayIso } from "../../utils/dateView";
 import {
@@ -185,12 +186,18 @@ export default function ManagerDashboardPage() {
     if (next) setSelectedBranch(next);
   }, [canPickBranch, selectedBranch, data, user?.branch_id, branches]);
 
-  const handleReviewTask = useCallback(async (taskId: string) => {
+  const openDashboardTask = useCallback(async (taskId: string) => {
     setReviewLoading(true);
     setError("");
     try {
       const occurrence = await taskService.getOccurrence(taskId);
-      setReviewTarget(occurrence);
+      if (dashboardTaskUsesReview(occurrence.status)) {
+        setEditOccurrenceId(null);
+        setReviewTarget(occurrence);
+        return;
+      }
+      setReviewTarget(null);
+      setEditOccurrenceId(taskId);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : he.errorGeneric);
     } finally {
@@ -297,9 +304,15 @@ export default function ManagerDashboardPage() {
           analysisExtra={data.branch ? <PromotionStagesAnalysisTable stages={stages} /> : undefined}
           chats={inbox.chats}
           onToggleAnalysis={() => setShowAnalysis((v) => !v)}
-          onReviewTask={(id) => void handleReviewTask(id)}
-          onOpenTask={(id) => setEditOccurrenceId(id)}
-          onOpenOwnTask={ownWork.open}
+          onReviewTask={(id) => void openDashboardTask(id)}
+          onOpenTask={(id) => void openDashboardTask(id)}
+          onOpenOwnTask={(task) => {
+            if (dashboardTaskUsesReview(task.status)) {
+              void openDashboardTask(task.id);
+              return;
+            }
+            ownWork.open(task);
+          }}
           onOpenChat={(card) => void inbox.openCard(card)}
           onOpenTaskChat={openTaskChat}
           onChanged={() => void load(true)}

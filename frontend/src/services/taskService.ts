@@ -414,10 +414,10 @@ export const taskService = {
     return response.data;
   },
 
-  reopenClosed: async (occurrenceId: string) => {
+  reopenClosed: async (occurrenceId: string, payload?: { rejection_note?: string }) => {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/reopen-closed`,
-      EMPTY_JSON_BODY,
+      payload ?? EMPTY_JSON_BODY,
     );
     return response.data;
   },

@@ -16,7 +16,7 @@ import {
 } from "./deliveryNote";
 
 function draft(partial: Partial<DeliveryLineDraft>): DeliveryLineDraft {
-  return { arrival: "ok", note: "", photo_url: "", ...partial };
+  return { arrival: "ok", note: "", photo_url: "", audio_url: "", ...partial };
 }
 
 describe("delivery note line", () => {
@@ -58,17 +58,24 @@ describe("delivery note line", () => {
       arrival: "ok",
       note: null,
       photo_url: null,
+      audio_url: null,
     });
   });
 
-  it("keeps one note and an optional photo when there is a problem", () => {
-    const problem = draft({ arrival: "problem", note: "רקוב", photo_url: "https://files/a.jpg" });
+  it("keeps one note and optional photo and audio when there is a problem", () => {
+    const problem = draft({
+      arrival: "problem",
+      note: "רקוב",
+      photo_url: "https://files/a.jpg",
+      audio_url: "https://files/a.webm",
+    });
     expect(showProblemFields(problem)).toBe(true);
     expect(draftToPayload("line-1", problem)).toEqual({
       line_id: "line-1",
       arrival: "problem",
       note: "רקוב",
       photo_url: "https://files/a.jpg",
+      audio_url: "https://files/a.webm",
     });
   });
 

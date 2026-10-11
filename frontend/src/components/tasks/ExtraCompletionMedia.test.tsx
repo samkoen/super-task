@@ -58,6 +58,13 @@ describe("ExtraCompletionMedia", () => {
     expect(next[0]?.media.file?.name).toBe("a.jpg");
   });
 
+  it("can hide the standalone title and capture buttons when embedded", () => {
+    render(<ExtraCompletionMedia extras={[]} onChange={vi.fn()} hideTitle hideActions />);
+    expect(screen.queryByText(he.extraCompletionTitle)).toBeNull();
+    expect(screen.queryByRole("button", { name: he.addPhoto })).toBeNull();
+    expect(screen.getByText(he.extraCompletionHint)).toBeTruthy();
+  });
+
   it("removes an extra video the oved already added", () => {
     const onChange = vi.fn();
     const extras: ExtraSlot[] = [

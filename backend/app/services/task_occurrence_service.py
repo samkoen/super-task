@@ -819,7 +819,9 @@ class TaskOccurrenceService:
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
 
-    def reopen_closed_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict:
+    def reopen_closed_occurrence(
+        self, actor: ActorContext, occurrence_id: str, *, rejection_note: str | None = None
+    ) -> dict:
         occurrence = self._require_closed_reopenable(actor, occurrence_id)
         completion = self._completions.find_by_occurrence(occurrence_id)
         if not completion:
@@ -834,7 +836,8 @@ class TaskOccurrenceService:
                     manager_review_status=completion.manager_review_status,
                 )
             )
-        cleared = self._completions.clear_approved_review(occurrence_id)
+        note = (rejection_note or "").strip() or None
+        cleared = self._completions.clear_approved_review(occurrence_id, rejection_note=note)
         assert cleared is not None
         updated = self._occurrences.reopen_after_review(occurrence_id)
         assert updated is not None

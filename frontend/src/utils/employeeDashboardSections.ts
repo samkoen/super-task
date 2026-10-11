@@ -11,6 +11,16 @@ export function employeeDisplayStatus<S extends string>(status: S): S | "complet
   return status === "pending_review" ? "completed" : status;
 }
 
+/** Envoyée par l'oved : ichour menahel déjà compris dans le compte du jour. */
+export function employeeDoneToday(completed: number, pendingReview: number): number {
+  return completed + pendingReview;
+}
+
+export function employeeDonePercent(done: number, total: number): number {
+  if (total <= 0) return 100;
+  return Math.round((done / total) * 100);
+}
+
 export function shouldHighlightEmployeeTask(status: string): boolean {
   return status === "overdue" || status === "awaiting_response";
 }
