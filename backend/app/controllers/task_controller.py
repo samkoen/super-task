@@ -686,14 +686,20 @@ async def reopen_occurrence(
 
 @router.post("/occurrences/{occurrence_id}/reopen-closed")
 @handle_controller_errors
-def reopen_closed_occurrence(
+async def reopen_closed_occurrence(
     occurrence_id: str,
     request: Request,
+    data: dict[str, Any] | None = Body(default=None),
     service: TaskOccurrenceService = Depends(get_occurrence_service),
+    messages: TaskMessageService = Depends(get_message_service),
     db: Session = Depends(get_db),
 ):
     actor = load_actor(request, UserRepository(db))
-    item = service.reopen_closed_occurrence(actor, occurrence_id)
+    note = ((data or {}).get("rejection_note") or "").strip() or None
+    item = service.reopen_closed_occurrence(actor, occurrence_id, rejection_note=note)
+    if note:
+        chat = await messages.post_message(actor, occurrence_id, body=note)
+        item = chat.get("occurrence") or item
     _emit_task_event(db, "task_reopened", item)
     return {"message": "המשימה נפתחה מחדש לעובד", "occurrence": item}
 

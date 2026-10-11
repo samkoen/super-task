@@ -63,6 +63,7 @@ export default function TaskCompletionReviewDialog({
   const open = Boolean(taskView);
   const isAwaiting = taskView?.status === "awaiting_response";
   const isReview = taskView?.status === "pending_review";
+  const isClosed = taskView?.status === "completed";
   const isClosedApproved = canReopenClosedTask(taskView);
   const showCompletion = Boolean(completion);
   const actionsBlocked = reviewActionsBlocked({ isReview, mediaReady });
@@ -156,8 +157,9 @@ export default function TaskCompletionReviewDialog({
 
   const handleReopenClosed = () => {
     setConfirmReopenClosed(false);
+    const remark = note.trim() || he.taskReopenNoteFallback;
     void runAction(async () => {
-      await taskService.reopenClosed(taskView!.id);
+      await taskService.reopenClosed(taskView!.id, { rejection_note: remark });
       return he.taskReopenedSuccess;
     });
   };
@@ -174,15 +176,14 @@ export default function TaskCompletionReviewDialog({
       disableAutoFocus
       disableRestoreFocus
     >
-      <DialogTitle>
-        {isClosedApproved ? he.taskClosedDetailTitle : isAwaiting ? he.taskChatTitle : he.taskReviewTitle}
-      </DialogTitle>
+      <DialogTitle>{reviewDialogTitle(isClosed, isClosedApproved, isAwaiting)}</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         {taskView && (
           <Typography variant="subtitle1" fontWeight={700}>
             {taskView.title}
           </Typography>
         )}
+        {isClosed && taskView ? <ClosedResultFacts task={taskView} /> : null}
         {taskView && (
           <OpenTaskChatButton
             occurrenceId={taskView.id}
@@ -263,7 +264,7 @@ export default function TaskCompletionReviewDialog({
             <QualityRatingStars value={rating} onChange={setRating} />
           </Box>
         )}
-        {isReview && (
+        {(isReview || isClosedApproved) && (
           <TextField
             label={he.taskReopenNote}
             value={note}
@@ -337,5 +338,35 @@ export default function TaskCompletionReviewDialog({
       onConfirm={handleReopenClosed}
     />
     </>
+  );
+}
+
+function reviewDialogTitle(isClosed: boolean, approved: boolean, awaiting: boolean): string {
+  if (approved) return he.taskClosedDetailTitle;
+  if (isClosed) return he.taskClosedSummaryTitle;
+  if (awaiting) return he.taskChatTitle;
+  return he.taskReviewTitle;
+}
+
+function ClosedResultFacts({ task }: { task: TaskOccurrence }) {
+  const who = task.assignee_name?.trim();
+  const stars = task.completion?.quality_rating;
+  if (!who && stars == null) return null;
+  return (
+    <Box>
+      {who ? (
+        <Typography variant="body2" color="text.secondary">
+          {he.taskClosedBy(who)}
+        </Typography>
+      ) : null}
+      {stars != null ? (
+        <Box mt={who ? 1 : 0}>
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+            {he.qualityRating}
+          </Typography>
+          <QualityRatingStars value={stars} readOnly />
+        </Box>
+      ) : null}
+    </Box>
   );
 }

@@ -335,13 +335,17 @@ describe("TaskCompletionReviewDialog", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: he.taskApproveClose })).toBeNull();
+    expect(screen.getByText(he.taskClosedDetailTitle)).toBeTruthy();
+    expect(screen.getByLabelText(he.taskReopenNote)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: he.taskReopenClosed }));
     expect(taskService.reopenClosed).not.toHaveBeenCalled();
     expect(screen.getByText(he.taskReopenClosedConfirm)).toBeTruthy();
     const confirmButtons = screen.getAllByRole("button", { name: he.taskReopenClosed });
     fireEvent.click(confirmButtons[confirmButtons.length - 1]);
     await waitFor(() => {
-      expect(taskService.reopenClosed).toHaveBeenCalledWith("occ-1");
+      expect(taskService.reopenClosed).toHaveBeenCalledWith("occ-1", {
+        rejection_note: he.taskReopenNoteFallback,
+      });
       expect(onDone).toHaveBeenCalledWith(he.taskReopenedSuccess);
       expect(onClose).toHaveBeenCalled();
     });

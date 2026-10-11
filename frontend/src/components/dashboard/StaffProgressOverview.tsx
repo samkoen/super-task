@@ -1,5 +1,5 @@
 import { Box, Typography } from "@mui/material";
-import type { TeamMember } from "../../services/dashboardService";
+import type { TeamMember, TimelineTask } from "../../services/dashboardService";
 import { he } from "../../i18n/he";
 import SectionHeading from "../ui/SectionHeading";
 import StaffProgressCard from "./StaffProgressCard";
@@ -7,9 +7,10 @@ import StaffProgressCard from "./StaffProgressCard";
 interface StaffProgressOverviewProps {
   team: TeamMember[];
   onChanged?: () => void;
+  onOpenTask?: (task: TimelineTask) => void;
 }
 
-export default function StaffProgressOverview({ team, onChanged }: StaffProgressOverviewProps) {
+export default function StaffProgressOverview({ team, onChanged, onOpenTask }: StaffProgressOverviewProps) {
   const presentCount = team.filter((m) =>
     [...(m.timeline ?? []), ...(m.overdue_backlog ?? [])].some((t) => Boolean(t.started_at)),
   ).length;
@@ -26,7 +27,12 @@ export default function StaffProgressOverview({ team, onChanged }: StaffProgress
       {team.length === 0 ? null : (
         <Box>
           {team.map((member) => (
-            <StaffProgressCard key={member.user_id} member={member} onChanged={onChanged} />
+            <StaffProgressCard
+              key={member.user_id}
+              member={member}
+              onChanged={onChanged}
+              onOpenTask={onOpenTask}
+            />
           ))}
         </Box>
       )}

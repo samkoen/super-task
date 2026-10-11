@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, ButtonBase, Typography, alpha, keyframes } from "@mui/material";
+import { Avatar, Box, ButtonBase, Typography, alpha, keyframes } from "@mui/material";
 import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import { avatarInitials } from "../../utils/avatarInitials";
 import { mediaUrl } from "../../utils/mediaUrl";
@@ -42,7 +42,6 @@ export default function EmployeePunchDoor({
   taskTitle,
   remainingCount = 0,
   onOpen,
-  onBack,
 }: {
   kind: PunchKind;
   name?: string;
@@ -50,7 +49,6 @@ export default function EmployeePunchDoor({
   taskTitle?: string | null;
   remainingCount?: number;
   onOpen: () => void;
-  onBack?: () => void;
 }) {
   const start = kind === "start";
   const label = start ? he.punchClockIn : he.punchClockOut;
@@ -68,16 +66,6 @@ export default function EmployeePunchDoor({
         <Typography variant="body2" textAlign="center" sx={{ color: alpha("#fff", 0.85) }}>
           {he.punchRemainingHint(remainingCount)}
         </Typography>
-      ) : null}
-      {onBack ? (
-        <Button
-          color="inherit"
-          variant="outlined"
-          onClick={onBack}
-          sx={{ minHeight: 52, px: 3, borderRadius: "14px", borderColor: alpha("#fff", 0.6) }}
-        >
-          {he.punchBackToTasks}
-        </Button>
       ) : null}
     </Box>
   );

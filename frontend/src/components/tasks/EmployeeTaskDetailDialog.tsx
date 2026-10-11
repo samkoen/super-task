@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
-  TextField,
   Typography,
   alpha,
   useMediaQuery,
@@ -15,15 +14,14 @@ import {
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import { EMPLOYEE_BRAND, EMPLOYEE_CARD_RADIUS, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN, employeeFieldSx } from "../../styles/employeeUi";
+import { EMPLOYEE_BRAND, EMPLOYEE_CARD_RADIUS, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
 import DeliveryLineCheck from "./DeliveryLineCheck";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import EmployeeCaptureSteps from "./EmployeeCaptureSteps";
 import EmployeeTaskActionsBar from "./EmployeeTaskActionsBar";
-import ExtraCompletionMedia from "./ExtraCompletionMedia";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
-import CollapsibleSection from "../ui/CollapsibleSection";
+import OptionalCaptureAccordion from "./OptionalCaptureAccordion";
 import { OpenTaskChatButton } from "./TaskChatDialog";
 import TaskStatusChip from "./TaskStatusChip";
 import { he } from "../../i18n/he";
@@ -294,32 +292,17 @@ function TaskDetailMedia({
   );
 }
 
-/** Note et fichiers en plus : repliés, pour ne pas encombrer l'écran. */
+/** Note et fichiers en plus : un seul accordéon à 4 icônes. */
 function OptionalSections({ capture }: { capture: EmployeeTaskCaptureProps }) {
-  const extras = capture.extras ?? [];
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-      <CollapsibleSection label={he.captureNoteToggle} defaultOpen={Boolean(capture.note.trim())}>
-        <TextField
-          label={he.note}
-          value={capture.note}
-          onChange={(e) => capture.onNoteChange(e.target.value)}
-          fullWidth
-          multiline
-          minRows={3}
-          placeholder={he.completionMediaHint}
-          sx={employeeFieldSx}
-        />
-      </CollapsibleSection>
-      <CollapsibleSection label={he.captureExtrasToggle} defaultOpen={extras.length > 0}>
-        <ExtraCompletionMedia
-          extras={extras}
-          onChange={capture.onExtrasChange ?? (() => undefined)}
-          disabled={capture.saving}
-          onAnnotatingChange={capture.onAnnotatingChange}
-        />
-      </CollapsibleSection>
-    </Box>
+    <OptionalCaptureAccordion
+      note={capture.note}
+      onNoteChange={capture.onNoteChange}
+      extras={capture.extras ?? []}
+      onExtrasChange={capture.onExtrasChange ?? (() => undefined)}
+      disabled={capture.saving}
+      onAnnotatingChange={capture.onAnnotatingChange}
+    />
   );
 }
 

@@ -31,6 +31,8 @@ import { useSearchParams } from "react-router-dom";
 import { taskIdFromSearch } from "../../utils/notificationNavigation";
 import {
   collectUniqueTasks,
+  employeeDonePercent,
+  employeeDoneToday,
   splitEmployeeWorkLists,
 } from "../../utils/employeeDashboardSections";
 import { formatHebrewDay, todayIso } from "../../utils/dateView";
@@ -127,13 +129,12 @@ function EmployeeOpenWorkLists({
       />
       {punchEnd ? (
         <Button
-          fullWidth
-          variant="outlined"
-          color="error"
+          size="small"
+          color="inherit"
           onClick={onRequestEnd}
-          sx={{ mb: 2.5, minHeight: 56, fontSize: "1.05rem", fontWeight: 800, borderRadius: "16px" }}
+          sx={{ mb: 2, alignSelf: "center", color: "text.secondary", fontWeight: 700 }}
         >
-          {he.punchOpenEndEarly}
+          {he.punchEndShift}
         </Button>
       ) : null}
     </>
@@ -640,7 +641,9 @@ export default function EmployeeTasksPage() {
     return splitEmployeeWorkLists(excludeAttendancePunch(pool));
   }, [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks]);
 
-  const progress = dashboard?.progress_percent ?? 0;
+  const totalCount = dashboard?.counts?.tasks_total ?? 0;
+  const doneCount = employeeDoneToday(completedTasks.length, pendingReviewTasks.length);
+  const progress = dashboard ? employeeDonePercent(doneCount, totalCount) : 0;
   const openCount = workLists.dynamic.length + workLists.routine.length;
   const todayLabel = formatHebrewDay(dashboard?.due_on ?? todayIso());
 
@@ -732,13 +735,14 @@ export default function EmployeeTasksPage() {
         onShift={Boolean(onShift)}
         onBreak={onBreak}
         breakBusy={breakBusy}
-        progress={progress}
+        progress={punch.showStart ? null : progress}
         onToggleBreak={() => void handleToggleBreak()}
-        qualityRating={dashboard?.employee?.quality_rating}
+        showBreak={!punch.showStart}
+        qualityRating={punch.showStart ? null : dashboard?.employee?.quality_rating}
         hero
         greeting={employeeGreeting(new Date().getHours())}
-        completedCount={dashboard?.counts?.tasks_completed}
-        totalCount={dashboard?.counts?.tasks_total}
+        completedCount={doneCount}
+        totalCount={totalCount}
       />
 
       <EmployeeAvatarCapture
@@ -780,7 +784,6 @@ export default function EmployeeTasksPage() {
                 onOpen={() => {
                   if (punch.end) openDetail(punch.end);
                 }}
-                onBack={punch.dismissEnd}
               />
             </>
           ) : (
@@ -788,7 +791,9 @@ export default function EmployeeTasksPage() {
               {managerWaiting}
               <EmployeeOpenWorkLists
                 punchEnd={punch.end}
-                onRequestEnd={punch.requestEnd}
+                onRequestEnd={() => {
+                  if (punch.end) openDetail(punch.end);
+                }}
                 openCount={openCount}
                 workLists={workLists}
                 onOpen={openWorkTask}

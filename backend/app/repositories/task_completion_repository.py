@@ -200,8 +200,10 @@ class TaskCompletionRepository:
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)
 
-    def clear_approved_review(self, occurrence_id: str) -> TaskCompletion | None:
-        """Enlève le drapeau d'approbation ; conserve médias et fil de chat."""
+    def clear_approved_review(
+        self, occurrence_id: str, *, rejection_note: str | None = None
+    ) -> TaskCompletion | None:
+        """Enlève l'approbation. Une remarque reste visible pour l'oved."""
         row = (
             self._db.query(orm.TaskCompletion)
             .filter(orm.TaskCompletion.occurrence_id == mp.parse_uuid(occurrence_id))
@@ -209,10 +211,11 @@ class TaskCompletionRepository:
         )
         if not row:
             return None
-        row.manager_review_status = None
+        note = (rejection_note or "").strip() or None
+        row.manager_review_status = task_status.REVIEW_REJECTED if note else None
         row.manager_reviewed_by_id = None
         row.manager_reviewed_at = None
-        row.rejection_note = None
+        row.rejection_note = note
         row.quality_rating = None
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)

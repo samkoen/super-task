@@ -116,6 +116,23 @@ describe("EmployeeTasksPage punch doors", () => {
   it("shows only the start door while clock-in is open", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
+        counts: {
+          tasks_total: 4,
+          tasks_completed: 0,
+          tasks_pending: 4,
+          tasks_in_progress: 0,
+          tasks_overdue: 0,
+          tasks_cancelled: 0,
+          completion_rate: 0,
+        },
+        employee: {
+          id: "e1",
+          full_name: "דני עובד",
+          job_function: null,
+          branch_id: "b1",
+          branch_name: "שפע",
+          quality_rating: { average: 4, count: 2, by_category: [] },
+        },
         today_tasks: [
           card({ id: "s", title: "פתיחת משמרת", is_work_start: true }),
           card({ id: "t", title: "מדף חלב" }),
@@ -125,6 +142,9 @@ describe("EmployeeTasksPage punch doors", () => {
     renderPage();
     expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
     expect(screen.queryByText("מדף חלב")).toBeNull();
+    expect(screen.queryByRole("button", { name: he.employeeBreakStart })).toBeNull();
+    expect(screen.queryByText(he.employeeProgressDoneLabel, { exact: false })).toBeNull();
+    expect(screen.queryByText(he.qualityRatingCount(2))).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: he.punchClockIn }));
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
@@ -143,25 +163,84 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText("מדף חלב")).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.employeeBreakStart })).toBeTruthy();
     expect(screen.queryByText(he.punchClockOut)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: he.punchOpenEndEarly }));
-    expect(screen.getByText(he.punchClockOut)).toBeTruthy();
-    expect(screen.queryByText("מדף חלב")).toBeNull();
+    expect(screen.queryByRole("button", { name: he.punchBackToTasks })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: he.punchEndShift }));
+    expect(screen.getByText("detail:סיום משמרת")).toBeTruthy();
+    expect(screen.getByText("מדף חלב")).toBeTruthy();
   });
 
-  it("opens the end door when due_at has already passed", async () => {
+  it("keeps the other tasks when exit time has passed", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        counts: {
+          tasks_total: 4,
+          tasks_completed: 0,
+          tasks_pending: 4,
+          tasks_in_progress: 0,
+          tasks_overdue: 0,
+          tasks_cancelled: 0,
+          completion_rate: 0,
+        },
+        today_tasks: [
+          card({ id: "e", title: "סיום משמרת", is_work_end: true, due_at: "2020-01-01T17:00:00+03:00" }),
+          card({ id: "t", title: "מדף חלב" }),
+          card({ id: "u", title: "סידור ירקות" }),
+          card({ id: "v", title: "ניקיון קופה" }),
+        ],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText("מדף חלב")).toBeTruthy();
+    expect(screen.getByText("סידור ירקות")).toBeTruthy();
+    expect(screen.getByText("ניקיון קופה")).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.punchEndShift })).toBeTruthy();
+    expect(screen.queryByText(he.punchClockOut)).toBeNull();
+    expect(screen.queryByRole("button", { name: he.punchBackToTasks })).toBeNull();
+  });
+
+  it("opens the end door when due and no other work remains", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
         today_tasks: [
           card({ id: "e", title: "סיום משמרת", is_work_end: true, due_at: "2020-01-01T17:00:00+03:00" }),
-          card({ id: "t", title: "מדף חלב" }),
         ],
       }),
     );
     renderPage();
     expect(await screen.findByText(he.punchClockOut)).toBeTruthy();
-    await waitFor(() => expect(screen.queryByText("מדף חלב")).toBeNull());
+  });
+
+  it("counts a task waiting for menahel approval as done today", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        progress_percent: 0,
+        counts: {
+          tasks_total: 4,
+          tasks_completed: 0,
+          tasks_pending: 3,
+          tasks_in_progress: 0,
+          tasks_overdue: 0,
+          tasks_cancelled: 0,
+          completion_rate: 0,
+        },
+        today_tasks: [
+          card({ id: "a", title: "מדף חלב" }),
+          card({ id: "b", title: "סידור ירקות" }),
+          card({ id: "c", title: "ניקיון קופה" }),
+        ],
+        pending_review_tasks: [card({ id: "p", title: "מילוי מדף", status: "pending_review" })],
+      }),
+    );
+    renderPage();
+    expect(
+      await screen.findByText(`${he.employeeProgressOf(1, 4)} ${he.employeeProgressDoneLabel}`),
+    ).toBeTruthy();
+    expect(screen.getByText("25%")).toBeTruthy();
   });
 
   it("lets the oved open completed tasks without a bottom שיחה overlay", async () => {

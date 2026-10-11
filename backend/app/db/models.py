@@ -801,6 +801,7 @@ class DeliveryLineAnswer(Base):
     rejected_qty: Mapped[float | None] = mapped_column(Float, nullable=True)
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
 
 class AgrolineAccount(Base):

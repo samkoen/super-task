@@ -1,10 +1,19 @@
-import type { ReactNode } from "react";
-import { Box, Button, ButtonBase, TextField, Typography } from "@mui/material";
+import { useCallback, useState, type ReactNode } from "react";
+import { Box, Button, ButtonBase, CircularProgress, TextField, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import AddAPhotoOutlinedIcon from "@mui/icons-material/AddAPhotoOutlined";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import MicIcon from "@mui/icons-material/Mic";
+import { PhotoCaptureDialog } from "../media/MediaCaptureActions";
+import AudioCaptureDialog from "../media/AudioCaptureDialog";
+import CompactAudioPlayer from "../media/CompactAudioPlayer";
+import { mediaUrl } from "../../utils/mediaUrl";
+import { captureErrorMessage, scheduleAfterDialogPaint } from "../media/captureDialogShared";
+import { useCameraStream } from "../../hooks/useCameraStream";
 import { taskService } from "../../services/taskService";
+import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
+import { normalizePhotoOrientation } from "../../utils/mediaCapture";
 import { he } from "../../i18n/he";
 import { employeeCardSx } from "../../styles/employeeUi";
 import {
@@ -89,7 +98,7 @@ function StatusButtons({
         label={he.deliveryNoteConditionOk}
         ariaLabel={`${he.deliveryNoteConditionOk}: ${line.product_name}`}
         disabled={disabled}
-        onClick={() => onChange({ arrival: "ok", note: "", photo_url: "" })}
+        onClick={() => onChange({ arrival: "ok", note: "", photo_url: "", audio_url: "" })}
       />
       <StatusButton
         selected={problem}
@@ -173,38 +182,159 @@ function ProblemFields({
         multiline
         minRows={2}
       />
-      <Button
-        component="label"
-        disabled={disabled}
-        variant="outlined"
-        startIcon={<AddAPhotoOutlinedIcon />}
-        sx={{ minHeight: 52, borderRadius: "14px", fontWeight: 700 }}
-      >
-        {draft.photo_url ? he.deliveryNotePhotoAttached : he.deliveryNoteLinePhoto}
-        <input
-          hidden
-          type="file"
-          accept="image/*"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void uploadLinePhoto(file, draft, onChange, onError);
-          }}
-        />
-      </Button>
+      <Box display="flex" gap={1} alignItems="flex-start">
+        <Box flex={1}>
+          <LinePhotoButton draft={draft} disabled={disabled} onChange={onChange} onError={onError} />
+        </Box>
+        <LineAudioButton draft={draft} disabled={disabled} onChange={onChange} onError={onError} />
+      </Box>
     </Box>
   );
 }
 
-async function uploadLinePhoto(
+type LinePhotoProps = {
+  draft: DeliveryLineDraft;
+  disabled: boolean;
+  onChange: (draft: DeliveryLineDraft) => void;
+  onError: (message: string) => void;
+};
+
+function LinePhotoButton({ draft, disabled, onChange, onError }: LinePhotoProps) {
+  const shot = useLinePhotoCamera();
+  const [uploading, setUploading] = useState(false);
+  const save = (file: File) => saveLinePhoto(file, draft, onChange, onError, setUploading);
+  return (
+    <>
+      <Button
+        type="button"
+        disabled={disabled || uploading}
+        variant="outlined"
+        startIcon={uploading ? <CircularProgress size={18} /> : <PhotoCameraIcon />}
+        onClick={shot.launch}
+        fullWidth
+        sx={{ minHeight: 52, borderRadius: "14px", fontWeight: 700 }}
+      >
+        {draft.photo_url ? he.deliveryNotePhotoAttached : he.deliveryNoteLinePhoto}
+      </Button>
+      {shot.nativeError ? (
+        <Typography variant="caption" color="warning.main">
+          {captureErrorMessage(shot.nativeError)}
+        </Typography>
+      ) : null}
+      <PhotoCaptureDialog
+        open={shot.open}
+        uploading={uploading}
+        camera={shot.camera}
+        seedBlob={shot.seed}
+        preparing={shot.preparing}
+        annotate={false}
+        onClose={shot.close}
+        onCapture={save}
+      />
+    </>
+  );
+}
+
+function useLinePhotoCamera() {
+  const camera = useCameraStream({ defaultFacing: "environment" });
+  const [open, setOpen] = useState(false);
+  const [seed, setSeed] = useState<Blob | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [nativeError, setNativeError] = useState("");
+  const openWeb = useCallback(() => {
+    setSeed(null);
+    setPreparing(false);
+    setOpen(true);
+    scheduleAfterDialogPaint(() => void camera.start());
+  }, [camera.start]);
+  const launch = useCallback(() => {
+    setNativeError("");
+    void launchPhotoCapture({
+      openWeb,
+      onNative: (file) => showNativeShot(file, setOpen, setPreparing, setSeed),
+      onPermissionDenied: () => setNativeError("permission"),
+    });
+  }, [openWeb]);
+  const close = useCallback(() => {
+    setOpen(false);
+    setSeed(null);
+    setPreparing(false);
+    camera.stop();
+  }, [camera.stop]);
+  return { camera, open, seed, preparing, nativeError, launch, close };
+}
+
+async function showNativeShot(
+  file: File,
+  setOpen: (open: boolean) => void,
+  setPreparing: (preparing: boolean) => void,
+  setSeed: (seed: Blob | null) => void,
+) {
+  setPreparing(true);
+  setOpen(true);
+  try {
+    setSeed(await normalizePhotoOrientation(file));
+  } finally {
+    setPreparing(false);
+  }
+}
+
+function LineAudioButton({ draft, disabled, onChange, onError }: LinePhotoProps) {
+  const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const src = mediaUrl(draft.audio_url);
+  const save = (file: File) => saveLineAudio(file, draft, onChange, onError, setUploading);
+  return (
+    <Box flex={1} display="flex" flexDirection="column" gap={1}>
+      {src ? <CompactAudioPlayer src={src} /> : null}
+      <Button
+        type="button"
+        disabled={disabled || uploading}
+        variant="outlined"
+        fullWidth
+        startIcon={uploading ? <CircularProgress size={18} /> : <MicIcon />}
+        onClick={() => setOpen(true)}
+        sx={{ minHeight: 52, borderRadius: "14px", fontWeight: 700 }}
+      >
+        {draft.audio_url ? he.deliveryNoteAudioAttached : he.deliveryNoteLineAudio}
+      </Button>
+      <AudioCaptureDialog open={open} uploading={uploading} onClose={() => setOpen(false)} onCapture={save} />
+    </Box>
+  );
+}
+
+async function saveLineAudio(
   file: File,
   draft: DeliveryLineDraft,
   onChange: (draft: DeliveryLineDraft) => void,
   onError: (message: string) => void,
+  setUploading: (uploading: boolean) => void,
 ) {
+  setUploading(true);
+  try {
+    const uploaded = await taskService.uploadAudio(file);
+    onChange({ ...draft, audio_url: uploaded.url });
+  } catch {
+    onError(he.errorGeneric);
+  } finally {
+    setUploading(false);
+  }
+}
+
+async function saveLinePhoto(
+  file: File,
+  draft: DeliveryLineDraft,
+  onChange: (draft: DeliveryLineDraft) => void,
+  onError: (message: string) => void,
+  setUploading: (uploading: boolean) => void,
+) {
+  setUploading(true);
   try {
     const uploaded = await taskService.uploadPhoto(file);
     onChange({ ...draft, photo_url: uploaded.url });
   } catch {
     onError(he.errorGeneric);
+  } finally {
+    setUploading(false);
   }
 }

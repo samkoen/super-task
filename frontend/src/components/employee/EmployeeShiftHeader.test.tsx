@@ -92,6 +92,24 @@ describe("EmployeeShiftHeader", () => {
     expect(meta.compareDocumentPosition(breakBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("keeps the shift status and hides the break button before clock-in", () => {
+    render(
+      <EmployeeShiftHeader
+        hero
+        name="דני כהן"
+        onShift={false}
+        progress={0}
+        completedCount={0}
+        totalCount={4}
+        qualityRating={{ average: 4, count: 2, by_category: [] }}
+        onToggleBreak={vi.fn()}
+        showBreak={false}
+      />,
+    );
+    expect(screen.getByText(he.employeeOffShift)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.employeeBreakStart })).toBeNull();
+  });
+
   it("hides break controls when the header is identity-only", () => {
     render(
       <EmployeeShiftHeader

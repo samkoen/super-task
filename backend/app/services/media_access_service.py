@@ -86,6 +86,7 @@ def _url_exists(db: Session, url: str) -> bool:
         or db.execute(
             select(orm.User.id).where(orm.User.avatar_url == url).limit(1)
         ).first()
+        or _delivery_answer_media_exists(db, url)
     )
 
 
@@ -139,9 +140,34 @@ def _url_exists_in_branches(
         ).first()
         or _direct_url_in_scope(db, url, uuids, network_id)
         or _avatar_url_in_branches(db, url, uuids)
+        or _delivery_answer_media_exists(db, url, uuids)
     ):
         return True
     return False
+
+
+def _delivery_answer_media_match(url: str):
+    return or_(
+        orm.DeliveryLineAnswer.photo_url == url,
+        orm.DeliveryLineAnswer.audio_url == url,
+    )
+
+
+def _delivery_answer_media_exists(db: Session, url: str, branch_uuids: list | None = None) -> bool:
+    query = select(orm.DeliveryLineAnswer.id).where(_delivery_answer_media_match(url))
+    if branch_uuids is not None:
+        query = (
+            query.join(
+                orm.DeliveryNoteOpening,
+                orm.DeliveryNoteOpening.id == orm.DeliveryLineAnswer.opening_id,
+            )
+            .join(
+                orm.TaskOccurrence,
+                orm.TaskOccurrence.id == orm.DeliveryNoteOpening.occurrence_id,
+            )
+            .where(orm.TaskOccurrence.branch_id.in_(branch_uuids))
+        )
+    return bool(db.execute(query.limit(1)).first())
 
 
 def _system_bug_media_allowed(db: Session, actor: ActorContext, url: str) -> bool:

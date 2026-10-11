@@ -591,7 +591,7 @@ def test_any_branch_manager_can_reopen_closed_approved_task():
     occurrence_repo, completion_repo, actor = _closed_reopen_setup()
     result = _service(occurrence_repo, completion_repo).reopen_closed_occurrence(actor, "occ-1")
     occurrence_repo.reopen_after_review.assert_called_once_with("occ-1")
-    completion_repo.clear_approved_review.assert_called_once_with("occ-1")
+    completion_repo.clear_approved_review.assert_called_once_with("occ-1", rejection_note=None)
     occurrence_repo.set_media_purge_after.assert_called_once_with("occ-1", None)
     assert result["status"] == task_status.IN_PROGRESS
     assert result["id"] == "occ-1"

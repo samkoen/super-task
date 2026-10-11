@@ -151,11 +151,17 @@ def test_problem_line_requires_a_note_and_keeps_the_photo():
     with pytest.raises(ValueError, match="הערה"):
         validate_line_answer({"arrival": "problem"}, expected_qty=12)
     answer = validate_line_answer(
-        {"arrival": "problem", "note": "רקוב", "photo_url": "https://files/a.jpg"},
+        {
+            "arrival": "problem",
+            "note": "רקוב",
+            "photo_url": "https://files/a.jpg",
+            "audio_url": "https://files/a.webm",
+        },
         expected_qty=12,
     )
     assert answer["note"] == "רקוב"
     assert answer["photo_url"] == "https://files/a.jpg"
+    assert answer["audio_url"] == "https://files/a.webm"
     assert answer["fully_ok"] is False
 
 

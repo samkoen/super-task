@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import StaffProgressOverview from "./StaffProgressOverview";
 import { FeedbackProvider } from "../../context/FeedbackContext";
@@ -64,6 +64,16 @@ describe("StaffProgressOverview", () => {
     fireEvent.click(screen.getByText(/יוסי כהן/));
     expect(screen.getByText("ניקוי מדף")).toBeTruthy();
     expect(screen.getByText("סידור")).toBeTruthy();
+  });
+
+  it("opens a completed task from the employee list", () => {
+    const onOpenTask = vi.fn();
+    renderWithFeedback(<StaffProgressOverview team={[member]} onOpenTask={onOpenTask} />);
+    fireEvent.click(screen.getByText(/יוסי כהן/));
+    fireEvent.click(screen.getByText("סידור"));
+    expect(onOpenTask).toHaveBeenCalledWith(expect.objectContaining({ id: "t2", status: "completed" }));
+    fireEvent.click(screen.getByText("ניקוי מדף"));
+    expect(onOpenTask).toHaveBeenCalledTimes(1);
   });
 
   it("shows empty hint when no employees", () => {

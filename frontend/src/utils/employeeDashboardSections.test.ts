@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   collectUniqueTasks,
   employeeDisplayStatus,
+  employeeDonePercent,
+  employeeDoneToday,
   isDynamicEmployeeTask,
   mergeEmployeeFinishedTasks,
   shouldHighlightEmployeeTask,
@@ -26,6 +28,13 @@ describe("employeeDashboardSections", () => {
     expect(employeeDisplayStatus("completed")).toBe("completed");
     expect(employeeDisplayStatus("overdue")).toBe("overdue");
     expect(employeeDisplayStatus("in_progress")).toBe("in_progress");
+  });
+
+  it("counts a submitted task before the menahel approves it", () => {
+    expect(employeeDoneToday(0, 1)).toBe(1);
+    expect(employeeDoneToday(2, 1)).toBe(3);
+    expect(employeeDonePercent(1, 4)).toBe(25);
+    expect(employeeDonePercent(0, 0)).toBe(100);
   });
 
   it("treats only ad-hoc as the photo-tile list", () => {

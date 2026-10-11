@@ -15,32 +15,77 @@ export default function ExtraCompletionMedia({
   onChange,
   disabled = false,
   onAnnotatingChange,
+  hideTitle = false,
+  hideActions = false,
 }: {
   extras: ExtraSlot[];
   onChange: (next: ExtraSlot[]) => void;
   disabled?: boolean;
   onAnnotatingChange?: (busy: boolean) => void;
+  hideTitle?: boolean;
+  hideActions?: boolean;
 }) {
   const canAdd = canAddExtraMedia(extras);
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <Typography sx={{ fontSize: "1.05rem", fontWeight: 800 }}>{he.extraCompletionTitle}</Typography>
+      {hideTitle ? null : (
+        <Typography sx={{ fontSize: "1.05rem", fontWeight: 800 }}>{he.extraCompletionTitle}</Typography>
+      )}
       <Typography variant="caption" color="text.secondary">
         {canAdd ? he.extraCompletionHint : he.extraCompletionLimit}
       </Typography>
-      <MediaCaptureActions
-        prominent
-        quiet
-        photoAdded={false}
-        videoAdded={false}
-        audioAdded={false}
-        uploadingKind={null}
-        disabled={disabled || !canAdd}
-        onAnnotatingChange={onAnnotatingChange}
-        onCapture={(file, kind, meta) =>
-          onChange(appendExtraMedia(extras, kind, file, meta?.durationSeconds))
-        }
-      />
+      {hideActions ? null : (
+        <ExtraCaptureActions
+          extras={extras}
+          disabled={disabled || !canAdd}
+          onChange={onChange}
+          onAnnotatingChange={onAnnotatingChange}
+        />
+      )}
+      <ExtraMediaList extras={extras} disabled={disabled} onChange={onChange} />
+    </Box>
+  );
+}
+
+function ExtraCaptureActions({
+  extras,
+  disabled,
+  onChange,
+  onAnnotatingChange,
+}: {
+  extras: ExtraSlot[];
+  disabled: boolean;
+  onChange: (next: ExtraSlot[]) => void;
+  onAnnotatingChange?: (busy: boolean) => void;
+}) {
+  return (
+    <MediaCaptureActions
+      prominent
+      quiet
+      photoAdded={false}
+      videoAdded={false}
+      audioAdded={false}
+      uploadingKind={null}
+      disabled={disabled}
+      onAnnotatingChange={onAnnotatingChange}
+      onCapture={(file, kind, meta) =>
+        onChange(appendExtraMedia(extras, kind, file, meta?.durationSeconds))
+      }
+    />
+  );
+}
+
+function ExtraMediaList({
+  extras,
+  disabled,
+  onChange,
+}: {
+  extras: ExtraSlot[];
+  disabled: boolean;
+  onChange: (next: ExtraSlot[]) => void;
+}) {
+  return (
+    <>
       {extras.map((item, index) => (
         <ExtraMediaRow
           key={`${item.kind}-${item.media.previewUrl || item.media.keptUrl}-${index}`}
@@ -49,7 +94,7 @@ export default function ExtraCompletionMedia({
           onRemove={() => onChange(removeExtraMedia(extras, index))}
         />
       ))}
-    </Box>
+    </>
   );
 }
 

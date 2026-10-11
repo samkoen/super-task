@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   excludeAttendancePunch,
   findOpenPunchTask,
+  hasOpenWorkTasks,
   isPunchDue,
   shouldShowEndDoor,
 } from "./punchDoor";
@@ -48,30 +49,27 @@ describe("punchDoor", () => {
     expect(isPunchDue("2026-09-02T17:01:00+03:00", now)).toBe(false);
   });
 
-  it("opens the end door at due time unless a task dialog is open", () => {
+  it("opens the end door once work is done, even before the scheduled time", () => {
     const end = punch("e", { is_work_end: true });
-    expect(
-      shouldShowEndDoor({ startOpen: false, end, inTask: false, due: true, requested: false, dismissed: false }),
-    ).toBe(true);
-    expect(
-      shouldShowEndDoor({ startOpen: false, end, inTask: true, due: true, requested: false, dismissed: false }),
-    ).toBe(false);
+    const done = { startOpen: false, end, inTask: false, hasOpenWork: false };
+    expect(shouldShowEndDoor(done)).toBe(true);
+    expect(shouldShowEndDoor({ ...done, inTask: true })).toBe(false);
   });
 
-  it("lets the oved open the end door early and hide it again", () => {
+  it("keeps the work list when other tasks are still open", () => {
     const end = punch("e", { is_work_end: true });
+    const shelf = punch("t");
+    expect(hasOpenWorkTasks([end, shelf])).toBe(true);
+    expect(hasOpenWorkTasks([end, punch("done", { status: "completed" })])).toBe(false);
     expect(
-      shouldShowEndDoor({ startOpen: false, end, inTask: false, due: false, requested: true, dismissed: false }),
-    ).toBe(true);
-    expect(
-      shouldShowEndDoor({ startOpen: false, end, inTask: false, due: true, requested: false, dismissed: true }),
+      shouldShowEndDoor({ startOpen: false, end, inTask: false, hasOpenWork: true }),
     ).toBe(false);
   });
 
   it("keeps the start door exclusive", () => {
     const end = punch("e", { is_work_end: true });
     expect(
-      shouldShowEndDoor({ startOpen: true, end, inTask: false, due: true, requested: true, dismissed: false }),
+      shouldShowEndDoor({ startOpen: true, end, inTask: false, hasOpenWork: false }),
     ).toBe(false);
   });
 });

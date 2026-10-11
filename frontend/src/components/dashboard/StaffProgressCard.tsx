@@ -17,6 +17,7 @@ import type { TeamMember, TimelineTask } from "../../services/dashboardService";
 import { taskService } from "../../services/taskService";
 import { useFeedback } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
+import { dashboardTaskUsesReview } from "../../utils/dashboardTaskOpen";
 import { formatDueAt } from "../../utils/dateView";
 import { isManagerNextTask } from "../../utils/employeeTaskFocus";
 import {
@@ -31,6 +32,7 @@ import EmployeeQualityRating from "../employee/EmployeeQualityRating";
 interface StaffProgressCardProps {
   member: TeamMember;
   onChanged?: () => void;
+  onOpenTask?: (task: TimelineTask) => void;
 }
 
 function jobLabel(jobFunction: string | null): string | null {
@@ -48,11 +50,13 @@ function TaskGroup({
   tasks,
   busyId,
   onToggleNext,
+  onOpen,
 }: {
   title: string;
   tasks: TimelineTask[];
   busyId: string | null;
   onToggleNext: (task: TimelineTask, enabled: boolean) => void;
+  onOpen?: (task: TimelineTask) => void;
 }) {
   if (tasks.length === 0) return null;
   return (
@@ -63,11 +67,13 @@ function TaskGroup({
       <List dense disablePadding>
         {tasks.map((task) => {
           const isNext = isManagerNextTask(task);
+          const opensResult = Boolean(onOpen) && dashboardTaskUsesReview(task.status);
           return (
             <ListItem
               key={task.id}
               disableGutters
-              sx={{ py: 0.25, alignItems: "flex-start", gap: 0.5 }}
+              onClick={opensResult ? () => onOpen?.(task) : undefined}
+              sx={{ py: 0.25, alignItems: "flex-start", gap: 0.5, cursor: opensResult ? "pointer" : undefined }}
               secondaryAction={
                 canMarkNext(task) ? (
                   <FormControlLabel
@@ -118,7 +124,7 @@ function TaskGroup({
   );
 }
 
-export default function StaffProgressCard({ member, onChanged }: StaffProgressCardProps) {
+export default function StaffProgressCard({ member, onChanged, onOpenTask }: StaffProgressCardProps) {
   const { showError, showSuccess } = useFeedback();
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -246,18 +252,21 @@ export default function StaffProgressCard({ member, onChanged }: StaffProgressCa
                 tasks={groups.inProgress}
                 busyId={busyId}
                 onToggleNext={handleToggleNext}
+                onOpen={onOpenTask}
               />
               <TaskGroup
                 title={he.dashboardStaffGroupCompleted}
                 tasks={groups.completed}
                 busyId={busyId}
                 onToggleNext={handleToggleNext}
+                onOpen={onOpenTask}
               />
               <TaskGroup
                 title={he.dashboardStaffGroupWaiting}
                 tasks={groups.waiting}
                 busyId={busyId}
                 onToggleNext={handleToggleNext}
+                onOpen={onOpenTask}
               />
             </Box>
           )}

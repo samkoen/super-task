@@ -28,6 +28,8 @@ interface EmployeeShiftHeaderProps {
   breakBusy?: boolean;
   progress?: number | null;
   onToggleBreak?: () => void;
+  /** Faux pendant פתיחה : le statut reste, pas le bouton הפסקה. */
+  showBreak?: boolean;
   extra?: ReactNode;
   qualityRating?: QualityRatingSummary | null;
   /** Carte d'accueil colorée (écran oved) au lieu de l'en-tête sobre. */
@@ -149,7 +151,7 @@ function ShiftIdentity({ name, meta, slogan, hero, greeting, ...avatar }: Identi
 
 type PresenceProps = Pick<
   EmployeeShiftHeaderProps,
-  "onShift" | "onBreak" | "breakBusy" | "onToggleBreak" | "hero"
+  "onShift" | "onBreak" | "breakBusy" | "onToggleBreak" | "hero" | "showBreak"
 >;
 
 function StatusPill({ onBreak, onShift, hero }: Pick<PresenceProps, "onBreak" | "onShift" | "hero">) {
@@ -199,7 +201,7 @@ function breakButtonSx(hero: boolean | undefined, onBreak: boolean | undefined) 
   };
 }
 
-function ShiftPresence({ onShift, onBreak, breakBusy, onToggleBreak, hero }: PresenceProps) {
+function ShiftPresence({ onShift, onBreak, breakBusy, onToggleBreak, hero, showBreak = true }: PresenceProps) {
   const breakLabel = onBreak ? he.employeeBreakEnd : he.employeeBreakStart;
   return (
     <Box
@@ -211,16 +213,18 @@ function ShiftPresence({ onShift, onBreak, breakBusy, onToggleBreak, hero }: Pre
       width={{ xs: "100%", sm: "auto" }}
     >
       <StatusPill onBreak={onBreak} onShift={onShift} hero={hero} />
-      <Button
-        variant={hero || onBreak ? "contained" : "outlined"}
-        color={onBreak ? "warning" : "primary"}
-        disabled={breakBusy}
-        onClick={onToggleBreak}
-        startIcon={<FreeBreakfastIcon />}
-        sx={breakButtonSx(hero, onBreak)}
-      >
-        {breakLabel}
-      </Button>
+      {showBreak ? (
+        <Button
+          variant={hero || onBreak ? "contained" : "outlined"}
+          color={onBreak ? "warning" : "primary"}
+          disabled={breakBusy}
+          onClick={onToggleBreak}
+          startIcon={<FreeBreakfastIcon />}
+          sx={breakButtonSx(hero, onBreak)}
+        >
+          {breakLabel}
+        </Button>
+      ) : null}
     </Box>
   );
 }
@@ -327,6 +331,7 @@ export default function EmployeeShiftHeader(props: EmployeeShiftHeaderProps) {
               breakBusy={props.breakBusy ?? false}
               onToggleBreak={onToggleBreak}
               hero={hero}
+              showBreak={props.showBreak}
             />
           ) : (
             extra

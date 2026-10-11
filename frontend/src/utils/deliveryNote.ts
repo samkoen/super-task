@@ -9,6 +9,7 @@ export type DeliveryLineDraft = {
   arrival: DeliveryLineStatus | "";
   note: string;
   photo_url: string;
+  audio_url: string;
 };
 
 export type DeliveryLineView = {
@@ -25,6 +26,7 @@ export type DeliveryLineView = {
     arrival?: DeliveryLineStatus | null;
     note?: string | null;
     photo_url?: string | null;
+    audio_url?: string | null;
     fully_ok?: boolean;
   } | null;
 };
@@ -44,7 +46,7 @@ export type DeliveryCheck = {
 const STATUSES = new Set<DeliveryLineStatus>(["ok", "problem"]);
 
 export function emptyLineDraft(): DeliveryLineDraft {
-  return { arrival: "", note: "", photo_url: "" };
+  return { arrival: "", note: "", photo_url: "", audio_url: "" };
 }
 
 export function draftFromLine(line: DeliveryLineView): DeliveryLineDraft {
@@ -54,6 +56,7 @@ export function draftFromLine(line: DeliveryLineView): DeliveryLineDraft {
     arrival: answer.arrival,
     note: answer.note ?? "",
     photo_url: answer.photo_url ?? "",
+    audio_url: answer.audio_url ?? "",
   };
 }
 
@@ -127,5 +130,6 @@ export function draftToPayload(lineId: string, draft: DeliveryLineDraft) {
     arrival: problem ? "problem" : "ok",
     note: problem ? draft.note.trim() || null : null,
     photo_url: problem ? draft.photo_url || null : null,
+    audio_url: problem ? draft.audio_url || null : null,
   };
 }

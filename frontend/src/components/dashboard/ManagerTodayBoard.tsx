@@ -74,6 +74,7 @@ export default function ManagerTodayBoard({
           analysisExtra={analysisExtra}
           onToggleAnalysis={onToggleAnalysis}
           onOpenTask={onOpenTask}
+          onReviewTask={onReviewTask}
           onChanged={onChanged}
         />
       ) : null}

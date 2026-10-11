@@ -289,6 +289,7 @@ def _answer_dict(row: orm.DeliveryLineAnswer) -> dict:
         "rejected_qty": row.rejected_qty,
         "note": row.note,
         "photo_url": row.photo_url,
+        "audio_url": row.audio_url,
     }
 
 
@@ -299,3 +300,4 @@ def _copy_answer(row: orm.DeliveryLineAnswer, answer: dict) -> None:
     row.rejected_qty = answer["rejected_qty"]
     row.note = answer["note"]
     row.photo_url = answer["photo_url"]
+    row.audio_url = answer.get("audio_url")

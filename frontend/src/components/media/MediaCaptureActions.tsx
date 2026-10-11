@@ -7,16 +7,12 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  IconButton,
-  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
-import VideocamIcon from "@mui/icons-material/Videocam";
-import MicIcon from "@mui/icons-material/Mic";
 import { useCameraStream } from "../../hooks/useCameraStream";
 import { useVideoRecorder } from "../../hooks/useVideoRecorder";
 import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "./PhotoAnnotationCanvas";
@@ -35,6 +31,7 @@ import { canUseNativeVideoRecorder } from "../../plugins/nativeVideoRecorder";
 import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
 import CaptureActionButtons from "./CaptureActionButtons";
+import CaptureIconToolbar from "./CaptureIconToolbar";
 import AppDialogTitle from "../ui/AppDialogTitle";
 import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
 import { employeePrimaryButtonSx } from "../../styles/employeeUi";
@@ -48,8 +45,8 @@ interface MediaCaptureActionsProps {
   audioAdded: boolean;
   uploadingKind: MediaKind | null;
   disabled?: boolean;
-  /** Boutons texte (défaut) ou petites icônes discrètes (chat). */
-  density?: "default" | "icon";
+  /** Boutons texte (défaut), petites icônes (chat) ou barre d'icônes oved. */
+  density?: "default" | "icon" | "toolbar";
   minVideoSeconds?: number | null;
   allowedKinds?: MediaKind[];
   photoLabel?: string;
@@ -455,72 +452,27 @@ export default function MediaCaptureActions({
     videoRecorder.cleanup();
   }, [videoRecorder.cleanup]);
 
-  const iconActions = (
-    <Box display="flex" alignItems="center" gap={0.25} sx={{ opacity: 0.75 }}>
-      {showAudio && (
-      <Tooltip title={audioAdded ? he.audioAdded : he.addAudio}>
-        <span>
-          <IconButton
-            size="small"
-            aria-label={he.addAudio}
-            color={audioAdded ? "primary" : "default"}
-            onClick={() => (onAudioStart ? onAudioStart() : setAudioOpen(true))}
-            disabled={captureDisabled}
-            sx={{ p: 0.5 }}
-          >
-            {uploadingKind === "audio" ? (
-              <CircularProgress size={16} />
-            ) : (
-              <MicIcon sx={{ fontSize: 18 }} />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
-      )}
-      {showPhoto && (
-      <Tooltip title={photoAdded ? he.photoAdded : he.addPhoto}>
-        <span>
-          <IconButton
-            size="small"
-            aria-label={he.addPhoto}
-            color={photoAdded ? "primary" : "default"}
-            onClick={openPhotoCapture}
-            disabled={photoDisabled}
-            sx={{ p: 0.5 }}
-          >
-            {uploadingKind === "photo" ? (
-              <CircularProgress size={16} />
-            ) : (
-              <PhotoCameraIcon sx={{ fontSize: 18 }} />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
-      )}
-      {showVideo && (
-      <Tooltip title={videoAdded ? videoDoneLabel ?? he.videoAdded : videoLabel ?? he.addVideo}>
-        <span>
-          <IconButton
-            size="small"
-            aria-label={videoAdded ? videoDoneLabel ?? he.videoAdded : videoLabel ?? he.addVideo}
-            color={videoAdded ? "primary" : "default"}
-            onClick={openVideoCapture}
-            disabled={videoDisabled}
-            sx={{ p: 0.5 }}
-          >
-            {uploadingKind === "video" ? (
-              <CircularProgress size={16} />
-            ) : (
-              <VideocamIcon sx={{ fontSize: 18 }} />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
-      )}
-    </Box>
-  );
-
   const openAudio = () => (onAudioStart ? onAudioStart() : setAudioOpen(true));
+  const iconActions = (
+    <CaptureIconToolbar
+      toolbar={density === "toolbar"}
+      showAudio={showAudio}
+      showPhoto={showPhoto}
+      showVideo={showVideo}
+      audioAdded={audioAdded}
+      photoAdded={photoAdded}
+      videoAdded={videoAdded}
+      uploadingKind={uploadingKind}
+      captureDisabled={captureDisabled}
+      photoDisabled={photoDisabled}
+      videoDisabled={videoDisabled}
+      videoLabel={videoLabel}
+      videoDoneLabel={videoDoneLabel}
+      onAudio={openAudio}
+      onPhoto={openPhotoCapture}
+      onVideo={openVideoCapture}
+    />
+  );
   const defaultActions = (
     <CaptureActionButtons
       uploadingKind={uploadingKind}
@@ -555,7 +507,7 @@ export default function MediaCaptureActions({
 
   return (
     <>
-      {density === "icon" ? iconActions : defaultActions}
+      {density === "default" ? defaultActions : iconActions}
       {!captureSupported && !nativeVideo && !nativePhoto && (
         <Typography variant="caption" color="warning.main">
           {he.mediaCaptureUnsupported}
