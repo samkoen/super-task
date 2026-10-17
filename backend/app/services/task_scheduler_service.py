@@ -5,6 +5,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from app.domain import task_recurrence, task_status
+from app.domain.delivery_note import opened_by_teuda
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
@@ -43,7 +44,10 @@ class TaskSchedulerService:
         }
 
     def generate_from_template(self, template, *, on_date: date):
-        if getattr(template, "opened_by_delivery_note", False):
+        if opened_by_teuda(
+            getattr(template, "opened_by_delivery_note", False),
+            getattr(template, "delivery_note_task_type", None),
+        ):
             return None
         anchor = None
         if template.biweekly_anchor:

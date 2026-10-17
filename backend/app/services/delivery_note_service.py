@@ -5,9 +5,12 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from app.domain import roles
+from app.domain.agroline_order import current_readings, next_reading, visible_orders
 from app.domain.delivery_note import (
     group_mishloah,
+    is_order_read,
     normalize_document,
+    opened_by_teuda,
     TASK_TYPE_LINE_CHECK,
     occurrence_title,
     public_check,
@@ -32,6 +35,35 @@ _TZ = ZoneInfo("Asia/Jerusalem")
 
 def _israel_today() -> str:
     return datetime.now(_TZ).date().isoformat()
+
+
+def _day_of(due_at: object) -> date:
+    raw = datetime.fromisoformat(str(due_at))
+    if raw.tzinfo is None:
+        raw = raw.replace(tzinfo=_TZ)
+    return raw.astimezone(_TZ).date()
+
+
+def _order_payload(document: dict, day: str) -> dict:
+    payload = {key: value for key, value in document.items() if key != "pdf_bytes"}
+    payload["document_date"] = day
+    return payload
+
+
+def _kept_pdf(document: dict, url: str | None, store_pdf) -> str | None:
+    pdf = document.get("pdf_bytes")
+    if pdf and store_pdf:
+        return store_pdf(pdf)
+    return url
+
+
+def _public_order(item: dict) -> dict:
+    return {
+        "agroline_number": item["agroline_number"],
+        "customer_name": item["customer_name"],
+        "document_date": item["document_date"],
+        "pdf_url": item.get("pdf_url"),
+    }
 
 
 def _account_view(row: dict, *, configured: bool) -> dict:
@@ -59,11 +91,13 @@ class DeliveryNoteService:
         templates: TaskTemplateRepository,
         occurrences: TaskOccurrenceRepository,
         accounts: AgrolineAccountRepository | None = None,
+        orders=None,
     ):
         self._notes = notes
         self._templates = templates
         self._occurrences = occurrences
         self._accounts = accounts
+        self._orders = orders
 
     def link_customer(self, actor: ActorContext, customer_name: str, branch_id: str) -> dict:
         self._assert_manager(actor)
@@ -87,9 +121,9 @@ class DeliveryNoteService:
         updated = self._templates.set_opened_by_delivery_note(template_id, opened, kind)
         if updated is None:
             raise ValueError("המשימה הקבועה לא נמצאה")
-        if updated.opened_by_delivery_note:
+        if opened_by_teuda(updated.opened_by_delivery_note, updated.delivery_note_task_type):
             self._occurrences.delete_without_delivery_note(updated.id)
-        opened_ids = self._open_branch_notes(updated) if updated.opened_by_delivery_note else []
+        opened_ids = self._open_for_mark(updated)
         return {
             "id": updated.id,
             "opened_by_delivery_note": updated.opened_by_delivery_note,
@@ -191,6 +225,23 @@ class DeliveryNoteService:
         self._assert_agroline_user(actor)
         return self._notes.list_inbox(document_date)
 
+    def orders_view(self, actor: ActorContext, occurrence_id: str) -> dict | None:
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if occurrence is None or not self._can_read_orders(actor, occurrence):
+            return None
+        return self._visible_orders(actor, occurrence)
+
+    def order_day(self, actor: ActorContext, occurrence_id: str) -> date:
+        occurrence = self._order_occurrence(actor, occurrence_id)
+        return _day_of(occurrence.due_at)
+
+    def store_orders(self, actor: ActorContext, occurrence_id: str, documents: list, store_pdf=None) -> dict:
+        occurrence = self._order_occurrence(actor, occurrence_id)
+        day = _day_of(occurrence.due_at).isoformat()
+        for document in documents:
+            self._save_order(day, document, store_pdf)
+        return self._visible_orders(actor, occurrence)
+
     def check_for_occurrence(self, actor: ActorContext, occurrence_id: str) -> dict | None:
         occurrence = self._occurrences.find_by_id(occurrence_id)
         if occurrence is None:
@@ -243,7 +294,11 @@ class DeliveryNoteService:
             return []
         templates = self._templates.list_templates(branch_id=note["branch_id"], active_only=True)
         active = [
-            item.id for item in templates if item.opened_by_delivery_note and item.assignee_user_id
+            item.id
+            for item in templates
+            if item.opened_by_delivery_note
+            and item.assignee_user_id
+            and not is_order_read(item.delivery_note_task_type)
         ]
         pending = templates_to_open(active, self._notes.template_ids_for_note(note["id"]))
         by_id = {item.id: item for item in templates}
@@ -281,31 +336,83 @@ class DeliveryNoteService:
             opened.extend(self._open_models(note))
         return opened
 
+    def _open_for_mark(self, template) -> list[str]:
+        if not template.opened_by_delivery_note:
+            return []
+        if is_order_read(template.delivery_note_task_type):
+            return self._ensure_order_occurrence(template)
+        return self._open_branch_notes(template)
+
+    def _ensure_order_occurrence(self, template) -> list[str]:
+        if not template.assignee_user_id:
+            return []
+        today = date.fromisoformat(_israel_today())
+        if self._occurrences.exists_for_template_on_date(template.id, today):
+            return []
+        return [self._spawn(template, template.title, today)]
+
     def _open_one(self, note: dict, template) -> str:
-        due_at = task_recurrence.due_at_for_date(
+        occurrence_id = self._spawn(
+            template,
+            occurrence_title(template.title, note["agroline_number"]),
             date.fromisoformat(note["document_date"]),
-            template.due_time,
         )
+        self._notes.link_opening(note["id"], template.id, occurrence_id, self._copied_type(template))
+        return occurrence_id
+
+    def _spawn(self, template, title: str, day: date) -> str:
         occurrence = self._occurrences.create(
             template_id=template.id,
             branch_id=template.branch_id,
-            title=occurrence_title(template.title, note["agroline_number"]),
+            title=title[:300],
             description=template.description,
-            due_at=due_at,
+            due_at=task_recurrence.due_at_for_date(day, template.due_time),
             assignee_user_id=template.assignee_user_id,
             department_id=template.department_id,
             task_kind=template.task_kind,
             photo_required=template.photo_required,
-            min_video_seconds=template.min_video_seconds,
-            completion_requirements=template.completion_requirements,
+            min_video_seconds=getattr(template, "min_video_seconds", None),
+            completion_requirements=getattr(template, "completion_requirements", None),
             created_by_id=template.created_by_id,
-            ops_category=template.ops_category,
+            ops_category=getattr(template, "ops_category", None),
         )
-        self._notes.link_opening(note["id"], template.id, occurrence.id, self._copied_type(template))
         return occurrence.id
 
     def _copied_type(self, template) -> str:
         return template.delivery_note_task_type or TASK_TYPE_LINE_CHECK
+
+    def _order_occurrence(self, actor: ActorContext, occurrence_id: str):
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if occurrence is None:
+            raise ValueError("המשימה לא נמצאה")
+        if not self._can_read_orders(actor, occurrence):
+            raise ValueError("סוג המשימה אינו קריאת הזמנות")
+        return occurrence
+
+    def _can_read_orders(self, actor: ActorContext, occurrence) -> bool:
+        self._assert_can_answer(actor, occurrence)
+        template = self._templates.find_by_id(occurrence.template_id)
+        return bool(template) and is_order_read(getattr(template, "delivery_note_task_type", None))
+
+    def _visible_orders(self, actor: ActorContext, occurrence) -> dict:
+        day = _day_of(occurrence.due_at).isoformat()
+        stored = current_readings(self._orders.list_on(day)) if self._orders else []
+        shown = visible_orders(
+            stored, sees_all=actor.role in _MANAGERS, branch_id=str(occurrence.branch_id)
+        )
+        return {"orders": [_public_order(item) for item in shown]}
+
+    def _save_order(self, day: str, document: dict, store_pdf) -> None:
+        if self._orders is None:
+            raise ValueError("שמירת ההזמנות אינה זמינה")
+        payload = _order_payload(document, day)
+        kind = next_reading(self._orders.versions(payload["agroline_number"]), payload)
+        if kind is None:
+            return
+        payload["pdf_url"] = _kept_pdf(document, payload.get("pdf_url"), store_pdf)
+        name = payload["customer_name"]
+        branch_id = self._branch_for_customer(name) if name else None
+        self._orders.save_reading(kind, branch_id, payload, datetime.now(_TZ))
 
     def _assert_line_check(self, opening: dict) -> None:
         if (opening.get("task_type") or TASK_TYPE_LINE_CHECK) != TASK_TYPE_LINE_CHECK:

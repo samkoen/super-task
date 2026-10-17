@@ -10,8 +10,14 @@ from sqlalchemy.orm import Session
 from app.auth.actor import load_actor
 from app.controllers.controller_helpers import handle_controller_errors
 from app.dependencies import get_db
-from app.integrations.agroline.client import AgrolineClient, AgrolineError, fetch_documents
+from app.integrations.agroline.client import (
+    AgrolineClient,
+    AgrolineError,
+    fetch_documents,
+    fetch_orders,
+)
 from app.repositories.agroline_account_repository import AgrolineAccountRepository
+from app.repositories.agroline_order_repository import AgrolineOrderRepository
 from app.repositories.delivery_note_repository import DeliveryNoteRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -28,6 +34,7 @@ def get_service(db: Session = Depends(get_db)) -> DeliveryNoteService:
         TaskTemplateRepository(db),
         TaskOccurrenceRepository(db),
         AgrolineAccountRepository(db),
+        AgrolineOrderRepository(db),
     )
 
 
@@ -151,6 +158,37 @@ def list_notes(
     return service.list_mishloah(actor, document_date=document_date, branch_id=branch_id)
 
 
+@router.get("/occurrences/{occurrence_id}/orders")
+@handle_controller_errors
+def list_order_pdfs(
+    occurrence_id: str,
+    request: Request,
+    service: DeliveryNoteService = Depends(get_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    view = service.orders_view(actor, occurrence_id)
+    if view is None:
+        return JSONResponse({"error": "אין הזמנות למשימה זו"}, status_code=404)
+    return view
+
+
+@router.post("/occurrences/{occurrence_id}/orders")
+@handle_controller_errors
+def read_order_pdfs(
+    occurrence_id: str,
+    request: Request,
+    service: DeliveryNoteService = Depends(get_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    day = service.order_day(actor, occurrence_id)
+    fetched, read_errors = _read_orders(service, day)
+    saved = service.store_orders(actor, occurrence_id, fetched, store_pdf=_store_order_pdf)
+    saved["errors"] = read_errors
+    return saved
+
+
 @router.get("/occurrences/{occurrence_id}")
 @handle_controller_errors
 def check_for_occurrence(
@@ -187,6 +225,34 @@ def _sync_day(value: object) -> date:
         return date.fromisoformat(text)
     except ValueError as exc:
         raise ValueError("תאריך לא תקין") from exc
+
+
+def _read_orders(service: DeliveryNoteService, day: date) -> tuple[list[dict], list[dict]]:
+    username, password, internal = service.credentials()
+    client = AgrolineClient()
+    try:
+        return _fetch_orders(client, username, password, internal, day)
+    finally:
+        client.close()
+
+
+def _fetch_orders(client, username, password, internal, day) -> tuple[list[dict], list[dict]]:
+    try:
+        return fetch_orders(
+            client,
+            username=username,
+            password=password,
+            internal=internal,
+            day=day,
+        )
+    except AgrolineError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _store_order_pdf(data: bytes) -> str | None:
+    return blob_storage.put_bytes(
+        folder="agroline_orders", data=data, ext=".pdf", content_type="application/pdf"
+    )
 
 
 def _read_agroline(service: DeliveryNoteService, day: date) -> tuple[list[dict], list[dict]]:

@@ -1,5 +1,5 @@
 import api from "./api";
-import type { DeliveryCheck, DeliveryOverall } from "../utils/deliveryNote";
+import type { AgrolineOrderPdf, DeliveryCheck, DeliveryOverall } from "../utils/deliveryNote";
 
 export type DeliveryAnswerPayload = {
   overall_status?: DeliveryOverall | null;
@@ -72,6 +72,21 @@ export const deliveryNoteService = {
       "/delivery-notes/links",
       { customer_name: customerName, branch_id: branchId },
     );
+    return response.data;
+  },
+
+  ordersForOccurrence: async (occurrenceId: string) => {
+    const response = await api.get<{ orders: AgrolineOrderPdf[] }>(
+      `/delivery-notes/occurrences/${occurrenceId}/orders`,
+    );
+    return response.data;
+  },
+
+  readOrders: async (occurrenceId: string) => {
+    const response = await api.post<{
+      orders: AgrolineOrderPdf[];
+      errors: Array<{ agroline_number: string; error: string }>;
+    }>(`/delivery-notes/occurrences/${occurrenceId}/orders`, {}, { timeout: 300_000 });
     return response.data;
   },
 

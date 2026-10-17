@@ -2,7 +2,7 @@ from datetime import date
 
 import httpx
 
-from app.integrations.agroline.client import AgrolineClient, AgrolineError, fetch_documents
+from app.integrations.agroline.client import AgrolineClient, AgrolineError, fetch_documents, fetch_orders
 from app.integrations.agroline.secret import decrypt_password, encrypt_password
 
 
@@ -54,6 +54,36 @@ def test_fetch_documents_reads_list_lines_and_pdf():
     assert documents[0]["document_date"] == "2026-10-02"
     assert documents[0]["pdf_url"] == "https://files/note.pdf"
     assert documents[0]["lines"][0]["product_name"] == "עגבניות"
+
+
+def test_fetch_orders_reads_the_list_and_the_pdf():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/auth"):
+            return httpx.Response(200, json={"token": "tok"})
+        if request.url.path.endswith("/order/orders_short"):
+            return httpx.Response(
+                200,
+                json=[{"OrderID": 831155, "Customer_Name": "שפע", "Delivery_Date": "20261012"}],
+            )
+        if request.url.path.endswith("/pdf"):
+            return httpx.Response(200, content=b"%PDF")
+        return httpx.Response(404)
+
+    client = AgrolineClient(base_url="https://agroline.test/v2", transport=httpx.MockTransport(handler))
+    documents, errors = fetch_orders(
+        client,
+        username="user",
+        password="secret",
+        internal=False,
+        day=date(2026, 10, 12),
+    )
+    client.close()
+    assert errors == []
+    assert documents[0]["agroline_number"] == "831155"
+    assert documents[0]["pdf_url"] is None
+    assert documents[0]["pdf_bytes"] == b"%PDF"
+    assert len(documents[0]["pdf_sha256"]) == 64
+    assert documents[0]["customer_name"] == "שפע"
 
 
 def test_login_reports_when_agroline_is_unreachable():

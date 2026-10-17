@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
 from app.db import mappers as mp
+from app.domain.delivery_note import TASK_TYPE_ORDER
 from app.models.task_template import TaskTemplate
 
 
@@ -63,7 +64,12 @@ class TaskTemplateRepository:
             .where(orm.TaskTemplate.is_active.is_(True))
             .where(orm.TaskTemplate.task_kind == "fixed")
             .where(orm.TaskTemplate.recurrence.in_(["daily", "weekly", "biweekly", "monthly"]))
-            .where(orm.TaskTemplate.opened_by_delivery_note.is_(False))
+            .where(
+                or_(
+                    orm.TaskTemplate.opened_by_delivery_note.is_(False),
+                    orm.TaskTemplate.delivery_note_task_type == TASK_TYPE_ORDER,
+                )
+            )
         )
         rows = self._db.execute(q).scalars().all()
         return [t for row in rows if (t := mp.task_template_orm_to_domain(row))]

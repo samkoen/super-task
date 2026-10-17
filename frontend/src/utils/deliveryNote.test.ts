@@ -21,7 +21,7 @@ function draft(partial: Partial<DeliveryLineDraft>): DeliveryLineDraft {
 
 describe("delivery note line", () => {
   it("offers the line check and the origin list as teuda task types", () => {
-    expect(DELIVERY_TASK_TYPES).toEqual(["line_check", "origin_list"]);
+    expect(DELIVERY_TASK_TYPES).toEqual(["line_check", "origin_list", "order_read"]);
   });
 
   it("keeps only products that have a country", () => {

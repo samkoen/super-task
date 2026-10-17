@@ -7,7 +7,7 @@ import { mediaUrl } from "../../utils/mediaUrl";
  * Ouvre le PDF d'une teuda. Le stockage est privé : l'adresse brute répond « Authorization »,
  * il faut passer par le proxy média de l'application (comme pour les photos).
  */
-export default function DeliveryPdfButton({ url }: { url?: string | null }) {
+export default function DeliveryPdfButton({ url, label }: { url?: string | null; label?: string }) {
   const href = mediaUrl(url);
   if (!href) return null;
   return (
@@ -20,7 +20,7 @@ export default function DeliveryPdfButton({ url }: { url?: string | null }) {
       startIcon={<PictureAsPdfOutlinedIcon />}
       sx={{ minHeight: 48, borderRadius: "14px", fontWeight: 700, flexShrink: 0 }}
     >
-      {he.deliveryNotePdf}
+      {label || he.deliveryNotePdf}
     </Button>
   );
 }

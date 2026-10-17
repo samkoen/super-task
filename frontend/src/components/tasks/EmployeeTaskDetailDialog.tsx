@@ -16,6 +16,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
 import DeliveryLineCheck from "./DeliveryLineCheck";
+import OrderRead from "./OrderRead";
 import TaskReferenceMediaDialog, { hasTaskReferenceMedia } from "./TaskReferenceMediaDialog";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import CompletionHintDialog from "./CompletionHintDialog";
@@ -150,6 +151,7 @@ export default function EmployeeTaskDetailDialog({
       >
         <TaskRejectionRemark completion={task.completion} />
         <DeliveryLineCheck occurrenceId={task.id} disabled={!canDoTask(task.status)} />
+        <OrderRead occurrenceId={task.id} disabled={!canDoTask(task.status)} />
         <StartUrlButton url={task.start_url} fullWidth />
         <TaskDetailMedia task={task} hints={hints} capture={liveCapture} onAsk={setQuestion} />
       </DialogContent>

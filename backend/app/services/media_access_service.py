@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 import app.db.models as orm
 from app.core.config import SYSTEM_BUG_INBOX_USER_IDS
 from app.db import mappers as mp
+from app.domain import roles
 from app.domain.scope import ActorContext
 from app.domain.system_bug import can_view_system_bug_inbox, parse_inbox_user_ids
 from app.domain.task_scope import visible_branch_ids_for_tasks
@@ -14,6 +15,8 @@ from app.repositories.branch_repository import BranchRepository
 
 
 DELIVERY_NOTE_FOLDER = "delivery_notes/"
+ORDER_FOLDER = "agroline_orders/"
+_ORDER_READERS = {roles.ADMIN, roles.NETWORK_MANAGER, roles.BRANCH_MANAGER}
 
 
 def actor_can_access_media_url(db: Session, actor: ActorContext, media_url: str) -> bool:
@@ -22,7 +25,26 @@ def actor_can_access_media_url(db: Session, actor: ActorContext, media_url: str)
         return False
     if _task_media_allowed(db, actor, url):
         return True
+    if _order_pdf_allowed(db, actor, url):
+        return True
     return _delivery_note_pdf_allowed(db, actor, url)
+
+
+def _order_pdf_allowed(db: Session, actor: ActorContext, url: str) -> bool:
+    """PDF d'הזמנה : le menahel voit tout, l'oved seulement le snif de la commande."""
+    if ORDER_FOLDER not in url:
+        return False
+    row = db.execute(
+        select(orm.AgrolineOrder.branch_id).where(orm.AgrolineOrder.pdf_url == url).limit(1)
+    ).first()
+    if row is None:
+        return False
+    if actor.role in _ORDER_READERS:
+        return True
+    if row[0] is None:
+        return False
+    visible = visible_branch_ids_for_tasks(actor, BranchRepository(db))
+    return visible is None or str(row[0]) in {str(branch) for branch in visible}
 
 
 def _delivery_note_pdf_allowed(db: Session, actor: ActorContext, url: str) -> bool:

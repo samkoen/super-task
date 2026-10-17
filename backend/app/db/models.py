@@ -804,6 +804,32 @@ class DeliveryLineAnswer(Base):
     audio_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
 
+class AgrolineOrder(Base):
+    """Une lecture d'הזמנה. Au plus deux lignes : la première, et la dernière si elle diffère."""
+
+    __tablename__ = "agroline_orders"
+    __table_args__ = (
+        UniqueConstraint("agroline_number", "reading_kind", name="uq_agroline_order_reading"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=_uuid
+    )
+    agroline_number: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    reading_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="first")
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("branches.id"), nullable=True, index=True
+    )
+    customer_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    document_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    pdf_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    pdf_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class AgrolineAccount(Base):
     """Identifiants Agroline. Le mot de passe est chiffré, jamais renvoyé."""
 

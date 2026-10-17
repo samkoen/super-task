@@ -216,8 +216,10 @@ def _open_saved_teudot(db: Session, actor, templates: list[dict], payload: dict,
         template_id = str(item.get("id") or "")
         if not template_id:
             continue
-        item.pop("_created_occurrence", None)
+        created = item.pop("_created_occurrence", None)
         saved = notes.mark_opened_by_delivery_note(actor, template_id, True, task_type)
+        if created and str(task_type or "") == "order_read":
+            _emit_task_event(db, "task_created", created)
         _emit_opened_occurrences(db, occurrences, saved.get("opened_occurrence_ids") or [])
 
 

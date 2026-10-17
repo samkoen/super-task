@@ -50,6 +50,24 @@ def test_generate_from_template_skips_delivery_note_model(monkeypatch):
     occurrence_repo.create.assert_not_called()
 
 
+def test_generate_from_template_keeps_the_order_task_on_the_calendar(monkeypatch):
+    template = _template(opened_by_delivery_note=True, delivery_note_task_type="order_read")
+    occurrence_repo = MagicMock()
+    occurrence_repo.exists_for_template_on_date.return_value = False
+    occurrence_repo.create.return_value = MagicMock()
+    scheduler = TaskSchedulerService(MagicMock(), occurrence_repo)
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.task_recurrence.should_generate_on_date",
+        lambda *args, **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "app.services.task_scheduler_service.blob_storage.copy_media_url",
+        lambda url, folder: None,
+    )
+    assert scheduler.generate_from_template(template, on_date=date(2026, 10, 12)) is not None
+    occurrence_repo.create.assert_called_once()
+
+
 def test_generate_from_template_copies_reference_media(monkeypatch):
     template = _template()
     occurrence_repo = MagicMock()

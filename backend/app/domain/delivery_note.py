@@ -18,7 +18,8 @@ OVERALLS = frozenset({OVERALL_ACCEPTED, OVERALL_PROBLEM})
 
 TASK_TYPE_LINE_CHECK = "line_check"
 TASK_TYPE_ORIGIN = "origin_list"
-TASK_TYPES = frozenset({TASK_TYPE_LINE_CHECK, TASK_TYPE_ORIGIN})
+TASK_TYPE_ORDER = "order_read"
+TASK_TYPES = frozenset({TASK_TYPE_LINE_CHECK, TASK_TYPE_ORIGIN, TASK_TYPE_ORDER})
 
 KIND_FRESH = "fresh"
 KIND_MIXED = "mixed"
@@ -165,6 +166,15 @@ def suggest_overall_status(rows: list[dict]) -> str:
     if all(row.get("fully_ok") for row in rows):
         return OVERALL_ACCEPTED
     return OVERALL_PROBLEM
+
+
+def is_order_read(task_type: object) -> bool:
+    return str(task_type or "").strip() == TASK_TYPE_ORDER
+
+
+def opened_by_teuda(opened: bool, task_type: object) -> bool:
+    """Une tâche הזמנות reste au calendrier. Les autres s'ouvrent avec la תעודה."""
+    return bool(opened) and not is_order_read(task_type)
 
 
 def task_type_for_model(opened: bool, raw: object) -> str | None:

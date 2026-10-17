@@ -1,12 +1,14 @@
 """Lecture des תעודות משלוח sur my.agroline.co.il."""
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 
 import httpx
 
 from app.core.config import AGROLINE_BASE_URL
 from app.domain.agroline_delivery import map_agroline_delivery
+from app.domain.agroline_order import map_agroline_order
 from app.domain.delivery_pdf import attach_pdf_origins
 
 
@@ -68,6 +70,26 @@ class AgrolineClient:
         _raise_for_status(response, body)
         return _as_list(body, ("details", "data", "pallets"))
 
+    def list_orders(self, token: str, day: date) -> list[dict]:
+        stamp = day.strftime("%Y%m%d")
+        try:
+            response = self._http.get(
+                "/order/orders_short",
+                params={"DateFrom": stamp, "DateTo": stamp},
+                headers=_headers(token),
+            )
+        except httpx.HTTPError as exc:
+            raise AgrolineError("לא ניתן להתחבר לאגרוליין") from exc
+        body = _json_or_empty(response)
+        _raise_for_status(response, body)
+        return _as_list(body, ("orders", "data"))
+
+    def order_pdf(self, token: str, number: object) -> bytes:
+        response = self._http.get(f"/order/{number}/pdf", headers=_headers(token))
+        if response.status_code >= 400:
+            raise AgrolineError("לא ניתן להוריד את ה-PDF")
+        return response.content
+
     def pdf(self, token: str, number: object, sub: object) -> bytes:
         response = self._http.get(
             f"/delivery/{number}/{sub or 0}/pdf",
@@ -97,6 +119,46 @@ def fetch_documents(
         if error:
             errors.append(error)
     return documents, errors
+
+
+def fetch_orders(
+    client: AgrolineClient,
+    *,
+    username: str,
+    password: str,
+    internal: bool,
+    day: date,
+) -> tuple[list[dict], list[dict]]:
+    token = client.login(username, password, internal)
+    documents: list[dict] = []
+    errors: list[dict] = []
+    for header in client.list_orders(token, day):
+        document, error = _one_order(client, token, header, day)
+        if document:
+            documents.append(document)
+        if error:
+            errors.append(error)
+    return documents, errors
+
+
+def _one_order(client, token, header, day) -> tuple[dict | None, dict | None]:
+    number = header.get("OrderID") or header.get("Order_Num")
+    try:
+        pdf = _order_pdf_bytes(client, token, number)
+        document = map_agroline_order(header, fallback_date=day.isoformat(), pdf_url=None)
+        document["pdf_sha256"] = hashlib.sha256(pdf).hexdigest() if pdf else None
+        document["pdf_bytes"] = pdf
+        return document, None
+    except (AgrolineError, ValueError, httpx.HTTPError) as exc:
+        message = str(exc) if isinstance(exc, (AgrolineError, ValueError)) else "לא ניתן לקרוא את ההזמנה מאגרוליין"
+        return None, {"agroline_number": str(number or ""), "error": message}
+
+
+def _order_pdf_bytes(client, token, number) -> bytes | None:
+    try:
+        return client.order_pdf(token, number)
+    except (AgrolineError, httpx.HTTPError):
+        return None
 
 
 def _one_document(client, token, header, day, store_pdf) -> tuple[dict | None, dict | None]:

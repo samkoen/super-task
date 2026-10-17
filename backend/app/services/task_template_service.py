@@ -15,7 +15,7 @@ from app.domain.network_fixed_task import (
 from app.domain.completion_media import packed_media_fields, parse_requirements_input
 from app.domain.ops_category import normalize_ops_category
 from app.domain.start_url import normalize_start_url
-from app.domain.delivery_note import task_type_for_model
+from app.domain.delivery_note import opened_by_teuda, task_type_for_model
 from app.domain.task_kind import FIXED
 from app.domain.work_start import normalize_work_flags
 from app.domain.scope import ActorContext
@@ -581,7 +581,10 @@ class TaskTemplateService:
         return updated
 
     def _open_today_unless_delivery(self, template, recurrence: str):
-        if getattr(template, "opened_by_delivery_note", False):
+        if opened_by_teuda(
+            getattr(template, "opened_by_delivery_note", False),
+            getattr(template, "delivery_note_task_type", None),
+        ):
             return None
         if recurrence not in task_recurrence.RECURRING:
             return None

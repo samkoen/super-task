@@ -1,6 +1,11 @@
 export const DELIVERY_TASK_LINE_CHECK = "line_check";
 export const DELIVERY_TASK_ORIGIN = "origin_list";
-export const DELIVERY_TASK_TYPES = [DELIVERY_TASK_LINE_CHECK, DELIVERY_TASK_ORIGIN] as const;
+export const DELIVERY_TASK_ORDER = "order_read";
+export const DELIVERY_TASK_TYPES = [
+  DELIVERY_TASK_LINE_CHECK,
+  DELIVERY_TASK_ORIGIN,
+  DELIVERY_TASK_ORDER,
+] as const;
 
 export type DeliveryLineStatus = "ok" | "problem";
 export type DeliveryOverall = "accepted" | "problem";
@@ -29,6 +34,13 @@ export type DeliveryLineView = {
     audio_url?: string | null;
     fully_ok?: boolean;
   } | null;
+};
+
+export type AgrolineOrderPdf = {
+  agroline_number: string;
+  customer_name: string;
+  document_date: string;
+  pdf_url?: string | null;
 };
 
 export type DeliveryCheck = {

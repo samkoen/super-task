@@ -181,6 +181,9 @@ class FakeOccurrences:
     def find_by_id(self, occurrence_id):
         return next((item for item in self.created if item.id == occurrence_id), None)
 
+    def exists_for_template_on_date(self, template_id, day):
+        return False
+
     def delete_without_delivery_note(self, template_id):
         removed = [item.id for item in self.created if getattr(item, "from_teuda", False) is False and item.template_id == template_id]
         self.created = [item for item in self.created if item.id not in removed]
@@ -529,3 +532,112 @@ def test_same_snif_name_opens_the_saved_teuda_for_its_oved():
     assert opened == ["occ-1"]
     assert occurrences.created[0].assignee_user_id == "oved-1"
     assert occurrences.created[0].branch_id == "snif-1"
+
+
+def test_order_task_stays_on_the_calendar_and_does_not_open_with_a_teuda():
+    template = _template("tpl-a")
+    template.opened_by_delivery_note = False
+    service, notes, occurrences = _service([template])
+    occurrences.created.append(SimpleNamespace(id="calendar", template_id="tpl-a", from_teuda=False))
+    service.mark_opened_by_delivery_note(_actor(), "tpl-a", True, "order_read")
+    assert any(item.id == "calendar" for item in occurrences.created)
+    service.ingest(_actor(), _document())
+    assert notes.openings == []
+
+
+def test_employee_sees_his_snif_orders_and_the_manager_sees_all():
+    template = _template("tpl-a")
+    template.delivery_note_task_type = "order_read"
+    service, _, occurrences = _service([template])
+    service._orders = _FakeOrders()
+    occurrences.created.append(_order_occurrence())
+    documents = [_order("1", "שפע כנסת יחזקאל"), _order("2", "לקוח בלי סניף")]
+    employee = _actor(role="employee", user_id="oved-1")
+    shown = service.store_orders(employee, "occ-order", documents)
+    assert [item["agroline_number"] for item in shown["orders"]] == ["1"]
+    everyone = service.store_orders(_actor(), "occ-order", documents)
+    assert {item["agroline_number"] for item in everyone["orders"]} == {"1", "2"}
+    assert service.orders_view(employee, "occ-order")["orders"][0]["pdf_url"] == "https://files/1.pdf"
+    with pytest.raises(PermissionError):
+        service.orders_view(_actor(role="employee", user_id="other"), "occ-order")
+
+
+def test_a_line_check_task_has_no_order_list():
+    template = _template("tpl-a")
+    template.delivery_note_task_type = "line_check"
+    service, _, occurrences = _service([template])
+    occurrences.created.append(_order_occurrence())
+    employee = _actor(role="employee", user_id="oved-1")
+    assert service.orders_view(employee, "occ-order") is None
+    with pytest.raises(ValueError, match="קריאת הזמנות"):
+        service.order_day(employee, "occ-order")
+
+
+def test_a_reread_keeps_two_versions_only_when_the_order_changes():
+    template = _template("tpl-a")
+    template.delivery_note_task_type = "order_read"
+    service, _, occurrences = _service([template])
+    orders = _FakeOrders()
+    service._orders = orders
+    occurrences.created.append(_order_occurrence())
+    employee = _actor(role="employee", user_id="oved-1")
+    service.store_orders(employee, "occ-order", [_order("1", "שפע כנסת יחזקאל", sha="aaa")])
+    first_at = orders.versions("1")[0]["read_at"]
+    service.store_orders(employee, "occ-order", [_order("1", "שפע כנסת יחזקאל", sha="aaa")])
+    assert [row["reading_kind"] for row in orders.versions("1")] == ["first"]
+    assert orders.versions("1")[0]["read_at"] == first_at
+    shown = service.store_orders(employee, "occ-order", [_order("1", "שפע כנסת יחזקאל", sha="bbb")])
+    kinds = {row["reading_kind"]: row for row in orders.versions("1")}
+    assert set(kinds) == {"first", "latest"}
+    assert kinds["first"]["pdf_sha256"] == "aaa"
+    assert kinds["first"]["read_at"] == first_at
+    assert kinds["latest"]["pdf_sha256"] == "bbb"
+    assert kinds["latest"]["read_at"]
+    assert shown["orders"][0]["pdf_url"] == "https://files/1.pdf"
+    latest_at = kinds["latest"]["read_at"]
+    service.store_orders(employee, "occ-order", [_order("1", "שפע כנסת יחזקאל", sha="bbb")])
+    again = next(row for row in orders.versions("1") if row["reading_kind"] == "latest")
+    assert again["read_at"] == latest_at
+    assert len(orders.versions("1")) == 2
+
+
+class _FakeOrders:
+    def __init__(self):
+        self.rows: list[dict] = []
+
+    def versions(self, number):
+        return [row for row in self.rows if row["agroline_number"] == number]
+
+    def list_on(self, day):
+        return [row for row in self.rows if row["document_date"] == day]
+
+    def save_reading(self, kind, branch_id, document, read_at):
+        row = {key: value for key, value in document.items() if key != "pdf_bytes"}
+        row.update(branch_id=branch_id, reading_kind=kind, read_at=read_at.isoformat())
+        self.rows = [
+            item
+            for item in self.rows
+            if not (item["agroline_number"] == row["agroline_number"] and item.get("reading_kind") == kind)
+        ]
+        self.rows.append(row)
+        return row
+
+
+def _order(number: str, customer: str, sha: str | None = None) -> dict:
+    return {
+        "agroline_number": number,
+        "customer_name": customer,
+        "document_date": "2026-10-12",
+        "pdf_url": f"https://files/{number}.pdf",
+        "pdf_sha256": sha,
+    }
+
+
+def _order_occurrence():
+    return SimpleNamespace(
+        id="occ-order",
+        template_id="tpl-a",
+        branch_id="snif-1",
+        assignee_user_id="oved-1",
+        due_at="2026-10-12T18:00:00+03:00",
+    )

@@ -27,7 +27,7 @@ def _ok_line(**extra):
 
 
 def test_teuda_task_types_are_the_line_check_and_the_origin_list():
-    assert set(TASK_TYPES) == {"line_check", "origin_list"}
+    assert set(TASK_TYPES) == {"line_check", "origin_list", "order_read"}
     assert task_type_for_model(True, None) == "line_check"
     assert task_type_for_model(True, "origin_list") == "origin_list"
     assert task_type_for_model(False, "line_check") is None
