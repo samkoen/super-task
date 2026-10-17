@@ -27,7 +27,10 @@ export default function TaskChatDialog({
   chatResolvedAt,
   completion,
   onOccurrenceUpdated,
+  initialDraft,
 }: {
+  /** Message pré-écrit dans la zone de saisie. */
+  initialDraft?: string;
   open: boolean;
   onClose: () => void;
   occurrenceId: string;
@@ -61,6 +64,7 @@ export default function TaskChatDialog({
               chatResolvedAt={chatResolvedAt}
               composeEnabled={status ? canComposeTaskChat(status, employee) : false}
               onOccurrenceUpdated={onOccurrenceUpdated}
+              initialDraft={initialDraft}
             />
           </Box>
         ) : null}

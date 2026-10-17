@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { resolveApiBaseUrl } from "./apiBaseUrl";
+import {
+  API_TIMEOUT_LOCAL_DEV_MS,
+  API_TIMEOUT_MS,
+  resolveApiBaseUrl,
+  resolveApiTimeoutMs,
+} from "./apiBaseUrl";
+
+describe("resolveApiTimeoutMs", () => {
+  it("leaves a long timeout on localhost, where the API talks to a remote database", () => {
+    expect(resolveApiTimeoutMs({ isNative: false, origin: "http://localhost:5173" })).toBe(
+      API_TIMEOUT_LOCAL_DEV_MS,
+    );
+  });
+
+  it("keeps the standard timeout on the deployed site and in the APK", () => {
+    expect(resolveApiTimeoutMs({ isNative: false, origin: "https://super.onrender.com" })).toBe(API_TIMEOUT_MS);
+    expect(resolveApiTimeoutMs({ isNative: true, origin: "https://localhost" })).toBe(API_TIMEOUT_MS);
+  });
+});
 
 describe("resolveApiBaseUrl", () => {
   it("forces /api on localhost even if VITE_API_URL points to Render", () => {

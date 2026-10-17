@@ -6,6 +6,8 @@ interface TaskReferenceMediaDisplayProps {
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
+  /** Masque l'intitulé quand un titre l'affiche déjà (dialogue). */
+  hideLabel?: boolean;
 }
 
 /** Affiche les médias de référence (URLs Blob privées via proxy auth). */
@@ -13,6 +15,7 @@ export default function TaskReferenceMediaDisplay({
   reference_photo_url,
   reference_video_url,
   reference_audio_url,
+  hideLabel = false,
 }: TaskReferenceMediaDisplayProps) {
   const photoSrc = mediaUrl(reference_photo_url ?? null);
   const videoSrc = mediaUrl(reference_video_url ?? null);
@@ -20,10 +23,12 @@ export default function TaskReferenceMediaDisplay({
   if (!photoSrc && !videoSrc && !audioSrc) return null;
 
   return (
-    <Box sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 1.25 }}>
-      <Typography variant="caption" color="text.secondary" fontWeight={600}>
-        {he.taskReferenceMediaLabel}
-      </Typography>
+    <Box sx={{ mt: hideLabel ? 0 : 1.5, display: "flex", flexDirection: "column", gap: 1.25 }}>
+      {hideLabel ? null : (
+        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+          {he.taskReferenceMediaLabel}
+        </Typography>
+      )}
       {photoSrc && (
         <Box
           component="img"

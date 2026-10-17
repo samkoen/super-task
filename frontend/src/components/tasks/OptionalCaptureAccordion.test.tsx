@@ -76,7 +76,7 @@ describe("OptionalCaptureAccordion", () => {
       he.addPhoto,
       he.addVideo,
     ]);
-    expect(screen.getByText(he.captureOptionalToggle)).toBeTruthy();
+    expect(screen.queryByText(he.captureOptionalToggle)).toBeNull();
     expect(screen.getByRole("button", { name: he.captureOptionalToggle })).toBeTruthy();
     expect(screen.queryByRole("button", { name: he.captureNoteToggle })).toBeNull();
     expect(screen.queryByRole("button", { name: he.captureExtrasToggle })).toBeNull();

@@ -4,11 +4,8 @@ import { avatarInitials } from "../../utils/avatarInitials";
 import { mediaUrl } from "../../utils/mediaUrl";
 import { he } from "../../i18n/he";
 import type { PunchKind } from "../../utils/punchDoor";
-import {
-  EMPLOYEE_CARD_RADIUS,
-  EMPLOYEE_END_GRADIENT,
-  EMPLOYEE_START_GRADIENT,
-} from "../../styles/employeeUi";
+import { EMPLOYEE_CARD_RADIUS, EMPLOYEE_END_GRADIENT } from "../../styles/employeeUi";
+import EmployeeStartDoor from "./EmployeeStartDoor";
 
 const AVATAR = 168;
 
@@ -18,7 +15,7 @@ const pulse = keyframes`
   100% { transform: scale(1.22); opacity: 0; }
 `;
 
-const doorSx = (start: boolean) => ({
+const endDoorSx = {
   position: "relative",
   overflow: "hidden",
   display: "flex",
@@ -31,9 +28,22 @@ const doorSx = (start: boolean) => ({
   minHeight: 440,
   borderRadius: EMPLOYEE_CARD_RADIUS,
   color: "common.white",
-  background: start ? EMPLOYEE_START_GRADIENT : EMPLOYEE_END_GRADIENT,
-  boxShadow: `0 16px 40px ${alpha(start ? "#14532D" : "#581C2B", 0.35)}`,
-});
+  background: EMPLOYEE_END_GRADIENT,
+  boxShadow: `0 16px 40px ${alpha("#581C2B", 0.35)}`,
+} as const;
+
+interface EmployeePunchDoorProps {
+  kind: PunchKind;
+  name?: string;
+  photoUrl?: string | null;
+  taskTitle?: string | null;
+  remainingCount?: number;
+  /** Écran d'ouverture : date du jour et lieu (affichés une seule fois). */
+  dateLabel?: string;
+  meta?: string;
+  branchCity?: string | null;
+  onOpen: () => void;
+}
 
 export default function EmployeePunchDoor({
   kind,
@@ -41,28 +51,34 @@ export default function EmployeePunchDoor({
   photoUrl,
   taskTitle,
   remainingCount = 0,
+  dateLabel,
+  meta,
+  branchCity,
   onOpen,
-}: {
-  kind: PunchKind;
-  name?: string;
-  photoUrl?: string | null;
-  taskTitle?: string | null;
-  remainingCount?: number;
-  onOpen: () => void;
-}) {
-  const start = kind === "start";
-  const label = start ? he.punchClockIn : he.punchClockOut;
+}: EmployeePunchDoorProps) {
+  if (kind === "start") {
+    return (
+      <EmployeeStartDoor
+        name={name}
+        photoUrl={photoUrl}
+        dateLabel={dateLabel}
+        meta={meta}
+        branchCity={branchCity}
+        onOpen={onOpen}
+      />
+    );
+  }
   return (
-    <Box sx={doorSx(start)}>
+    <Box sx={endDoorSx}>
       <Typography variant="h4" component="h2" fontWeight={800} textAlign="center">
-        {label}
+        {he.punchClockOut}
       </Typography>
       {taskTitle ? <TaskPill title={taskTitle} /> : null}
-      <PunchAvatar name={name} photoUrl={photoUrl} label={label} onOpen={onOpen} />
+      <PunchAvatar name={name} photoUrl={photoUrl} label={he.punchClockOut} onOpen={onOpen} />
       <Typography variant="h6" fontWeight={700} textAlign="center" sx={{ color: "common.white" }}>
-        {start ? he.punchClockInHint : he.punchClockOutHint}
+        {he.punchClockOutHint}
       </Typography>
-      {!start && remainingCount > 0 ? (
+      {remainingCount > 0 ? (
         <Typography variant="body2" textAlign="center" sx={{ color: alpha("#fff", 0.85) }}>
           {he.punchRemainingHint(remainingCount)}
         </Typography>

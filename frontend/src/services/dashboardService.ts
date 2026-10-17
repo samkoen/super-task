@@ -212,6 +212,7 @@ export interface EmployeeDashboard {
     job_function: string | null;
     branch_id: string;
     branch_name: string | null;
+    branch_city?: string | null;
     preferred_language?: string;
     avatar_url?: string | null;
     excellence_slogan?: string | null;

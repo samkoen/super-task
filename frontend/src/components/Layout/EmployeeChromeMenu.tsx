@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MenuIcon from "@mui/icons-material/Menu";
-import { IconButton, Menu, MenuItem, alpha } from "@mui/material";
+import { Badge, Chip, IconButton, Menu, MenuItem, alpha } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
 import { he } from "../../i18n/he";
 import { employeeChromeMenuFlags } from "../../utils/employeeChromeMenu";
@@ -11,6 +11,8 @@ type MenuFlags = ReturnType<typeof employeeChromeMenuFlags>;
 
 interface EmployeeChromeMenuProps {
   onLogout: () => void;
+  /** Messages non lus : affichés sur le burger et sur « שיחות ». */
+  chatUnread?: number;
 }
 
 function ChromeMenuItems({
@@ -22,7 +24,9 @@ function ChromeMenuItems({
   onChats,
   onAccount,
   onLogout,
+  chatUnread,
 }: {
+  chatUnread: number;
   flags: MenuFlags;
   exitBusy: boolean;
   onExit: () => void;
@@ -45,7 +49,12 @@ function ChromeMenuItems({
       {flags.showManagerArea ? (
         <MenuItem onClick={onManager}>{he.managerArea}</MenuItem>
       ) : null}
-      <MenuItem onClick={onChats}>{he.directChatTitle}</MenuItem>
+      <MenuItem onClick={onChats} sx={{ gap: 1.5, justifyContent: "space-between" }}>
+        {he.directChatTitle}
+        {chatUnread > 0 ? (
+          <Chip size="small" color="error" label={chatUnread > 99 ? "99+" : chatUnread} sx={{ height: 20 }} />
+        ) : null}
+      </MenuItem>
       <MenuItem onClick={onAccount}>{he.myAccount}</MenuItem>
       <MenuItem onClick={onLogout}>{he.logout}</MenuItem>
     </>
@@ -55,9 +64,11 @@ function ChromeMenuItems({
 function ChromeMenuButton({
   open,
   onOpen,
+  unread,
 }: {
   open: boolean;
   onOpen: (el: HTMLElement) => void;
+  unread: number;
 }) {
   return (
     <IconButton
@@ -69,7 +80,9 @@ function ChromeMenuButton({
       onClick={(event) => onOpen(event.currentTarget)}
       sx={{ "&:hover": { bgcolor: alpha("#fff", 0.08) } }}
     >
-      <MenuIcon />
+      <Badge color="error" variant="dot" invisible={unread <= 0}>
+        <MenuIcon />
+      </Badge>
     </IconButton>
   );
 }
@@ -95,11 +108,11 @@ function useChromeMenuState(onLogout: () => void) {
   return { user, navigate, anchor, setAnchor, viewAsOpen, setViewAsOpen, exitBusy, close, handleExitViewAs, onLogout };
 }
 
-export default function EmployeeChromeMenu({ onLogout }: EmployeeChromeMenuProps) {
+export default function EmployeeChromeMenu({ onLogout, chatUnread = 0 }: EmployeeChromeMenuProps) {
   const menu = useChromeMenuState(onLogout);
   return (
     <>
-      <ChromeMenuButton open={Boolean(menu.anchor)} onOpen={menu.setAnchor} />
+      <ChromeMenuButton open={Boolean(menu.anchor)} onOpen={menu.setAnchor} unread={chatUnread} />
       <Menu
         id="employee-chrome-menu"
         anchorEl={menu.anchor}
@@ -109,6 +122,7 @@ export default function EmployeeChromeMenu({ onLogout }: EmployeeChromeMenuProps
         transformOrigin={{ vertical: "top", horizontal: "left" }}
       >
         <ChromeMenuItems
+          chatUnread={chatUnread}
           flags={employeeChromeMenuFlags(menu.user)}
           exitBusy={menu.exitBusy}
           onExit={() => void menu.handleExitViewAs()}

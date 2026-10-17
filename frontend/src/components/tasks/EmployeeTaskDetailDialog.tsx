@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Box,
@@ -14,17 +14,20 @@ import {
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import { EMPLOYEE_BRAND, EMPLOYEE_CARD_RADIUS, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
+import { EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
 import DeliveryLineCheck from "./DeliveryLineCheck";
-import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
+import TaskReferenceMediaDialog, { hasTaskReferenceMedia } from "./TaskReferenceMediaDialog";
 import CompletionMediaPreview from "./CompletionMediaPreview";
-import EmployeeCaptureSteps from "./EmployeeCaptureSteps";
+import CompletionHintDialog from "./CompletionHintDialog";
+import EmployeeCaptureSteps, { type SlotHints } from "./EmployeeCaptureSteps";
 import EmployeeTaskActionsBar from "./EmployeeTaskActionsBar";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
-import OptionalCaptureAccordion from "./OptionalCaptureAccordion";
-import { OpenTaskChatButton } from "./TaskChatDialog";
+import TaskChatDialog from "./TaskChatDialog";
+import { ToolButtons, type StepHintControls } from "./SubtaskTileParts";
 import TaskStatusChip from "./TaskStatusChip";
 import { he } from "../../i18n/he";
+import { useSlotHintPlayback } from "../../hooks/useSlotHintPlayback";
+import { taskSpeechText } from "../../utils/captureGuide";
 import { formatDueAt } from "../../utils/dateView";
 import { normalizeStartUrl, openExternalUrl } from "../../utils/startUrl";
 import { canDoTask } from "../../utils/employeeDoTask";
@@ -95,6 +98,14 @@ export default function EmployeeTaskDetailDialog({
 }: EmployeeTaskDetailDialogProps) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
+  const hints = useSlotHintPlayback(language);
+  const [question, setQuestion] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const taskId = task?.id;
+  useEffect(() => {
+    if (chatFirst && taskId) setChatOpen(true);
+  }, [chatFirst, taskId]);
   if (!task) return null;
   const liveCapture = capture && canDoTask(task.status) ? capture : undefined;
 
@@ -111,7 +122,19 @@ export default function EmployeeTaskDetailDialog({
       disableAutoFocus
       disableRestoreFocus
     >
-      <TaskDialogHeader onClose={onClose}>{titleNode ?? task.title}</TaskDialogHeader>
+      <TaskDialogHeader
+        onClose={onClose}
+        meta={
+          <TaskStatusRow
+            task={task}
+            hints={hints}
+            onChat={() => setChatOpen(true)}
+            onReference={hasTaskReferenceMedia(task) ? () => setReferenceOpen(true) : undefined}
+          />
+        }
+      >
+        {titleNode ?? task.title}
+      </TaskDialogHeader>
       <DialogContent
         sx={{
           display: "flex",
@@ -125,22 +148,10 @@ export default function EmployeeTaskDetailDialog({
           bgcolor: alpha(EMPLOYEE_INK, 0.03),
         }}
       >
-        <TaskStatusRow task={task} />
         <TaskRejectionRemark completion={task.completion} />
-        <TaskDescription text={task.description} />
         <DeliveryLineCheck occurrenceId={task.id} disabled={!canDoTask(task.status)} />
         <StartUrlButton url={task.start_url} fullWidth />
-        <OpenTaskChatButton
-          occurrenceId={task.id}
-          title={task.title}
-          status={task.status}
-          employee
-          completion={task.completion ?? null}
-          onOccurrenceUpdated={() => onChatUpdated?.()}
-          autoOpen={chatFirst}
-        />
-        <TaskDetailMedia task={task} language={language} capture={liveCapture} />
-        {liveCapture ? <OptionalSections capture={liveCapture} /> : null}
+        <TaskDetailMedia task={task} hints={hints} capture={liveCapture} onAsk={setQuestion} />
       </DialogContent>
       <EmployeeTaskActionsBar
         status={task.status}
@@ -150,41 +161,79 @@ export default function EmployeeTaskDetailDialog({
         onDoTask={onDoTask}
         starting={starting}
       />
+      <TaskReferenceMediaDialog open={referenceOpen} media={task} onClose={() => setReferenceOpen(false)} />
+      {hints.dialog ? (
+        <CompletionHintDialog title={hints.dialog.title} text={hints.dialog.text} onClose={hints.closeDialog} />
+      ) : null}
+      <TaskChatDialog
+        open={chatOpen || question !== null}
+        onClose={() => {
+          setChatOpen(false);
+          setQuestion(null);
+        }}
+        occurrenceId={task.id}
+        title={task.title}
+        status={task.status}
+        employee
+        completion={task.completion ?? null}
+        initialDraft={question ? he.subtaskQuestionDraft(question) : undefined}
+        onOccurrenceUpdated={() => onChatUpdated?.()}
+      />
     </Dialog>
   );
 }
 
-function TaskDialogHeader({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+function TaskDialogHeader({
+  children,
+  meta,
+  onClose,
+}: {
+  children: ReactNode;
+  meta?: ReactNode;
+  onClose: () => void;
+}) {
   return (
     <DialogTitle
       component="div"
       sx={{
         display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 1,
-        pt: "calc(16px + env(safe-area-inset-top, 0px))",
+        flexDirection: "column",
+        gap: 1.25,
+        pt: "calc(14px + env(safe-area-inset-top, 0px))",
         pb: 1.5,
+        px: { xs: 2, sm: 3 },
         flexShrink: 0,
         borderBottom: 1,
         borderColor: "divider",
       }}
     >
-      <Box flex={1} minWidth={0}>
-        {children}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: "1.35rem",
+            fontWeight: 800,
+            lineHeight: 1.3,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {children}
+        </Box>
+        <IconButton
+          aria-label={he.close}
+          onClick={onClose}
+          sx={{
+            bgcolor: alpha(EMPLOYEE_INK, 0.06),
+            width: EMPLOYEE_TOUCH_MIN - 8,
+            height: EMPLOYEE_TOUCH_MIN - 8,
+            flexShrink: 0,
+          }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
       </Box>
-      <IconButton
-        aria-label={he.close}
-        onClick={onClose}
-        sx={{
-          bgcolor: alpha(EMPLOYEE_INK, 0.06),
-          width: EMPLOYEE_TOUCH_MIN - 8,
-          height: EMPLOYEE_TOUCH_MIN - 8,
-          flexShrink: 0,
-        }}
-      >
-        <CloseRoundedIcon />
-      </IconButton>
+      {meta}
     </DialogTitle>
   );
 }
@@ -204,50 +253,69 @@ function TaskRejectionRemark({ completion }: { completion?: TaskCompletion | nul
   );
 }
 
-/** Consigne du manager : carte bien lisible avec filet de couleur. */
-function TaskDescription({ text }: { text?: string | null }) {
-  if (!text) return null;
-  return (
-    <Box
-      sx={{
-        p: 2,
-        bgcolor: "background.paper",
-        borderRadius: EMPLOYEE_CARD_RADIUS,
-        borderInlineStart: `6px solid ${EMPLOYEE_BRAND}`,
-      }}
-    >
-      <Typography variant="caption" sx={{ fontWeight: 800, color: EMPLOYEE_BRAND }}>
-        {he.taskWhatToDo}
-      </Typography>
-      <Typography sx={{ whiteSpace: "pre-wrap", fontSize: "1.1rem", lineHeight: 1.6, mt: 0.25 }}>
-        {text}
-      </Typography>
-    </Box>
-  );
+/** Lire / écouter la tâche entière : mêmes contrôles que ceux d'une sous-tâche. */
+function taskHintControls(
+  title: string,
+  description: string | null | undefined,
+  hints: SlotHints,
+): StepHintControls | undefined {
+  const text = taskSpeechText(title, description);
+  if (!text) return undefined;
+  const id = "task-hint";
+  return {
+    speaking: hints.speakingId === id,
+    loading: hints.loadingId === id,
+    listenEnabled: true,
+    onShow: () => void hints.show(id, text, title),
+    onSpeak: () => void hints.speak(id, text),
+  };
 }
 
-function TaskStatusRow({ task }: { task: EmployeeTaskDetailTask }) {
+/** Statut + heure en petit, et à droite les trois icônes lire / écouter / chat. */
+function TaskStatusRow({
+  task,
+  hints,
+  onChat,
+  onReference,
+}: {
+  task: EmployeeTaskDetailTask;
+  hints: SlotHints;
+  onChat: () => void;
+  /** Présent seulement si le menahel a joint une image, une vidéo ou un audio. */
+  onReference?: () => void;
+}) {
   return (
-    <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+    <Box data-testid="task-status-row" display="flex" columnGap={1} rowGap={0.75} flexWrap="wrap" alignItems="center">
       <TaskStatusChip status={employeeDisplayStatus(task.status)} />
       {task.completion && showsCompletionOutcome(task.status) ? (
         <CompletionOutcomeChip status={task.completion.status} />
       ) : null}
-      <Typography variant="body2" color="text.secondary" dir="ltr" sx={{ fontWeight: 600 }}>
+      <Typography color="text.secondary" dir="ltr" sx={{ fontWeight: 600, fontSize: "0.75rem" }}>
         {he.dueAt}: {formatDueAt(task.due_at)}
       </Typography>
+      <Box data-testid="task-tools" sx={{ display: "flex", gap: 0.75, marginInlineStart: "auto", flexShrink: 0 }}>
+        <ToolButtons
+          hintControls={taskHintControls(task.title, task.description, hints)}
+          onAsk={onChat}
+          askLabel={he.taskChatSection}
+          onHelp={onReference}
+          onDark={false}
+        />
+      </Box>
     </Box>
   );
 }
 
 function TaskDetailMedia({
   task,
-  language,
+  hints,
   capture,
+  onAsk,
 }: {
   task: EmployeeTaskDetailTask;
-  language: EmployeeLanguage;
+  hints: SlotHints;
   capture?: EmployeeTaskCaptureProps;
+  onAsk: (title: string) => void;
 }) {
   const requirements = effectiveRequirements(task);
   const hasRef = Boolean(
@@ -257,18 +325,14 @@ function TaskDetailMedia({
 
   return (
     <>
-      <TaskReferenceMediaDisplay
-        reference_photo_url={task.reference_photo_url}
-        reference_video_url={task.reference_video_url}
-        reference_audio_url={task.reference_audio_url}
-      />
       {capture ? (
         <EmployeeCaptureSteps
           requirements={requirements}
           slots={capture.slots}
           onChange={capture.onSlotsChange}
           disabled={capture.saving}
-          language={language}
+          hints={hints}
+          onAsk={onAsk}
           onAnnotatingChange={capture.onAnnotatingChange}
         />
       ) : (
@@ -289,20 +353,6 @@ function TaskDetailMedia({
         </Typography>
       )}
     </>
-  );
-}
-
-/** Note et fichiers en plus : un seul accordéon à 4 icônes. */
-function OptionalSections({ capture }: { capture: EmployeeTaskCaptureProps }) {
-  return (
-    <OptionalCaptureAccordion
-      note={capture.note}
-      onNoteChange={capture.onNoteChange}
-      extras={capture.extras ?? []}
-      onExtrasChange={capture.onExtrasChange ?? (() => undefined)}
-      disabled={capture.saving}
-      onAnnotatingChange={capture.onAnnotatingChange}
-    />
   );
 }
 

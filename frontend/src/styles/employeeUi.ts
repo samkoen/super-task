@@ -7,8 +7,6 @@ export const EMPLOYEE_INK = "#0F172A";
 
 export const EMPLOYEE_BRAND_GRADIENT =
   "linear-gradient(135deg, #064C42 0%, #0A6B5C 45%, #14937D 100%)";
-export const EMPLOYEE_START_GRADIENT =
-  "linear-gradient(135deg, #14532D 0%, #15803D 55%, #22A559 100%)";
 export const EMPLOYEE_END_GRADIENT =
   "linear-gradient(135deg, #581C2B 0%, #8B2A3E 55%, #B23A52 100%)";
 

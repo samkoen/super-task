@@ -175,6 +175,7 @@ class DashboardService:
 
         user = self._users.find_by_id(actor.user_id)
         branch_name = self._occurrences.get_branch_name(actor.branch_id)
+        branch_city = self._occurrences.get_branch_city(actor.branch_id)
         buckets = split_employee_day_tasks(tasks_today, now=now, tz=TZ)
         counts = _count_by_status(tasks_today)
         progress = int(round(counts["completion_rate"] * 100))
@@ -198,6 +199,7 @@ class DashboardService:
                 "job_function": user.job_function if user else None,
                 "branch_id": actor.branch_id,
                 "branch_name": branch_name,
+                "branch_city": branch_city,
                 "preferred_language": language,
                 "avatar_url": user.avatar_url if user else None,
                 "excellence_slogan": user.excellence_slogan if user else None,

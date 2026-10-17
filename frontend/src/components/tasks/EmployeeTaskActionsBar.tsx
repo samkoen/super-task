@@ -5,7 +5,7 @@ import { he } from "../../i18n/he";
 import { EMPLOYEE_INK } from "../../styles/employeeUi";
 import { captureProgress } from "../../utils/captureProgress";
 import { canDoTask } from "../../utils/employeeDoTask";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
+import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
 import type { TaskStatus } from "../../services/taskService";
@@ -34,13 +34,8 @@ export function ReadinessLine({
   return (
     <Box data-testid="readiness-line" data-ready={ready} sx={{ textAlign: "center" }}>
       {ready || progress.remaining > 0 ? (
-        <Typography sx={{ fontWeight: 800, color: ready ? "success.main" : "text.primary" }}>
+        <Typography sx={{ fontWeight: 800, lineHeight: 1.3, color: ready ? "success.main" : "text.primary" }}>
           {ready ? he.captureAllReady : he.captureRemaining(progress.remaining)}
-        </Typography>
-      ) : null}
-      {slotsFilled === false ? (
-        <Typography variant="caption" color="warning.main">
-          {he.completionFillSlotsHint}
         </Typography>
       ) : null}
     </Box>
@@ -97,11 +92,11 @@ export default function EmployeeTaskActionsBar({
     <DialogActions
       sx={{
         px: { xs: 2, sm: 3 },
-        pt: 1.5,
-        pb: dialogActionsPbCss(),
+        pt: 0.75,
+        pb: withSystemBottomInsetCss("8px"),
         flexDirection: "column",
         alignItems: "stretch",
-        gap: 1,
+        gap: 0.5,
         flexShrink: 0,
         borderTop: 1,
         borderColor: "divider",

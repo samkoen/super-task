@@ -35,22 +35,23 @@ import {
   employeeDoneToday,
   splitEmployeeWorkLists,
 } from "../../utils/employeeDashboardSections";
-import { formatHebrewDay, todayIso } from "../../utils/dateView";
+import { formatHebrewDay, formatHebrewDayNoYear, todayIso } from "../../utils/dateView";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
 import IncompleteTaskSendDialog from "../../components/tasks/IncompleteTaskSendDialog";
 import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
-import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
+import EmployeeHomeHeader from "../../components/employee/EmployeeHomeHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import EmployeePunchDoor from "../../components/employee/EmployeePunchDoor";
 import EmployeeFinishedTaskSections from "../../components/employee/EmployeeFinishedTaskSections";
-import EmployeeTaskSection from "../../components/employee/EmployeeTaskSection";
+import EmployeeTimeline from "../../components/employee/EmployeeTimeline";
 import EmployeeManagerWaitingSection from "../../components/employee/EmployeeManagerWaitingSection";
-import EmployeeNextTaskCard from "../../components/employee/EmployeeNextTaskCard";
 import EmployeeAllDone from "../../components/employee/EmployeeAllDone";
-import { employeeGreeting, pickNextTask, withoutTask } from "../../utils/employeeNextTask";
+import { pickNextTask } from "../../utils/employeeNextTask";
+import { orderTimelineTasks } from "../../utils/employeeTimeline";
 import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
+import { usePublishEmployeeStartDoor } from "../../hooks/useEmployeeStartDoorOpen";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
@@ -108,25 +109,11 @@ function EmployeeOpenWorkLists({
   workLists: { dynamic: EmployeeTaskCard[]; routine: EmployeeTaskCard[] };
   onOpen: (task: EmployeeTaskCard) => void;
 }) {
-  const nextTask = pickNextTask(workLists);
-  const rest = withoutTask(workLists, nextTask?.id);
+  const entries = orderTimelineTasks(workLists, pickNextTask(workLists));
   return (
     <>
-      {nextTask ? <EmployeeNextTaskCard task={nextTask} onOpen={onOpen} /> : null}
       {openCount === 0 ? <EmployeeAllDone /> : null}
-      <EmployeeTaskSection
-        title={he.employeeRoutineTasks}
-        tasks={rest.routine}
-        onOpen={onOpen}
-        layout="list"
-      />
-      <EmployeeTaskSection
-        title={he.employeeDynamicTasks}
-        tasks={rest.dynamic}
-        onOpen={onOpen}
-        layout="tile"
-        color="error.main"
-      />
+      <EmployeeTimeline entries={entries} onOpen={onOpen} />
       {punchEnd ? (
         <Button
           size="small"
@@ -716,34 +703,38 @@ export default function EmployeeTasksPage() {
     />
   );
 
+  const metaLabel = [
+    headerBranch ? `${he.branch}: ${headerBranch}` : "",
+    headerJob ? jobLabel(headerJob) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const startDoorOpen = Boolean(punch.showStart && punch.start);
+  usePublishEmployeeStartDoor(startDoorOpen);
+  const showShiftHeader = !startDoorOpen && !(loading && !dashboard);
+
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", px: { xs: 1, sm: 2 } }}>
-      <EmployeeShiftHeader
-        dateLabel={todayLabel}
-        name={headerName}
-        photoUrl={photoUrl}
-        photoEditable
-        onEditPhoto={() => setAvatarOpen(true)}
-        onDeletePhoto={photoUrl ? () => void handleAvatarDelete() : undefined}
-        slogan={dashboard?.employee?.excellence_slogan ?? user?.excellence_slogan}
-        meta={[
-          headerBranch ? `${he.branch}: ${headerBranch}` : "",
-          headerJob ? jobLabel(headerJob) : "",
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-        onShift={Boolean(onShift)}
-        onBreak={onBreak}
-        breakBusy={breakBusy}
-        progress={punch.showStart ? null : progress}
-        onToggleBreak={() => void handleToggleBreak()}
-        showBreak={!punch.showStart}
-        qualityRating={punch.showStart ? null : dashboard?.employee?.quality_rating}
-        hero
-        greeting={employeeGreeting(new Date().getHours())}
-        completedCount={doneCount}
-        totalCount={totalCount}
-      />
+      {showShiftHeader ? (
+        <EmployeeHomeHeader
+          dateLabel={todayLabel}
+          name={headerName}
+          photoUrl={photoUrl}
+          onEditPhoto={() => setAvatarOpen(true)}
+          onDeletePhoto={photoUrl ? () => void handleAvatarDelete() : undefined}
+          slogan={dashboard?.employee?.excellence_slogan ?? user?.excellence_slogan}
+          meta={metaLabel}
+          branchCity={dashboard?.employee?.branch_city}
+          onShift={Boolean(onShift)}
+          onBreak={onBreak}
+          breakBusy={breakBusy}
+          progress={progress}
+          onToggleBreak={() => void handleToggleBreak()}
+          qualityRating={dashboard?.employee?.quality_rating}
+          completedCount={doneCount}
+          totalCount={totalCount}
+        />
+      ) : null}
 
       <EmployeeAvatarCapture
         open={avatarOpen}
@@ -766,7 +757,9 @@ export default function EmployeeTasksPage() {
               kind="start"
               name={headerName}
               photoUrl={photoUrl}
-              taskTitle={punch.start.title}
+              dateLabel={formatHebrewDayNoYear(dashboard?.due_on ?? todayIso())}
+              meta={metaLabel}
+              branchCity={dashboard?.employee?.branch_city}
               onOpen={() => {
                 if (punch.start) openDetail(punch.start);
               }}

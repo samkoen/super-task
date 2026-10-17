@@ -12,6 +12,7 @@ def _svc() -> DashboardService:
     occ = MagicMock()
     occ.list_occurrences.return_value = []
     occ.get_branch_name.return_value = "סניף"
+    occ.get_branch_city.return_value = "ירושלים"
     occ.expire_open_fixed_before.return_value = []
     users = MagicMock()
     users.find_by_id.return_value = MagicMock(
@@ -54,3 +55,13 @@ def test_employee_dashboard_includes_excellence_slogan():
     data = asyncio.run(svc.employee_dashboard(actor))
     assert data["employee"]["excellence_slogan"] == "מצוינות כל יום"
     assert data["employee"]["avatar_url"] == "/uploads/avatars/a.jpg"
+
+
+def test_employee_dashboard_exposes_branch_city_for_weather():
+    actor = ActorContext(
+        user_id="m1", role="branch_manager", network_id="n1", branch_id="b1"
+    )
+    svc = _svc()
+    assert asyncio.run(svc.employee_dashboard(actor))["employee"]["branch_city"] == "ירושלים"
+    svc._occurrences.get_branch_city.return_value = None
+    assert asyncio.run(svc.employee_dashboard(actor))["employee"]["branch_city"] is None

@@ -35,6 +35,9 @@ import NotificationBell from "../notifications/NotificationBell";
 import ChatAlertBanner from "../notifications/ChatAlertBanner";
 import { useAuth } from "../../context/AuthContext";
 import { useEmployeeBreakMute } from "../../hooks/useEmployeeBreakMute";
+import { useEmployeeChatUnread } from "../../hooks/useEmployeeChatUnread";
+import { useEmployeeStartDoorOpen } from "../../hooks/useEmployeeStartDoorOpen";
+import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
 import { useNativeTaskChatAlerts } from "../../hooks/useNativeTaskChatAlerts";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
@@ -124,6 +127,8 @@ function Layout() {
   const isEmployee = usesEmployeeChrome(user?.role, location.pathname);
   const employeeAlertsOn = Boolean(user) && !loading && isEmployee;
   const breakMuted = useEmployeeBreakMute(employeeAlertsOn);
+  const startDoorOpen = useEmployeeStartDoorOpen();
+  const chatUnread = useEmployeeChatUnread(employeeAlertsOn, user?.role);
   useEmployeeNotificationSounds(employeeAlertsOn, breakMuted);
   const chatAlerts = useNativeTaskChatAlerts({
     enabled: Boolean(user) && !loading,
@@ -377,8 +382,8 @@ function Layout() {
             </Typography>
           </Box>
           <Box display="flex" alignItems="center" gap={0.25}>
-            <NotificationBell muteIncoming={breakMuted} />
-            <EmployeeChromeMenu onLogout={handleLogout} />
+            {!startDoorOpen && <NotificationBell muteIncoming={breakMuted} />}
+            <EmployeeChromeMenu onLogout={handleLogout} chatUnread={chatUnread} />
           </Box>
         </Box>
         {(user?.branches?.length ?? 0) >= 2 && (
@@ -398,7 +403,7 @@ function Layout() {
           sx={{
             px: { xs: 1.5, sm: 2.5 },
             pt: { xs: 2, sm: 2.5 },
-            pb: employeeBottomContentPadCss(),
+            pb: startDoorOpen ? withSystemBottomInsetCss("24px") : employeeBottomContentPadCss(),
             maxWidth: 960,
             mx: "auto",
           }}
@@ -406,7 +411,7 @@ function Layout() {
           {shouldShowEmployeeBack(location.pathname, showBack) && <BackButton />}
           <OutletSuspense />
         </Box>
-        <EmployeeBottomNav />
+        {!startDoorOpen && <EmployeeBottomNav />}
         <ChatAlertBanner
           alert={chatAlerts.banner}
           onOpen={chatAlerts.open}

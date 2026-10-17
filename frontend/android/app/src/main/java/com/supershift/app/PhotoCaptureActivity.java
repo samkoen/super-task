@@ -6,7 +6,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
+import android.widget.ImageButton;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
@@ -28,8 +28,8 @@ public class PhotoCaptureActivity extends AppCompatActivity {
     static final String EXTRA_PATH = "path";
 
     private PreviewView previewView;
-    private Button flipButton;
-    private Button shutterButton;
+    private ImageButton flipButton;
+    private ImageButton shutterButton;
     private ProcessCameraProvider cameraProvider;
     private ImageCapture imageCapture;
     private boolean useBackCamera = true;
@@ -91,7 +91,9 @@ public class PhotoCaptureActivity extends AppCompatActivity {
             .build();
         cameraProvider.unbindAll();
         cameraProvider.bindToLifecycle(this, cameraSelector(), preview, imageCapture);
-        flipButton.setEnabled(hasBothCameras());
+        boolean canFlip = hasBothCameras();
+        flipButton.setEnabled(canFlip);
+        flipButton.setAlpha(canFlip ? 1f : 0.4f);
     }
 
     private CameraSelector cameraSelector() {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import EmployeeTaskDetailDialog from "./EmployeeTaskDetailDialog";
 import { he } from "../../i18n/he";
 import type { TaskStatus } from "../../services/taskService";
@@ -8,11 +9,19 @@ import type { EmployeeTaskCaptureProps } from "./EmployeeTaskDetailDialog";
 vi.mock("../../services/deliveryNoteService", () => ({
   deliveryNoteService: {
     checkForOccurrence: vi.fn(async () => null),
+    ordersForOccurrence: vi.fn(async () => {
+      const { ApiError } = await import("../../services/api");
+      throw new ApiError("אין הזמנות למשימה זו", 404);
+    }),
   },
 }));
 
 vi.mock("./TaskChatPanel", () => ({
-  default: () => <div data-testid="task-chat-panel">{he.taskChatTitle}</div>,
+  default: ({ initialDraft }: { initialDraft?: string }) => (
+    <div data-testid="task-chat-panel" data-draft={initialDraft ?? ""}>
+      {he.taskChatTitle}
+    </div>
+  ),
 }));
 
 vi.mock("../../utils/mediaUrl", () => ({
@@ -46,6 +55,7 @@ vi.mock("../media/MediaCaptureActions", () => ({
     videoAdded,
     allowedKinds,
     onCapture,
+    trigger,
   }: {
     photoLabel?: string;
     videoLabel?: string;
@@ -56,8 +66,13 @@ vi.mock("../media/MediaCaptureActions", () => ({
     videoAdded?: boolean;
     allowedKinds?: string[];
     onCapture?: (file: File, kind: "photo" | "video" | "audio") => void;
+    trigger?: (open: () => void, state: { disabled: boolean }) => ReactNode;
   }) => {
     const kinds = allowedKinds ?? ["photo", "video", "audio"];
+    if (trigger) {
+      const kind = kinds[0] as "photo" | "video" | "audio";
+      return <>{trigger(() => onCapture?.(new File(["x"], `${kind}.bin`), kind), { disabled: false })}</>;
+    }
     return (
       <div>
         {kinds.includes("photo") ? (
@@ -90,6 +105,12 @@ function task(status: TaskStatus = "pending") {
   };
 }
 
+/** Icônes d'une sous-tâche : celles de la tâche (en-tête) sont exclues. */
+function slotHint(label: string) {
+  const tools = screen.getByTestId("task-tools");
+  return screen.getAllByLabelText(label).filter((el) => !tools.contains(el));
+}
+
 function capture(overrides: Partial<EmployeeTaskCaptureProps> = {}): EmployeeTaskCaptureProps {
   return {
     slots: [null],
@@ -104,11 +125,10 @@ function capture(overrides: Partial<EmployeeTaskCaptureProps> = {}): EmployeeTas
 }
 
 describe("EmployeeTaskDetailDialog", () => {
-  it("keeps a chat button in the task and hides the thread until it is opened", () => {
+  it("keeps a chat icon in the header and hides the thread until it is opened", () => {
     render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
-    const description = screen.getByText("לצלם את המדף");
     const chat = screen.getByRole("button", { name: he.taskChatSection });
-    expect(description.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("task-tools").contains(chat)).toBe(true);
     expect(screen.queryByTestId("task-chat-panel")).toBeNull();
     fireEvent.click(chat);
     expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
@@ -119,7 +139,6 @@ describe("EmployeeTaskDetailDialog", () => {
       <EmployeeTaskDetailDialog task={task()} chatFirst capture={capture()} onClose={vi.fn()} />,
     );
     expect(screen.getByTestId("task-chat-panel")).toBeTruthy();
-    expect(screen.getByLabelText(he.note)).toBeTruthy();
   });
 
   it("offers to reopen the start url", () => {
@@ -187,7 +206,7 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("still finishes after the oved types a note (WebView focus)", () => {
+  it("finishes with the single main button", () => {
     const onSubmit = vi.fn();
     render(
       <EmployeeTaskDetailDialog
@@ -196,7 +215,6 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    fireEvent.change(screen.getByLabelText(he.note), { target: { value: "בוצע" } });
     fireEvent.click(screen.getByRole("button", { name: he.markDone }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
@@ -211,7 +229,7 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
+    expect(slotHint(he.completionShowHint)).toHaveLength(1);
   });
 
   it("shows hint icons when the menahel wrote an explanation", () => {
@@ -226,7 +244,7 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
+    expect(slotHint(he.completionShowHint)).toHaveLength(1);
   });
 
   it("shows hint icons on an audio slot", () => {
@@ -241,8 +259,8 @@ describe("EmployeeTaskDetailDialog", () => {
       />,
     );
     expect(screen.getByText("הקלטה")).toBeTruthy();
-    expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
-    expect(screen.getByLabelText(he.completionListenHint)).toBeTruthy();
+    expect(slotHint(he.completionShowHint)).toHaveLength(1);
+    expect(slotHint(he.completionListenHint)).toHaveLength(1);
   });
 
   it("keeps the three previous videos when the oved opens a reopened task", () => {
@@ -266,7 +284,11 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(he.completionSlotsProgress(3, 3))).toBeTruthy();
+    expect(screen.getAllByTestId("capture-step").map((el) => el.getAttribute("data-state"))).toEqual([
+      "done",
+      "done",
+      "done",
+    ]);
     expect(screen.getAllByRole("button", { name: he.completionRetake })).toHaveLength(3);
     expect(screen.queryByRole("button", { name: he.completionTakeVideo })).toBeNull();
   });
@@ -285,8 +307,8 @@ describe("EmployeeTaskDetailDialog", () => {
       />,
     );
     expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
-    expect(screen.getByLabelText(he.completionShowHint)).toBeTruthy();
-    expect(screen.getByLabelText(he.completionListenHint)).toBeTruthy();
+    expect(slotHint(he.completionShowHint)).toHaveLength(1);
+    expect(slotHint(he.completionListenHint)).toHaveLength(1);
   });
 
   it("shows all visual slots as soon as the oved opens the task", () => {
@@ -311,7 +333,7 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByText("ניקיון")).toBeTruthy();
   });
 
-  it("keeps the photo button and optional files while a chat reply is pending", () => {
+  it("keeps the photo button while a chat reply is pending", () => {
     render(
       <EmployeeTaskDetailDialog
         task={{
@@ -323,12 +345,10 @@ describe("EmployeeTaskDetailDialog", () => {
       />,
     );
     expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.captureOptionalToggle })).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.captureAddText })).toBeTruthy();
     expect(screen.getByRole("button", { name: he.markDone })).toBeTruthy();
   });
 
-  it("lets the oved add optional photo, video and audio besides required slots", () => {
+  it("shows only the required steps: no optional additions bar", () => {
     render(
       <EmployeeTaskDetailDialog
         task={{
@@ -339,10 +359,11 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: he.captureOptionalToggle })).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.addPhoto })).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.addVideo })).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.addAudio })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: he.captureOptionalToggle })).toBeNull();
+    expect(screen.queryByTestId("optional-capture-icons")).toBeNull();
+    expect(screen.queryByRole("button", { name: he.addPhoto })).toBeNull();
+    expect(screen.queryByRole("button", { name: he.addVideo })).toBeNull();
+    expect(screen.queryByRole("button", { name: he.addAudio })).toBeNull();
     expect(screen.getByRole("button", { name: he.completionTakePhoto })).toBeTruthy();
   });
 
@@ -364,7 +385,7 @@ describe("EmployeeTaskDetailDialog", () => {
     expect(screen.getByText("חלב")).toBeTruthy();
     expect(screen.getByText("לחם")).toBeTruthy();
     expect(screen.getByText("ביצים")).toBeTruthy();
-    expect(screen.getByText(he.completionFillSlotsHint)).toBeTruthy();
+    expect(screen.queryByText(he.completionFillSlotsHint)).toBeNull();
     expect((screen.getByRole("button", { name: he.markDone }) as HTMLButtonElement).disabled).toBe(
       false,
     );
@@ -387,7 +408,6 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(he.completionSlotsProgress(1, 2))).toBeTruthy();
     expect(screen.getByText(he.captureRemaining(1))).toBeTruthy();
     const states = screen.getAllByTestId("capture-step").map((el) => el.getAttribute("data-state"));
     expect(states).toEqual(["done", "next"]);
@@ -405,35 +425,6 @@ describe("EmployeeTaskDetailDialog", () => {
       />,
     );
     expect(screen.getByText(he.captureAllReady)).toBeTruthy();
-  });
-
-  it("keeps the note and extra files folded until the oved asks for them", () => {
-    render(
-      <EmployeeTaskDetailDialog
-        task={task("in_progress")}
-        capture={capture()}
-        onClose={vi.fn()}
-      />,
-    );
-    const extras = screen.getByRole("button", { name: he.captureOptionalToggle });
-    expect(extras.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("button", { name: he.captureNoteToggle })).toBeNull();
-    expect(screen.queryByRole("button", { name: he.captureExtrasToggle })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: he.captureAddText }));
-    expect(extras.getAttribute("aria-expanded")).toBe("true");
-  });
-
-  it("opens the note by itself when a note was already written", () => {
-    render(
-      <EmployeeTaskDetailDialog
-        task={task("in_progress")}
-        capture={capture({ note: "כבר כתבתי" })}
-        onClose={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("button", { name: he.captureOptionalToggle }).getAttribute("aria-expanded")).toBe(
-      "true",
-    );
   });
 
   it("puts the manager's rejection remark before the instructions", () => {
@@ -459,10 +450,107 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
-    const remark = screen.getByText(he.taskRejectedReopen);
-    const description = screen.getByText("לצלם את המדף");
-    expect(remark.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText(he.taskWhatToDo)).toBeTruthy();
+    expect(screen.getByText(he.taskRejectedReopen)).toBeTruthy();
+    expect(screen.getByText("תקן את התמונה")).toBeTruthy();
+    expect(screen.queryByText(he.taskWhatToDo)).toBeNull();
+  });
+
+  it("lets the oved read or listen to the task at any time", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    expect(screen.getByTestId("task-tools").contains(screen.getByRole("button", { name: he.completionShowHint }))).toBe(true);
+    expect(screen.getByTestId("task-tools").contains(screen.getByRole("button", { name: he.completionListenHint }))).toBe(true);
+  });
+
+  it("uses the same read, listen and question icons as the sub-tasks, on the status line", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    const tools = screen.getByTestId("task-tools");
+    for (const name of [he.completionShowHint, he.completionListenHint, he.taskChatSection]) {
+      expect(tools.contains(screen.getByRole("button", { name }))).toBe(true);
+    }
+    const status = screen.getByTestId("task-status-chip-in_progress");
+    expect(status.parentElement).toBe(tools.parentElement);
+  });
+
+  it("draws the task chat as a speech bubble, not a question mark", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    const chat = screen.getByRole("button", { name: he.taskChatSection });
+    expect(chat.querySelector("[data-testid='ChatBubbleOutlineRoundedIcon']")).toBeTruthy();
+    expect(chat.querySelector("[data-testid='HelpOutlineRoundedIcon']")).toBeNull();
+  });
+
+  it("keeps only the chat icon when there is nothing to read", () => {
+    render(
+      <EmployeeTaskDetailDialog task={{ ...task("in_progress"), title: "", description: "" }} onClose={vi.fn()} />,
+    );
+    expect(screen.queryByRole("button", { name: he.completionShowHint })).toBeNull();
+    const tools = screen.getByTestId("task-tools");
+    expect(tools.contains(screen.getByRole("button", { name: he.taskChatSection }))).toBe(true);
+  });
+
+  it("shows the status and the due time in the header under the name, not in the scrolling body", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    const status = screen.getByTestId("task-status-chip-in_progress");
+    const time = screen.getByText(new RegExp(`${he.dueAt}:`));
+    const title = screen.getByText("צילום מדף");
+    expect(title.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.parentElement).toBe(time.parentElement);
+  });
+
+  it("puts the title and the close button on the first line, status, time and icons on the second", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    const close = screen.getByRole("button", { name: he.close });
+    const titleRow = close.parentElement as HTMLElement;
+    expect(titleRow.contains(screen.getByText("צילום מדף"))).toBe(true);
+    const row = screen.getByTestId("task-status-row");
+    expect(titleRow.contains(row)).toBe(false);
+    expect(titleRow.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(row.contains(screen.getByTestId("task-status-chip-in_progress"))).toBe(true);
+    expect(row.contains(screen.getByText(new RegExp(`${he.dueAt}:`)))).toBe(true);
+    expect(row.contains(screen.getByTestId("task-tools"))).toBe(true);
+  });
+
+  it("hides the manager's examples behind a ? icon next to the other tools", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{ ...task("in_progress"), reference_photo_url: "/ref.jpg", reference_video_url: "/ref.mp4" }}
+        onClose={vi.fn()}
+      />,
+    );
+    const help = screen.getByRole("button", { name: he.taskReferenceMediaLabel });
+    expect(screen.getByTestId("task-tools").contains(help)).toBe(true);
+    expect(help.querySelector("[data-testid='HelpOutlineRoundedIcon']")).toBeTruthy();
+    expect(document.querySelector("img[src='/ref.jpg']")).toBeNull();
+    fireEvent.click(help);
+    expect(document.querySelector("img[src='/ref.jpg']")).toBeTruthy();
+    expect(document.querySelector("video[src='/ref.mp4']")).toBeTruthy();
+  });
+
+  it("shows no ? icon when the manager attached nothing", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: he.taskReferenceMediaLabel })).toBeNull();
+  });
+
+  it("does not repeat the task description above the sub-task squares", () => {
+    render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
+    expect(screen.queryByText("לצלם את המדף")).toBeNull();
+  });
+
+  it("opens the task chat with the step name already written when the oved asks a question", () => {
+    render(
+      <EmployeeTaskDetailDialog
+        task={{
+          ...task("in_progress"),
+          completion_requirements: [{ kind: "photo", title: "מדף חלב" }],
+        }}
+        capture={capture()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("task-chat-panel")).toBeNull();
+    fireEvent.click(screen.getByLabelText(he.subtaskAsk));
+    expect(screen.getByTestId("task-chat-panel").getAttribute("data-draft")).toBe(
+      he.subtaskQuestionDraft("מדף חלב"),
+    );
   });
 
   it("does not show do-task when waiting for manager review", () => {
@@ -516,6 +604,7 @@ describe("EmployeeTaskDetailDialog", () => {
         onClose={vi.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: he.taskReferenceMediaLabel }));
     expect(document.querySelector("img[src='/ref.jpg']")).toBeTruthy();
     expect(document.querySelector("video[src='/ref.mp4']")).toBeTruthy();
     expect(document.querySelector("audio[src='/ref.webm']")).toBeTruthy();

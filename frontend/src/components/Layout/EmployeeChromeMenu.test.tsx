@@ -56,6 +56,12 @@ describe("EmployeeChromeMenu", () => {
     expect(screen.queryByRole("menuitem", { name: he.managerArea })).toBeNull();
   });
 
+  it("shows the unread count next to שיחות", () => {
+    render(<EmployeeChromeMenu onLogout={() => {}} chatUnread={3} />);
+    openMenu();
+    expect(screen.getByRole("menuitem", { name: new RegExp(he.directChatTitle) }).textContent).toContain("3");
+  });
+
   it("lets a branch manager open view-as and go to management", () => {
     mocks.user.role = "branch_manager";
     mocks.user.is_preview = false;

@@ -25,6 +25,8 @@ interface TaskChatPanelProps {
    * sinon `VITE_TASK_CHAT_POLL_MS`.
    */
   pollMs?: number | false;
+  /** Texte déjà écrit dans la zone de message (ex. question sur une sous-tâche). */
+  initialDraft?: string;
 }
 
 export default function TaskChatPanel({
@@ -36,6 +38,7 @@ export default function TaskChatPanel({
   compact = false,
   composeEnabled = true,
   pollMs,
+  initialDraft,
 }: TaskChatPanelProps) {
   const { user } = useAuth();
   const onUpdatedRef = useRef(onOccurrenceUpdated);
@@ -48,6 +51,10 @@ export default function TaskChatPanel({
     [occurrenceId],
   );
   const thread = useChatThread({ transport, enabled: true });
+  const setBody = thread.setBody;
+  useEffect(() => {
+    if (initialDraft) setBody(initialDraft);
+  }, [initialDraft, setBody]);
   useTaskChatLiveSync(occurrenceId, () => void thread.loadLatest(true), { pollMs });
   const manager = useTaskChatManager({
     userRole: user?.role,

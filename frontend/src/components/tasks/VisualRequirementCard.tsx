@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Box, TextField, Typography } from "@mui/material";
 import MediaCaptureActions from "../media/MediaCaptureActions";
+import ExampleFileButton from "./ExampleFileButton";
 import { he } from "../../i18n/he";
+import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { mediaUrl } from "../../utils/mediaUrl";
 import {
   MAX_SLOT_HINT,
@@ -128,26 +130,33 @@ function ExamplePhotoField({
   disabled: boolean;
   onExample: (url: string, file: File | null) => void;
 }) {
+  // Affichage immédiat via le proxy ; le chargement authentifié ne sert qu'en secours (onError).
+  const media = useResolvedMediaSrc(exampleSrc, false);
+  const previewSrc = media.src;
   return (
     <>
       <Typography variant="caption" color="text.secondary">
         {he.completionSlotExample}
       </Typography>
-      <MediaCaptureActions
-        photoAdded={Boolean(exampleSrc)}
-        videoAdded={false}
-        audioAdded={false}
-        uploadingKind={null}
-        disabled={disabled}
-        allowedKinds={["photo"]}
-        photoLabel={he.completionSlotExample}
-        photoDoneLabel={he.completionRetake}
-        onCapture={(file) => onExample(URL.createObjectURL(file), file)}
-      />
-      {exampleSrc && (
+      <Box display="flex" flexWrap="wrap" gap={1} alignItems="center">
+        <MediaCaptureActions
+          photoAdded={Boolean(exampleSrc)}
+          videoAdded={false}
+          audioAdded={false}
+          uploadingKind={null}
+          disabled={disabled}
+          allowedKinds={["photo"]}
+          photoLabel={he.completionSlotExample}
+          photoDoneLabel={he.completionRetake}
+          onCapture={(file) => onExample(URL.createObjectURL(file), file)}
+        />
+        <ExampleFileButton disabled={disabled} onPick={(file) => onExample(URL.createObjectURL(file), file)} />
+      </Box>
+      {exampleSrc && previewSrc && (
         <Box
           component="img"
-          src={exampleSrc}
+          src={previewSrc}
+          onError={media.onError}
           alt={title || he.completionSlotExample}
           sx={{ maxWidth: "100%", maxHeight: 140, borderRadius: 1, display: "block" }}
         />

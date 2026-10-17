@@ -43,6 +43,17 @@ export function resolveApiBaseUrl(
   return "http://10.0.2.2:5001/api";
 }
 
+export const API_TIMEOUT_MS = 30_000;
+/** Dev local branché sur la base de prod distante : chaque requête SQL coûte des centaines de ms. */
+export const API_TIMEOUT_LOCAL_DEV_MS = 120_000;
+
+export function resolveApiTimeoutMs(options?: { isNative?: boolean; origin?: string }): number {
+  const isNative = options?.isNative ?? Capacitor.isNativePlatform();
+  const origin =
+    options?.origin ?? (typeof window !== "undefined" ? window.location.origin : "");
+  return !isNative && isLocalDevOrigin(origin) ? API_TIMEOUT_LOCAL_DEV_MS : API_TIMEOUT_MS;
+}
+
 export function isLocalDevOrigin(origin: string): boolean {
   if (!origin) return true;
   try {

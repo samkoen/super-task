@@ -138,6 +138,20 @@ describe("TaskChatPanel", () => {
     expect(document.querySelector("audio")).toBeNull();
   });
 
+  it("pre-fills the message box with the question about a step", async () => {
+    vi.mocked(taskService.listMessages).mockResolvedValue({ messages: [], has_more: false });
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} initialDraft={he.subtaskQuestionDraft("מדף חלב")} />);
+    const input = (await screen.findByPlaceholderText(he.taskChatPlaceholder)) as HTMLInputElement;
+    await waitFor(() => expect(input.value).toBe(he.subtaskQuestionDraft("מדף חלב")));
+  });
+
+  it("leaves the message box empty when there is no draft", async () => {
+    vi.mocked(taskService.listMessages).mockResolvedValue({ messages: [], has_more: false });
+    render(<TaskChatPanel occurrenceId="occ-1" pollMs={false} />);
+    const input = (await screen.findByPlaceholderText(he.taskChatPlaceholder)) as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+
   it("reloads the thread when a chat SSE event arrives", async () => {
     vi.mocked(taskService.listMessages)
       .mockResolvedValueOnce({ messages: [], has_more: false })

@@ -15,6 +15,8 @@ import StopIcon from "@mui/icons-material/Stop";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import { useVideoRecorder } from "../../hooks/useVideoRecorder";
 import CameraFacingPreview from "./CameraFacingPreview";
+import GuidedVideoStage from "./GuidedVideoStage";
+import type { CaptureGuide } from "../../utils/captureGuide";
 import AppDialogTitle from "../ui/AppDialogTitle";
 import {
   CaptureInstruction,
@@ -316,6 +318,7 @@ export default function VideoCaptureDialog({
   uploading,
   recorder,
   minSeconds,
+  guide,
   onClose,
   onCapture,
 }: {
@@ -323,6 +326,8 @@ export default function VideoCaptureDialog({
   uploading: boolean;
   recorder: Recorder;
   minSeconds: number | null;
+  /** Consigne du menahel : active l'écran caméra guidé avant l'enregistrement. */
+  guide?: CaptureGuide;
   onClose: () => void;
   onCapture: (file: File, durationSeconds: number) => void | Promise<void>;
 }) {
@@ -341,10 +346,18 @@ export default function VideoCaptureDialog({
     });
   };
 
+  if (guide && !hasPreview) {
+    return (
+      <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="xs" dir="rtl" disableEnforceFocus>
+        <GuidedVideoStage recorder={recorder} guide={guide} minSeconds={minSeconds} uploading={uploading} onClose={onClose} />
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="xs" dir="rtl" disableEnforceFocus>
       <AppDialogTitle
-        title={he.mediaCaptureVideoTitle}
+        title={guide?.title ?? he.mediaCaptureVideoTitle}
         onClose={onClose}
         closeDisabled={uploading || recording || confirming}
       />

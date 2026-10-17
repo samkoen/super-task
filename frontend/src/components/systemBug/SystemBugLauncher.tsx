@@ -7,6 +7,7 @@ import { he } from "../../i18n/he";
 import { SIDEBAR_WIDTH } from "../../constants/layout";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
+import { useEmployeeStartDoorOpen } from "../../hooks/useEmployeeStartDoorOpen";
 import { usesEmployeeChrome } from "../../utils/employeeSurface";
 import { isNativeApp } from "../../utils/isNativeApp";
 import { shouldUseMainNavOverlay } from "../../utils/mainNavOverlay";
@@ -102,6 +103,7 @@ export default function SystemBugLauncher() {
   const [open, setOpen] = useState(false);
   const [screenshot, setScreenshot] = useState<Blob | null>(null);
   const host = useSystemBugPortalHost();
+  const startDoorOpen = useEmployeeStartDoorOpen();
 
   useEffect(() => {
     pushRouteTrail(location.pathname);
@@ -127,7 +129,7 @@ export default function SystemBugLauncher() {
     <SystemBugTrigger
       besideSidebar={besideSidebar}
       managerChrome={managerChrome}
-      employeeNav={employeeChrome}
+      employeeNav={employeeChrome && !startDoorOpen}
       onClick={() => void startReport()}
     />
   );

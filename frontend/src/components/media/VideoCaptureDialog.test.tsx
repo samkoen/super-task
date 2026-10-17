@@ -118,3 +118,70 @@ describe("VideoCaptureDialog", () => {
     expect(screen.getByRole("button", { name: he.mediaCaptureRetry })).toBeTruthy();
   });
 });
+
+describe("VideoCaptureDialog with the manager's guide", () => {
+  const guide = { title: "צילום כניסה", hint: "צלם סרטון קצר של המדפים" };
+
+  beforeAll(() => {
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => undefined);
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:recorded"),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+
+  function renderGuided(rec: Recorder, minSeconds: number | null = 10) {
+    const onClose = vi.fn();
+    render(
+      <VideoCaptureDialog
+        open
+        uploading={false}
+        recorder={rec}
+        minSeconds={minSeconds}
+        guide={guide}
+        onClose={onClose}
+        onCapture={vi.fn()}
+      />,
+    );
+    return { onClose };
+  }
+
+  it("shows the camera screen with the step title instead of the plain dialog", () => {
+    renderGuided(recorder());
+    expect(screen.getByTestId("guided-camera")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "צילום כניסה" })).toBeTruthy();
+    expect(screen.getByText(he.mediaCaptureVideoReady(10))).toBeTruthy();
+  });
+
+  it("starts recording from the shutter and shows the REC clock", () => {
+    const idle = recorder();
+    renderGuided(idle);
+    fireEvent.click(screen.getByRole("button", { name: he.mediaCaptureRecord }));
+    expect(idle.startRecording).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts down the missing seconds while recording", () => {
+    renderGuided(recorder({ recording: true, elapsedSeconds: 3 }));
+    expect(screen.getByTestId("guided-rec-pill").textContent).toContain("00:03");
+    expect(screen.getByText(he.mediaCaptureVideoKeepGoing(7))).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.mediaCaptureStop })).toBeTruthy();
+  });
+
+  it("cannot be cancelled while recording", () => {
+    renderGuided(recorder({ recording: true, elapsedSeconds: 3 }));
+    expect((screen.getByRole("button", { name: he.cancel }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("falls back to the review screen once the video is recorded", () => {
+    renderGuided(recorder({ blob: videoBlob(), elapsedSeconds: 12 }));
+    expect(screen.queryByTestId("guided-camera")).toBeNull();
+    expect(screen.getByRole("button", { name: he.mediaCaptureUseRecording })).toBeTruthy();
+  });
+
+  it("offers to enable the camera when the preview is not running", () => {
+    const rec = recorder({ previewReady: false });
+    renderGuided(rec);
+    fireEvent.click(screen.getByRole("button", { name: he.mediaCaptureEnableCamera }));
+    expect(rec.startPreview).toHaveBeenCalled();
+  });
+});

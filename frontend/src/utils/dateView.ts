@@ -27,6 +27,12 @@ export function formatHebrewDay(iso: string): string {
   });
 }
 
+/** Jour + date sans année (ex. « יום חמישי, 15 באוקטובר »). */
+export function formatHebrewDayNoYear(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
+}
+
 export function weekRangeAround(iso: string): { from: string; to: string } {
   const d = new Date(`${iso}T12:00:00`);
   const start = new Date(d);

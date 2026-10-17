@@ -32,6 +32,10 @@ vi.mock("../../hooks/useTaskChangeListener", () => ({
   useTaskChangeListener: () => undefined,
 }));
 
+vi.mock("../../hooks/useBranchWeather", () => ({
+  useBranchWeather: () => null,
+}));
+
 vi.mock("../../hooks/useDirectChatLiveSync", () => ({
   useDirectChatLiveSync: () => undefined,
 }));
@@ -140,12 +144,15 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
+    expect(screen.queryByTestId("employee-home-header")).toBeNull();
+    expect(screen.queryByTestId("employee-timeline")).toBeNull();
+    expect(screen.getAllByText(/שפע/)).toHaveLength(1);
     expect(screen.queryByText("מדף חלב")).toBeNull();
     expect(screen.queryByRole("button", { name: he.employeeBreakStart })).toBeNull();
     expect(screen.queryByText(he.employeeProgressDoneLabel, { exact: false })).toBeNull();
     expect(screen.queryByText(he.qualityRatingCount(2))).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: he.punchClockIn }));
+    fireEvent.click(screen.getByRole("button", { name: he.punchOpenShift }));
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "send-chat" }));
     await waitFor(() => expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy());
@@ -163,6 +170,9 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText("מדף חלב")).toBeTruthy();
+    expect(screen.getByTestId("employee-home-header")).toBeTruthy();
+    expect(screen.getByTestId("start-door-hero")).toBeTruthy();
+    expect(screen.getByTestId("employee-timeline")).toBeTruthy();
     expect(screen.getByRole("button", { name: he.employeeBreakStart })).toBeTruthy();
     expect(screen.queryByText(he.punchClockOut)).toBeNull();
     expect(screen.queryByRole("button", { name: he.punchBackToTasks })).toBeNull();
@@ -267,7 +277,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
     expect(screen.queryByText(`${he.employeeShowCompleted} (1)`)).toBeNull();
     expect(screen.queryByText("מילוי מדף")).toBeNull();
   });
@@ -283,7 +293,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
     expect(screen.queryByText("מדף חלב")).toBeNull();
     expect(screen.queryByText(`${he.employeeShowCompleted} (1)`)).toBeNull();
     expect(screen.queryByText("ניקוי רצפה")).toBeNull();
@@ -301,7 +311,7 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText(`${he.employeeShowCompleted} (2)`)).toBeTruthy();
-    expect(screen.queryByText(he.punchClockIn)).toBeNull();
+    expect(screen.queryByRole("heading", { name: he.punchOpenShift })).toBeNull();
     fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (2)`));
     fireEvent.click(screen.getByText("פתיחת משמרת"));
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
@@ -347,7 +357,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchClockIn)).toBeTruthy();
+    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
     expect(screen.queryByText(`${he.employeeManagerWaiting} (1)`)).toBeNull();
     expect(screen.queryByText("ניקוי מדף")).toBeNull();
   });

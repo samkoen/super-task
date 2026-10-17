@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Box,
   CircularProgress,
@@ -65,6 +65,11 @@ export default function TaskOccurrenceEditDialog({
     if (employeesProp) setEmployees(employeesProp);
   }, [employeesProp]);
 
+  // Les parents passent des callbacks/listes recréés à chaque rendu : on les lit via une ref
+  // pour ne recharger (et réinitialiser le formulaire) que lorsque l'id de la tâche change.
+  const latest = useRef({ onClose, showError, role: user?.role, hasEmployees: Boolean(employeesProp) });
+  latest.current = { onClose, showError, role: user?.role, hasEmployees: Boolean(employeesProp) };
+
   useEffect(() => {
     if (!occurrenceId) {
       setTarget(null);
@@ -74,11 +79,12 @@ export default function TaskOccurrenceEditDialog({
     }
     let cancelled = false;
     setLoading(true);
-    void loadEditTarget(occurrenceId, Boolean(employeesProp), (result) => {
+    void loadEditTarget(occurrenceId, latest.current.hasEmployees, (result) => {
       if (cancelled) return;
+      const { onClose: close, showError: fail, role } = latest.current;
       if (result.ok === false) {
-        showError(result.error);
-        onClose();
+        fail(result.error);
+        close();
         setLoading(false);
         return;
       }
@@ -87,7 +93,7 @@ export default function TaskOccurrenceEditDialog({
         ...formFromOccurrence(result.fresh),
         apply_to_network: defaultApplyAdHocEditToNetwork(
           result.fresh,
-          user?.role === "network_manager" || user?.role === "admin",
+          role === "network_manager" || role === "admin",
         ),
       });
       setMediaDirty(false);
@@ -97,7 +103,7 @@ export default function TaskOccurrenceEditDialog({
     return () => {
       cancelled = true;
     };
-  }, [occurrenceId, employeesProp, onClose, showError, user?.role]);
+  }, [occurrenceId]);
 
   const editEmployees = useMemo(() => {
     const staff = withSelfAssignee(employees, user);

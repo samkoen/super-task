@@ -1,11 +1,11 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { he } from "../i18n/he";
 import { apiErrorMessage, humanizeApiError } from "../utils/apiErrorMessage";
-import { resolveApiBaseUrl } from "./apiBaseUrl";
+import { resolveApiBaseUrl, resolveApiTimeoutMs } from "./apiBaseUrl";
 
 const api = axios.create({
   baseURL: resolveApiBaseUrl(),
-  timeout: 30_000,
+  timeout: resolveApiTimeoutMs(),
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });

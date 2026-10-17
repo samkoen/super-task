@@ -15,7 +15,7 @@ describe("ReadinessLine", () => {
   it("says how many steps are left", () => {
     render(<ReadinessLine requirements={reqs} slots={[kept, null]} slotsFilled={false} />);
     expect(screen.getByText(he.captureRemaining(1))).toBeTruthy();
-    expect(screen.getByText(he.completionFillSlotsHint)).toBeTruthy();
+    expect(screen.queryByText(he.completionFillSlotsHint)).toBeNull();
   });
 
   it("says everything is ready once all steps are filled", () => {
@@ -28,7 +28,7 @@ describe("ReadinessLine", () => {
     render(<ReadinessLine requirements={reqs} slots={[kept, kept]} slotsFilled={false} />);
     expect(screen.queryByText(he.captureRemaining(0))).toBeNull();
     expect(screen.queryByText(he.captureAllReady)).toBeNull();
-    expect(screen.getByText(he.completionFillSlotsHint)).toBeTruthy();
+    expect(screen.queryByText(he.completionFillSlotsHint)).toBeNull();
   });
 
   it("stays out of the way for a task without requirements", () => {

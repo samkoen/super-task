@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import TaskOccurrenceEditDialog from "./TaskOccurrenceEditDialog";
 import { he } from "../../i18n/he";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
@@ -107,6 +107,19 @@ describe("TaskOccurrenceEditDialog", () => {
     expect(document.querySelector("img[src='/p.jpg']")).toBeTruthy();
     expect(document.querySelector("video[src='/v.mp4']")).toBeTruthy();
     expect(screen.getByTestId("compact-audio-player")).toBeTruthy();
+  });
+
+  it("does not reload nor reset the form when the parent re-renders with new callbacks", async () => {
+    vi.mocked(taskService.getOccurrence).mockClear();
+    const { rerender } = render(
+      <TaskOccurrenceEditDialog occurrenceId="occ-1" employees={[]} onClose={() => undefined} />,
+    );
+    const title = (await screen.findByLabelText(new RegExp(he.taskTitle))) as HTMLInputElement;
+    fireEvent.change(title, { target: { value: "titre modifié" } });
+    rerender(<TaskOccurrenceEditDialog occurrenceId="occ-1" employees={[]} onClose={() => undefined} />);
+    rerender(<TaskOccurrenceEditDialog occurrenceId="occ-1" employees={[]} onClose={() => undefined} />);
+    expect((screen.getByLabelText(new RegExp(he.taskTitle)) as HTMLInputElement).value).toBe("titre modifié");
+    expect(taskService.getOccurrence).toHaveBeenCalledTimes(1);
   });
 
   it("hides submitted media when the occurrence has none", async () => {

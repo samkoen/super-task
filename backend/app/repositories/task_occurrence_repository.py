@@ -604,6 +604,11 @@ class TaskOccurrenceRepository:
         row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))
         return row.name if row else None
 
+    def get_branch_city(self, branch_id: str) -> str | None:
+        row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))
+        city = (row.city or "").strip() if row else ""
+        return city or None
+
     def get_department_name(self, department_id: str | None) -> str | None:
         if not department_id:
             return None

@@ -1,5 +1,5 @@
 import { useRef, useState, type RefObject } from "react";
-import { Box, Collapse, IconButton, TextField, Typography } from "@mui/material";
+import { Box, Collapse, IconButton, TextField } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import NotesRoundedIcon from "@mui/icons-material/NotesRounded";
@@ -39,9 +39,6 @@ export default function OptionalCaptureAccordion({
   const noteRef = useRef<HTMLTextAreaElement>(null);
   return (
     <Box>
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5, px: 0.5 }}>
-        {he.captureOptionalToggle}
-      </Typography>
       <OptionalCaptureHeader
         open={open}
         disabled={disabled}

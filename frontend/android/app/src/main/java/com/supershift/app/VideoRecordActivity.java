@@ -7,7 +7,7 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -43,8 +43,8 @@ public class VideoRecordActivity extends AppCompatActivity {
 
     private PreviewView previewView;
     private TextView timerView;
-    private Button flipButton;
-    private Button toggleButton;
+    private ImageButton flipButton;
+    private ImageButton toggleButton;
     private ProcessCameraProvider cameraProvider;
     private VideoCapture<Recorder> videoCapture;
     private Recording recording;
@@ -130,7 +130,9 @@ public class VideoRecordActivity extends AppCompatActivity {
         videoCapture = VideoCapture.withOutput(recorder);
         cameraProvider.unbindAll();
         cameraProvider.bindToLifecycle(this, cameraSelector(), preview, videoCapture);
-        flipButton.setEnabled(hasBothCameras());
+        boolean canFlip = hasBothCameras();
+        flipButton.setEnabled(canFlip);
+        flipButton.setAlpha(canFlip ? 1f : 0.4f);
     }
 
     private CameraSelector cameraSelector() {
@@ -198,7 +200,8 @@ public class VideoRecordActivity extends AppCompatActivity {
             event -> onRecordEvent(event, file)
         );
         segmentStartedAt = SystemClock.elapsedRealtime();
-        toggleButton.setText(R.string.video_record_stop);
+        toggleButton.setBackgroundResource(R.drawable.bg_shutter_video_recording);
+        toggleButton.setContentDescription(getString(R.string.video_record_stop));
         timerHandler.post(timerTick);
     }
 

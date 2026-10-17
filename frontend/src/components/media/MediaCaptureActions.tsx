@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Box,
@@ -32,6 +32,8 @@ import { launchPhotoCapture } from "../../utils/launchPhotoCapture";
 import { launchVideoCapture } from "../../utils/launchVideoCapture";
 import CaptureActionButtons from "./CaptureActionButtons";
 import CaptureIconToolbar from "./CaptureIconToolbar";
+import GuidedPhotoStage from "./GuidedPhotoStage";
+import type { CaptureGuide } from "../../utils/captureGuide";
 import AppDialogTitle from "../ui/AppDialogTitle";
 import { dialogSecondaryActionSx, dialogStackedActionsSx } from "../../styles/dialogUi";
 import { employeePrimaryButtonSx } from "../../styles/employeeUi";
@@ -62,6 +64,10 @@ interface MediaCaptureActionsProps {
   onAudioStart?: () => void;
   onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
   onAnnotatingChange?: (busy: boolean) => void;
+  /** Consigne du menahel (titre, texte, image) : active l'écran caméra guidé. */
+  guide?: CaptureGuide;
+  /** Remplace les boutons : l'appelant dessine sa propre surface qui ouvre la capture. */
+  trigger?: (open: () => void, state: { disabled: boolean }) => ReactNode;
 }
 
 function takePhotoFile(
@@ -156,7 +162,10 @@ export function PhotoCaptureDialog({
   seedBlob = null,
   preparing = false,
   faceGuide = false,
+  guide,
 }: {
+  /** Consigne du menahel : écran caméra guidé avant la prise de vue. */
+  guide?: CaptureGuide;
   open: boolean;
   uploading: boolean;
   camera: ReturnType<typeof useCameraStream>;
@@ -227,9 +236,28 @@ export function PhotoCaptureDialog({
 
   const hasPreview = Boolean(previewBlob && previewBlob.size > 0);
 
+  if (guide && !hasPreview && !preparing) {
+    return (
+      <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="xs" dir="rtl" disableEnforceFocus>
+        <GuidedPhotoStage
+          camera={camera}
+          guide={guide}
+          capturing={capturing}
+          uploading={uploading}
+          onShoot={() => void handleCapture()}
+          onClose={onClose}
+        />
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth fullScreen={fullScreen} maxWidth="sm" dir="rtl" disableEnforceFocus>
-      <AppDialogTitle title={title ?? he.mediaCapturePhotoTitle} onClose={onClose} closeDisabled={capturing || confirming} />
+      <AppDialogTitle
+        title={title ?? guide?.title ?? he.mediaCapturePhotoTitle}
+        onClose={onClose}
+        closeDisabled={capturing || confirming}
+      />
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1, overflowY: "auto" }}>
         {faceGuide && !hasPreview ? (
           <Typography variant="body1" fontWeight={700} textAlign="center">
@@ -363,6 +391,8 @@ export default function MediaCaptureActions({
   onAudioStart,
   onCapture,
   onAnnotatingChange,
+  guide,
+  trigger,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream({ defaultFacing: "environment" });
   const videoRecorder = useVideoRecorder({ defaultFacing: "environment" });
@@ -505,9 +535,14 @@ export default function MediaCaptureActions({
     />
   );
 
+  const primary: MediaKind = showVideo ? "video" : showPhoto ? "photo" : "audio";
+  const openers = { photo: openPhotoCapture, video: openVideoCapture, audio: openAudio };
+  const disabledBy = { photo: photoDisabled, video: videoDisabled, audio: captureDisabled };
+  const customTrigger = trigger ? trigger(openers[primary], { disabled: disabledBy[primary] }) : null;
+
   return (
     <>
-      {density === "default" ? defaultActions : iconActions}
+      {customTrigger ?? (density === "default" ? defaultActions : iconActions)}
       {!captureSupported && !nativeVideo && !nativePhoto && (
         <Typography variant="caption" color="warning.main">
           {he.mediaCaptureUnsupported}
@@ -524,6 +559,7 @@ export default function MediaCaptureActions({
         camera={photoCamera}
         seedBlob={photoSeed}
         preparing={photoPreparing}
+        guide={guide}
         onClose={closePhotoCapture}
         onCapture={(file) => onCapture(file, "photo")}
       />
@@ -532,6 +568,7 @@ export default function MediaCaptureActions({
         uploading={uploadingKind === "video"}
         recorder={videoRecorder}
         minSeconds={minVideoSeconds && minVideoSeconds > 0 ? minVideoSeconds : null}
+        guide={guide}
         onClose={closeVideoCapture}
         onCapture={(file, durationSeconds) => onCapture(file, "video", { durationSeconds })}
       />
