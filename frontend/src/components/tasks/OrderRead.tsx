@@ -20,6 +20,7 @@ export default function OrderRead({ occurrenceId, disabled = false }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    setOrders(null);
     setLoadFailed(false);
     loadOrders(occurrenceId).then((result) => {
       if (cancelled) return;
@@ -33,7 +34,15 @@ export default function OrderRead({ occurrenceId, disabled = false }: Props) {
 
   if (loadFailed) return <LoadError onRetry={() => setAttempt(attempt + 1)} />;
   if (!orders) return null;
-  return <OrderPanel occurrenceId={occurrenceId} orders={orders} disabled={disabled} onRead={setOrders} />;
+  return (
+    <OrderPanel
+      key={occurrenceId}
+      occurrenceId={occurrenceId}
+      orders={orders}
+      disabled={disabled}
+      onRead={setOrders}
+    />
+  );
 }
 
 async function loadOrders(occurrenceId: string): Promise<AgrolineOrderPdf[] | null | "error"> {
