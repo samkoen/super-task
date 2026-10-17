@@ -21,6 +21,7 @@ vi.mock("../plugins/apkUpdate", () => ({
 }));
 vi.mock("../services/apiBaseUrl", () => ({
   resolveApiBaseUrl: () => "https://api.example/api",
+  resolveApiTimeoutMs: () => 30_000,
 }));
 
 import { useAppUpdate } from "./useAppUpdate";

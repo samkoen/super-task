@@ -498,7 +498,9 @@ describe("EmployeeTaskDetailDialog", () => {
 
   it("puts the title and the close button on the first line, status, time and icons on the second", () => {
     render(<EmployeeTaskDetailDialog task={task("in_progress")} onClose={vi.fn()} />);
-    const close = screen.getByRole("button", { name: he.close });
+    const close = screen.getAllByRole("button", { name: he.close }).find((button) =>
+      button.querySelector("[data-testid='CloseRoundedIcon']"),
+    ) as HTMLElement;
     const titleRow = close.parentElement as HTMLElement;
     expect(titleRow.contains(screen.getByText("צילום מדף"))).toBe(true);
     const row = screen.getByTestId("task-status-row");
