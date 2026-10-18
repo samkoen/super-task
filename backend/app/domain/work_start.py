@@ -58,6 +58,26 @@ def arrival_at_from_visual(attachments: list | None, *, now: datetime) -> dateti
     return now if when > now else when
 
 
+def _punch_closed(tasks: list, flag: str) -> bool:
+    return any(
+        getattr(task, flag, False) and getattr(task, "status", None) in CLOCK_IN_STATUSES
+        for task in tasks
+    )
+
+
+def employee_on_shift(tasks: list, *, active_work: bool = False) -> bool:
+    """En משמרת dès que פתיחת משמרת est close, jusqu'à סיום משמרת.
+
+    Sans tâche d'ouverture : repli sur une tâche déjà en cours.
+    """
+    has_start = any(getattr(task, "is_work_start", False) for task in tasks)
+    if not has_start:
+        return active_work
+    if _punch_closed(tasks, "is_work_end"):
+        return False
+    return _punch_closed(tasks, "is_work_start")
+
+
 def clock_in_at(tasks: list, *, fallback_any_start: bool = True) -> str | None:
     """Heure d'arrivée = started_at de la tâche pointage fermée.
 

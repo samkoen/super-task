@@ -34,6 +34,7 @@ from app.domain.manager_dashboard import (
     task_queue_bucket,
 )
 from app.domain.employee_day_buckets import split_employee_day_tasks
+from app.domain.work_start import employee_on_shift
 from app.domain.manager_waiting import select_manager_waiting, waiting_message_preview
 from app.domain.store_kpis import build_store_kpis
 from app.domain.quality_rating import aggregate_quality_ratings, empty_quality_summary
@@ -179,7 +180,10 @@ class DashboardService:
         buckets = split_employee_day_tasks(tasks_today, now=now, tz=TZ)
         counts = _count_by_status(tasks_today)
         progress = int(round(counts["completion_rate"] * 100))
-        on_shift = len(buckets.in_progress) > 0 or len(buckets.awaiting_response) > 0
+        on_shift = employee_on_shift(
+            tasks_today,
+            active_work=bool(buckets.in_progress or buckets.awaiting_response),
+        )
         language = user.preferred_language if user else "he"
         quality = self._quality_summaries([actor.user_id]).get(
             actor.user_id, empty_quality_summary()
