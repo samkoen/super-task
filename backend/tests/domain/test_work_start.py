@@ -6,6 +6,7 @@ from app.domain import task_status
 from app.domain.work_start import (
     arrival_at_from_visual,
     clock_in_at,
+    employee_on_shift,
     first_visual_captured_at,
     normalize_work_flags,
 )
@@ -49,6 +50,39 @@ def test_clock_in_uses_closed_work_start_only():
         ),
     ]
     assert clock_in_at(tasks) == "2026-08-18T08:40:00+03:00"
+
+
+def test_on_shift_after_open_punch_before_any_task_starts():
+    tasks = [
+        _task(is_work_start=True, status=task_status.PENDING_REVIEW),
+        _task(status=task_status.PENDING),
+        _task(is_work_end=True, status=task_status.PENDING),
+    ]
+    assert employee_on_shift(tasks, active_work=False) is True
+
+
+def test_on_shift_false_until_open_punch_closed():
+    tasks = [
+        _task(is_work_start=True, status=task_status.PENDING),
+        _task(status=task_status.IN_PROGRESS),
+    ]
+    assert employee_on_shift(tasks, active_work=True) is False
+
+
+def test_on_shift_false_after_close_punch():
+    tasks = [
+        _task(is_work_start=True, status=task_status.COMPLETED),
+        _task(is_work_end=True, status=task_status.COMPLETED),
+        _task(status=task_status.IN_PROGRESS),
+    ]
+    assert employee_on_shift(tasks, active_work=True) is False
+
+
+def test_on_shift_without_punch_follows_active_work():
+    idle = [_task(status=task_status.PENDING)]
+    busy = [_task(status=task_status.IN_PROGRESS)]
+    assert employee_on_shift(idle, active_work=False) is False
+    assert employee_on_shift(busy, active_work=True) is True
 
 
 def test_clock_in_none_until_work_start_closed():
