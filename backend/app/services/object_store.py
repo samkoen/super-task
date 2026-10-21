@@ -135,7 +135,6 @@ def ensure_browser_put_cors() -> None:
     global _cors_applied
     if _cors_applied or not config.object_storage_enabled():
         return
-    _cors_applied = True
     try:
         s3_client().put_bucket_cors(
             Bucket=config.R2_BUCKET,
@@ -143,6 +142,8 @@ def ensure_browser_put_cors() -> None:
         )
     except Exception:
         logger.warning("R2 browser PUT CORS was not updated")
+        return
+    _cors_applied = True
 
 
 def presign_put(key: str, content_type: str, content_length: int) -> str:

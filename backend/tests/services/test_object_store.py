@@ -60,6 +60,26 @@ def _enable_r2(monkeypatch, fake: FakeS3):
     object_store.reset_browser_put_cors()
 
 
+def test_browser_put_cors_retries_after_a_failed_write(monkeypatch):
+    fake = FakeS3()
+    _enable_r2(monkeypatch, fake)
+    attempts = {"n": 0}
+    real = fake.put_bucket_cors
+
+    def flaky(**kwargs):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise RuntimeError("r2 down")
+        real(**kwargs)
+
+    fake.put_bucket_cors = flaky
+    object_store.presign_put("task_videos/a.webm", "video/webm", 1)
+    object_store.presign_put("task_videos/b.webm", "video/webm", 1)
+    object_store.presign_put("task_videos/c.webm", "video/webm", 1)
+    assert len(fake.cors) == 1
+    assert attempts["n"] == 2
+
+
 def test_put_copy_delete_and_presign(monkeypatch):
     fake = FakeS3()
     _enable_r2(monkeypatch, fake)
