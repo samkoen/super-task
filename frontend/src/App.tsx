@@ -28,6 +28,7 @@ const ManagerFixedTasksPage = lazy(() => import("./pages/manager/ManagerFixedTas
 const ManagerEmployeesPage = lazy(() => import("./pages/manager/ManagerEmployeesPage"));
 const ManagerReportsPage = lazy(() => import("./pages/manager/ManagerReportsPage"));
 const ManagerProfilePage = lazy(() => import("./pages/manager/ManagerProfilePage"));
+const ManagerSettingsPage = lazy(() => import("./pages/manager/ManagerSettingsPage"));
 const EmployeeTasksPage = lazy(() => import("./pages/employee/EmployeeTasksPage"));
 const EmployeeChatsPage = lazy(() => import("./pages/employee/EmployeeChatsPage"));
 const EmployeeProfilePage = lazy(() => import("./pages/employee/EmployeeProfilePage"));
@@ -224,6 +225,14 @@ export default function App() {
             element={
               <LazyPage>
                 <ManagerProfilePage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/settings"
+            element={
+              <LazyPage>
+                <ManagerSettingsPage />
               </LazyPage>
             }
           />

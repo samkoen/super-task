@@ -11,13 +11,12 @@ from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
-from app.repositories.task_template_repository import TaskTemplateRepository
 from app.repositories.user_repository import UserRepository
 from app.realtime.task_events import notify_task_change
 from app.services import blob_storage
 from app.services.employee_activity_service import EmployeeActivityService
 from app.services.media_ready_service import MediaReadyService
-from app.services.media_retention_service import MediaRetentionService
+from app.services.media_retention_service import bind_media_retention
 from app.services.notification_service import NotificationService
 
 router = APIRouter()
@@ -44,12 +43,7 @@ def purge_expired_media(
 ):
     """Ménage quotidien : médias expirés + alertes > 7 jours."""
     _assert_cron_authorized(authorization)
-    service = MediaRetentionService(
-        TaskOccurrenceRepository(db),
-        TaskCompletionRepository(db),
-        template_repo=TaskTemplateRepository(db),
-    )
-    media_result = service.purge_due()
+    media_result = bind_media_retention(db).purge_due()
     notifications_deleted = NotificationRepository(db).delete_older_than(
         notification_purge_cutoff()
     )

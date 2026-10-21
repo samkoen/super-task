@@ -830,6 +830,16 @@ class AgrolineOrder(Base):
     )
 
 
+class AppSetting(Base):
+    """Réglage global. `media_retention_days` : jours de conservation des médias."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(64), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class AgrolineAccount(Base):
     """Identifiants Agroline. Le mot de passe est chiffré, jamais renvoyé."""
 

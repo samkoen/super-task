@@ -2,11 +2,20 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.core import config
+from sqlalchemy.orm import Session
+
 from app.domain.completion_media import attachment_urls, requirement_example_urls
+from app.domain.media_retention_policy import (
+    DEFAULT_RETENTION_DAYS,
+    MAX_RETENTION_DAYS,
+    MIN_RETENTION_DAYS,
+    finished_at,
+    media_is_due,
+)
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.task_template_repository import TaskTemplateRepository
@@ -22,14 +31,16 @@ class MediaRetentionService:
         occurrence_repo: TaskOccurrenceRepository,
         completion_repo: TaskCompletionRepository,
         template_repo: TaskTemplateRepository | None = None,
+        retention_days: Callable[[], int] | None = None,
     ):
         self._occurrences = occurrence_repo
         self._completions = completion_repo
         self._templates = template_repo
+        self._retention_days = retention_days or (lambda: DEFAULT_RETENTION_DAYS)
 
     def schedule_purge(self, occurrence_id: str, *, now: datetime | None = None) -> datetime:
         when = now or datetime.now(TZ)
-        purge_after = when + timedelta(hours=config.MEDIA_RETENTION_HOURS)
+        purge_after = when + timedelta(days=self._safe_days())
         self._occurrences.set_media_purge_after(occurrence_id, purge_after)
         return purge_after
 
@@ -38,12 +49,31 @@ class MediaRetentionService:
 
     def purge_due(self, *, now: datetime | None = None) -> dict:
         moment = now or datetime.now(TZ)
-        due = self._occurrences.list_due_for_media_purge(moment)
-        purged = 0
-        for occurrence in due:
-            if self._purge_one(occurrence.id):
-                purged += 1
-        return {"purged": purged, "checked": len(due), "at": moment.isoformat()}
+        days = self._safe_days()
+        pending = self._occurrences.list_scheduled_media_purge()
+        purged = sum(1 for item in pending if self._purge_if_due(item.id, days, moment))
+        return {"purged": purged, "checked": len(pending), "at": moment.isoformat()}
+
+    def _safe_days(self) -> int:
+        try:
+            days = int(self._retention_days())
+        except (TypeError, ValueError):
+            return DEFAULT_RETENTION_DAYS
+        if days < MIN_RETENTION_DAYS or days > MAX_RETENTION_DAYS:
+            return DEFAULT_RETENTION_DAYS
+        return days
+
+    def _purge_if_due(self, occurrence_id: str, days: int, now: datetime) -> bool:
+        if not self._retention_elapsed(occurrence_id, days, now):
+            return False
+        return self._purge_one(occurrence_id)
+
+    def _retention_elapsed(self, occurrence_id: str, days: int, now: datetime) -> bool:
+        completion = self._completions.find_by_occurrence(occurrence_id)
+        if completion is None:
+            return True
+        anchor = finished_at(completion.manager_reviewed_at, completion.completed_at)
+        return media_is_due(anchor, days, now)
 
     def collect_deletable_media_urls(self, occurrence_id: str) -> list[str]:
         """URLs à supprimer (hors celles encore liées au template)."""
@@ -110,3 +140,15 @@ class MediaRetentionService:
             len(deleted),
         )
         return True
+
+
+def bind_media_retention(db: Session) -> MediaRetentionService:
+    from app.repositories.app_setting_repository import AppSettingRepository
+
+    settings = AppSettingRepository(db)
+    return MediaRetentionService(
+        TaskOccurrenceRepository(db),
+        TaskCompletionRepository(db),
+        template_repo=TaskTemplateRepository(db),
+        retention_days=settings.media_retention_days,
+    )

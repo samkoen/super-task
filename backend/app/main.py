@@ -28,6 +28,7 @@ from app.controllers import (
     invitation_controller,
     issue_report_controller,
     media_controller,
+    media_retention_settings_controller,
     network_controller,
     notification_controller,
     product_controller,
@@ -68,6 +69,14 @@ def _configure_logging() -> None:
     logging.getLogger("app").setLevel(level)
 
 
+def _start_media_purge_loop():
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return None
+    from app.services.media_purge_loop import media_purge_loop
+
+    return asyncio.create_task(media_purge_loop())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     run_startup_migrations(
@@ -76,7 +85,12 @@ async def lifespan(app: FastAPI):
         database_url=os.environ.get("DATABASE_URL", ""),
     )
     sse_hub.bind_loop(asyncio.get_running_loop())
-    yield
+    purge_task = _start_media_purge_loop()
+    try:
+        yield
+    finally:
+        if purge_task is not None:
+            purge_task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -174,6 +188,11 @@ def create_app() -> FastAPI:
     app.include_router(ai_controller.router, prefix="/api/ai", tags=["ai"])
     app.include_router(cron_controller.router, prefix="/api/cron", tags=["cron"])
     app.include_router(media_controller.router, prefix="/api/media", tags=["media"])
+    app.include_router(
+        media_retention_settings_controller.router,
+        prefix="/api/settings",
+        tags=["settings"],
+    )
 
     # HTML et /api sur le même hôte : cookie de session first-party pour Safari iOS.
     # Sans frontend/dist, rien n'est monté (dev Vite, tests). L'APK ne passe pas par ici.
