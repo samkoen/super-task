@@ -112,7 +112,41 @@ def object_is_readable(url: str) -> bool:
         return False
 
 
+_cors_applied = False
+
+
+def reset_browser_put_cors() -> None:
+    global _cors_applied
+    _cors_applied = False
+
+
+def browser_put_cors_rule() -> dict:
+    """Le téléphone envoie la vidéo en PUT direct vers R2."""
+    return {
+        "AllowedOrigins": ["*"],
+        "AllowedMethods": ["GET", "PUT", "HEAD"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["ETag"],
+        "MaxAgeSeconds": 3600,
+    }
+
+
+def ensure_browser_put_cors() -> None:
+    global _cors_applied
+    if _cors_applied or not config.object_storage_enabled():
+        return
+    _cors_applied = True
+    try:
+        s3_client().put_bucket_cors(
+            Bucket=config.R2_BUCKET,
+            CORSConfiguration={"CORSRules": [browser_put_cors_rule()]},
+        )
+    except Exception:
+        logger.warning("R2 browser PUT CORS was not updated")
+
+
 def presign_put(key: str, content_type: str, content_length: int) -> str:
+    ensure_browser_put_cors()
     return s3_client().generate_presigned_url(
         "put_object",
         Params={
