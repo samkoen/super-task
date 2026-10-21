@@ -30,6 +30,8 @@ def get_gallery_service(db: Session = Depends(get_db)) -> TaskGalleryService:
 
 
 def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceService:
+    from app.services.media_retention_service import bind_media_retention
+
     return TaskOccurrenceService(
         TaskOccurrenceRepository(db),
         TaskCompletionRepository(db),
@@ -37,6 +39,7 @@ def get_occurrence_service(db: Session = Depends(get_db)) -> TaskOccurrenceServi
         UserRepository(db),
         TaskTranslationService(TaskTranslationRepository(db)),
         TaskTemplateRepository(db),
+        media_retention=bind_media_retention(db),
         notification_repo=NotificationRepository(db),
         gallery_repo=TaskGalleryRepository(db),
     )

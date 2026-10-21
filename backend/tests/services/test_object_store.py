@@ -16,6 +16,7 @@ class FakeS3:
     def __init__(self):
         self.objects: dict[str, tuple[bytes, str]] = {}
         self.presigned: list[tuple[str, dict]] = []
+        self.cors: list[dict] = []
 
     def put_object(self, *, Bucket: str, Key: str, Body: bytes, ContentType: str):
         self.objects[Key] = (Body, ContentType)
@@ -38,6 +39,9 @@ class FakeS3:
             raise KeyError(Key)
         return {"ContentType": self.objects[Key][1]}
 
+    def put_bucket_cors(self, *, Bucket: str, CORSConfiguration: dict):
+        self.cors.append(CORSConfiguration["CORSRules"][0])
+
     def generate_presigned_url(self, method: str, Params: dict, ExpiresIn: int):
         self.presigned.append((method, Params))
         return f"https://signed.example/{method}/{Params['Key']}"
@@ -53,6 +57,27 @@ def _enable_r2(monkeypatch, fake: FakeS3):
         "https://abc.r2.cloudflarestorage.com",
     )
     monkeypatch.setattr(object_store, "s3_client", lambda: fake)
+    object_store.reset_browser_put_cors()
+
+
+def test_browser_put_cors_retries_after_a_failed_write(monkeypatch):
+    fake = FakeS3()
+    _enable_r2(monkeypatch, fake)
+    attempts = {"n": 0}
+    real = fake.put_bucket_cors
+
+    def flaky(**kwargs):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise RuntimeError("r2 down")
+        real(**kwargs)
+
+    fake.put_bucket_cors = flaky
+    object_store.presign_put("task_videos/a.webm", "video/webm", 1)
+    object_store.presign_put("task_videos/b.webm", "video/webm", 1)
+    object_store.presign_put("task_videos/c.webm", "video/webm", 1)
+    assert len(fake.cors) == 1
+    assert attempts["n"] == 2
 
 
 def test_put_copy_delete_and_presign(monkeypatch):
@@ -68,6 +93,9 @@ def test_put_copy_delete_and_presign(monkeypatch):
     put = object_store.presign_put("task_videos/c.webm", "video/webm", 42)
     assert "put_object" in put
     assert fake.presigned[0][1]["ContentLength"] == 42
+    assert fake.cors[0]["AllowedMethods"] == ["GET", "PUT", "HEAD"]
+    object_store.presign_put("task_videos/d.webm", "video/webm", 1)
+    assert len(fake.cors) == 1
     assert fake.presigned[0][1]["ContentType"] == "video/webm"
     get = object_store.presign_get(url)
     assert "get_object" in get

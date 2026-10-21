@@ -165,6 +165,13 @@ export const he = {
   passwordOptional: "סיסמה (השאר ריק לשמירה)",
   employeeArea: "המשימות שלי",
   myAccount: "החשבון שלי",
+  managerSettings: "הגדרות",
+  mediaRetentionHint:
+    "כמה ימים נשמרים הסרטונים, ההקלטות והתמונות אחרי סיום המשימה. 0 מוחק אותם בניקוי הבא.",
+  mediaRetentionDays: "מספר ימים",
+  mediaRetentionSave: "שמירה",
+  mediaRetentionSaved: "ההגדרה נשמרה",
+  mediaRetentionInvalid: "יש להזין מספר ימים בין 0 ל-365",
   myAccountSubtitle: "עדכון פרטים אישיים ושינוי סיסמה",
   employeeAccountSubtitle: "עדכון פרטים, שפה ותמונת פרופיל",
   myLanguage: "השפה שלי",

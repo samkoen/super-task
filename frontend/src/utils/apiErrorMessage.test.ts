@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { he } from "../i18n/he";
-import { apiErrorMessage, humanizeApiError, isFetchInterruptedError } from "./apiErrorMessage";
+import {
+  apiErrorMessage,
+  humanizeApiError,
+  isFetchInterruptedError,
+  isHtmlErrorDocument,
+} from "./apiErrorMessage";
 
 describe("apiErrorMessage", () => {
   it("reads a Hebrew error string from the API body", () => {
@@ -62,6 +67,14 @@ describe("apiErrorMessage", () => {
   it("detects interrupt errors used for upload retries", () => {
     expect(isFetchInterruptedError(new TypeError("Failed to fetch"))).toBe(true);
     expect(isFetchInterruptedError(new Error("upload failed"))).toBe(false);
+  });
+
+  it("does not show a raw HTML error page to the employee", () => {
+    const page = `<!DOCTYPE html><html><body><path d="M58.5148 5.09334"/></svg></a></div></footer></body></html>`;
+    expect(isHtmlErrorDocument(page)).toBe(true);
+    expect(humanizeApiError(page)).toBe(he.errorGeneric);
+    expect(apiErrorMessage(new Error(page), he.errorGeneric)).toBe(he.errorGeneric);
+    expect(humanizeApiError("<html>Request Entity Too Large 413</html>")).toBe(he.errorRequestTooLarge);
   });
 
   it("falls back when the payload is not readable", () => {

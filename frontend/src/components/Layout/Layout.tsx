@@ -30,6 +30,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import SettingsIcon from "@mui/icons-material/Settings";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import NotificationBell from "../notifications/NotificationBell";
 import ChatAlertBanner from "../notifications/ChatAlertBanner";
@@ -179,6 +180,7 @@ function Layout() {
         { text: he.managerFixedTasks, icon: <RepeatIcon />, path: "/manager/fixed-tasks" },
         { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/manager/gallery" },
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
+        { text: he.managerSettings, icon: <SettingsIcon />, path: "/manager/settings" },
         { text: he.myAccount, icon: <AccountCircleIcon />, path: "/manager/account" },
       );
       return withSystemBugInbox(user, items);

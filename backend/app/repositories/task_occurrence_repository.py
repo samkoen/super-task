@@ -545,12 +545,8 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
-    def list_due_for_media_purge(self, before: datetime) -> list[TaskOccurrence]:
-        q = (
-            select(orm.TaskOccurrence)
-            .where(orm.TaskOccurrence.media_purge_after.is_not(None))
-            .where(orm.TaskOccurrence.media_purge_after <= before)
-        )
+    def list_scheduled_media_purge(self) -> list[TaskOccurrence]:
+        q = select(orm.TaskOccurrence).where(orm.TaskOccurrence.media_purge_after.is_not(None))
         rows = self._db.execute(q).scalars().all()
         return [o for r in rows if (o := mp.task_occurrence_orm_to_domain(r))]
 

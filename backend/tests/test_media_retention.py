@@ -64,15 +64,14 @@ def _completion(**overrides) -> TaskCompletion:
     return TaskCompletion(**base)
 
 
-def test_schedule_purge_uses_retention_hours(monkeypatch):
-    monkeypatch.setattr("app.services.media_retention_service.config.MEDIA_RETENTION_HOURS", 24)
+def test_schedule_purge_uses_configured_days():
     occurrence_repo = MagicMock()
-    service = MediaRetentionService(occurrence_repo, MagicMock())
+    service = MediaRetentionService(occurrence_repo, MagicMock(), retention_days=lambda: 5)
     now = datetime(2026, 7, 17, 12, 0, tzinfo=TZ)
 
     when = service.schedule_purge("occ-1", now=now)
 
-    assert when == now + timedelta(hours=24)
+    assert when == now + timedelta(days=5)
     occurrence_repo.set_media_purge_after.assert_called_once_with("occ-1", when)
 
 
@@ -85,7 +84,7 @@ def test_purge_due_deletes_reference_and_completion_media(monkeypatch):
     occurrence = _occurrence()
     completion = _completion()
     occurrence_repo = MagicMock()
-    occurrence_repo.list_due_for_media_purge.return_value = [occurrence]
+    occurrence_repo.list_scheduled_media_purge.return_value = [occurrence]
     occurrence_repo.find_by_id.return_value = occurrence
     completion_repo = MagicMock()
     completion_repo.find_by_occurrence.return_value = completion
@@ -160,9 +159,31 @@ def test_collect_includes_slot_example_unless_on_template():
     assert "https://blob.example/owned-slot.jpg" in urls
 
 
+def test_purge_due_waits_when_retention_is_not_over(monkeypatch):
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "app.services.media_retention_service.blob_storage.delete_media_url",
+        lambda url: deleted.append(url) if url else None,
+    )
+    now = datetime(2026, 7, 18, 13, 0, tzinfo=TZ)
+    occurrence = _occurrence(media_purge_after=now.isoformat())
+    completion = _completion(manager_reviewed_at=(now - timedelta(days=2)).isoformat())
+    occurrence_repo = MagicMock()
+    occurrence_repo.list_scheduled_media_purge.return_value = [occurrence]
+    completion_repo = MagicMock()
+    completion_repo.find_by_occurrence.return_value = completion
+    service = MediaRetentionService(occurrence_repo, completion_repo, retention_days=lambda: 7)
+
+    result = service.purge_due(now=now)
+
+    assert result["purged"] == 0
+    assert deleted == []
+    occurrence_repo.clear_reference_media.assert_not_called()
+
+
 def test_purge_due_empty_list():
     occurrence_repo = MagicMock()
-    occurrence_repo.list_due_for_media_purge.return_value = []
+    occurrence_repo.list_scheduled_media_purge.return_value = []
     service = MediaRetentionService(occurrence_repo, MagicMock())
     result = service.purge_due(now=datetime.now(TZ))
     assert result["purged"] == 0

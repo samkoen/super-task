@@ -28,6 +28,23 @@ export function isFetchInterruptedError(error: unknown): boolean {
 }
 
 const OBJECT_STRING = "[object Object]";
+const HTML_DOCUMENT = /<!doctype\s+html|<html[\s>]|<\/html>/i;
+const HTML_TOO_LARGE = /request entity too large|payload too large|function_payload_too_large|\b413\b/i;
+
+/** Page HTML brute (erreur d'hébergeur), pas un message à montrer. */
+export function isHtmlErrorDocument(text: string): boolean {
+  return HTML_DOCUMENT.test(text);
+}
+
+function readableErrorText(text: string): string {
+  if (isRequestEntityTooLarge(text) || (isHtmlErrorDocument(text) && HTML_TOO_LARGE.test(text))) {
+    return he.errorRequestTooLarge;
+  }
+  if (isRequestTimeoutText(text)) return he.errorServerUnreachable;
+  if (isFetchInterruptedText(text)) return he.errorFetchInterrupted;
+  if (isHtmlErrorDocument(text)) return he.errorGeneric;
+  return text;
+}
 
 export function humanizeApiError(payload: unknown, depth = 0): string {
   if (depth > 5 || payload == null) return "";
@@ -36,15 +53,12 @@ export function humanizeApiError(payload: unknown, depth = 0): string {
     if (!text || text === OBJECT_STRING) return "";
     if (text.startsWith("{") || text.startsWith("[")) {
       try {
-        return humanizeApiError(JSON.parse(text), depth + 1) || text;
+        return humanizeApiError(JSON.parse(text), depth + 1) || readableErrorText(text);
       } catch {
-        return text;
+        return readableErrorText(text);
       }
     }
-    if (isRequestEntityTooLarge(text)) return he.errorRequestTooLarge;
-    if (isRequestTimeoutText(text)) return he.errorServerUnreachable;
-    if (isFetchInterruptedText(text)) return he.errorFetchInterrupted;
-    return text;
+    return readableErrorText(text);
   }
   if (typeof payload === "number" || typeof payload === "boolean") return String(payload);
   if (Array.isArray(payload)) {
