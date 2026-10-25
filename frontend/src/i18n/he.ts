@@ -329,6 +329,49 @@ export const he = {
   fixedTaskUpdateAllBranchesHint: "רק השדות שערכת יעודכנו בכל הסניפים. השיוך לעובד נשאר בכל סניף.",
   fixedTaskUpdateAllBranchesConfirm: "כל הסניפים יעודכנו בערכים החדשים",
   fixedTaskNetworkChip: "כל הרשת",
+  fixedTaskBranchesWithoutEmployee: (names: string) =>
+    `בסניפים אלה אין עובד משויך: ${names}. כדאי להוסיף עובד לפני יצירת המשימה.`,
+  fixedGroupSearch: "חיפוש משימה",
+  fixedGroupActiveOf: (active: number, total: number) =>
+    `פעילה ב-${active} מתוך ${total} סניפים`,
+  fixedGroupCustomizedChip: (count: number) =>
+    count === 1 ? "מותאמת בסניף אחד" : `מותאמת ב-${count} סניפים`,
+  fixedGroupUnassignedChip: (count: number) =>
+    count === 1 ? "סניף ללא עובד" : `${count} סניפים ללא עובד`,
+  fixedGroupStatusActive: "פעילה",
+  fixedGroupStatusInactive: "לא פעילה",
+  fixedDetailTabGeneral: "הגדרות כלליות",
+  fixedDetailTabBranches: "סניפים",
+  fixedDetailNotFound: "המשימה לא נמצאה",
+  fixedDetailGeneralHint: "ההגדרות חלות על כל הסניפים. שיוך לעובד נקבע בכל סניף בנפרד.",
+  fixedDetailImpact: (branches: number, customized: number) =>
+    customized > 0
+      ? `ישפיע על ${branches} סניפים · שדות שהותאמו ב-${customized} סניפים לא ישונו`
+      : `ישפיע על ${branches} סניפים`,
+  fixedDetailSave: "שמירת הגדרות כלליות",
+  fixedDetailSaved: "ההגדרות הכלליות נשמרו",
+  fixedDetailDanger: "אזור מסוכן",
+  fixedDetailDeleteNetwork: "מחיקת המשימה מכל הרשת",
+  fixedDetailRemoveFromBranch: "הסרה מהסניף",
+  fixedBranchCustomized: "מותאם",
+  fixedBranchNoAssignee: "אין עובד משויך",
+  fixedBranchSheetTitle: (name: string) => `התאמה לסניף ${name}`,
+  fixedBranchCustomToggle: "התאמה לסניף",
+  fixedBranchDefaultValue: (value: string) => `ברירת מחדל: ${value}`,
+  fixedBranchActiveLabel: "פעילה בסניף",
+  fixedBranchDaysLabel: "ימים בשבוע",
+  fixedBranchDescriptionLabel: "הוראות מיוחדות לסניף",
+  fixedBranchSave: "שמירת ההתאמה",
+  fixedBranchSaved: "ההתאמה לסניף נשמרה",
+  fixedBranchResetAll: "חזרה לברירת מחדל בכל השדות",
+  fixedOverrideFieldLabels: {
+    due_time: "שעה",
+    weekly_days: "ימים",
+    is_active: "הפעלה",
+    description: "הוראות",
+    reference_media: "מדיה",
+    start_url: "קישור",
+  },
   managerFixedTasksCreatedNetwork: (count: number) =>
     count === 1 ? "משימה קבועה נוצרה בסניף אחד" : `נוצרו ${count} משימות קבועות ברשת`,
   managerAdHocCreatedNetwork: (count: number) =>
@@ -357,6 +400,7 @@ export const he = {
   },
   taskFormSectionWhat: "מה צריך לעשות",
   taskFormSectionWho: "למי ומתי",
+  taskFormSectionWhen: "מתי",
   taskFormSectionProof: "מה העובד צריך לצרף",
   taskFormSectionHelp: "הסבר לעובד (תמונה, וידאו או הקלטה)",
   taskAdvancedOptions: "אפשרויות מתקדמות",

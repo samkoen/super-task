@@ -323,6 +323,25 @@ class TaskTemplateService:
         self._sync_open_occurrence_text(updated)
         return self._to_api(updated)
 
+    # --- Points d'entrée publics pour FixedTaskGroupService -----------------
+
+    def require_editable(self, actor: ActorContext, template_id: str):
+        return self._require_editable_template(actor, template_id)
+
+    def to_api(self, template, **extra) -> dict:
+        return self._to_api(template, **extra)
+
+    def sync_open_occurrences(self, template) -> None:
+        self._sync_open_occurrence_text(template)
+
+    def validate_assignment(
+        self, branch_id: str, assignee_user_id: str | None, department_id: str | None
+    ) -> None:
+        self._validate_assignment(branch_id, assignee_user_id, department_id)
+
+    def build_edit_payload(self, existing, **fields) -> dict:
+        return self._edit_payload(existing, **fields)
+
     def delete_template(
         self, actor: ActorContext, template_id: str, *, apply_to_network: bool = False
     ) -> dict:

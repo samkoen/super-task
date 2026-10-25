@@ -26,7 +26,9 @@ export function sortFixedTemplates(templates: TaskTemplate[]): TaskTemplate[] {
   });
 }
 
-export function formatTemplateSchedule(template: TaskTemplate): string {
+export function formatTemplateSchedule(
+  template: Pick<TaskTemplate, "recurrence" | "due_time" | "weekly_days" | "monthly_day">,
+): string {
   try {
     const recurrence =
       he.recurrenceLabels[template.recurrence as TaskRecurrence] ??

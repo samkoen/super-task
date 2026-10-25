@@ -25,8 +25,10 @@ import { he } from "../../i18n/he";
 import { assigneeOptionLabel, assigneesForBranch } from "../../utils/assigneeOptions";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import {
+  branchNamesWithoutEmployee,
   createFieldsFromBranchSelection,
 } from "../../utils/fixedTaskCreateScope";
+import BranchesWithoutEmployeeNotice from "./fixed/BranchesWithoutEmployeeNotice";
 import { DAILY_DEFAULT_WEEKDAYS } from "../../utils/taskRecurrence";
 import { startUrlFieldError } from "../../utils/startUrl";
 import {
@@ -468,6 +470,11 @@ export default function NewTaskFormDialog({
               <Typography color="text.secondary" display="block" mt={0.75}>
                 {he.fixedTaskApplyToNetworkHint}
               </Typography>
+            )}
+            {groupedCreate && taskKind === "fixed" && (
+              <BranchesWithoutEmployeeNotice
+                names={branchNamesWithoutEmployee(branches, selectedBranchIds, employees)}
+              />
             )}
           </Box>
         )}

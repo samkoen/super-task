@@ -25,6 +25,7 @@ from app.controllers import (
     employee_activity_controller,
     employee_report_controller,
     events_controller,
+    fixed_task_controller,
     invitation_controller,
     issue_report_controller,
     media_controller,
@@ -162,6 +163,9 @@ def create_app() -> FastAPI:
         tags=["promotion-stages"],
     )
     app.include_router(task_controller.router, prefix="/api/tasks", tags=["tasks"])
+    app.include_router(
+        fixed_task_controller.router, prefix="/api/fixed-tasks", tags=["fixed-tasks"]
+    )
     app.include_router(
         delivery_note_controller.router, prefix="/api/delivery-notes", tags=["delivery-notes"]
     )

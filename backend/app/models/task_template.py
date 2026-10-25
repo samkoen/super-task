@@ -33,6 +33,7 @@ class TaskTemplate:
     network_group_id: str | None = None
     opened_by_delivery_note: bool = False
     delivery_note_task_type: str | None = None
+    overridden_fields: list | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -63,6 +64,7 @@ class TaskTemplate:
             "is_active": self.is_active,
             "opened_by_delivery_note": self.opened_by_delivery_note,
             "delivery_note_task_type": self.delivery_note_task_type,
+            "overridden_fields": list(self.overridden_fields or []),
             "created_by_id": self.created_by_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,

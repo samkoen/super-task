@@ -6,7 +6,27 @@ from sqlalchemy.orm import Session
 import app.db.models as orm
 from app.db import mappers as mp
 from app.domain.delivery_note import TASK_TYPE_ORDER
+from app.domain.fixed_task_overrides import local_attrs_allowed
 from app.models.task_template import TaskTemplate
+
+
+_LOCAL_ATTRS = local_attrs_allowed() | {"overridden_fields"}
+_TEXT_ATTRS = {"description"}
+_URL_ATTRS = {"start_url", "reference_photo_url", "reference_video_url", "reference_audio_url"}
+
+
+def _column_value(attr: str, value):
+    if attr == "assignee_user_id":
+        return mp.parse_uuid(value) if value else None
+    if attr in _TEXT_ATTRS:
+        return (value or "").strip()
+    if attr in _URL_ATTRS:
+        return (value or "").strip() or None
+    if attr == "is_active":
+        return bool(value)
+    if attr == "overridden_fields":
+        return list(value or [])
+    return value
 
 
 class TaskTemplateRepository:
@@ -205,6 +225,18 @@ class TaskTemplateRepository:
             row.reference_video_url = reference_video_url.strip() or None
         if reference_audio_url is not None:
             row.reference_audio_url = reference_audio_url.strip() or None
+        self._db.flush()
+        return mp.task_template_orm_to_domain(row)
+
+    def update_fields(self, id_: str, values: dict) -> TaskTemplate | None:
+        """Met à jour seulement les attributs adaptables par snif (+ `overridden_fields`)."""
+        row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
+        if not row:
+            return None
+        for attr, value in values.items():
+            if attr not in _LOCAL_ATTRS:
+                raise ValueError(f"champ non modifiable : {attr}")
+            setattr(row, attr, _column_value(attr, value))
         self._db.flush()
         return mp.task_template_orm_to_domain(row)
 
