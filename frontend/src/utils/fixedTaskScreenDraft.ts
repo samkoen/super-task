@@ -22,6 +22,10 @@ export type FixedTaskCreateFormDraft = {
   media: TaskReferenceMediaValue;
   openedByDeliveryNote?: boolean;
   deliveryNoteTaskType?: string;
+  /** Assistant de création : étape courante, oved choisi par snif, sélection modifiée à la main. */
+  step?: "what" | "when" | "where";
+  branchChoices?: Record<string, string>;
+  branchesTouched?: boolean;
 };
 
 type CreateSlot = { open: boolean; form: FixedTaskCreateFormDraft | null };

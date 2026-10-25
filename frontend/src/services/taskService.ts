@@ -202,6 +202,8 @@ export interface CreateTaskTemplatePayload {
   /** Network manager : duplique sur tous les snifim, ou branch_ids. */
   apply_to_network?: boolean;
   branch_ids?: string[];
+  /** Création réseau : oved choisi par snif (`{branch_id: user_id}`), sinon le premier oved. */
+  branch_assignees?: Record<string, string>;
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;

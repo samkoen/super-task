@@ -44,7 +44,7 @@ vi.mock("../../services/branchService", () => ({
   branchService: { list: vi.fn() },
 }));
 
-vi.mock("../../components/tasks/NewTaskFormDialog", () => ({
+vi.mock("../../components/tasks/fixed/FixedTaskWizard", () => ({
   default: (props: { rememberKey?: string }) =>
     props.rememberKey ? <div data-testid="fixed-task-create-restored" /> : null,
 }));

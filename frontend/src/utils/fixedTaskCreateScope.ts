@@ -81,19 +81,23 @@ export function createFieldsFromBranchSelection(
 export function groupedCreateApiFields(payload: {
   apply_to_network?: boolean;
   branch_ids?: string[];
+  branch_assignees?: Record<string, string>;
   branch_id: string;
   assignee_user_id: string;
 }): {
   apply_to_network?: boolean;
   branch_ids?: string[];
+  branch_assignees?: Record<string, string>;
   branch_id?: string;
   assignee_user_id?: string;
 } {
   if (!payload.apply_to_network) {
     return { branch_id: payload.branch_id, assignee_user_id: payload.assignee_user_id };
   }
+  const assignees = payload.branch_assignees;
   return {
     apply_to_network: true,
     ...(payload.branch_ids?.length ? { branch_ids: payload.branch_ids } : {}),
+    ...(assignees && Object.keys(assignees).length ? { branch_assignees: assignees } : {}),
   };
 }

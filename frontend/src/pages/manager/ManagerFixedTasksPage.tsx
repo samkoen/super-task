@@ -9,7 +9,7 @@ import { fixedTaskService, type FixedTaskGroup } from "../../services/fixedTaskS
 import { userService } from "../../services/userService";
 import FixedTaskGroupCard from "../../components/tasks/fixed/FixedTaskGroupCard";
 import FixedTaskListFilters from "../../components/tasks/fixed/FixedTaskListFilters";
-import NewTaskFormDialog from "../../components/tasks/NewTaskFormDialog";
+import FixedTaskWizard from "../../components/tasks/fixed/FixedTaskWizard";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import PageHeader from "../../components/ui/PageHeader";
@@ -19,7 +19,6 @@ import { useFixedTaskCreate } from "../../hooks/useFixedTaskCreate";
 import { he } from "../../i18n/he";
 import { asList } from "../../utils/asList";
 import { withSelfAssignee } from "../../utils/assigneeOptions";
-import { datetimeLocalForNewTask, todayIso } from "../../utils/dateView";
 import { filterFixedGroups, sortFixedGroups, type FixedGroupFilter } from "../../utils/fixedTaskGroups";
 import { MANAGER_FIXED_TASKS_DRAFT_KEY } from "../../utils/fixedTaskScreenDraft";
 
@@ -122,17 +121,14 @@ export default function ManagerFixedTasksPage() {
         </Box>
       )}
       {create.open && (
-        <NewTaskFormDialog
+        <FixedTaskWizard
           open
           onClose={() => create.setOpen(false)}
           onSubmit={create.submit}
           branches={branches}
           employees={employees}
-          isBranchManager={user?.role === "branch_manager"}
           canPickBranch={canPickBranch}
-          defaultBranchId={user?.branch_id ?? branches[0]?.id ?? ""}
-          defaultDueAt={datetimeLocalForNewTask(todayIso())}
-          forcedTaskKind="fixed"
+          defaultBranchId={user?.branch_id ?? ""}
           rememberKey={MANAGER_FIXED_TASKS_DRAFT_KEY}
           saving={create.saving}
           onError={showError}

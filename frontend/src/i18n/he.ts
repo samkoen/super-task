@@ -331,6 +331,17 @@ export const he = {
   fixedTaskNetworkChip: "כל הרשת",
   fixedTaskBranchesWithoutEmployee: (names: string) =>
     `בסניפים אלה אין עובד משויך: ${names}. כדאי להוסיף עובד לפני יצירת המשימה.`,
+  fixedWizardStepLabels: { what: "מה", when: "מתי", where: "איפה" } as Record<string, string>,
+  fixedWizardProgress: (step: number, total: number) => `שלב ${step} מתוך ${total}`,
+  fixedWizardNext: "המשך",
+  fixedWizardBack: "חזרה",
+  fixedWizardNeedContent: "כתבו כותרת או תיאור למשימה",
+  fixedWizardWhereTitle: "איפה ומי מבצע",
+  fixedWizardWhereIntro: "בחרו באילו סניפים תתבצע המשימה, ומי יבצע אותה בכל סניף",
+  fixedWizardBranchAssignee: (branch: string) => `עובד בסניף ${branch}`,
+  fixedWizardNoEmployee: "אין עובד בסניף — המשימה תשויך למנהל הסניף אם קיים, אחרת הסניף ידולג",
+  fixedWizardRecap: (count: number, schedule: string) =>
+    `${count === 1 ? "סניף אחד" : `${count} סניפים`} · ${schedule}`,
   fixedGroupSearch: "חיפוש משימה",
   fixedGroupActiveOf: (active: number, total: number) =>
     `פעילה ב-${active} מתוך ${total} סניפים`,

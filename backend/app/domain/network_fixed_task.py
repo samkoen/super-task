@@ -17,6 +17,17 @@ def pick_first_employee(employees: list[User]) -> User | None:
     return min(pool, key=lambda u: (u.created_at or "", u.id))
 
 
+def resolve_branch_assignee_id(
+    branch_id: str, overrides: dict[str, str] | None, employees: list[User]
+) -> str | None:
+    """Oved choisi explicitement pour ce snif, sinon le premier oved par défaut."""
+    chosen = (overrides or {}).get(branch_id)
+    if chosen:
+        return chosen
+    first = pick_first_employee(employees)
+    return first.id if first else None
+
+
 def can_edit_network_fixed_group(role: str) -> bool:
     return role in {roles.NETWORK_MANAGER, roles.ADMIN}
 

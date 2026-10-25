@@ -60,6 +60,7 @@ export interface NewTaskFormSubmitPayload {
   ops_category?: OpsCategory | null;
   apply_to_network?: boolean;
   branch_ids?: string[];
+  branch_assignees?: Record<string, string>;
   min_video_seconds?: number | null;
   completion_requirements?: CompletionRequirement[];
   is_work_start?: boolean;
