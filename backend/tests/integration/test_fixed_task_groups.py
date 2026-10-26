@@ -204,3 +204,76 @@ def test_single_branch_task_is_its_own_group(client_nm, second_branch_seed):
 def test_unknown_task_returns_400(client_nm, second_branch_seed):
     res = client_nm.get("/api/fixed-tasks/00000000-0000-0000-0000-000000000000")
     assert res.status_code == 400
+
+
+PHOTO = [{"kind": "photo", "title": "מדף"}]
+VIDEO_AND_PHOTO = [{"kind": "video", "min_seconds": 5}, {"kind": "photo", "title": "שלט"}]
+
+
+def _kinds(item: dict) -> list[str]:
+    return [r["kind"] for r in item["completion_requirements"] or []]
+
+
+def test_branch_can_have_its_own_proof_requirements(client_nm, group, second_branch_seed):
+    world = second_branch_seed
+    tpl_b = _branch(group, world["branch_b_id"])["template_id"]
+    res = client_nm.patch(
+        f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"completion_requirements": PHOTO}}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["overridden_fields"] == ["completion_requirements"]
+    assert _kinds(res.json()) == ["photo"]
+    assert res.json()["photo_required"] is True
+    fresh = client_nm.get(f"/api/fixed-tasks/{group['key']}").json()
+    assert _kinds(fresh) == []
+    assert _kinds(_branch(fresh, world["branch_id"])) == []
+    assert fresh["overridden_count"] == 1
+
+
+def test_general_update_keeps_the_branch_proof_requirements(client_nm, group, second_branch_seed):
+    world = second_branch_seed
+    tpl_b = _branch(group, world["branch_b_id"])["template_id"]
+    client_nm.patch(
+        f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"completion_requirements": PHOTO}}
+    )
+    res = client_nm.patch(
+        f"/api/fixed-tasks/{group['key']}/defaults",
+        json=_general(group, completion_requirements=VIDEO_AND_PHOTO),
+    )
+    assert res.status_code == 200, res.text
+    fresh = res.json()
+    assert _kinds(_branch(fresh, world["branch_id"])) == ["video", "photo"]
+    assert _kinds(_branch(fresh, world["branch_b_id"])) == ["photo"]
+    assert _kinds(fresh) == ["video", "photo"]
+
+
+def test_reset_restores_the_default_proof_requirements(client_nm, group, second_branch_seed):
+    world = second_branch_seed
+    tpl_b = _branch(group, world["branch_b_id"])["template_id"]
+    client_nm.patch(
+        f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"completion_requirements": PHOTO}}
+    )
+    res = client_nm.patch(
+        f"/api/fixed-tasks/branches/{tpl_b}", json={"reset": ["completion_requirements"]}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["overridden_fields"] == []
+    assert _kinds(res.json()) == []
+    assert res.json()["photo_required"] is False
+
+
+def test_proof_requirements_equal_to_default_are_not_an_override(client_nm, group, second_branch_seed):
+    tpl_b = _branch(group, second_branch_seed["branch_b_id"])["template_id"]
+    res = client_nm.patch(
+        f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"completion_requirements": []}}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["overridden_fields"] == []
+
+
+def test_legacy_proof_columns_cannot_be_set_directly(client_nm, group, second_branch_seed):
+    tpl_b = _branch(group, second_branch_seed["branch_b_id"])["template_id"]
+    res = client_nm.patch(
+        f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"photo_required": True}}
+    )
+    assert res.status_code == 400

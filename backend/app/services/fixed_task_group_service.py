@@ -2,6 +2,7 @@
 import re
 
 from app.domain import task_recurrence
+from app.domain.completion_media import packed_media_fields, parse_requirements_input
 from app.domain.fixed_task_overrides import (
     group_defaults,
     local_attrs_allowed,
@@ -27,6 +28,7 @@ _GROUP_DROP = {
 _BRANCH_KEYS = (
     "due_time", "weekly_days", "is_active", "description", "start_url",
     "reference_photo_url", "reference_video_url", "reference_audio_url",
+    "completion_requirements", "photo_required", "min_video_seconds",
 )
 
 
@@ -127,7 +129,17 @@ class FixedTaskGroupService:
             clean["weekly_days"] = task_recurrence.stored_weekly_days(
                 existing.recurrence, clean["weekly_days"]
             )
-        return clean
+        return self._pack_completion(clean)
+
+    @staticmethod
+    def _pack_completion(clean: dict) -> dict:
+        """Les preuves se posent via `completion_requirements` ; les copies historiques en découlent."""
+        if "completion_requirements" not in clean:
+            if {"photo_required", "min_video_seconds"} & set(clean):
+                raise ValueError("שדה לא ניתן להתאמה בסניף")
+            return clean
+        reqs = parse_requirements_input(clean["completion_requirements"], provided=True)
+        return {**clean, **packed_media_fields(reqs)}
 
     # --- Mapping -----------------------------------------------------------
 

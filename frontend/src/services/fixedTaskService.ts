@@ -10,7 +10,8 @@ export type FixedOverrideField =
   | "is_active"
   | "description"
   | "reference_media"
-  | "start_url";
+  | "start_url"
+  | "completion_requirements";
 
 export interface FixedTaskBranch {
   template_id: string;
@@ -26,6 +27,10 @@ export interface FixedTaskBranch {
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
+  /** Ce que l'oved doit joindre, tel qu'appliqué à ce snif (adapté ou hérité). */
+  completion_requirements?: CompletionRequirement[] | null;
+  photo_required?: boolean;
+  min_video_seconds?: number | null;
   overridden_fields: FixedOverrideField[];
   opened_by_delivery_note: boolean;
 }
@@ -88,6 +93,7 @@ export type FixedBranchChanges = Partial<{
   is_active: boolean;
   description: string;
   start_url: string | null;
+  completion_requirements: CompletionRequirement[];
 }>;
 
 export const fixedTaskService = {

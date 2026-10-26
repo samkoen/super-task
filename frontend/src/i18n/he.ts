@@ -382,7 +382,9 @@ export const he = {
     description: "הוראות",
     reference_media: "מדיה",
     start_url: "קישור",
+    completion_requirements: "מה לצרף",
   },
+  fixedBranchNoProof: "ללא",
   managerFixedTasksCreatedNetwork: (count: number) =>
     count === 1 ? "משימה קבועה נוצרה בסניף אחד" : `נוצרו ${count} משימות קבועות ברשת`,
   managerAdHocCreatedNetwork: (count: number) =>

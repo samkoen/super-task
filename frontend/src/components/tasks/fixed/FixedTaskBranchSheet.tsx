@@ -8,8 +8,11 @@ import { he } from "../../../i18n/he";
 import { employeeFieldSx } from "../../../styles/employeeUi";
 import { asText } from "../../../utils/asList";
 import { assigneeOptionLabel } from "../../../utils/assigneeOptions";
+import { effectiveRequirements } from "../../../utils/completionMedia";
+import { requirementsSummary } from "../../../utils/completionRequirementList";
 import { branchToForm, type FixedBranchForm } from "../../../utils/fixedTaskGroups";
 import { formatWeekdaysPart } from "../../../utils/taskRecurrence";
+import CompletionRequirementsEditor from "../CompletionRequirementsEditor";
 import CustomerLinkRow from "../CustomerLinkRow";
 import TaskFormSection from "../form/TaskFormSection";
 import WeekdayMultiSelect from "../WeekdayMultiSelect";
@@ -138,9 +141,29 @@ function TextOverrides({ group, form, onChange }: FieldsProps) {
   );
 }
 
+/** « מה העובד צריך לצרף » : par défaut la liste générale, ou une liste propre à ce snif. */
+function ProofOverride({ group, form, onChange, disabled }: FieldsProps & { disabled: boolean }) {
+  return (
+    <OverrideField
+      label={he.taskFormSectionProof}
+      defaultText={requirementsSummary(effectiveRequirements(group))}
+      custom={form.custom_completion}
+      onCustomChange={(custom_completion) => onChange({ ...form, custom_completion })}
+    >
+      <CompletionRequirementsEditor
+        value={form.completion_requirements}
+        onChange={(completion_requirements) => onChange({ ...form, completion_requirements })}
+        disabled={disabled}
+      />
+    </OverrideField>
+  );
+}
+
 function resetAll(form: FixedBranchForm, group: FixedTaskGroup): FixedBranchForm {
   return {
     ...form,
+    custom_completion: false,
+    completion_requirements: effectiveRequirements(group),
     is_active: group.is_active,
     custom_due_time: false,
     due_time: group.due_time,
@@ -191,6 +214,7 @@ function SheetBody({
       <TaskFormSection title={he.fixedBranchCustomToggle}>
         <ScheduleOverrides group={group} form={form} onChange={onChange} />
         <TextOverrides group={group} form={form} onChange={onChange} />
+        <ProofOverride group={group} form={form} onChange={onChange} disabled={saving} />
         <Button
           startIcon={<RestartAltIcon />}
           onClick={() => onChange(resetAll(form, group))}

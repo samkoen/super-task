@@ -6,6 +6,7 @@ modification des réglages généraux ne les écrase pas.
 """
 from __future__ import annotations
 
+import json
 from collections import Counter
 
 # Champ « logique » -> attributs du template qu'il recouvre.
@@ -16,6 +17,8 @@ FIELD_ATTRS: dict[str, tuple[str, ...]] = {
     "description": ("description",),
     "reference_media": ("reference_photo_url", "reference_video_url", "reference_audio_url"),
     "start_url": ("start_url",),
+    # « Ce que l'oved doit joindre » : la liste + ses deux copies historiques.
+    "completion_requirements": ("completion_requirements", "photo_required", "min_video_seconds"),
 }
 OVERRIDABLE_FIELDS: tuple[str, ...] = tuple(FIELD_ATTRS)
 
@@ -43,11 +46,16 @@ def _clean(value):
     return value
 
 
+def _key(value: tuple) -> str:
+    """Clé hashable d'une valeur (les listes de preuves ne le sont pas)."""
+    return json.dumps(value, sort_keys=True, default=str)
+
+
 def _most_common(values: list[tuple]) -> tuple:
-    counts = Counter(values)
+    counts = Counter(_key(v) for v in values)
     best = max(counts.values())
     for value in values:  # ordre stable : le plus ancien gagne l'égalité
-        if counts[value] == best:
+        if counts[_key(value)] == best:
             return value
     return values[0]
 
@@ -78,6 +86,9 @@ def preserve_overrides(payload: dict, sibling) -> dict:
             merged[attr] = getattr(sibling, attr, None)
         if field == "start_url":
             merged["update_start_url"] = False
+        if field == "completion_requirements":
+            merged["update_completion_requirements"] = True
+            merged["update_min_video_seconds"] = True
     return merged
 
 

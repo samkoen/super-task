@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import FixedTaskBranchSheet, { type FixedTaskBranchSheetProps } from "./FixedTaskBranchSheet";
 import { fixtureBranch, fixtureGroup } from "./fixedTaskFixtures";
 import { he } from "../../../i18n/he";
+import { requirementsSummary } from "../../../utils/completionRequirementList";
 
 function props(over: Partial<FixedTaskBranchSheetProps> = {}): FixedTaskBranchSheetProps {
   return {
@@ -64,6 +65,33 @@ describe("FixedTaskBranchSheet", () => {
     render(<FixedTaskBranchSheet {...props({ branch })} />);
     fireEvent.click(screen.getByRole("button", { name: he.fixedBranchResetAll }));
     expect(toggle(he.dueTime).checked).toBe(false);
+  });
+
+  it("lets one branch have its own proof requirements, starting from the general list", () => {
+    const onSave = vi.fn();
+    const group = fixtureGroup({ completion_requirements: [{ kind: "photo", title: "מדף" }], photo_required: true });
+    render(<FixedTaskBranchSheet {...props({ group, onSave })} />);
+    const label = he.taskFormSectionProof;
+    expect(screen.getByText(he.fixedBranchDefaultValue(requirementsSummary([{ kind: "photo", title: "מדף" }])))).toBeTruthy();
+    expect(screen.queryByText(he.completionAddVideoReq)).toBeNull();
+    fireEvent.click(toggle(label));
+    fireEvent.click(screen.getByRole("button", { name: he.completionAddVideoReq }));
+    fireEvent.click(screen.getByRole("button", { name: he.fixedBranchSave }));
+    const saved = onSave.mock.calls[0][0];
+    expect(saved.custom_completion).toBe(true);
+    expect(saved.completion_requirements.map((r: { kind: string }) => r.kind)).toEqual(["photo", "video"]);
+  });
+
+  it("shows the default as 'none' when the general list is empty, and resets it with the reset button", () => {
+    const branch = fixtureBranch({
+      completion_requirements: [{ kind: "photo" }],
+      overridden_fields: ["completion_requirements"],
+    });
+    render(<FixedTaskBranchSheet {...props({ branch })} />);
+    expect(screen.getByText(he.fixedBranchDefaultValue(he.fixedBranchNoProof))).toBeTruthy();
+    expect(toggle(he.taskFormSectionProof).checked).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: he.fixedBranchResetAll }));
+    expect(toggle(he.taskFormSectionProof).checked).toBe(false);
   });
 
   it("cannot be saved without an assignee", () => {

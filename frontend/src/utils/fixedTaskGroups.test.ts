@@ -161,3 +161,53 @@ describe("buildBranchPatch", () => {
     expect(form.custom_description).toBe(false);
   });
 });
+
+describe("branch proof requirements (מה העובד צריך לצרף)", () => {
+  const photo = [{ kind: "photo" as const, title: "מדף" }];
+  const video = [{ kind: "video" as const, min_seconds: 5 }];
+  const g = group({ completion_requirements: photo, photo_required: true });
+
+  it("shows the general list while the branch has none of its own", () => {
+    const form = branchToForm(branch(), g);
+    expect(form.custom_completion).toBe(false);
+    expect(form.completion_requirements.map((r) => r.kind)).toEqual(["photo"]);
+  });
+
+  it("shows the branch's own list once adapted", () => {
+    const b = branch({ completion_requirements: video, overridden_fields: ["completion_requirements"] });
+    const form = branchToForm(b, g);
+    expect(form.custom_completion).toBe(true);
+    expect(form.completion_requirements.map((r) => r.kind)).toEqual(["video"]);
+  });
+
+  it("sends the new list when the branch is switched to its own", () => {
+    const b = branch();
+    const form = { ...branchToForm(b, g), custom_completion: true, completion_requirements: video };
+    expect(buildBranchPatch(b, g, form).changes.completion_requirements).toEqual(video);
+  });
+
+  it("allows an empty list of its own (nothing to attach for this branch)", () => {
+    const b = branch();
+    const form = { ...branchToForm(b, g), custom_completion: true, completion_requirements: [] };
+    expect(buildBranchPatch(b, g, form).changes.completion_requirements).toEqual([]);
+  });
+
+  it("resets the proof requirements when the toggle goes back off", () => {
+    const b = branch({ completion_requirements: video, overridden_fields: ["completion_requirements"] });
+    const form = { ...branchToForm(b, g), custom_completion: false };
+    expect(buildBranchPatch(b, g, form)).toEqual({ changes: {}, reset: ["completion_requirements"] });
+  });
+
+  it("does not resend an unchanged adaptation, nor an untouched default", () => {
+    const adapted = branch({ completion_requirements: video, overridden_fields: ["completion_requirements"] });
+    expect(branchPatchIsEmpty(buildBranchPatch(adapted, g, branchToForm(adapted, g)))).toBe(true);
+    const plain = branch();
+    expect(branchPatchIsEmpty(buildBranchPatch(plain, g, branchToForm(plain, g)))).toBe(true);
+  });
+
+  it("labels the adapted field in the branch summary", () => {
+    expect(branchOverrideSummary({ overridden_fields: ["completion_requirements"] })).toBe(
+      he.fixedOverrideFieldLabels.completion_requirements,
+    );
+  });
+});

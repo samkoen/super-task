@@ -114,6 +114,28 @@ describe("ManagerFixedTaskDetailPage", () => {
     );
   });
 
+  it("sends a reset when a branch goes back to the general proof requirements", async () => {
+    const adapted = fixtureBranch({
+      completion_requirements: [{ kind: "video", min_seconds: 5 }],
+      overridden_fields: ["completion_requirements"],
+    });
+    vi.mocked(fixedTaskService.get).mockResolvedValue(fixtureGroup({ branches: [adapted], branch_count: 1 }));
+    vi.mocked(fixedTaskService.updateBranch).mockResolvedValue(adapted);
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: he.fixedDetailTabBranches }));
+    fireEvent.click(await screen.findByRole("button", { name: he.fixedBranchSheetTitle("תל אביב") }));
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: `${he.fixedBranchCustomToggle}: ${he.taskFormSectionProof}` }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: he.fixedBranchSave }));
+    await waitFor(() =>
+      expect(fixedTaskService.updateBranch).toHaveBeenCalledWith("t1", {
+        changes: {},
+        reset: ["completion_requirements"],
+      }),
+    );
+  });
+
   it("deletes the whole network task after confirmation and goes back to the list", async () => {
     vi.mocked(fixedTaskService.get).mockResolvedValue(fixtureGroup());
     vi.mocked(taskService.deleteTemplate).mockResolvedValue({ message: "", deleted_count: 2 });

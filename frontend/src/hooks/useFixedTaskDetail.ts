@@ -108,7 +108,10 @@ export function useFixedTaskDetail(key: string) {
   const saveBranch = (branch: FixedTaskBranch, form: FixedBranchForm) =>
     run(async () => {
       if (!group) return;
-      const patch = buildBranchPatch(branch, group, form);
+      const completion = form.custom_completion
+        ? await resolveTaskCompletionGuides(form.completion_requirements)
+        : form.completion_requirements;
+      const patch = buildBranchPatch(branch, group, { ...form, completion_requirements: completion });
       if (!branchPatchIsEmpty(patch)) await fixedTaskService.updateBranch(branch.template_id, patch);
       await reload();
       showSuccess(he.fixedBranchSaved);

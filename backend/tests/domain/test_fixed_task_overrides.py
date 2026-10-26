@@ -105,3 +105,41 @@ def test_split_into_groups_empty_list():
 @pytest.mark.parametrize("field", ov.OVERRIDABLE_FIELDS)
 def test_every_overridable_field_has_attrs(field):
     assert ov.FIELD_ATTRS[field]
+
+
+def test_group_defaults_handle_list_valued_proof_requirements():
+    photo = [{"kind": "photo", "title": "מדף"}]
+    members = [
+        _tpl("a", completion_requirements=photo, photo_required=True),
+        _tpl("b", completion_requirements=[dict(photo[0])], photo_required=True),
+        _tpl("c", completion_requirements=[], photo_required=False, overridden_fields=["completion_requirements"]),
+    ]
+    defaults = ov.group_defaults(members)
+    assert defaults["completion_requirements"] == photo
+    assert defaults["photo_required"] is True
+
+
+def test_preserve_overrides_keeps_the_branch_proof_requirements():
+    sibling = _tpl(
+        "c",
+        completion_requirements=[{"kind": "video"}],
+        photo_required=False,
+        min_video_seconds=5,
+        overridden_fields=["completion_requirements"],
+    )
+    merged = ov.preserve_overrides(
+        {"completion_requirements": [], "photo_required": False, "update_completion_requirements": False},
+        sibling,
+    )
+    assert merged["completion_requirements"] == [{"kind": "video"}]
+    assert merged["min_video_seconds"] == 5
+    assert merged["update_completion_requirements"] is True
+
+
+def test_next_overridden_flags_changed_proof_and_clears_it_when_back_to_default():
+    defaults = {"completion_requirements": [], "photo_required": False, "min_video_seconds": None}
+    template = _tpl("c")
+    changed = {"completion_requirements": [{"kind": "photo"}], "photo_required": True, "min_video_seconds": None}
+    assert ov.next_overridden(template, defaults, changed, []) == ["completion_requirements"]
+    back = _tpl("c", overridden_fields=["completion_requirements"])
+    assert ov.next_overridden(back, defaults, dict(defaults), []) == []

@@ -138,15 +138,31 @@ export type FixedBranchForm = {
   description: string;
   custom_start_url: boolean;
   start_url: string;
+  /** « מה העובד צריך לצרף » propre à ce snif. */
+  custom_completion: boolean;
+  completion_requirements: CompletionRequirement[];
 };
 
 const has = (b: FixedTaskBranch, f: FixedOverrideField) => b.overridden_fields.includes(f);
 
-export function branchToForm(
-  branch: FixedTaskBranch,
-  group: Pick<FixedTaskGroup, "recurrence" | "due_time" | "weekly_days" | "description" | "start_url">,
-): FixedBranchForm {
+type GroupDefaults = Pick<
+  FixedTaskGroup,
+  | "recurrence"
+  | "due_time"
+  | "weekly_days"
+  | "description"
+  | "start_url"
+  | "completion_requirements"
+  | "photo_required"
+  | "min_video_seconds"
+>;
+
+export function branchToForm(branch: FixedTaskBranch, group: GroupDefaults): FixedBranchForm {
   return {
+    custom_completion: has(branch, "completion_requirements"),
+    completion_requirements: effectiveRequirements(
+      has(branch, "completion_requirements") ? branch : group,
+    ),
     assignee_user_id: branch.assignee_user_id ?? "",
     is_active: branch.is_active,
     custom_due_time: has(branch, "due_time"),
@@ -181,6 +197,20 @@ function textFieldPatch(
   }
 }
 
+function completionPatch(
+  branch: FixedTaskBranch,
+  form: FixedBranchForm,
+  patch: { changes: FixedBranchChanges; reset: FixedOverrideField[] },
+): void {
+  const wasCustom = has(branch, "completion_requirements");
+  if (!form.custom_completion) {
+    if (wasCustom) patch.reset.push("completion_requirements");
+    return;
+  }
+  const same = JSON.stringify(form.completion_requirements) === JSON.stringify(effectiveRequirements(branch));
+  if (!wasCustom || !same) patch.changes.completion_requirements = form.completion_requirements;
+}
+
 /** Compare le formulaire au snif : valeurs posées (`changes`) et champs revenus au défaut (`reset`). */
 export function buildBranchPatch(
   branch: FixedTaskBranch,
@@ -202,6 +232,7 @@ export function buildBranchPatch(
   );
   textFieldPatch("description", branch, form, form.description, patch);
   textFieldPatch("start_url", branch, form, form.start_url.trim() || null, patch);
+  completionPatch(branch, form, patch);
   return patch;
 }
 
