@@ -277,3 +277,20 @@ def test_legacy_proof_columns_cannot_be_set_directly(client_nm, group, second_br
         f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"photo_required": True}}
     )
     assert res.status_code == 400
+
+
+def test_branch_filter_keeps_whole_task_counts(client_nm, group, second_branch_seed):
+    world = second_branch_seed
+    tpl_b = _branch(group, world["branch_b_id"])["template_id"]
+    client_nm.patch(f"/api/fixed-tasks/branches/{tpl_b}", json={"changes": {"due_time": "07:30"}})
+    rows = client_nm.get("/api/fixed-tasks", params={"branch_id": world["branch_b_id"]}).json()
+    assert len(rows) == 1
+    assert rows[0]["branch_count"] == 2
+    assert rows[0]["overridden_count"] == 1
+    assert rows[0]["due_time"] == "09:00"
+    assert len(rows[0]["branches"]) == 2
+
+
+def test_branch_filter_hides_tasks_absent_from_that_branch(client_nm, group):
+    other = "00000000-0000-0000-0000-000000000001"
+    assert client_nm.get("/api/fixed-tasks", params={"branch_id": other}).json() == []

@@ -48,10 +48,13 @@ class FixedTaskGroupService:
     def list_groups(self, actor: ActorContext, *, branch_id: str | None = None) -> list[dict]:
         self._ensure_can_manage(actor)
         visible = visible_branch_ids_for_tasks(actor, self._branches)
-        items = self._repo.list_templates(
-            branch_ids=visible, branch_id=branch_id, active_only=False, task_kind=FIXED
-        )
-        return [self._group_to_api(actor, members) for members in split_into_groups(items)]
+        items = self._repo.list_templates(branch_ids=visible, active_only=False, task_kind=FIXED)
+        groups = split_into_groups(items)
+        if branch_id:
+            # Le filtre garde les tâches présentes dans ce snif, mais chaque carte reste calculée
+            # sur toute la tâche (nombre de snifim, adaptations, valeurs par défaut).
+            groups = [g for g in groups if any(str(m.branch_id) == str(branch_id) for m in g)]
+        return [self._group_to_api(actor, members) for members in groups]
 
     def get_group(self, actor: ActorContext, key: str) -> dict:
         return self._group_to_api(actor, self._members(actor, key))
