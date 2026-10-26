@@ -107,6 +107,14 @@ def _parse_optional_ids(raw: Any) -> list[str] | None:
     return ids or None
 
 
+def _parse_branch_assignees(raw: Any) -> dict[str, str] | None:
+    """`{branch_id: user_id}` — les entrées vides sont ignorées."""
+    if not isinstance(raw, dict):
+        return None
+    pairs = {str(k).strip(): str(v).strip() for k, v in raw.items() if str(v or "").strip()}
+    return pairs or None
+
+
 _UNSET = object()
 
 
@@ -275,6 +283,7 @@ def create_template(
             branch_ids=_parse_optional_ids(payload.get("branch_ids")),
             opened_by_delivery_note=opened,
             delivery_note_task_type=payload.get("delivery_note_task_type"),
+            branch_assignees=_parse_branch_assignees(payload.get("branch_assignees")),
         )
         _publish_created_templates(db, actor, result["templates"], payload, notes)
         return {

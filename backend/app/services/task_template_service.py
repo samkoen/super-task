@@ -8,7 +8,7 @@ from app.domain.network_edit_diff import merge_template_network_payload
 from app.domain.network_fixed_task import (
     can_edit_network_fixed_group,
     grouped_network_ids,
-    pick_first_employee,
+    resolve_branch_assignee_id,
     select_network_create_branches,
     siblings_by_content,
 )
@@ -188,8 +188,12 @@ class TaskTemplateService:
         branch_ids: list[str] | None = None,
         opened_by_delivery_note: bool = False,
         delivery_note_task_type: str | None = None,
+        branch_assignees: dict[str, str] | None = None,
     ) -> dict:
-        """Duplique une tâche קבועה (tous les snifim, ou une liste). 1er oved par snif."""
+        """Duplique une tâche קבועה (tous les snifim, ou une liste).
+
+        Oved par snif : celui de `branch_assignees` s'il est donné, sinon le premier oved.
+        """
         if actor.role not in {roles.NETWORK_MANAGER, roles.ADMIN}:
             raise PermissionError("יצירה לכל הרשת למנהל רשת בלבד")
         branches = select_network_create_branches(
@@ -204,6 +208,7 @@ class TaskTemplateService:
             item = self._create_network_copy(
                 actor,
                 branch,
+                branch_assignees,
                 title=title,
                 description=description,
                 recurrence=recurrence,
@@ -238,18 +243,18 @@ class TaskTemplateService:
             raise ValueError("לא נוצרו משימות — אין עובדים בסניפים")
         return {"templates": created, "skipped": skipped}
 
-    def _create_network_copy(self, actor, branch, **fields) -> dict | None:
+    def _create_network_copy(self, actor, branch, branch_assignees, **fields) -> dict | None:
         employees = self._users.list_users(
             roles_in=worker_roles_for_roster(actor.role),
             branch_ids=[branch.id],
         )
-        first = pick_first_employee(employees)
-        if not first:
+        assignee_id = resolve_branch_assignee_id(branch.id, branch_assignees, employees)
+        if not assignee_id:
             return None
         return self.create_template(
             actor,
             branch_id=branch.id,
-            assignee_user_id=first.id,
+            assignee_user_id=assignee_id,
             **fields,
         )
 
@@ -322,6 +327,25 @@ class TaskTemplateService:
         assert updated is not None
         self._sync_open_occurrence_text(updated)
         return self._to_api(updated)
+
+    # --- Points d'entrée publics pour FixedTaskGroupService -----------------
+
+    def require_editable(self, actor: ActorContext, template_id: str):
+        return self._require_editable_template(actor, template_id)
+
+    def to_api(self, template, **extra) -> dict:
+        return self._to_api(template, **extra)
+
+    def sync_open_occurrences(self, template) -> None:
+        self._sync_open_occurrence_text(template)
+
+    def validate_assignment(
+        self, branch_id: str, assignee_user_id: str | None, department_id: str | None
+    ) -> None:
+        self._validate_assignment(branch_id, assignee_user_id, department_id)
+
+    def build_edit_payload(self, existing, **fields) -> dict:
+        return self._edit_payload(existing, **fields)
 
     def delete_template(
         self, actor: ActorContext, template_id: str, *, apply_to_network: bool = False

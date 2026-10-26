@@ -1,3 +1,5 @@
+import { userBelongsToBranch, type UserBranchRef } from "./userBranchMembership";
+
 export type FixedTaskScope = "one" | "selected" | "all";
 
 export function isGroupedFixedCreate(scope: FixedTaskScope): boolean {
@@ -20,6 +22,19 @@ export function toggleAllBranches(selectedIds: string[], allIds: string[]): stri
 export function toggleBranchId(selectedIds: string[], id: string): string[] {
   if (selectedIds.includes(id)) return selectedIds.filter((item) => item !== id);
   return [...selectedIds, id];
+}
+
+/** Noms des snifim choisis où aucun oved actif n'est connu (la copie n'y aurait personne à qui s'assigner). */
+export function branchNamesWithoutEmployee(
+  branches: { id: string; name: string }[],
+  selectedIds: string[],
+  employees: (UserBranchRef & { role: string; is_active?: boolean })[],
+): string[] {
+  const staff = employees.filter((u) => u.role === "employee" && u.is_active !== false);
+  return branches
+    .filter((b) => selectedIds.includes(b.id))
+    .filter((b) => !staff.some((u) => userBelongsToBranch(u, b.id)))
+    .map((b) => b.name);
 }
 
 export function parseMultiSelectIds(value: unknown): string[] {
@@ -66,19 +81,23 @@ export function createFieldsFromBranchSelection(
 export function groupedCreateApiFields(payload: {
   apply_to_network?: boolean;
   branch_ids?: string[];
+  branch_assignees?: Record<string, string>;
   branch_id: string;
   assignee_user_id: string;
 }): {
   apply_to_network?: boolean;
   branch_ids?: string[];
+  branch_assignees?: Record<string, string>;
   branch_id?: string;
   assignee_user_id?: string;
 } {
   if (!payload.apply_to_network) {
     return { branch_id: payload.branch_id, assignee_user_id: payload.assignee_user_id };
   }
+  const assignees = payload.branch_assignees;
   return {
     apply_to_network: true,
     ...(payload.branch_ids?.length ? { branch_ids: payload.branch_ids } : {}),
+    ...(assignees && Object.keys(assignees).length ? { branch_assignees: assignees } : {}),
   };
 }

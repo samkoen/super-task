@@ -3,10 +3,8 @@ import {
   clearFixedTaskCreateDraft,
   readFixedTaskCreateDraft,
   readFixedTaskCreateForm,
-  readFixedTaskEditDraft,
   setFixedTaskCreateOpen,
   writeFixedTaskCreateForm,
-  writeFixedTaskEditDraft,
   type FixedTaskCreateFormDraft,
 } from "./fixedTaskScreenDraft";
 
@@ -38,7 +36,6 @@ function form(over: Partial<FixedTaskCreateFormDraft> = {}): FixedTaskCreateForm
 describe("fixedTaskScreenDraft", () => {
   beforeEach(() => {
     clearFixedTaskCreateDraft(KEY);
-    writeFixedTaskEditDraft(KEY, null);
   });
 
   it("keeps example photos when the screen draft stays open", () => {
@@ -62,30 +59,5 @@ describe("fixedTaskScreenDraft", () => {
     writeFixedTaskCreateForm(KEY, form());
     setFixedTaskCreateOpen(KEY, false);
     expect(readFixedTaskCreateDraft(KEY)).toBeNull();
-  });
-
-  it("keeps an in-progress edit with its example file", () => {
-    const file = new File(["img"], "example.jpg", { type: "image/jpeg" });
-    writeFixedTaskEditDraft(KEY, {
-      template: { id: "t1", title: "קבועה" } as never,
-      form: {
-        title: "קבועה",
-        description: "",
-        due_time: "09:00",
-        weekly_days: "2",
-        assignee_user_id: "u1",
-        is_active: true,
-        ops_category: "",
-        completion_requirements: [
-          { kind: "photo", example_url: "blob:edit", pending_example: file },
-        ],
-        is_work_start: false,
-        is_work_end: false,
-        start_url: "",
-        apply_to_network: false,
-      },
-      media: { reference_photo_url: "", reference_video_url: "", reference_audio_url: "" },
-    });
-    expect(readFixedTaskEditDraft(KEY)?.form.completion_requirements[0]?.pending_example).toBe(file);
   });
 });

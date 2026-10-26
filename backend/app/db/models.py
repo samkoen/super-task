@@ -245,6 +245,7 @@ class TaskTemplate(Base):
         Boolean, default=False, server_default="false", nullable=False
     )
     delivery_note_task_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    overridden_fields: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

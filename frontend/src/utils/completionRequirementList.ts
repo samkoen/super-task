@@ -16,6 +16,12 @@ export function requirementRowLabel(req: CompletionRequirement): string {
   return `${requirementRowName(req)}: ${requirementKindLabel(req.kind)}`;
 }
 
+/** Phrase courte des preuves demandées (ex. « מדף: תמונה · שלט: תמונה »), ou « ללא » si aucune. */
+export function requirementsSummary(reqs: CompletionRequirement[]): string {
+  if (reqs.length === 0) return he.fixedBranchNoProof;
+  return reqs.map(requirementRowLabel).join(" · ");
+}
+
 export function nextOpenIndexAfterRemove(open: number | null, removed: number): number | null {
   if (open == null || open === removed) return null;
   return open > removed ? open - 1 : open;

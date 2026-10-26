@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ManagerFixedTasksPage from "./ManagerFixedTasksPage";
 import { he } from "../../i18n/he";
-import { taskService } from "../../services/taskService";
+import { fixedTaskService } from "../../services/fixedTaskService";
 import { userService } from "../../services/userService";
 import { ApiError } from "../../services/api";
+import { fixtureBranch, fixtureGroup } from "../../components/tasks/fixed/fixedTaskFixtures";
 import {
   MANAGER_FIXED_TASKS_DRAFT_KEY,
   clearFixedTaskCreateDraft,
@@ -26,24 +28,12 @@ vi.mock("../../context/AuthContext", () => ({
   }),
 }));
 
-vi.mock("../../services/deliveryNoteService", () => ({
-  deliveryNoteService: {
-    account: vi.fn(async () => ({ configured: false, username: "", internal: false })),
-    saveAccount: vi.fn(),
-    syncToday: vi.fn(),
-    inbox: vi.fn(async () => []),
-    markTemplate: vi.fn(),
-    linkCustomer: vi.fn(),
-  },
+vi.mock("../../services/fixedTaskService", () => ({
+  fixedTaskService: { list: vi.fn() },
 }));
 
 vi.mock("../../services/taskService", () => ({
-  taskService: {
-    listTemplates: vi.fn(),
-    createTemplate: vi.fn(),
-    updateTemplate: vi.fn(),
-    deleteTemplate: vi.fn(),
-  },
+  taskService: { createTemplate: vi.fn() },
 }));
 
 vi.mock("../../services/userService", () => ({
@@ -54,19 +44,21 @@ vi.mock("../../services/branchService", () => ({
   branchService: { list: vi.fn() },
 }));
 
-vi.mock("../../components/tasks/NewTaskFormDialog", () => ({
+vi.mock("../../components/tasks/fixed/FixedTaskWizard", () => ({
   default: (props: { rememberKey?: string }) =>
     props.rememberKey ? <div data-testid="fixed-task-create-restored" /> : null,
 }));
 
-vi.mock("../../components/tasks/TaskReferenceMediaEditor", () => ({
-  default: () => null,
-  resolveTaskReferenceMedia: async () => ({}),
-}));
-
-vi.mock("../../components/tasks/CompletionRequirementsEditor", () => ({
-  default: () => null,
-}));
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={["/manager/fixed-tasks"]}>
+      <Routes>
+        <Route path="/manager/fixed-tasks" element={<ManagerFixedTasksPage />} />
+        <Route path="/manager/fixed-tasks/:key" element={<div data-testid="detail-route" />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 describe("ManagerFixedTasksPage", () => {
   beforeEach(() => {
@@ -75,62 +67,46 @@ describe("ManagerFixedTasksPage", () => {
   });
 
   it("shows the header and empty state", async () => {
-    vi.mocked(taskService.listTemplates).mockResolvedValue([]);
-    render(<ManagerFixedTasksPage />);
+    vi.mocked(fixedTaskService.list).mockResolvedValue([]);
+    renderPage();
     expect(screen.getByRole("heading", { name: he.managerFixedTasks })).toBeTruthy();
     await waitFor(() => expect(screen.getByText(he.managerFixedTasksEmpty)).toBeTruthy());
   });
 
-  it("renders a template row", async () => {
-    vi.mocked(taskService.listTemplates).mockResolvedValue([
-      {
-        id: "t1",
-        branch_id: "b1",
-        title: "פתיחת סניף",
-        description: "",
-        recurrence: "daily",
-        due_time: "09:00",
-        weekly_days: null,
-        monthly_day: null,
-        assignee_user_id: "u1",
-        department_id: null,
-        task_kind: "fixed",
-        photo_required: true,
-        is_active: true,
-        created_by_id: "m1",
-        created_at: "",
-        updated_at: "",
-        assignee_name: "עובד",
-      },
+  it("renders one card per task and opens its detail page", async () => {
+    vi.mocked(fixedTaskService.list).mockResolvedValue([
+      fixtureGroup({ key: "g1", title: "פתיחת סניף" }),
+      fixtureGroup({ key: "g2", title: "סגירת סניף", is_network: false, branches: [fixtureBranch()] }),
     ]);
-    render(<ManagerFixedTasksPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByText("פתיחת סניף")).toBeTruthy());
+    expect(screen.getByText("סגירת סניף")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: `${he.edit}: פתיחת סניף` }));
+    expect(screen.getByTestId("detail-route")).toBeTruthy();
   });
 
-  it("stays visible when the API returns a non-array or a null title", async () => {
-    vi.mocked(taskService.listTemplates).mockResolvedValue([
-      {
-        id: "t1",
-        branch_id: "b1",
-        title: null as unknown as string,
-        description: "",
-        recurrence: "daily",
-        due_time: "09:00",
-        weekly_days: ["0", "1"] as unknown as string,
-        monthly_day: null,
-        assignee_user_id: null,
-        department_id: null,
-        task_kind: "fixed",
-        photo_required: false,
-        is_active: true,
-        created_by_id: "m1",
-        created_at: "",
-        updated_at: "",
-        assignee_name: { he: "עובד" } as unknown as string,
-      },
+  it("filters by activity and by title search", async () => {
+    vi.mocked(fixedTaskService.list).mockResolvedValue([
+      fixtureGroup({ key: "g1", title: "ניקיון" }),
+      fixtureGroup({ key: "g2", title: "מלאי", active_count: 0 }),
+    ]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("ניקיון")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: he.managerFixedTasksFilterInactive }));
+    expect(screen.queryByText("ניקיון")).toBeNull();
+    expect(screen.getByText("מלאי")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.managerFixedTasksFilterAll }));
+    fireEvent.change(screen.getByLabelText(he.fixedGroupSearch), { target: { value: "ניק" } });
+    expect(screen.queryByText("מלאי")).toBeNull();
+    expect(screen.getByText("ניקיון")).toBeTruthy();
+  });
+
+  it("stays visible when the API returns a null title and a non-array team", async () => {
+    vi.mocked(fixedTaskService.list).mockResolvedValue([
+      fixtureGroup({ title: null as unknown as string, weekly_days: ["0", "1"] as unknown as string }),
     ]);
     vi.mocked(userService.listTeam).mockResolvedValue(undefined as never);
-    render(<ManagerFixedTasksPage />);
+    renderPage();
     await waitFor(() => expect(screen.getByRole("heading", { name: he.managerFixedTasks })).toBeTruthy());
     expect(screen.queryByText(he.pageCrashTitle)).toBeNull();
   });
@@ -150,23 +126,21 @@ describe("ManagerFixedTasksPage", () => {
       monthlyDay: 1,
       opsCategory: "",
       selectedBranchIds: ["b1"],
-      completionRequirements: [
-        { kind: "photo", title: "מדף", example_url: "blob:ex", pending_example: file },
-      ],
+      completionRequirements: [{ kind: "photo", title: "מדף", example_url: "blob:ex", pending_example: file }],
       isWorkStart: false,
       isWorkEnd: false,
       startUrl: "",
       media: { reference_photo_url: "", reference_video_url: "", reference_audio_url: "" },
     });
-    vi.mocked(taskService.listTemplates).mockResolvedValue([]);
-    render(<ManagerFixedTasksPage />);
+    vi.mocked(fixedTaskService.list).mockResolvedValue([]);
+    renderPage();
     expect(screen.getByTestId("fixed-task-create-restored")).toBeTruthy();
     await waitFor(() => expect(screen.getByRole("heading", { name: he.managerFixedTasks })).toBeTruthy());
   });
 
   it("shows an error instead of a blank page when loading fails", async () => {
-    vi.mocked(taskService.listTemplates).mockRejectedValue(new ApiError("שגיאת שרת", 500));
-    render(<ManagerFixedTasksPage />);
+    vi.mocked(fixedTaskService.list).mockRejectedValue(new ApiError("שגיאת שרת", 500));
+    renderPage();
     await waitFor(() => expect(screen.getByText("שגיאת שרת")).toBeTruthy());
     expect(screen.getByRole("heading", { name: he.managerFixedTasks })).toBeTruthy();
   });
