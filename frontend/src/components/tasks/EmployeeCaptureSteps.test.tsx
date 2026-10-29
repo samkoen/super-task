@@ -82,6 +82,43 @@ describe("EmployeeCaptureSteps", () => {
     expect(within(steps[0]).queryByText(he.completionSlotDone)).toBeNull();
   });
 
+  it("shows the manager remark and marked image on a rejected step, right away", () => {
+    renderSteps([kept("/a.jpg"), null, null], {
+      reviews: [
+        null,
+        { status: "rejected", remark: "צלם מקרוב את הדלת", annotated_url: "/uploads/marked.jpg" },
+        null,
+      ],
+    });
+    const steps = screen.getAllByTestId("capture-step");
+    expect(steps[1].getAttribute("data-review")).toBe("rejected");
+    const remark = within(steps[1]).getByTestId("slot-remark");
+    expect(within(remark).getByText("צלם מקרוב את הדלת")).toBeTruthy();
+    expect(within(remark).getByRole("img", { name: he.slotRemarkMarkedImage })).toBeTruthy();
+    expect(within(steps[1]).getByText(he.slotReviewRetakeHint)).toBeTruthy();
+    expect(steps[0].getAttribute("data-review")).toBeNull();
+    expect(within(steps[0]).queryByTestId("slot-remark")).toBeNull();
+  });
+
+  it("keeps the old photo on a rejected step when the oved does not retake it", () => {
+    renderSteps([kept("/a.jpg"), kept("/old.jpg"), null], {
+      reviews: [null, { status: "rejected", remark: "ליטוש" }, null],
+    });
+    const steps = screen.getAllByTestId("capture-step");
+    expect(steps[1].getAttribute("data-state")).toBe("done");
+    expect(within(steps[1]).getByText(he.slotReviewRetakeHint)).toBeTruthy();
+    expect(within(steps[1]).getByRole("button", { name: he.completionRetake })).toBeTruthy();
+  });
+
+  it("keeps the remark readable after the oved retook the photo", () => {
+    renderSteps([kept("/a.jpg"), kept("/new.jpg"), null], {
+      reviews: [null, { status: "rejected", remark: "ליטוש" }, null],
+    });
+    const steps = screen.getAllByTestId("capture-step");
+    expect(steps[1].getAttribute("data-state")).toBe("done");
+    expect(within(steps[1]).getByText("ליטוש")).toBeTruthy();
+  });
+
   it("has no 'what to attach' heading any more", () => {
     renderSteps([null, null, null]);
     expect(screen.queryByText(he.captureStepsTitle)).toBeNull();

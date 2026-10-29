@@ -698,6 +698,39 @@ async def reopen_occurrence(
     }
 
 
+@router.post("/occurrences/{occurrence_id}/review-slots")
+@handle_controller_errors
+async def review_occurrence_slots(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    messages: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    """V/X par sous-tâche : tout V accepte la tâche, un X la rouvre chez l'oved."""
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    item = service.review_completion_slots(
+        actor,
+        occurrence_id,
+        decisions=payload.get("decisions"),
+        quality_rating=payload.get("quality_rating"),
+    )
+    outcome = item.pop("review_outcome")
+    summary = item.pop("review_summary")
+    if outcome == "approved":
+        _emit_task_event(db, "task_approved", item)
+        return {"message": "המשימה אושרה ונסגרה", "outcome": outcome, "occurrence": item}
+    chat = await messages.post_message(actor, occurrence_id, body=summary)
+    _emit_task_event(db, "task_reopened", chat.get("occurrence") or item)
+    return {
+        "message": "המשימה נפתחה מחדש לעובד",
+        "outcome": outcome,
+        "occurrence": chat["occurrence"],
+    }
+
+
 @router.post("/occurrences/{occurrence_id}/reopen-closed")
 @handle_controller_errors
 async def reopen_closed_occurrence(

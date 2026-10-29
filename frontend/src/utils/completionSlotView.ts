@@ -1,6 +1,6 @@
 import { he } from "../i18n/he";
 import { mediaUrl } from "./mediaUrl";
-import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
+import type { CompletionAttachment, CompletionRequirement, SlotReview } from "./completionMedia";
 
 export type SlotFill = {
   url?: string | null;
@@ -10,6 +10,9 @@ export type SlotFill = {
   pending?: boolean;
   kind?: CompletionRequirement["kind"];
   durationSeconds?: number | null;
+  /** Position de ce fichier dans completion_attachments (clé du contrôle V/X). */
+  attachmentIndex?: number;
+  review?: SlotReview;
 };
 
 export function slotGuideText(req: CompletionRequirement): string {
@@ -62,6 +65,7 @@ export function attachmentsFromCompletion(completion?: {
 function toSlotFill(
   item: CompletionAttachment,
   req: CompletionRequirement,
+  attachmentIndex: number,
   opts?: { videosPending?: boolean },
 ): SlotFill {
   return {
@@ -71,6 +75,8 @@ function toSlotFill(
     posterUrl: item.poster_url,
     durationSeconds: item.duration_seconds,
     pending: req.kind === "video" && Boolean(opts?.videosPending),
+    attachmentIndex,
+    ...(item.review ? { review: item.review } : {}),
   };
 }
 
@@ -103,7 +109,7 @@ export function mapAttachmentsToSlots(
     const pick = pickAttachmentIndex(req, items, used, index);
     if (pick < 0) return null;
     used.add(pick);
-    return toSlotFill(items[pick], req, opts);
+    return toSlotFill(items[pick], req, pick, opts);
   });
   return { fills, leftover: items.filter((item, i) => !used.has(i) && item.kind !== "message" && Boolean(item.url)) };
 }

@@ -235,6 +235,10 @@ def attachment_urls(attachments: list[dict] | None) -> list[str]:
             value = str(item.get(key) or "").strip()
             if value:
                 urls.append(value)
+        review = item.get("review")
+        annotated = str(review.get("annotated_url") or "").strip() if isinstance(review, dict) else ""
+        if annotated:
+            urls.append(annotated)
     return urls
 
 

@@ -10,6 +10,7 @@ from app.domain.completion_media import (
     assert_attachments_match,
     assert_completion_media,
     attachment_is_filled,
+    attachments_from_legacy_paths,
     effective_requirements,
     first_path_of_kind,
     packed_media_fields,
@@ -24,6 +25,17 @@ from app.domain.audio_transcription_fallback import (
 from app.domain.completion_transcript_localization import localize_completion_transcript
 from app.domain.employee_language import normalize_employee_language
 from app.domain.quality_rating import normalize_quality_rating
+from app.domain.slot_review import (
+    OUTCOME_APPROVED,
+    OUTCOME_INCOMPLETE,
+    apply_decisions,
+    carry_over_reviews,
+    normalize_decisions,
+    rejection_summary,
+    required_indices,
+    review_outcome,
+    strip_reviews,
+)
 from app.domain.task_completion_submit import (
     employee_submission_needs_review,
     normalize_completion_status,
@@ -557,6 +569,12 @@ class TaskOccurrenceService:
             "audio_path": first_path_of_kind(attachments, "audio"),
         }
 
+    def _carry_slot_reviews(self, occurrence, existing, attachments: list) -> list:
+        _, reqs = self._media_requirements(occurrence)
+        return carry_over_reviews(
+            existing.completion_attachments, attachments, requirement_count=len(reqs)
+        )
+
     def _media_requirements(self, occurrence) -> tuple[object | None, list]:
         merged = self._with_reference_media(occurrence)
         raw = getattr(merged, "completion_requirements", None)
@@ -693,6 +711,8 @@ class TaskOccurrenceService:
 
         note_clean = (note or "").strip() or None
         existing = self._completions.find_by_occurrence(occurrence_id)
+        if existing and requires_completion_media(completion_status):
+            media["attachments"] = self._carry_slot_reviews(occurrence, existing, media["attachments"])
         employee_submission = as_assignee
         needs_review = employee_submission_needs_review(employee_submission)
         if employee_submission and not existing:
@@ -819,6 +839,51 @@ class TaskOccurrenceService:
         data["completion"] = mp.task_completion_domain_to_api(reviewed)
         return data
 
+    def review_completion_slots(
+        self,
+        actor: ActorContext,
+        occurrence_id: str,
+        *,
+        decisions: object,
+        quality_rating: object = None,
+    ) -> dict:
+        """V/X par sous-tâche : tout V → tâche acceptée ; au moins un X → rouverte chez l'oved."""
+        occurrence = self._require_reviewable(actor, occurrence_id)
+        completion = self._completions.find_by_occurrence(occurrence_id)
+        if not completion:
+            raise ValueError("לא נמצאה הגשת סיום")
+        self._assert_review_media_ready(occurrence_id)
+        attachments = self._reviewable_attachments(completion)
+        _, reqs = self._media_requirements(occurrence)
+        reviewed = apply_decisions(
+            attachments,
+            normalize_decisions(decisions, count=len(attachments)),
+            reviewed_at=datetime.now(TZ).isoformat(),
+        )
+        outcome = review_outcome(reviewed, required_indices(reqs, reviewed))
+        if outcome == OUTCOME_INCOMPLETE:
+            raise ValueError("יש לסמן V או X על כל תת-משימה")
+        approved = outcome == OUTCOME_APPROVED
+        stars = normalize_quality_rating(quality_rating) if approved else None
+        self._completions.update_attachments(occurrence_id, reviewed)
+        summary = rejection_summary(reviewed, [r.get("title") or "" for r in reqs], limit=500)
+        if approved:
+            data = self.approve_occurrence(actor, occurrence_id, quality_rating=stars)
+        else:
+            data = self.reopen_occurrence(actor, occurrence_id, rejection_note=summary)
+        data["review_outcome"] = outcome
+        data["review_summary"] = None if approved else summary
+        return data
+
+    @staticmethod
+    def _reviewable_attachments(completion) -> list[dict]:
+        stored = completion.completion_attachments
+        if stored:
+            return [dict(item) for item in stored]
+        return attachments_from_legacy_paths(
+            completion.photo_path, completion.video_path, completion.audio_path
+        )
+
     def reopen_closed_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, rejection_note: str | None = None
     ) -> dict:
@@ -839,6 +904,13 @@ class TaskOccurrenceService:
         note = (rejection_note or "").strip() or None
         cleared = self._completions.clear_approved_review(occurrence_id, rejection_note=note)
         assert cleared is not None
+        if cleared.completion_attachments:
+            cleared = (
+                self._completions.update_attachments(
+                    occurrence_id, strip_reviews(cleared.completion_attachments)
+                )
+                or cleared
+            )
         updated = self._occurrences.reopen_after_review(occurrence_id)
         assert updated is not None
         self._media_retention.cancel_purge(occurrence_id)

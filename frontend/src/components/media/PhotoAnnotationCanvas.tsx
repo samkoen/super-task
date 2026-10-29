@@ -23,6 +23,8 @@ export type { AnnotationTool };
 
 export interface PhotoAnnotationCanvasHandle {
   exportFile: () => Promise<File>;
+  /** Au moins une flèche ou un rond dessiné. */
+  hasAnnotations: () => boolean;
 }
 
 interface PhotoAnnotationCanvasProps {
@@ -325,6 +327,7 @@ const PhotoAnnotationCanvas = forwardRef<PhotoAnnotationCanvasHandle, PhotoAnnot
     };
 
     useImperativeHandle(ref, () => ({
+      hasAnnotations: () => shapesRef.current.length > 0,
       exportFile: async () => {
         const image = imageRef.current;
         const canvas = canvasRef.current;

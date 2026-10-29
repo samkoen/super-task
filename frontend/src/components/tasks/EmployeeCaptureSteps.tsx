@@ -3,7 +3,7 @@ import { Box } from "@mui/material";
 import CaptureStepCard, { type StepHintControls } from "./CaptureStepCard";
 import type { useSlotHintPlayback } from "../../hooks/useSlotHintPlayback";
 import { captureProgress } from "../../utils/captureProgress";
-import type { CompletionRequirement } from "../../utils/completionMedia";
+import type { CompletionRequirement, SlotReview } from "../../utils/completionMedia";
 import { slotDisplayTitle, slotGuideText } from "../../utils/completionSlotView";
 import { applyMessageSlot, applyPendingSlot, type PendingMedia } from "../../utils/pendingMedia";
 
@@ -39,6 +39,7 @@ export default function EmployeeCaptureSteps({
   disabled = false,
   onAnnotatingChange,
   onAsk,
+  reviews,
 }: {
   requirements: CompletionRequirement[];
   slots: Array<PendingMedia | null>;
@@ -48,6 +49,8 @@ export default function EmployeeCaptureSteps({
   onAnnotatingChange?: (busy: boolean) => void;
   /** Question sur une sous-tâche : reçoit son titre. */
   onAsk?: (title: string) => void;
+  /** Contrôle V/X du menahel, case par case (même ordre que `requirements`). */
+  reviews?: Array<SlotReview | null>;
 }) {
   const slotsRef = useRef(slots);
   slotsRef.current = slots;
@@ -63,6 +66,7 @@ export default function EmployeeCaptureSteps({
           index={index}
           state={progress.states[index]}
           media={slots[index] ?? null}
+          review={reviews?.[index] ?? null}
           disabled={disabled}
           hintControls={hintControlsFor(req, index, hints)}
           onCapture={(file, seconds) => onChange(applyPendingSlot(slotsRef.current, index, file, seconds))}

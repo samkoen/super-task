@@ -115,6 +115,19 @@ export interface UpdateTaskTemplatePayload {
   apply_to_network?: boolean;
 }
 
+export interface SlotReviewDecision {
+  index: number;
+  status: "approved" | "rejected";
+  remark?: string;
+  annotated_url?: string;
+}
+
+export interface ReviewSlotsPayload {
+  decisions: SlotReviewDecision[];
+  /** Obligatoire quand tout est V (la tâche est alors acceptée). */
+  quality_rating?: number | null;
+}
+
 export interface TaskCompletion {
   id: string;
   occurrence_id: string;
@@ -404,6 +417,16 @@ export const taskService = {
       `/tasks/occurrences/${occurrenceId}/approve`,
       payload,
     );
+    return response.data;
+  },
+
+  /** V/X par sous-tâche : tout V accepte la tâche, au moins un X la rouvre chez l'oved. */
+  reviewSlots: async (occurrenceId: string, payload: ReviewSlotsPayload) => {
+    const response = await api.post<{
+      message: string;
+      outcome: "approved" | "rejected";
+      occurrence: TaskOccurrence;
+    }>(`/tasks/occurrences/${occurrenceId}/review-slots`, payload);
     return response.data;
   },
 
