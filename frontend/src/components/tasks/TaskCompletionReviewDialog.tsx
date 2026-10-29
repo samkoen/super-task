@@ -1,34 +1,37 @@
-import { useEffect, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { Alert, Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
 import { ApiError } from "../../services/api";
 import { taskService, type TaskOccurrence, type TaskStatus } from "../../services/taskService";
+import FormDialog from "../ui/FormDialog";
 import CompletionMediaPreview from "./CompletionMediaPreview";
 import TaskReferenceMediaDisplay from "./TaskReferenceMediaDisplay";
 import { OpenTaskChatButton } from "./TaskChatDialog";
 import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
+import TaskFormSection from "./form/TaskFormSection";
+import SlotReviewPanel from "./review/SlotReviewPanel";
+import SlotReviewFinish from "./review/SlotReviewFinish";
 import { he } from "../../i18n/he";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
-import { dialogActionsPbCss } from "../../utils/systemInsets";
 import { completionFinishedText } from "../../utils/completionFinishedAt";
 import { DEFAULT_REVIEW_QUALITY_RATING } from "../../utils/qualityRating";
 import { initialReviewMediaReady, reviewActionsBlocked } from "../../utils/reviewMediaGate";
+import { normalizeRequirements } from "../../utils/completionMedia";
+import { attachmentsFromCompletion } from "../../utils/completionSlotView";
+import {
+  buildReviewItems,
+  buildReviewPayload,
+  initialDrafts,
+  summarizeReview,
+  type SlotDrafts,
+} from "../../utils/slotReview";
 import {
   markedPhotoUrls,
   reopenReviewedTask,
   upsertReviewPhotoMark,
   type ReviewPhotoMark,
 } from "../../utils/reviewReopenPhotos";
+import { dialogSecondaryActionSx } from "../../styles/dialogUi";
+import { employeeFieldSx, employeePrimaryButtonSx } from "../../styles/employeeUi";
 import ClosedTaskReopenConfirm from "./ClosedTaskReopenConfirm";
 import CompletionOutcomeChip from "./CompletionOutcomeChip";
 import QualityRatingStars from "./QualityRatingStars";
@@ -53,6 +56,7 @@ export default function TaskCompletionReviewDialog({
   const [marks, setMarks] = useState<ReviewPhotoMark[]>([]);
   const [annotateUrl, setAnnotateUrl] = useState<string | null>(null);
   const [taskView, setTaskView] = useState<TaskOccurrence | null>(task);
+  const [drafts, setDrafts] = useState<SlotDrafts>({});
 
   useEffect(() => {
     setTaskView(task);
@@ -68,6 +72,14 @@ export default function TaskCompletionReviewDialog({
   const showCompletion = Boolean(completion);
   const actionsBlocked = reviewActionsBlocked({ isReview, mediaReady });
 
+  const reviewItems = useMemo(() => {
+    const requirements = normalizeRequirements(taskView?.completion_requirements);
+    if (!requirements.length || completion?.status !== "completed") return [];
+    return buildReviewItems(requirements, attachmentsFromCompletion(completion));
+  }, [taskView?.completion_requirements, completion]);
+  const slotMode = isReview && reviewItems.length > 0;
+  const summary = summarizeReview(reviewItems, drafts);
+
   useEffect(() => {
     setNote("");
     setError("");
@@ -77,6 +89,12 @@ export default function TaskCompletionReviewDialog({
     setMarks([]);
     setAnnotateUrl(null);
   }, [taskView?.id, taskView?.completion?.media_ready]);
+
+  useEffect(() => {
+    setDrafts(initialDrafts(reviewItems));
+    // Nouveau dossier à contrôler seulement quand on change de tâche ou de soumission.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskView?.id, completion?.completed_at]);
 
   useEffect(() => {
     const taskId = taskView?.id;
@@ -155,6 +173,23 @@ export default function TaskCompletionReviewDialog({
     });
   };
 
+  const handleFinishSlots = () => {
+    if (summary.outcome === "approve" && rating == null) {
+      setError(he.qualityRatingRequired);
+      return;
+    }
+    void runAction(async () => {
+      const payload = await buildReviewPayload({
+        items: reviewItems,
+        drafts,
+        rating,
+        uploadPhoto: (file) => taskService.uploadPhoto(file),
+      });
+      const result = await taskService.reviewSlots(taskView!.id, payload);
+      return result.outcome === "approved" ? he.taskApprovedSuccess : he.taskReopenedSuccess;
+    });
+  };
+
   const handleReopenClosed = () => {
     setConfirmReopenClosed(false);
     const remark = note.trim() || he.taskReopenNoteFallback;
@@ -166,20 +201,62 @@ export default function TaskCompletionReviewDialog({
 
   return (
     <>
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      fullWidth
-      maxWidth="sm"
-      dir="rtl"
-      disableEnforceFocus
-      disableAutoFocus
-      disableRestoreFocus
-    >
-      <DialogTitle>{reviewDialogTitle(isClosed, isClosedApproved, isAwaiting)}</DialogTitle>
-      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+      <FormDialog
+        open={open}
+        title={reviewDialogTitle(isClosed, isClosedApproved, isAwaiting)}
+        onClose={handleClose}
+        busy={saving}
+        actions={
+          <>
+            <Button onClick={handleClose} disabled={saving} sx={dialogSecondaryActionSx}>
+              {he.cancel}
+            </Button>
+            {slotMode && (
+              <FinishSlotsButton
+                outcome={summary.outcome}
+                saving={saving}
+                disabled={!summary.canFinish || actionsBlocked}
+                onClick={handleFinishSlots}
+              />
+            )}
+            {isReview && !slotMode && (
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={handleReopen}
+                disabled={saving || actionsBlocked}
+                sx={dialogSecondaryActionSx}
+              >
+                {he.taskReopen}
+              </Button>
+            )}
+            {isReview && !slotMode && (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleApprove}
+                disabled={saving || rating == null || actionsBlocked}
+                sx={employeePrimaryButtonSx}
+              >
+                {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
+              </Button>
+            )}
+            {isClosedApproved && (
+              <Button
+                variant="contained"
+                color="warning"
+                onClick={() => setConfirmReopenClosed(true)}
+                disabled={saving}
+                sx={employeePrimaryButtonSx}
+              >
+                {he.taskReopenClosed}
+              </Button>
+            )}
+          </>
+        }
+      >
         {taskView && (
-          <Typography variant="subtitle1" fontWeight={700}>
+          <Typography variant="h6" fontWeight={800}>
             {taskView.title}
           </Typography>
         )}
@@ -203,37 +280,23 @@ export default function TaskCompletionReviewDialog({
             reference_audio_url={taskView.reference_audio_url}
           />
         )}
-        {showCompletion && completion && (
-          <Box>
-            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={1}>
-              <CompletionOutcomeChip status={completion.status} />
-              {finishedAt && (
-                <Typography variant="body2" fontWeight={700} dir="ltr">
-                  {finishedAt}
-                </Typography>
-              )}
-            </Box>
-            {completion.status === "not_completed" && (
-              <Alert severity="warning">
-                {he.taskNotCompletedAlert}
-                {completion.not_completed_reason ? (
-                  <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
-                    {he.notCompletedReason}: {completion.not_completed_reason}
-                  </Typography>
-                ) : null}
-              </Alert>
-            )}
-          </Box>
+        <CompletionFacts
+          show={showCompletion}
+          status={completion?.status}
+          finishedAt={finishedAt}
+          note={completion?.note}
+          reason={completion?.not_completed_reason}
+        />
+        {showCompletion && completion && slotMode && (
+          <SlotReviewPanel
+            items={reviewItems}
+            drafts={drafts}
+            onDraftsChange={setDrafts}
+            videosPending={!mediaReady}
+            disabled={saving}
+          />
         )}
-        {showCompletion && completion?.note && (
-          <Box>
-            <Typography variant="caption" color="text.secondary" display="block">
-              {he.note}
-            </Typography>
-            <Typography variant="body2">{completion.note}</Typography>
-          </Box>
-        )}
-        {showCompletion && completion && (
+        {showCompletion && completion && !slotMode && (
           <CompletionMediaPreview
             photo_path={completion.photo_path}
             video_path={completion.video_path}
@@ -246,25 +309,27 @@ export default function TaskCompletionReviewDialog({
             markedPhotoUrls={markedPhotoUrls(marks)}
           />
         )}
-        {isReview && marks.length > 0 && (
+        {isReview && !slotMode && marks.length > 0 && (
           <Alert severity="info">{he.reviewMarkedPhotoCount(marks.length)}</Alert>
         )}
-        {actionsBlocked && (
-          <Alert severity="info">{he.reviewVideosNotReady}</Alert>
-        )}
+        {actionsBlocked && <Alert severity="info">{he.reviewVideosNotReady}</Alert>}
 
-        {isReview && (
-          <Box>
-            <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
-              {he.qualityRating}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
+        {slotMode && (
+          <SlotReviewFinish
+            summary={summary}
+            rating={rating}
+            onRatingChange={setRating}
+          />
+        )}
+        {isReview && !slotMode && (
+          <TaskFormSection title={he.qualityRating}>
+            <Typography color="text.secondary" sx={{ fontSize: "1rem" }}>
               {he.qualityRatingHint}
             </Typography>
             <QualityRatingStars value={rating} onChange={setRating} />
-          </Box>
+          </TaskFormSection>
         )}
-        {(isReview || isClosedApproved) && (
+        {((isReview && !slotMode) || isClosedApproved) && (
           <TextField
             label={he.taskReopenNote}
             value={note}
@@ -274,69 +339,104 @@ export default function TaskCompletionReviewDialog({
             multiline
             minRows={2}
             disabled={saving}
+            sx={employeeFieldSx}
           />
         )}
 
         {error && <Alert severity="error">{error}</Alert>}
-      </DialogContent>
-      <DialogActions
-        sx={{
-          px: 3,
-          pb: dialogActionsPbCss(),
-          flexWrap: "wrap",
-          gap: 1,
-          flexDirection: { xs: "column", sm: "row" },
-          "& > :not(style)": { width: { xs: "100%", sm: "auto" } },
+      </FormDialog>
+      <ChatPhotoAnnotateReplyDialog
+        photoUrl={annotateUrl}
+        sending={saving}
+        hideCaption
+        submitLabel={he.reviewMarkPhotoSave}
+        onClose={() => setAnnotateUrl(null)}
+        onSend={(file) => {
+          if (!annotateUrl) return;
+          setMarks((prev) => upsertReviewPhotoMark(prev, { sourceUrl: annotateUrl, file }));
+          setAnnotateUrl(null);
         }}
-      >
-        <Button onClick={handleClose} disabled={saving}>
-          {he.cancel}
-        </Button>
-        {isReview && (
-          <Button variant="outlined" color="warning" onClick={handleReopen} disabled={saving || actionsBlocked}>
-            {he.taskReopen}
-          </Button>
+      />
+      <ClosedTaskReopenConfirm
+        open={confirmReopenClosed}
+        saving={saving}
+        onCancel={() => setConfirmReopenClosed(false)}
+        onConfirm={handleReopenClosed}
+      />
+    </>
+  );
+}
+
+function FinishSlotsButton({
+  outcome,
+  saving,
+  disabled,
+  onClick,
+}: {
+  outcome: "pending" | "approve" | "reopen";
+  saving: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const reopen = outcome === "reopen";
+  const label = reopen ? he.slotReviewFinishReopen : he.slotReviewFinishApprove;
+  return (
+    <Button
+      variant="contained"
+      color={reopen ? "warning" : "success"}
+      onClick={onClick}
+      disabled={saving || disabled}
+      sx={employeePrimaryButtonSx}
+    >
+      {saving ? <CircularProgress size={22} color="inherit" /> : label}
+    </Button>
+  );
+}
+
+function CompletionFacts({
+  show,
+  status,
+  finishedAt,
+  note,
+  reason,
+}: {
+  show: boolean;
+  status?: "completed" | "not_completed";
+  finishedAt: string | null;
+  note?: string | null;
+  reason?: string | null;
+}): ReactElement | null {
+  if (!show || !status) return null;
+  return (
+    <>
+      <Box>
+        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" mb={1}>
+          <CompletionOutcomeChip status={status} />
+          {finishedAt && (
+            <Typography variant="body2" fontWeight={700} dir="ltr">
+              {finishedAt}
+            </Typography>
+          )}
+        </Box>
+        {status === "not_completed" && (
+          <Alert severity="warning">
+            {he.taskNotCompletedAlert}
+            {reason ? (
+              <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>
+                {he.notCompletedReason}: {reason}
+              </Typography>
+            ) : null}
+          </Alert>
         )}
-        {isReview && (
-          <Button
-            variant="contained"
-            color="success"
-            onClick={handleApprove}
-            disabled={saving || rating == null || actionsBlocked}
-          >
-            {saving ? <CircularProgress size={22} color="inherit" /> : he.taskApproveClose}
-          </Button>
-        )}
-        {isClosedApproved && (
-          <Button
-            variant="contained"
-            color="warning"
-            onClick={() => setConfirmReopenClosed(true)}
-            disabled={saving}
-          >
-            {he.taskReopenClosed}
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
-    <ChatPhotoAnnotateReplyDialog
-      photoUrl={annotateUrl}
-      sending={saving}
-      hideCaption
-      submitLabel={he.reviewMarkPhotoSave}
-      onClose={() => setAnnotateUrl(null)}
-      onSend={(file) => {
-        if (!annotateUrl) return;
-        setMarks((prev) => upsertReviewPhotoMark(prev, { sourceUrl: annotateUrl, file }));
-        setAnnotateUrl(null);
-      }}
-    />
-    <ClosedTaskReopenConfirm
-      open={confirmReopenClosed}
-      saving={saving}
-      onCancel={() => setConfirmReopenClosed(false)}
-      onConfirm={handleReopenClosed}
-    />
+      </Box>
+      {note ? (
+        <Box>
+          <Typography variant="caption" color="text.secondary" display="block">
+            {he.note}
+          </Typography>
+          <Typography variant="body2">{note}</Typography>
+        </Box>
+      ) : null}
     </>
   );
 }

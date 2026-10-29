@@ -37,6 +37,7 @@ import { employeeDisplayStatus } from "../../utils/employeeDashboardSections";
 import { rejectionRemark } from "../../utils/taskReview";
 import { effectiveRequirements } from "../../utils/completionMedia";
 import { attachmentsFromCompletion } from "../../utils/completionSlotView";
+import { slotReviewsFromCompletion } from "../../utils/employeeCompletionUpload";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import type { ExtraSlot } from "../../utils/extraCompletionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
@@ -336,6 +337,7 @@ function TaskDetailMedia({
           hints={hints}
           onAsk={onAsk}
           onAnnotatingChange={capture.onAnnotatingChange}
+          reviews={slotReviewsFromCompletion(requirements, task.completion)}
         />
       ) : (
         <CompletionMediaPreview

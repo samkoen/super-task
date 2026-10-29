@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { he } from "../i18n/he";
 import {
+  slotReviewsFromCompletion,
   slotsFromKeptAttachments,
   slotsMeetTaskRequirements,
   uploadRequirementSlots,
@@ -177,6 +178,32 @@ describe("employeeCompletionUpload", () => {
     ]);
     slots.forEach((item) => revokePendingMedia(item));
     extras.forEach((item) => revokePendingMedia(item.media));
+  });
+
+  it("keeps the old file of a slot the menahel rejected until a new one is taken", () => {
+    const reqs: CompletionRequirement[] = [{ kind: "photo", title: "מדף" }, { kind: "photo", title: "מקרר" }];
+    const attachments = [
+      { kind: "photo" as const, url: "/a.jpg", review: { status: "approved" as const } },
+      { kind: "photo" as const, url: "/b.jpg", review: { status: "rejected" as const, remark: "flou" } },
+    ];
+    const slots = slotsFromKeptAttachments(reqs, attachments);
+    expect(slots[0]?.keptUrl).toBe("/a.jpg");
+    expect(slots[1]?.keptUrl).toBe("/b.jpg");
+    expect(slotsMeetTaskRequirements(reqs, slots)).toBe(true);
+  });
+
+  it("exposes the menahel review of each slot for the oved screen", () => {
+    const reqs: CompletionRequirement[] = [{ kind: "photo" }, { kind: "photo" }];
+    const completion = {
+      completion_attachments: [
+        { kind: "photo" as const, url: "/a.jpg" },
+        { kind: "photo" as const, url: "/b.jpg", review: { status: "rejected" as const, remark: "flou" } },
+      ],
+    };
+    expect(slotReviewsFromCompletion(reqs, completion)).toEqual([
+      null,
+      { status: "rejected", remark: "flou" },
+    ]);
   });
 
   it("does not treat a zero-byte video as ready", () => {

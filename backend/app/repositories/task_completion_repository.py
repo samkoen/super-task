@@ -200,6 +200,21 @@ class TaskCompletionRepository:
         self._db.flush()
         return mp.task_completion_orm_to_domain(row)
 
+    def update_attachments(
+        self, occurrence_id: str, attachments: list
+    ) -> TaskCompletion | None:
+        """Remplace la liste des pièces jointes (ex. contrôles V/X par sous-tâche)."""
+        row = (
+            self._db.query(orm.TaskCompletion)
+            .filter(orm.TaskCompletion.occurrence_id == mp.parse_uuid(occurrence_id))
+            .first()
+        )
+        if not row:
+            return None
+        row.completion_attachments = list(attachments)
+        self._db.flush()
+        return mp.task_completion_orm_to_domain(row)
+
     def clear_approved_review(
         self, occurrence_id: str, *, rejection_note: str | None = None
     ) -> TaskCompletion | None:

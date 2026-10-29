@@ -1,5 +1,5 @@
 import { he } from "../i18n/he";
-import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
+import type { CompletionAttachment, CompletionRequirement, SlotReview } from "./completionMedia";
 import { MAX_MESSAGE_TEXT, meetsCompletionRequirements } from "./completionMedia";
 import { attachmentsFromCompletion, mapAttachmentsToSlots } from "./completionSlotView";
 import type { ExtraSlot } from "./extraCompletionMedia";
@@ -33,10 +33,21 @@ export function slotsFromKeptAttachments(
   attachments: CompletionAttachment[] | null | undefined,
 ): Array<PendingMedia | null> {
   return mapAttachmentsToSlots(requirements, attachments).fills.map((fill) => {
+    // Un X du menahel : l'ancienne photo/vidéo reste en place tant que l'oved n'en prend pas une nouvelle.
     if (fill?.text?.trim()) return createMessageMedia(fill.text);
     if (fill?.url) return createKeptMedia(fill.url, fill.durationSeconds, fill.posterUrl ?? undefined);
     return null;
   });
+}
+
+/** Contrôle V/X du menahel, case par case (null = pas de contrôle). */
+export function slotReviewsFromCompletion(
+  requirements: CompletionRequirement[],
+  completion: Parameters<typeof attachmentsFromCompletion>[0],
+): Array<SlotReview | null> {
+  return mapAttachmentsToSlots(requirements, attachmentsFromCompletion(completion)).fills.map(
+    (fill) => fill?.review ?? null,
+  );
 }
 
 export function slotsFromTaskCompletion(

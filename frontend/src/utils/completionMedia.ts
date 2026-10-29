@@ -12,6 +12,15 @@ export type CompletionRequirement = {
   pending_example?: File | null;
 };
 
+/** Contrôle V/X du menahel sur une sous-tâche rendue. */
+export type SlotReview = {
+  status: "approved" | "rejected";
+  remark?: string;
+  /** Image (photo ou fragment de vidéo) avec flèches / ronds du menahel. */
+  annotated_url?: string;
+  reviewed_at?: string;
+};
+
 export type CompletionAttachment = {
   kind: CompletionKind;
   url?: string;
@@ -19,6 +28,7 @@ export type CompletionAttachment = {
   duration_seconds?: number;
   captured_at?: string;
   poster_url?: string;
+  review?: SlotReview;
 };
 
 export const MAX_COMPLETION_REQUIREMENTS = 10;
