@@ -110,6 +110,50 @@ def test_one_rejected_slot_reopens_with_remark_visible_to_oved(
     assert any("צלם מקרוב" in (m.get("body") or "") for m in messages)
 
 
+def test_full_round_trip_oved_sees_remark_and_resubmits(
+    client_mgr, client_emp, world_seed, jpeg_bytes, mock_i18n
+):
+    """Oved ferme, menahel met לא תקין sur une sous-tâche, oved voit la remarque et referme."""
+    occ_id = _create_started(client_mgr, client_emp, world_seed)
+    urls = [_upload(client_emp, jpeg_bytes, "a.jpg"), _upload(client_emp, jpeg_bytes, "b.jpg")]
+    closed = _submit(client_emp, occ_id, urls)
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["occurrence"]["status"] == "pending_review"
+
+    annotated = _upload(client_mgr, jpeg_bytes, "marked.jpg")
+    reopened = _review(
+        client_mgr,
+        occ_id,
+        [
+            {"index": 0, "status": "approved"},
+            {"index": 1, "status": "rejected", "remark": "לא תקין", "annotated_url": annotated},
+        ],
+    )
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["outcome"] == "rejected"
+    assert reopened.json()["occurrence"]["status"] == "in_progress"
+
+    card = _find_card(client_emp.get("/api/dashboard/employee").json(), occ_id)
+    assert card["status"] == "in_progress"
+    attachments = card["completion"]["completion_attachments"]
+    assert attachments[0]["review"]["status"] == "approved"
+    refused = attachments[1]["review"]
+    assert refused["remark"] == "לא תקין"
+    assert refused["annotated_url"] == annotated
+    assert client_emp.get("/api/media/proxy", params={"src": annotated}).status_code == 200
+    messages = client_emp.get(f"/api/tasks/occurrences/{occ_id}/messages").json()["messages"]
+    assert any("לא תקין" in (m.get("body") or "") for m in messages)
+
+    again = _submit(client_emp, occ_id, urls)
+    assert again.status_code == 200, again.text
+    resubmitted = again.json()["occurrence"]
+    assert resubmitted["status"] == "pending_review"
+    kept = resubmitted["completion"]["completion_attachments"]
+    assert [a["url"] for a in kept] == urls
+    assert kept[0]["review"]["status"] == "approved"
+    assert "review" not in kept[1]
+
+
 def test_resubmit_without_new_photo_keeps_old_media_and_asks_review_again(
     client_mgr, client_emp, world_seed, jpeg_bytes, mock_i18n
 ):
