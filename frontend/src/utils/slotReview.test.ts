@@ -56,6 +56,18 @@ describe("summarizeReview", () => {
     expect(summary).toMatchObject({ outcome: "pending", remaining: 1, canFinish: false });
   });
 
+  it("blocks finish while a rejected extra was sent back unchanged", () => {
+    const items = buildReviewItems(reqs, [
+      attachments[0],
+      attachments[1],
+      { kind: "photo", url: "/uploads/extra.jpg", review: { status: "rejected", remark: "flou" } },
+    ]);
+    expect(items[2].required).toBe(true);
+    const drafts = { 0: approvedDraft(), 1: approvedDraft() };
+    expect(summarizeReview(items, drafts).canFinish).toBe(false);
+    expect(summarizeReview(items, { ...drafts, 2: approvedDraft() }).outcome).toBe("approve");
+  });
+
   it("does not wait for optional extras", () => {
     const drafts = { 0: approvedDraft(), 1: approvedDraft() };
     expect(summarizeReview(items, drafts)).toMatchObject({ outcome: "approve", canFinish: true });

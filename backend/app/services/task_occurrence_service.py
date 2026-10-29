@@ -569,6 +569,12 @@ class TaskOccurrenceService:
             "audio_path": first_path_of_kind(attachments, "audio"),
         }
 
+    def _carry_slot_reviews(self, occurrence, existing, attachments: list) -> list:
+        _, reqs = self._media_requirements(occurrence)
+        return carry_over_reviews(
+            existing.completion_attachments, attachments, requirement_count=len(reqs)
+        )
+
     def _media_requirements(self, occurrence) -> tuple[object | None, list]:
         merged = self._with_reference_media(occurrence)
         raw = getattr(merged, "completion_requirements", None)
@@ -706,9 +712,7 @@ class TaskOccurrenceService:
         note_clean = (note or "").strip() or None
         existing = self._completions.find_by_occurrence(occurrence_id)
         if existing and requires_completion_media(completion_status):
-            media["attachments"] = carry_over_reviews(
-                existing.completion_attachments, media["attachments"]
-            )
+            media["attachments"] = self._carry_slot_reviews(occurrence, existing, media["attachments"])
         employee_submission = as_assignee
         needs_review = employee_submission_needs_review(employee_submission)
         if employee_submission and not existing:

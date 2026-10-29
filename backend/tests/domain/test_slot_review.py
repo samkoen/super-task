@@ -152,6 +152,39 @@ def test_carry_over_keeps_old_file_of_unchanged_rejected_slot_to_review_again():
     assert review_of(out[0]) is None
 
 
+def test_unchanged_rejected_extra_still_blocks_until_reviewed_again():
+    requirements = [{"kind": "photo"}]
+    previous = apply_decisions(
+        _photos(2),
+        {0: {"status": "approved"}, 1: {"status": "rejected", "remark": "flou"}},
+        reviewed_at=NOW,
+    )
+    resent = carry_over_reviews(previous, _photos(2), requirement_count=1)
+    assert review_of(resent[0])["status"] == "approved"
+    assert review_of(resent[1])["remark"] == "flou"
+    skipped = apply_decisions(resent, {0: {"status": "approved"}}, reviewed_at=NOW)
+    assert review_outcome(skipped, required_indices(requirements, skipped)) == OUTCOME_REJECTED
+    accepted = apply_decisions(
+        resent, {0: {"status": "approved"}, 1: {"status": "approved"}}, reviewed_at=NOW
+    )
+    assert review_outcome(accepted, required_indices(requirements, accepted)) == OUTCOME_APPROVED
+
+
+def test_replaced_rejected_extra_no_longer_blocks():
+    requirements = [{"kind": "photo"}]
+    previous = apply_decisions(
+        _photos(2), {0: {"status": "approved"}, 1: {"status": "rejected"}}, reviewed_at=NOW
+    )
+    replaced = carry_over_reviews(
+        previous,
+        [_photos(1)[0], {"kind": "photo", "url": "/uploads/new.jpg"}],
+        requirement_count=1,
+    )
+    assert review_of(replaced[1]) is None
+    decided = apply_decisions(replaced, {0: {"status": "approved"}}, reviewed_at=NOW)
+    assert review_outcome(decided, required_indices(requirements, decided)) == OUTCOME_APPROVED
+
+
 def test_carry_over_keeps_approved_and_resets_unchanged_rejected():
     previous = apply_decisions(
         _photos(2), {0: {"status": "approved"}, 1: {"status": "rejected"}}, reviewed_at=NOW

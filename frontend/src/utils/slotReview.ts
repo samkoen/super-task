@@ -60,6 +60,16 @@ function itemTitle(
   return `${he.completionRequirementN(index + 1)} · ${KIND_LABEL[kind]()}`;
 }
 
+/** Un extra refusé et renvoyé tel quel bloque la fin, comme une sous-tâche exigée. */
+function slotMustBeDecided(
+  requirements: CompletionRequirement[],
+  index: number,
+  attachment: CompletionAttachment,
+): boolean {
+  if (requirements.length === 0 || index < requirements.length) return true;
+  return attachment.review?.status === "rejected";
+}
+
 /** Même règle que le backend : une case par exigence, ou tous les fichiers sans exigence. */
 export function buildReviewItems(
   requirements: CompletionRequirement[],
@@ -74,7 +84,7 @@ export function buildReviewItems(
       attachment,
       requirement,
       title: itemTitle(requirement, index, attachment.kind),
-      required: requirements.length === 0 || index < requirements.length,
+      required: slotMustBeDecided(requirements, index, attachment),
     });
   });
   return items;

@@ -17,7 +17,7 @@ def _upload(client, jpeg_bytes: bytes, name: str = "a.jpg") -> str:
     return upload.json()["url"]
 
 
-def _create_started(client_mgr, client_emp, world_seed) -> str:
+def _create_started(client_mgr, client_emp, world_seed, reqs=None) -> str:
     created = client_mgr.post(
         "/api/tasks/ad-hoc",
         json={
@@ -27,7 +27,7 @@ def _create_started(client_mgr, client_emp, world_seed) -> str:
             "due_at": due_at_iso(),
             "assignee_user_id": world_seed["employee_id"],
             "photo_required": False,
-            "completion_requirements": REQS,
+            "completion_requirements": REQS if reqs is None else reqs,
         },
     )
     assert created.status_code == 201, created.text
@@ -152,6 +152,41 @@ def test_full_round_trip_oved_sees_remark_and_resubmits(
     assert [a["url"] for a in kept] == urls
     assert kept[0]["review"]["status"] == "approved"
     assert "review" not in kept[1]
+
+
+def test_unchanged_rejected_extra_must_be_reviewed_again(
+    client_mgr, client_emp, world_seed, jpeg_bytes, mock_i18n
+):
+    occ_id = _create_started(client_mgr, client_emp, world_seed, [{"kind": "photo", "title": "מדף"}])
+    urls = [_upload(client_emp, jpeg_bytes, "a.jpg"), _upload(client_emp, jpeg_bytes, "extra.jpg")]
+    assert _submit(client_emp, occ_id, urls).status_code == 200
+    reopened = _review(
+        client_mgr,
+        occ_id,
+        [
+            {"index": 0, "status": "approved"},
+            {"index": 1, "status": "rejected", "remark": "לא תקין"},
+        ],
+    )
+    assert reopened.status_code == 200, reopened.text
+    resent = _submit(client_emp, occ_id, urls)
+    assert resent.status_code == 200, resent.text
+    kept = resent.json()["occurrence"]["completion"]["completion_attachments"]
+    assert kept[1]["review"]["status"] == "rejected"
+    skipped = _review(client_mgr, occ_id, [{"index": 0, "status": "approved"}], quality_rating=4)
+    assert skipped.status_code == 200, skipped.text
+    assert skipped.json()["outcome"] == "rejected"
+    assert skipped.json()["occurrence"]["status"] == "in_progress"
+    assert _submit(client_emp, occ_id, urls).status_code == 200
+    closed = _review(
+        client_mgr,
+        occ_id,
+        [{"index": 0, "status": "approved"}, {"index": 1, "status": "approved"}],
+        quality_rating=4,
+    )
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["outcome"] == "approved"
+    assert closed.json()["occurrence"]["status"] == "completed"
 
 
 def test_resubmit_without_new_photo_keeps_old_media_and_asks_review_again(

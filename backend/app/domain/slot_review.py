@@ -109,20 +109,32 @@ def rejection_summary(attachments: list[dict], titles: list[str], *, limit: int)
     return "\n".join(lines)[:limit]
 
 
-def carry_over_reviews(previous: list[dict] | None, current: list[dict]) -> list[dict]:
-    """Nouvelle soumission : un V reste valide si le fichier est inchangé.
+def carry_over_reviews(
+    previous: list[dict] | None, current: list[dict], *, requirement_count: int = 0
+) -> list[dict]:
+    """Nouvelle soumission : un V reste si le fichier est inchangé.
 
-    Un X dont le fichier n'a pas été refait garde l'ancienne photo/vidéo mais repasse
-    « à contrôler » : le menahel la revoit (le contrôle X est effacé).
+    Un X sur une sous-tâche exigée s'efface : la case, déjà obligatoire, repasse « à contrôler ».
+    Un X sur un fichier facultatif inchangé reste, sinon on pourrait fermer sans le revoir.
     """
     before = previous or []
-    out: list[dict] = []
-    for index, item in enumerate(current):
-        prior = before[index] if index < len(before) else None
-        review = review_of(prior)
-        keep = review is not None and review["status"] == SLOT_APPROVED and same_content(prior, item)
-        out.append({**item, "review": review} if keep else item)
-    return out
+    return [
+        _carried(before[index] if index < len(before) else None, item, index, requirement_count)
+        for index, item in enumerate(current)
+    ]
+
+
+def _carried(prior: dict | None, item: dict, index: int, requirement_count: int) -> dict:
+    review = review_of(prior)
+    if review is None or not same_content(prior, item):
+        return item
+    if review["status"] == SLOT_APPROVED or _optional_index(index, requirement_count):
+        return {**item, "review": review}
+    return item
+
+
+def _optional_index(index: int, requirement_count: int) -> bool:
+    return requirement_count > 0 and index >= requirement_count
 
 
 def strip_reviews(attachments: list[dict] | None) -> list[dict]:
