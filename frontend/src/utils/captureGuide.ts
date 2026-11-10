@@ -6,6 +6,8 @@ export type CaptureGuide = {
   title: string;
   hint?: string;
   exampleSrc?: string | null;
+  /** « הושלמו N מתוך M » dans l'en-tête de la caméra (FLOW 1). */
+  progress?: { done: number; total: number };
 };
 
 export function guideFromRequirement(req: CompletionRequirement, index: number): CaptureGuide {

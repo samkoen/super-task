@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -319,6 +319,7 @@ export default function VideoCaptureDialog({
   recorder,
   minSeconds,
   guide,
+  deferReview = false,
   onClose,
   onCapture,
 }: {
@@ -326,6 +327,8 @@ export default function VideoCaptureDialog({
   uploading: boolean;
   recorder: Recorder;
   minSeconds: number | null;
+  /** Remet la vidéo dès l'arrêt (sans aperçu ici) : l'appelant fait sa propre revue. */
+  deferReview?: boolean;
   /** Consigne du menahel : active l'écran caméra guidé avant l'enregistrement. */
   guide?: CaptureGuide;
   onClose: () => void;
@@ -338,6 +341,12 @@ export default function VideoCaptureDialog({
   const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
   const tooShort = Boolean(minSeconds && elapsedSeconds < minSeconds);
   const { confirming, confirm } = useVideoConfirm({ recorder, uploading, tooShort, onCapture, onClose });
+
+  // FLOW 1 : la revue (écran 08) est faite hors de la caméra, on remet la vidéo dès l'arrêt.
+  useEffect(() => {
+    if (deferReview && open && hasPreview && !tooShort && !confirming) void confirm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deferReview, open, hasPreview, tooShort]);
 
   const handleRetry = () => {
     reset();

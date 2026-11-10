@@ -68,6 +68,8 @@ interface MediaCaptureActionsProps {
   guide?: CaptureGuide;
   /** Remplace les boutons : l'appelant dessine sa propre surface qui ouvre la capture. */
   trigger?: (open: () => void, state: { disabled: boolean }) => ReactNode;
+  /** Vidéo : pas d'aperçu dans la caméra, l'appelant affiche sa propre revue. */
+  deferVideoReview?: boolean;
 }
 
 function takePhotoFile(
@@ -393,6 +395,7 @@ export default function MediaCaptureActions({
   onAnnotatingChange,
   guide,
   trigger,
+  deferVideoReview = false,
 }: MediaCaptureActionsProps) {
   const photoCamera = useCameraStream({ defaultFacing: "environment" });
   const videoRecorder = useVideoRecorder({ defaultFacing: "environment" });
@@ -569,6 +572,7 @@ export default function MediaCaptureActions({
         recorder={videoRecorder}
         minSeconds={minVideoSeconds && minVideoSeconds > 0 ? minVideoSeconds : null}
         guide={guide}
+        deferReview={deferVideoReview}
         onClose={closeVideoCapture}
         onCapture={(file, durationSeconds) => onCapture(file, "video", { durationSeconds })}
       />

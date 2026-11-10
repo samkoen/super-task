@@ -281,13 +281,14 @@ def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
     for item in requirements:
         if not isinstance(item, dict) or item.get("kind") in {"audio", "message"}:
             continue
-        url = str(item.get("example_url") or "").strip()
-        if url:
-            urls.append(url)
+        for key in ("example_url", "guide_video_url"):
+            url = str(item.get(key) or "").strip()
+            if url:
+                urls.append(url)
     return urls
 
 
-_GUIDE_KEYS = ("title", "hint", "example_url")
+_GUIDE_KEYS = ("title", "hint", "example_url", "guide_video_url")
 
 
 def _is_bare_photo_list(requirements: list[dict]) -> bool:
@@ -409,6 +410,9 @@ def _slot_guide_fields(item: dict) -> dict:
         extra["hint"] = hint
     if example_url:
         extra["example_url"] = example_url
+    guide_video_url = _optional_text(item.get("guide_video_url"), max_len=MAX_EXAMPLE_URL)
+    if guide_video_url:
+        extra["guide_video_url"] = guide_video_url
     if item.get("slot") is True:
         extra["slot"] = True
     return extra

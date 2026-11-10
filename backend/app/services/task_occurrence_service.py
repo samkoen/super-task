@@ -36,6 +36,13 @@ from app.domain.slot_review import (
     review_outcome,
     strip_reviews,
 )
+from app.domain.slot_submit import (
+    merge_slot,
+    normalize_slot_attachment,
+    parse_slot_index,
+    pending_slot_indices,
+    slot_already_sent,
+)
 from app.domain.task_completion_submit import (
     employee_submission_needs_review,
     normalize_completion_status,
@@ -681,18 +688,7 @@ class TaskOccurrenceService:
         occurrence = self._occurrences.find_by_id(occurrence_id)
         if not occurrence:
             raise ValueError("משימה לא נמצאה")
-        self._assert_can_complete(actor, occurrence)
-        if occurrence.status in task_status.TERMINAL:
-            raise ValueError("המשימה כבר נסגרה")
-        as_assignee = employee_can_see_occurrence(
-            actor,
-            assignee_user_id=occurrence.assignee_user_id,
-            branch_id=occurrence.branch_id,
-        )
-        if as_assignee and occurrence.status == task_status.PENDING_REVIEW:
-            raise ValueError("המשימה ממתינה לאישור מנהל")
-        if as_assignee and not task_status.employee_may_submit(occurrence.status):
-            raise ValueError("יש להתחיל את המשימה לפני הסיום")
+        as_assignee = self._assert_open_for_submission(actor, occurrence)
         completion_status = normalize_completion_status(completion_status)
         reason_clean = normalize_not_completed_reason(
             completion_status, not_completed_reason
@@ -791,6 +787,91 @@ class TaskOccurrenceService:
         data = self._to_api(updated)
         data["completion"] = mp.task_completion_domain_to_api(completion)
         return data
+
+    def _assert_open_for_submission(self, actor: ActorContext, occurrence) -> bool:
+        """Vérifie qu'on peut encore envoyer un média ; retourne True si l'acteur est l'oved."""
+        self._assert_can_complete(actor, occurrence)
+        if occurrence.status in task_status.TERMINAL:
+            raise ValueError("המשימה כבר נסגרה")
+        as_assignee = employee_can_see_occurrence(
+            actor,
+            assignee_user_id=occurrence.assignee_user_id,
+            branch_id=occurrence.branch_id,
+        )
+        if as_assignee and occurrence.status == task_status.PENDING_REVIEW:
+            raise ValueError("המשימה ממתינה לאישור מנהל")
+        if as_assignee and not task_status.employee_may_submit(occurrence.status):
+            raise ValueError("יש להתחיל את המשימה לפני הסיום")
+        return as_assignee
+
+    async def submit_slot(
+        self, actor: ActorContext, occurrence_id: str, slot_index: object, *, attachment: object
+    ) -> dict:
+        """Envoie une sous-tâche. La tâche part en contrôle quand toutes les cases sont envoyées."""
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        self._assert_can_complete(actor, occurrence)
+        _, reqs = self._media_requirements(occurrence)
+        index = parse_slot_index(slot_index, count=len(reqs))
+        item = normalize_slot_attachment(reqs[index], attachment)
+        existing = self._completions.find_by_occurrence(occurrence_id)
+        stored = list(existing.completion_attachments or []) if existing else []
+        if slot_already_sent(stored, index, item):
+            return self._slot_result(occurrence, existing, index, reqs, stored)
+        as_assignee = self._assert_open_for_submission(actor, occurrence)
+        merged = merge_slot(stored, reqs, index, item)
+        if pending_slot_indices(reqs, merged):
+            completion = self._save_slot_draft(actor, occurrence, existing, merged, as_assignee)
+            return self._slot_result(occurrence, completion, index, reqs, merged)
+        data = await self.complete_occurrence(
+            actor,
+            occurrence_id,
+            completion_status=task_status.COMPLETION_DONE,
+            completion_attachments=merged,
+        )
+        return {
+            "occurrence": data,
+            "slot_index": index,
+            "task_submitted": True,
+            "finalized": True,
+            "pending_slots": [],
+        }
+
+    def _save_slot_draft(self, actor, occurrence, existing, merged: list[dict], as_assignee: bool):
+        """Enregistre la sous-tâche sans clore la tâche (la tâche reste en cours)."""
+        if existing:
+            updated = self._completions.update_attachments(occurrence.id, merged)
+            assert updated is not None
+            return updated
+        if as_assignee:
+            self._stamp_work_start_arrival(occurrence, merged)
+        packed = self._pack_attachments(merged)
+        return self._completions.create(
+            occurrence_id=occurrence.id,
+            status=task_status.COMPLETION_DONE,
+            note=None,
+            photo_path=packed["photo_path"],
+            video_path=packed["video_path"],
+            audio_path=packed["audio_path"],
+            completion_attachments=merged,
+            not_completed_reason=None,
+            completed_by_id=actor.user_id,
+            manager_review_status=None,
+        )
+
+    def _slot_result(self, occurrence, completion, index: int, reqs: list[dict], attachments) -> dict:
+        data = self._to_api(occurrence)
+        data["completion"] = mp.task_completion_domain_to_api(completion) if completion else None
+        pending = pending_slot_indices(reqs, list(attachments))
+        submitted = occurrence.status in {task_status.PENDING_REVIEW, *task_status.TERMINAL}
+        return {
+            "occurrence": data,
+            "slot_index": index,
+            "task_submitted": submitted,
+            "finalized": False,
+            "pending_slots": [] if submitted else pending,
+        }
 
     def approve_occurrence(
         self, actor: ActorContext, occurrence_id: str, *, quality_rating: object = None

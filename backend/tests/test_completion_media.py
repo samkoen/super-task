@@ -227,6 +227,37 @@ def test_requirement_example_urls_skips_audio_and_empty():
     ) == ["/a.jpg"]
 
 
+def test_normalize_keeps_guide_video_for_photo_and_video_but_not_audio_or_message():
+    reqs = normalize_requirements(
+        [
+            {"kind": "video", "min_seconds": 10, "title": "גיבוי", "guide_video_url": " /uploads/task_videos/how.mp4 "},
+            {"kind": "photo", "guide_video_url": "/uploads/task_videos/p.mp4"},
+            {"kind": "audio", "title": "א", "guide_video_url": "/uploads/task_videos/no.mp4"},
+            {"kind": "message", "title": "ב", "guide_video_url": "/uploads/task_videos/no.mp4"},
+        ]
+    )
+    assert reqs[0]["guide_video_url"] == "/uploads/task_videos/how.mp4"
+    assert reqs[1] == {"kind": "photo", "guide_video_url": "/uploads/task_videos/p.mp4"}
+    assert "guide_video_url" not in reqs[2]
+    assert "guide_video_url" not in reqs[3]
+
+
+def test_guide_video_counts_as_guide_and_is_listed_for_retention():
+    only_video = [{"kind": "photo", "guide_video_url": "/v.mp4"}]
+    assert requirement_example_urls(only_video) == ["/v.mp4"]
+    both = [{"kind": "video", "example_url": "/a.jpg", "guide_video_url": "/v.mp4"}, {"kind": "audio"}]
+    assert requirement_example_urls(both) == ["/a.jpg", "/v.mp4"]
+
+
+def test_merge_fills_missing_guide_video_from_template():
+    merged = merge_completion_requirements(
+        [{"kind": "video", "min_seconds": 10, "title": "גיבוי"}],
+        [{"kind": "video", "min_seconds": 10, "guide_video_url": "/how.mp4"}],
+    )
+    assert merged[0]["guide_video_url"] == "/how.mp4"
+    assert merged[0]["title"] == "גיבוי"
+
+
 def test_merge_uses_template_guides_when_occurrence_has_kinds_only():
     merged = merge_completion_requirements(
         [{"kind": "photo"}, {"kind": "video", "min_seconds": 10}],

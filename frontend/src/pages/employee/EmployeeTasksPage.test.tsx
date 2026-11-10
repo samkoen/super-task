@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+﻿import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import EmployeeTasksPage from "./EmployeeTasksPage";
@@ -144,7 +144,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
+    expect(await screen.findByTestId("start-door")).toBeTruthy();
     expect(screen.queryByTestId("employee-home-header")).toBeNull();
     expect(screen.queryByTestId("employee-timeline")).toBeNull();
     expect(screen.getAllByText(/שפע/)).toHaveLength(1);
@@ -277,7 +277,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
+    expect(await screen.findByTestId("start-door")).toBeTruthy();
     expect(screen.queryByText(`${he.employeeShowCompleted} (1)`)).toBeNull();
     expect(screen.queryByText("מילוי מדף")).toBeNull();
   });
@@ -293,7 +293,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
+    expect(await screen.findByTestId("start-door")).toBeTruthy();
     expect(screen.queryByText("מדף חלב")).toBeNull();
     expect(screen.queryByText(`${he.employeeShowCompleted} (1)`)).toBeNull();
     expect(screen.queryByText("ניקוי רצפה")).toBeNull();
@@ -311,7 +311,7 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText(`${he.employeeShowCompleted} (2)`)).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: he.punchOpenShift })).toBeNull();
+    expect(screen.queryByTestId("start-door")).toBeNull();
     fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (2)`));
     fireEvent.click(screen.getByText("פתיחת משמרת"));
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
@@ -357,7 +357,7 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(he.punchOpenShift)).toBeTruthy();
+    expect(await screen.findByTestId("start-door")).toBeTruthy();
     expect(screen.queryByText(`${he.employeeManagerWaiting} (1)`)).toBeNull();
     expect(screen.queryByText("ניקוי מדף")).toBeNull();
   });

@@ -244,6 +244,15 @@ export interface CreateAdHocPayload {
   start_url?: string | null;
 }
 
+export interface SubmitSlotResponse {
+  message: string;
+  occurrence: TaskOccurrence;
+  slot_index: number;
+  /** Vrai quand la dernière sous-tâche est partie : la tâche attend le menahel. */
+  task_submitted: boolean;
+  pending_slots: number[];
+}
+
 export interface CompleteTaskPayload {
   status: CompletionStatus;
   note?: string;
@@ -407,6 +416,16 @@ export const taskService = {
     const response = await api.post<{ message: string; occurrence: TaskOccurrence }>(
       `/tasks/occurrences/${occurrenceId}/complete`,
       payload,
+      { timeout: 120_000 },
+    );
+    return response.data;
+  },
+
+  /** Envoi d'une seule sous-tâche, dès qu'elle est prête (sans attendre les autres). */
+  submitSlot: async (occurrenceId: string, slotIndex: number, attachment: CompletionAttachment) => {
+    const response = await api.post<SubmitSlotResponse>(
+      `/tasks/occurrences/${occurrenceId}/slots/${slotIndex}/submit`,
+      { attachment },
       { timeout: 120_000 },
     );
     return response.data;

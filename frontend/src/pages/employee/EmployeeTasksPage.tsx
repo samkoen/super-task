@@ -27,7 +27,8 @@ import { authService } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
 import { playTaskEndSound } from "../../utils/notificationSounds";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import TaskFlowScreen from "../../components/taskflow/TaskFlowScreen";
 import { taskIdFromSearch } from "../../utils/notificationNavigation";
 import {
   collectUniqueTasks,
@@ -35,7 +36,7 @@ import {
   employeeDoneToday,
   splitEmployeeWorkLists,
 } from "../../utils/employeeDashboardSections";
-import { formatHebrewDay, formatHebrewDayNoYear, todayIso } from "../../utils/dateView";
+import { formatHebrewDay, todayIso } from "../../utils/dateView";
 import MediaCaptureActions, { type MediaKind } from "../../components/media/MediaCaptureActions";
 import EmployeeClaimTaskDialog from "../../components/tasks/EmployeeClaimTaskDialog";
 import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
@@ -264,6 +265,7 @@ export default function EmployeeTasksPage() {
   const { user, refresh } = useAuth();
   const employeeLanguage = ((user?.preferred_language || "he") as EmployeeLanguage);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { showSuccess, showError } = useFeedback();
   const [dashboard, setDashboard] = useState<EmployeeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -422,6 +424,7 @@ export default function EmployeeTasksPage() {
     [detailTask],
   );
   const canSubmitDone = slotsMeetTaskRequirements(requirements, slotMedia);
+  const flowTask = requirements.length > 0 ? detailTask : null;
 
   const handleReportUpload = useCallback(async (file: File, kind: MediaKind) => {
     setReportUploadingKind(kind);
@@ -540,6 +543,18 @@ export default function EmployeeTasksPage() {
     if (gen !== autoCompleteGen.current) return;
     await handleSubmit(next);
   };
+
+  const finishFlow = useCallback(() => {
+    closeDetail();
+    if (!onBreak) playTaskEndSound();
+    showSuccess(he.taskSubmitSuccess);
+    void load();
+  }, [closeDetail, load, onBreak, showSuccess]);
+
+  const exitFlow = useCallback(() => {
+    closeDetail();
+    void load(true);
+  }, [closeDetail, load]);
 
   const handleToggleBreak = async () => {
     setBreakBusy(true);
@@ -757,9 +772,7 @@ export default function EmployeeTasksPage() {
               kind="start"
               name={headerName}
               photoUrl={photoUrl}
-              dateLabel={formatHebrewDayNoYear(dashboard?.due_on ?? todayIso())}
-              meta={metaLabel}
-              branchCity={dashboard?.employee?.branch_city}
+              branch={headerBranch}
               onOpen={() => {
                 if (punch.start) openDetail(punch.start);
               }}
@@ -840,8 +853,27 @@ export default function EmployeeTasksPage() {
         </DialogActions>
       </Dialog>
 
+      {flowTask ? (
+        <TaskFlowScreen
+          key={flowTask.id}
+          task={flowTask}
+          shiftOpening={Boolean(flowTask.is_work_start)}
+          employeeName={headerName}
+          photoUrl={photoUrl}
+          onClose={exitFlow}
+          onFinished={finishFlow}
+          onOpenChats={() => navigate("/employee/chats")}
+          onServerUpdate={() => void load(true)}
+          onChatUpdated={() => {
+            void load();
+            showSuccess(he.taskChatSent);
+          }}
+          onError={showError}
+        />
+      ) : null}
+
       <EmployeeTaskDetailDialog
-        task={detailTask}
+        task={flowTask ? null : detailTask}
         language={employeeLanguage}
         chatFirst={chatFirst}
         titleNode={detailTask ? <EmployeeTaskTitle task={detailTask} variant="h6" /> : null}

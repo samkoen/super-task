@@ -5,7 +5,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CompletionExampleDialog from "../tasks/CompletionExampleDialog";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { he } from "../../i18n/he";
-import { EMPLOYEE_INK } from "../../styles/employeeUi";
+import { flowColor, flowRadius, flowText } from "../../styles/flowTokens";
 import { formatRecordingClock } from "../../utils/captureProgress";
 import type { CaptureGuide } from "../../utils/captureGuide";
 import type { CameraFacing } from "../../utils/mediaCapture";
@@ -33,22 +33,42 @@ export type GuidedCameraStageProps = {
   footer?: ReactNode;
 };
 
+function ProgressPill({ done, total }: { done: number; total: number }) {
+  return (
+    <Typography
+      data-testid="guided-progress"
+      sx={{
+        ...flowText.label,
+        alignSelf: "center",
+        mb: 1,
+        px: 1.5,
+        py: 0.5,
+        borderRadius: `${flowRadius.full}px`,
+        color: flowColor.neutral0,
+        bgcolor: flowColor.alphaNavy800_72,
+      }}
+    >
+      {he.flowStackCount(done, total)}
+    </Typography>
+  );
+}
+
 function GuideHeader({ guide }: { guide: CaptureGuide }) {
   return (
-    <Box sx={{ textAlign: "center", px: 1 }}>
+    <Box sx={{ textAlign: "center", px: 1, display: "flex", flexDirection: "column" }}>
+      {guide.progress ? <ProgressPill {...guide.progress} /> : null}
       <Typography
         component="h2"
-        sx={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.2, color: EMPLOYEE_INK, overflowWrap: "anywhere" }}
+        sx={{ ...flowText.h1, color: flowColor.neutral0, overflowWrap: "anywhere" }}
       >
         {guide.title}
       </Typography>
       {guide.hint ? (
         <Typography
           sx={{
+            ...flowText.body,
             mt: 0.75,
-            fontSize: "1.05rem",
-            lineHeight: 1.4,
-            color: "text.secondary",
+            color: flowColor.alphaNeutral0_80,
             display: "-webkit-box",
             WebkitLineClamp: 3,
             WebkitBoxOrient: "vertical",
@@ -258,6 +278,7 @@ export default function GuidedCameraStage(props: GuidedCameraStageProps) {
         pb: "calc(16px + env(safe-area-inset-bottom, 0px))",
         minHeight: 0,
         overflowY: "auto",
+        bgcolor: flowColor.neutral900,
       }}
     >
       <GuideHeader guide={props.guide} />

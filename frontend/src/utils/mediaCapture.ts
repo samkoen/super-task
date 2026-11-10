@@ -269,6 +269,7 @@ async function decodePhotoSource(blob: Blob): Promise<ImageBitmap | HTMLImageEle
 export async function encodePhotoJpeg(
   blob: Blob,
   maxEdge = PHOTO_UPLOAD_MAX_EDGE,
+  type: "image/jpeg" | "image/png" = "image/jpeg",
 ): Promise<Blob | null> {
   const source = await decodePhotoSource(blob);
   if (!source) return null;
@@ -286,10 +287,15 @@ export async function encodePhotoJpeg(
     closePhotoSource(source);
     return null;
   }
+  // JPEG n'a pas d'alpha : sans fond blanc, la transparence d'un PNG devient noire.
+  if (type === "image/jpeg" && typeof ctx.fillRect === "function") {
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, size.width, size.height);
+  }
   ctx.drawImage(source, 0, 0, size.width, size.height);
   closePhotoSource(source);
   return new Promise((resolve) => {
-    canvas.toBlob((out) => resolve(out), "image/jpeg", PHOTO_JPEG_QUALITY);
+    canvas.toBlob((out) => resolve(out), type, type === "image/jpeg" ? PHOTO_JPEG_QUALITY : undefined);
   });
 }
 
@@ -298,8 +304,22 @@ export async function normalizePhotoOrientation(blob: Blob): Promise<Blob> {
   return (await encodePhotoJpeg(blob)) ?? blob;
 }
 
-/** JPEG ≤ 1280 px — évite le 413 Vercel / CapacitorHttp. */
+/** Au-delà, un PNG redevient un JPEG (Vercel refuse un body > ~4,5 Mo). */
+export const PNG_UPLOAD_MAX_BYTES = 2_500_000;
+
+/** Un PNG garde sa transparence (illustrations d'exemple) tant qu'il reste léger. */
+async function encodeKeepingAlpha(file: File): Promise<File | null> {
+  if (file.type !== "image/png") return null;
+  const png = await encodePhotoJpeg(file, PHOTO_UPLOAD_MAX_EDGE, "image/png");
+  if (!png || png.type !== "image/png" || png.size > PNG_UPLOAD_MAX_BYTES) return null;
+  const base = photoUploadFilename(file.name).replace(/\.jpg$/, "");
+  return blobToFile(png, `${base}.png`, "image/png");
+}
+
+/** JPEG ≤ 1280 px (PNG léger conservé) — évite le 413 Vercel / CapacitorHttp. */
 export async function compressPhotoForUpload(file: File): Promise<File> {
+  const kept = await encodeKeepingAlpha(file);
+  if (kept) return kept;
   const encoded = await encodePhotoJpeg(file);
   if (!encoded) return file;
   return blobToFile(encoded, photoUploadFilename(file.name), "image/jpeg");

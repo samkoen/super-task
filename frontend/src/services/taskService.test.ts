@@ -76,3 +76,23 @@ describe("taskService manager day chats", () => {
     expect(data.items[0].unread_count).toBe(2);
   });
 });
+
+describe("taskService.submitSlot", () => {
+  beforeEach(() => {
+    mockPost.mockReset();
+  });
+
+  it("envoie une seule sous-tâche vers l'endpoint par slot", async () => {
+    mockPost.mockResolvedValue({
+      data: { message: "ok", occurrence: { id: "occ-1" }, slot_index: 1, task_submitted: false, pending_slots: [2] },
+    });
+    const result = await taskService.submitSlot("occ-1", 1, { kind: "video", url: "/u/v.webm", duration_seconds: 12 });
+    expect(mockPost).toHaveBeenCalledWith(
+      "/tasks/occurrences/occ-1/slots/1/submit",
+      { attachment: { kind: "video", url: "/u/v.webm", duration_seconds: 12 } },
+      { timeout: 120_000 },
+    );
+    expect(result.task_submitted).toBe(false);
+    expect(result.pending_slots).toEqual([2]);
+  });
+});
