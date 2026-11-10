@@ -1,4 +1,5 @@
 import { isFetchInterruptedError, isRequestTimeoutText } from "./apiErrorMessage";
+import type { CaptureLocation } from "./geoCheck";
 
 /**
  * File persistante des médias d'une sous-tâche : un fichier filmé est gardé sur l'appareil
@@ -19,17 +20,23 @@ export type QueuedSlot = {
   mimeType: string;
   durationSeconds: number | null;
   capturedAt: string;
+  /** GPS au moment du tournage ; absent si refusé ou indisponible. */
+  location?: CaptureLocation | null;
   createdAt: number;
   attempts: number;
-  /** `failed` : erreur définitive (le serveur a refusé) — pas de renvoi automatique. */
-  status: "pending" | "failed";
+  /**
+   * `held` : confirmé par l'oved, gardé sur disque, mais pas encore envoyé (attend « אישור ושליחה ») :
+   * le renvoi automatique l'ignore.
+   * `failed` : erreur définitive (le serveur a refusé) — pas de renvoi automatique.
+   */
+  status: "pending" | "failed" | "held";
   lastError?: string;
 };
 
 export type NewQueuedSlot = Pick<
   QueuedSlot,
   "occurrenceId" | "slotIndex" | "kind" | "file" | "durationSeconds" | "capturedAt"
-> & { fileName?: string };
+> & { fileName?: string; location?: CaptureLocation | null };
 
 export type SlotQueueEvent =
   | { type: "queued"; entry: QueuedSlot }
@@ -116,6 +123,9 @@ export function isRetryableSlotError(error: unknown): boolean {
 
 export type SlotUploadQueue = ReturnType<typeof createSlotUploadQueue>;
 
+/** Un média confirmé reste gardé 3 jours sans envoi, puis il est supprimé. */
+export const HELD_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
 export function createSlotUploadQueue(options: {
   storage: SlotQueueStorage;
   send: (entry: QueuedSlot) => Promise<unknown>;
@@ -130,8 +140,8 @@ export function createSlotUploadQueue(options: {
 
   const emit = (event: SlotQueueEvent) => listeners.forEach((listener) => listener(event));
 
-  const enqueue = async (item: NewQueuedSlot): Promise<QueuedSlot> => {
-    const entry: QueuedSlot = {
+  const build = (item: NewQueuedSlot, status: QueuedSlot["status"]): QueuedSlot => {
+    return {
       id: slotQueueId(item.occurrenceId, item.slotIndex),
       occurrenceId: item.occurrenceId,
       slotIndex: item.slotIndex,
@@ -141,13 +151,48 @@ export function createSlotUploadQueue(options: {
       mimeType: item.file.type,
       durationSeconds: item.durationSeconds,
       capturedAt: item.capturedAt,
+      location: item.location ?? null,
       createdAt: now(),
       attempts: 0,
-      status: "pending",
+      status,
     };
+  };
+
+  const enqueue = async (item: NewQueuedSlot): Promise<QueuedSlot> => {
+    const entry = build(item, "pending");
     await storage.put(entry);
     emit({ type: "queued", entry });
     return entry;
+  };
+
+  /** Garde un média confirmé sur disque sans le mettre en file d'envoi (aucun événement, aucun envoi). */
+  const hold = async (item: NewQueuedSlot): Promise<QueuedSlot> => {
+    const entry = build(item, "held");
+    await storage.put(entry);
+    return entry;
+  };
+
+  /** « אישור ושליחה » : un média gardé passe en file d'envoi. Faux si rien n'était gardé pour cette case. */
+  const release = async (id: string): Promise<boolean> => {
+    const entry = (await storage.getAll()).find((row) => row.id === id && row.status === "held");
+    if (!entry) return false;
+    const next: QueuedSlot = { ...entry, status: "pending" };
+    await storage.put(next);
+    emit({ type: "queued", entry: next });
+    return true;
+  };
+
+  /** La case est refilmée ou annulée : le média gardé n'a plus d'objet. Une entrée en envoi n'est jamais touchée. */
+  const dropHeld = async (id: string): Promise<void> => {
+    const entry = (await storage.getAll()).find((row) => row.id === id);
+    if (entry?.status === "held") await storage.remove(id);
+  };
+
+  /** Ménage : un média confirmé mais jamais envoyé ne reste pas indéfiniment sur l'appareil. */
+  const pruneHeld = async (maxAgeMs: number = HELD_MAX_AGE_MS): Promise<void> => {
+    const limit = now() - maxAgeMs;
+    const stale = (await storage.getAll()).filter((entry) => entry.status === "held" && entry.createdAt < limit);
+    await Promise.all(stale.map((entry) => storage.remove(entry.id)));
   };
 
   const sendOne = async (entry: QueuedSlot): Promise<"sent" | "stop" | "next"> => {
@@ -211,7 +256,7 @@ export function createSlotUploadQueue(options: {
     };
   };
 
-  return { enqueue, flush, list, retry, subscribe, remove: (id: string) => storage.remove(id) };
+  return { enqueue, hold, release, dropHeld, pruneHeld, flush, list, retry, subscribe, remove: (id: string) => storage.remove(id) };
 }
 
 export type AutoFlushEnv = {

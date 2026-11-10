@@ -62,7 +62,7 @@ interface MediaCaptureActionsProps {
   /** Avec `prominent` : grands boutons contourés, pour les ajouts facultatifs. */
   quiet?: boolean;
   onAudioStart?: () => void;
-  onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number }) => void | Promise<void>;
+  onCapture: (file: File, kind: MediaKind, meta?: { durationSeconds?: number; lightOk?: boolean | null }) => void | Promise<void>;
   onAnnotatingChange?: (busy: boolean) => void;
   /** Consigne du menahel (titre, texte, image) : active l'écran caméra guidé. */
   guide?: CaptureGuide;
@@ -574,7 +574,7 @@ export default function MediaCaptureActions({
         guide={guide}
         deferReview={deferVideoReview}
         onClose={closeVideoCapture}
-        onCapture={(file, durationSeconds) => onCapture(file, "video", { durationSeconds })}
+        onCapture={(file, durationSeconds, meta) => onCapture(file, "video", { durationSeconds, lightOk: meta?.lightOk })}
       />
       {onAudioStart ? null : (
         <AudioCaptureDialog

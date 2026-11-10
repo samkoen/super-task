@@ -1,13 +1,15 @@
 import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
 import { attachmentsFromCompletion, mapAttachmentsToSlots } from "./completionSlotView";
+import type { CaptureLocation } from "./geoCheck";
 import type { QueuedSlot, SlotQueueEvent } from "./slotUploadQueue";
 
 /**
  * État d'envoi d'une sous-tâche, du point de vue de l'oved :
- * idle → filmed (capturé, pas encore confirmé) → queued (gardé sur l'appareil) → uploading → sent,
- * ou failed quand le serveur refuse. Aucun titre ni nombre de cartes n'est figé ici.
+ * idle → filmed (capturé, pas encore confirmé) → ready (confirmé, gardé sur l'appareil) → queued → uploading → sent,
+ * ou failed quand le serveur refuse. L'envoi au serveur se fait à la fin, depuis l'écran récap (10).
+ * Aucun titre ni nombre de cartes n'est figé ici.
  */
-export type SlotUploadStatus = "idle" | "filmed" | "queued" | "uploading" | "sent" | "failed";
+export type SlotUploadStatus = "idle" | "filmed" | "ready" | "queued" | "uploading" | "sent" | "failed";
 
 export type SlotUiState = {
   status: SlotUploadStatus;
@@ -15,6 +17,10 @@ export type SlotUiState = {
   capturedAt?: string | null;
   sentAt?: string | null;
   durationSeconds?: number | null;
+  /** Lumière mesurée pendant le tournage : null/absent = non mesurée. */
+  lightOk?: boolean | null;
+  /** GPS relevé au tournage : null/absent = refusé ou pas encore reçu. */
+  location?: CaptureLocation | null;
   /** Fichier local (aperçu) ou URL serveur de la miniature. */
   previewUrl?: string | null;
   posterUrl?: string | null;
@@ -53,8 +59,25 @@ function stateFromAttachment(
   return base;
 }
 
+/** Aperçu local d'un média gardé sur disque (rien hors navigateur, ex. tests sans `URL.createObjectURL`). */
+function previewOf(entry: QueuedSlot): string | null {
+  return typeof URL !== "undefined" && typeof URL.createObjectURL === "function" ? URL.createObjectURL(entry.file) : null;
+}
+
 function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): SlotUiState {
   if (!entry) return state;
+  if (entry.status === "held") {
+    // Confirmé avant un rechargement : la carte est « prête », il ne manque que l'envoi final.
+    return {
+      ...state,
+      status: "ready",
+      capturedAt: entry.capturedAt,
+      durationSeconds: entry.durationSeconds,
+      location: entry.location ?? null,
+      previewUrl: previewOf(entry),
+      error: null,
+    };
+  }
   return {
     ...state,
     status: entry.status === "failed" ? "failed" : "queued",
@@ -90,13 +113,46 @@ function patch(states: SlotUiState[], index: number, change: Partial<SlotUiState
 export function markFilmed(
   states: SlotUiState[],
   index: number,
-  media: { capturedAt: string; durationSeconds?: number | null; previewUrl?: string | null },
+  media: { capturedAt: string; durationSeconds?: number | null; previewUrl?: string | null; lightOk?: boolean | null },
 ): SlotUiState[] {
   return patch(states, index, {
     status: "filmed",
     capturedAt: media.capturedAt,
     durationSeconds: media.durationSeconds ?? null,
+    lightOk: media.lightOk ?? null,
     previewUrl: media.previewUrl ?? null,
+    remark: null,
+    error: null,
+  });
+}
+
+/** La vidéo filmée a été découpée : nouvelle durée et nouvel aperçu, le reste de la prise est conservé. */
+export function markTrimmed(
+  states: SlotUiState[],
+  index: number,
+  media: { durationSeconds: number; previewUrl: string },
+): SlotUiState[] {
+  if (states[index]?.status !== "filmed") return states;
+  return patch(states, index, { durationSeconds: media.durationSeconds, previewUrl: media.previewUrl });
+}
+
+/** Le GPS arrive après la capture ; ignoré si l'oved a déjà jeté ou envoyé la prise. */
+export function withLocation(states: SlotUiState[], index: number, location: CaptureLocation | null): SlotUiState[] {
+  const status = states[index]?.status;
+  if (status !== "filmed" && status !== "ready") return states;
+  return patch(states, index, { location });
+}
+
+/** Sous-tâche confirmée : elle reste sur l'appareil jusqu'à l'envoi final (écran 10). */
+export function markReady(states: SlotUiState[], index: number, nowIso: string, text?: string): SlotUiState[] {
+  const current = states[index];
+  if (!current || current.status === "sent") return states;
+  // Un fichier ne se garde qu'après capture ; seul un message n'en a pas besoin.
+  if (current.status !== "filmed" && current.kind !== "message") return states;
+  return patch(states, index, {
+    status: "ready",
+    capturedAt: current.capturedAt ?? nowIso,
+    ...(text !== undefined ? { text } : {}),
     remark: null,
     error: null,
   });
@@ -105,7 +161,7 @@ export function markFilmed(
 /** L'oved annule la revue : la case redevient libre. */
 export function discardFilmed(states: SlotUiState[], index: number): SlotUiState[] {
   if (states[index]?.status !== "filmed") return states;
-  return patch(states, index, { status: "idle", capturedAt: null, durationSeconds: null, previewUrl: null });
+  return patch(states, index, { status: "idle", capturedAt: null, durationSeconds: null, lightOk: null, location: null, previewUrl: null });
 }
 
 export function applyQueueEvent(
@@ -128,7 +184,12 @@ export function applyQueueEvent(
 
 /** Remise au serveur faite ou en cours : l'oved n'a plus rien à filmer pour cette case. */
 export function isHandedOver(status: SlotUploadStatus): boolean {
-  return status === "sent" || status === "queued" || status === "uploading";
+  return status === "sent" || status === "ready" || status === "queued" || status === "uploading";
+}
+
+/** Reste-t-il quelque chose à envoyer au serveur (confirmé mais pas parti, ou refusé) ? */
+export function needsSending(states: SlotUiState[]): boolean {
+  return states.some((state) => state.status === "ready" || state.status === "failed");
 }
 
 export function handedOverCount(states: SlotUiState[]): number {

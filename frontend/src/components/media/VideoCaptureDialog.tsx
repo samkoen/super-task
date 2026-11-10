@@ -26,7 +26,10 @@ import {
   scheduleAfterDialogPaint,
   useBlobPreviewUrl,
 } from "./captureDialogShared";
+import FlowVideoCamera from "../taskflow/FlowVideoCamera";
+import { useLightSampler } from "../../hooks/useLightSampler";
 import { he } from "../../i18n/he";
+import { flowScreenBackground } from "../../styles/flowTokens";
 import { blobToFile } from "../../utils/mediaCapture";
 import { snapshotMediaFile } from "../../utils/videoUpload";
 import { videoRecordingProgress } from "../../utils/captureProgress";
@@ -229,29 +232,36 @@ function VideoActions(props: ActionsProps) {
   );
 }
 
+export type VideoCaptureMeta = { lightOk: boolean | null };
+
 function useVideoConfirm({
   recorder,
   uploading,
   tooShort,
+  allowShort,
+  lightOk,
   onCapture,
   onClose,
 }: {
   recorder: Recorder;
   uploading: boolean;
   tooShort: boolean;
-  onCapture: (file: File, durationSeconds: number) => void | Promise<void>;
+  /** FLOW : une vidéo trop courte part quand même vers la revue, qui la refuse avec son message. */
+  allowShort: boolean;
+  lightOk: () => boolean | null;
+  onCapture: (file: File, durationSeconds: number, meta?: VideoCaptureMeta) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const { blob, elapsedSeconds } = recorder;
   const confirm = async () => {
-    if (!blob || blob.size === 0 || uploading || confirming || tooShort) return;
+    if (!blob || blob.size === 0 || uploading || confirming || (tooShort && !allowShort)) return;
     setConfirming(true);
     try {
       const type = (blob.type || "video/webm").split(";")[0].trim() || "video/webm";
       const file = blobToFile(blob, `task-video-${Date.now()}.webm`, type);
       const frozen = await snapshotMediaFile(file);
-      await onCapture(frozen, elapsedSeconds);
+      await onCapture(frozen, elapsedSeconds, { lightOk: lightOk() });
       onClose();
     } finally {
       setConfirming(false);
@@ -332,7 +342,7 @@ export default function VideoCaptureDialog({
   /** Consigne du menahel : active l'écran caméra guidé avant l'enregistrement. */
   guide?: CaptureGuide;
   onClose: () => void;
-  onCapture: (file: File, durationSeconds: number) => void | Promise<void>;
+  onCapture: (file: File, durationSeconds: number, meta?: VideoCaptureMeta) => void | Promise<void>;
 }) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -340,13 +350,22 @@ export default function VideoCaptureDialog({
   const previewUrl = useBlobPreviewUrl(blob);
   const hasPreview = Boolean(blob && blob.size > 0 && previewUrl);
   const tooShort = Boolean(minSeconds && elapsedSeconds < minSeconds);
-  const { confirming, confirm } = useVideoConfirm({ recorder, uploading, tooShort, onCapture, onClose });
+  const readLight = useLightSampler(recorder.videoRef, recording);
+  const { confirming, confirm } = useVideoConfirm({
+    recorder,
+    uploading,
+    tooShort,
+    allowShort: deferReview,
+    lightOk: readLight,
+    onCapture,
+    onClose,
+  });
 
   // FLOW 1 : la revue (écran 08) est faite hors de la caméra, on remet la vidéo dès l'arrêt.
   useEffect(() => {
-    if (deferReview && open && hasPreview && !tooShort && !confirming) void confirm();
+    if (deferReview && open && hasPreview && !confirming) void confirm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deferReview, open, hasPreview, tooShort]);
+  }, [deferReview, open, hasPreview]);
 
   const handleRetry = () => {
     reset();
@@ -354,6 +373,21 @@ export default function VideoCaptureDialog({
       void startPreview();
     });
   };
+
+  if (guide && deferReview) {
+    return (
+      <Dialog
+        open={open}
+        onClose={() => !recording && onClose()}
+        fullScreen
+        dir="rtl"
+        PaperProps={{ sx: { background: flowScreenBackground } }}
+        disableEnforceFocus
+      >
+        <FlowVideoCamera recorder={recorder} guide={guide} minSeconds={minSeconds} handingOver={hasPreview || confirming} onClose={onClose} />
+      </Dialog>
+    );
+  }
 
   if (guide && !hasPreview) {
     return (

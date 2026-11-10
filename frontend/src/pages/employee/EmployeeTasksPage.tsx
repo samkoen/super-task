@@ -860,6 +860,8 @@ export default function EmployeeTasksPage() {
           shiftOpening={Boolean(flowTask.is_work_start)}
           employeeName={headerName}
           photoUrl={photoUrl}
+          branch={headerBranch}
+          branchCenter={dashboard?.employee?.branch_location}
           onClose={exitFlow}
           onFinished={finishFlow}
           onOpenChats={() => navigate("/employee/chats")}

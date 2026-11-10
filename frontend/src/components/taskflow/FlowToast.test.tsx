@@ -6,22 +6,27 @@ import { he } from "../../i18n/he";
 afterEach(() => vi.useRealTimers());
 
 describe("FlowToast", () => {
-  it("shows sent with the remaining count", () => {
-    render(<FlowToast toast={{ kind: "sent", remaining: 2 }} onClose={vi.fn()} />);
-    expect(screen.getByTestId("flow-toast-title").textContent).toBe(he.flowToastSent);
+  it("shows kept with the remaining count", () => {
+    render(<FlowToast toast={{ kind: "kept", remaining: 2 }} onClose={vi.fn()} />);
+    expect(screen.getByTestId("flow-toast-title").textContent).toBe(he.flowToastKept);
     expect(screen.getByTestId("flow-toast-subtitle").textContent).toBe(he.flowToastRemaining(2));
   });
 
-  it("shows the saved-on-device toast when offline", () => {
-    render(<FlowToast toast={{ kind: "saved", remaining: 1 }} onClose={vi.fn()} />);
-    expect(screen.getByTestId("flow-toast").getAttribute("data-tone")).toBe("pending");
-    expect(screen.getByTestId("flow-toast-title").textContent).toBe(he.flowToastSavedOnDevice);
+  it("says everything is ready to send after the last card", () => {
+    render(<FlowToast toast={{ kind: "kept", remaining: 0 }} onClose={vi.fn()} />);
+    expect(screen.getByTestId("flow-toast-subtitle").textContent).toBe(he.flowToastAllReady);
+  });
+
+  it("shows an error tone when sending failed", () => {
+    render(<FlowToast toast={{ kind: "failed", remaining: 0 }} onClose={vi.fn()} />);
+    expect(screen.getByTestId("flow-toast").getAttribute("data-tone")).toBe("error");
+    expect(screen.getByTestId("flow-toast-title").textContent).toBe(he.flowToastFailed);
   });
 
   it("closes itself after the delay", () => {
     vi.useFakeTimers();
     const onClose = vi.fn();
-    render(<FlowToast toast={{ kind: "sent", remaining: 0 }} onClose={onClose} durationMs={1000} />);
+    render(<FlowToast toast={{ kind: "kept", remaining: 0 }} onClose={onClose} durationMs={1000} />);
     act(() => {
       vi.advanceTimersByTime(1000);
     });

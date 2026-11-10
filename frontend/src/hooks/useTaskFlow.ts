@@ -3,18 +3,18 @@ import { useSlotUploads, type SlotUploadsOptions } from "./useSlotUploads";
 import type { MediaKind } from "../components/media/MediaCaptureActions";
 import { he } from "../i18n/he";
 import type { SubmitSlotResponse } from "../services/taskService";
-import type { FlowToastState } from "../utils/flowToast";
+import { remainingAfter, type FlowToastState } from "../utils/flowToast";
 import { readyForSummary } from "../utils/flowSummary";
 
 export type TaskFlowOptions = Omit<SlotUploadsOptions, "onSent" | "onSavedOnDevice" | "onFailed"> & {
-  /** Toutes les cartes sont remises (envoyées ou gardées sur l'appareil). */
+  /** Toutes les cartes sont confirmées : place au récap (10), qui fait l'envoi au serveur. */
   onAllHandedOver: () => void;
   onError?: (message: string) => void;
   /** Le serveur a pris en compte une carte (la liste des tâches peut se rafraîchir). */
   onServerUpdate?: (response: SubmitSlotResponse | null) => void;
 };
 
-/** Pilote l'écran du FLOW 1 : captures, revue vidéo, toasts, fin de tâche. */
+/** Pilote l'écran du FLOW 1 : captures, revue vidéo, toasts, récap final qui envoie tout. */
 export function useTaskFlow(options: TaskFlowOptions) {
   const { onAllHandedOver, onError, onServerUpdate, ...uploadOptions } = options;
   const [toast, setToast] = useState<FlowToastState | null>(null);
@@ -25,22 +25,13 @@ export function useTaskFlow(options: TaskFlowOptions) {
 
   const uploads = useSlotUploads({
     ...uploadOptions,
-    onSent: (_index, response) => {
-      touched.current = true;
-      const remaining = response?.pending_slots.length ?? 0;
-      setToast({ kind: response?.task_submitted ? "taskDone" : "sent", remaining });
-      onServerUpdate?.(response);
-    },
-    onSavedOnDevice: () => {
-      touched.current = true;
-      setToast({ kind: "saved", remaining: 0 });
-    },
+    onSent: (_index, response) => onServerUpdate?.(response),
     onFailed: (_index, message) => {
       setToast({ kind: "failed", remaining: 0 });
       onError?.(message || he.flowToastFailed);
     },
   });
-  const { states, film, discard, confirm } = uploads;
+  const { states, film, discard, keep, keepText } = uploads;
 
   useEffect(() => {
     if (finished.current || !touched.current || !readyForSummary(states)) return;
@@ -48,13 +39,32 @@ export function useTaskFlow(options: TaskFlowOptions) {
     onAllHandedOver();
   }, [states, onAllHandedOver]);
 
-  const capture = useCallback(
-    (index: number, file: File, kind: MediaKind, seconds?: number) => {
-      film(index, file, seconds);
-      // Seule la vidéo passe par l'écran de revue ; photo et audio sont déjà confirmés dans leur caméra.
-      if (kind !== "video") void confirm(index);
+  /** La carte est confirmée : elle reste sur l'appareil, l'envoi se fera au récap. */
+  const confirmSlot = useCallback(
+    (index: number) => {
+      touched.current = true;
+      keep(index);
+      setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
     },
-    [film, confirm],
+    [keep, states],
+  );
+
+  const saveText = useCallback(
+    (index: number, text: string) => {
+      touched.current = true;
+      keepText(index, text);
+      setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
+    },
+    [keepText, states],
+  );
+
+  const capture = useCallback(
+    (index: number, file: File, kind: MediaKind, seconds?: number, lightOk?: boolean | null) => {
+      film(index, file, seconds, lightOk);
+      // Seule la vidéo passe par l'écran de revue ; photo et audio sont déjà confirmés dans leur caméra.
+      if (kind !== "video") confirmSlot(index);
+    },
+    [film, confirmSlot],
   );
 
   const retakeSlot = useCallback(
@@ -68,13 +78,18 @@ export function useTaskFlow(options: TaskFlowOptions) {
   const closeToast = useCallback(() => setToast(null), []);
   const reviewIndex = states.findIndex((s) => s.status === "filmed" && s.kind === "video");
   return {
-    ...uploads,
+    states,
+    sending: uploads.sending,
+    sendAll: uploads.sendAll,
     total,
     toast,
     closeToast,
     retake,
     capture,
+    confirmSlot,
+    saveText,
     retakeSlot,
+    trimSlot: uploads.trim,
     reviewIndex: reviewIndex >= 0 ? reviewIndex : null,
   };
 }

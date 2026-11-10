@@ -13,7 +13,25 @@ import {
   sentCount,
   slotStatesFromCompletion,
   waitingUploadCount,
+  withLocation,
 } from "./slotUploadState";
+
+describe("withLocation", () => {
+  const position = { lat: 31.77, lng: 35.21 };
+
+  it("attache le GPS à une prise en cours et l'efface si on la jette", () => {
+    const filmed = markFilmed(emptySlotStates(reqs(2)), 0, { capturedAt: "t" });
+    const located = withLocation(filmed, 0, position);
+    expect(located[0].location).toEqual(position);
+    expect(discardFilmed(located, 0)[0].location).toBeNull();
+  });
+
+  it("ignore une position tardive sur une case libre ou hors liste", () => {
+    const states = emptySlotStates(reqs(2));
+    expect(withLocation(states, 0, position)).toBe(states);
+    expect(withLocation(states, 9, position)).toBe(states);
+  });
+});
 
 const reqs = (n: number): CompletionRequirement[] =>
   Array.from({ length: n }, (_, i) => ({ kind: "video", min_seconds: 5, title: `v${i}` }));

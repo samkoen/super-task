@@ -841,6 +841,7 @@ async def post_task_message(
         audio_url=payload.get("audio_url"),
         file_url=payload.get("file_url"),
         file_name=payload.get("file_name"),
+        slot_index=payload.get("slot_index"),
     )
     _emit_task_event(db, result["event_type"], result["occurrence"])
     return {

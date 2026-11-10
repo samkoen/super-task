@@ -30,6 +30,8 @@ export type CompletionAttachment = {
   text?: string;
   duration_seconds?: number;
   captured_at?: string;
+  /** GPS de l'appareil au moment du tournage (photo/vidéo), si l'oved l'a autorisé. */
+  location?: { lat: number; lng: number; accuracy?: number };
   poster_url?: string;
   review?: SlotReview;
 };

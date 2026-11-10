@@ -8,6 +8,8 @@ export type CaptureGuide = {
   exampleSrc?: string | null;
   /** « הושלמו N מתוך M » dans l'en-tête de la caméra (FLOW 1). */
   progress?: { done: number; total: number };
+  /** Bouton « ? » de la caméra : rouvre la fiche « איך מצלמים » (absent = bouton grisé). */
+  onHelp?: () => void;
 };
 
 export function guideFromRequirement(req: CompletionRequirement, index: number): CaptureGuide {

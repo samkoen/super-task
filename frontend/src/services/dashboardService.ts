@@ -213,6 +213,8 @@ export interface EmployeeDashboard {
     branch_id: string;
     branch_name: string | null;
     branch_city?: string | null;
+    /** Coordonnées GPS du snif, si définies par le menahel. */
+    branch_location?: { lat: number; lng: number } | null;
     preferred_language?: string;
     avatar_url?: string | null;
     excellence_slogan?: string | null;

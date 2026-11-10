@@ -71,6 +71,7 @@ class TaskMessageRepository:
         body_translated: str | None = None,
         audio_transcript: str | None = None,
         audio_transcript_sender: str | None = None,
+        slot_index: int | None = None,
     ) -> TaskMessage:
         row = orm.TaskMessage(
             id=uuid.uuid4(),
@@ -85,6 +86,7 @@ class TaskMessageRepository:
             file_name=(file_name or "").strip() or None,
             audio_transcript=(audio_transcript or "").strip() or None,
             audio_transcript_sender=(audio_transcript_sender or "").strip() or None,
+            slot_index=slot_index,
             created_at=datetime.now(timezone.utc),
         )
         self._db.add(row)

@@ -1,18 +1,22 @@
-import { Box, ButtonBase, Typography } from "@mui/material";
+import { Box, ButtonBase, CircularProgress, Typography } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import { he } from "../../i18n/he";
 import { flowColor, flowRadius, flowScreenBackground, flowSize, flowText } from "../../styles/flowTokens";
-import { hasPendingUpload, summaryRows } from "../../utils/flowSummary";
+import { hasPendingUpload, summaryPhase, summaryRows, type SummaryPhase } from "../../utils/flowSummary";
 import type { CompletionRequirement } from "../../utils/completionMedia";
-import type { SlotUiState } from "../../utils/slotUploadState";
+import { handedOverCount, type SlotUiState } from "../../utils/slotUploadState";
 
 type Props = {
-  title: string;
+  /** Ouverture de משמרת : le titre et le bouton final parlent de la journée, pas d'une simple tâche. */
+  shiftOpening: boolean;
   requirements: CompletionRequirement[];
   states: SlotUiState[];
-  /** Libellé du bouton ; par défaut « התחלת יום עבודה ». */
-  continueLabel?: string;
+  /** Un envoi est en cours (le bouton est bloqué). */
+  sending: boolean;
+  /** « אישור ושליחה » : envoie au serveur tout ce qui a été confirmé. */
+  onSend: () => void;
+  /** Bouton final une fois tout envoyé. */
   onContinue: () => void;
 };
 
@@ -35,13 +39,38 @@ function Row({ title, statusText, sent }: { title: string; statusText: string; s
   );
 }
 
+function titleFor(phase: SummaryPhase, shiftOpening: boolean): string {
+  if (phase !== "done") return he.flowSummaryTitleReady;
+  return shiftOpening ? he.flowSummaryTitleOpen : he.flowSummaryTitleTask;
+}
+
+function ActionButton({ phase, shiftOpening, onSend, onContinue }: Pick<Props, "shiftOpening" | "onSend" | "onContinue"> & { phase: SummaryPhase }) {
+  const done = phase === "done";
+  const label = done ? (shiftOpening ? he.flowSummaryStartDay : he.flowSummaryBack) : phase === "sending" ? he.flowSummarySending : he.flowSummarySend;
+  return (
+    <ButtonBase
+      data-testid={done ? "flow-summary-continue" : "flow-summary-send"}
+      data-phase={phase}
+      disabled={phase === "sending"}
+      onClick={done ? onContinue : onSend}
+      sx={{ mt: "auto", gap: 1, height: flowSize.roundButton, borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral900, color: flowColor.neutral0, ...flowText.button, "&.Mui-disabled": { opacity: 0.7, color: flowColor.neutral0 } }}
+    >
+      {phase === "sending" ? <CircularProgress size={18} color="inherit" /> : null}
+      {label}
+    </ButtonBase>
+  );
+}
+
 /**
- * Écran 10 : récap. Affiché même si un envoi attend le réseau (statut « ממתין להעלאה » sur sa ligne).
- * Le bouton mène directement aux tâches du jour, sans étape intermédiaire.
+ * Écran 10 : récap de fin de tâche, et c'est ici que tout part au serveur.
+ * D'abord « אישור ושליחה » (rien n'est encore envoyé), puis, une fois envoyé, les heures d'envoi et le bouton final.
+ * Un fichier qui attend le réseau reste visible avec son statut « ממתין להעלאה ».
  */
-export default function FlowSummary({ title, requirements, states, continueLabel, onContinue }: Props) {
+export default function FlowSummary({ shiftOpening, requirements, states, sending, onSend, onContinue }: Props) {
   const rows = summaryRows(requirements, states);
+  const phase = summaryPhase(states, sending);
   const sentCount = rows.filter((r) => r.sent).length;
+  const subtitle = phase === "done" ? he.flowSummarySubtitle(sentCount, rows.length) : he.flowSummarySubtitleReady(handedOverCount(states), rows.length);
   return (
     <Box
       data-testid="flow-summary"
@@ -52,29 +81,21 @@ export default function FlowSummary({ title, requirements, states, continueLabel
         <Box sx={{ width: 72, height: 72, display: "grid", placeItems: "center", borderRadius: "50%", bgcolor: flowColor.green300, alignSelf: "center" }}>
           <CheckRoundedIcon sx={{ fontSize: 40, color: flowColor.green700 }} />
         </Box>
-        <Typography component="h1" sx={{ ...flowText.h1, color: flowColor.neutral900, textAlign: "center" }}>
-          {title}
+        <Typography component="h1" data-testid="flow-summary-title" sx={{ ...flowText.h1, color: flowColor.neutral900, textAlign: "center" }}>
+          {titleFor(phase, shiftOpening)}
         </Typography>
-        <Typography sx={{ ...flowText.body, color: flowColor.alphaNeutral900_60, textAlign: "center" }}>
-          {he.flowSummarySubtitle(sentCount, rows.length)}
-        </Typography>
+        <Typography sx={{ ...flowText.body, color: flowColor.alphaNeutral900_60, textAlign: "center" }}>{subtitle}</Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
           {rows.map((row) => (
             <Row key={row.index} title={row.title} statusText={row.statusText} sent={row.sent} />
           ))}
         </Box>
-        {hasPendingUpload(states) ? (
+        {phase === "done" && hasPendingUpload(states) ? (
           <Typography data-testid="flow-summary-pending" sx={{ ...flowText.caption, color: flowColor.alphaNeutral900_66, textAlign: "center" }}>
             {he.flowSummaryPendingNote}
           </Typography>
         ) : null}
-        <ButtonBase
-          data-testid="flow-summary-continue"
-          onClick={onContinue}
-          sx={{ mt: "auto", height: flowSize.roundButton, borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral900, color: flowColor.neutral0, ...flowText.button }}
-        >
-          {continueLabel ?? he.flowSummaryStartDay}
-        </ButtonBase>
+        <ActionButton phase={phase} shiftOpening={shiftOpening} onSend={onSend} onContinue={onContinue} />
       </Box>
     </Box>
   );

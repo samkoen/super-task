@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Box, ButtonBase, TextField, Typography } from "@mui/material";
-import messageIcon from "../../assets/flow1/icon-message-circle.svg";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import MicNoneRoundedIcon from "@mui/icons-material/MicNoneRounded";
@@ -30,10 +29,9 @@ export type FlowCardProps = {
   disabled?: boolean;
   /** « הושלמו N מתוך M » dans la caméra. */
   progress?: { done: number; total: number };
-  onCapture: (file: File, kind: MediaKind, durationSeconds?: number) => void;
+  onCapture: (file: File, kind: MediaKind, durationSeconds?: number, lightOk?: boolean | null) => void;
   onSendText: (text: string) => void;
   onOpenGuide: () => void;
-  onChat: () => void;
   /** Change à chaque « צילום מחדש » : rouvre la caméra pour cette carte. */
   autoCaptureNonce?: number;
 };
@@ -132,13 +130,15 @@ function ExampleLink({ enabled, onClick }: { enabled: boolean; onClick: () => vo
   );
 }
 
-function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress, onCapture }: {
+function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress, onHelp, onCapture }: {
   req: CompletionRequirement;
   index: number;
   label: string;
   progress?: { done: number; total: number };
   disabled?: boolean;
   autoCaptureNonce?: number;
+  /** Ouvre la fiche « איך מצלמים » depuis le « ? » de la caméra. */
+  onHelp?: () => void;
   onCapture: FlowCardProps["onCapture"];
 }) {
   const openRef = useRef<(() => void) | null>(null);
@@ -155,9 +155,9 @@ function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress
       disabled={disabled}
       allowedKinds={[kind]}
       minVideoSeconds={kind === "video" ? req.min_seconds ?? null : null}
-      guide={{ ...guideFromRequirement(req, index), progress }}
+      guide={{ ...guideFromRequirement(req, index), progress, ...(onHelp ? { onHelp } : {}) }}
       deferVideoReview
-      onCapture={(file, captured, meta) => onCapture(file, captured, meta?.durationSeconds)}
+      onCapture={(file, captured, meta) => onCapture(file, captured, meta?.durationSeconds, meta?.lightOk)}
       trigger={(open, ui) => {
         openRef.current = open;
         return <PrimaryButton label={label} onClick={open} disabled={ui.disabled || disabled} />;
@@ -180,6 +180,7 @@ function CardActions(props: FlowCardProps & { text: string }) {
           disabled={disabled}
           autoCaptureNonce={autoCaptureNonce}
           progress={props.progress}
+          onHelp={hasGuide(req) ? props.onOpenGuide : undefined}
           onCapture={props.onCapture}
         />
       )}
@@ -193,15 +194,7 @@ function CardHeader({ props }: { props: FlowCardProps }) {
   const remark = state.remark?.trim();
   return (
     <>
-      <Box sx={{ display: "flex", direction: "ltr", alignItems: "center", justifyContent: "space-between" }}>
-        <ButtonBase
-          aria-label={he.flowCardChat}
-          data-testid="flow-card-chat"
-          onClick={props.onChat}
-          sx={{ p: "8px", m: "-8px", borderRadius: "50%" }}
-        >
-          <Box component="img" src={messageIcon} alt="" sx={{ width: 19, height: 19, display: "block" }} />
-        </ButtonBase>
+      <Box sx={{ display: "flex", direction: "ltr", alignItems: "center", justifyContent: "flex-end" }}>
         <Typography sx={{ ...flowText.label, color: flowColor.alphaNeutral900_66 }}>{stepNumber(index)}</Typography>
       </Box>
       <Typography component="h2" sx={{ ...flowText.h2, mt: "16px", color: flowColor.neutral900, textAlign: "right", overflowWrap: "anywhere" }}>

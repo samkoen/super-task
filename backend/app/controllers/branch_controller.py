@@ -10,7 +10,7 @@ from app.dependencies import get_db
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.network_repository import NetworkRepository
 from app.repositories.user_repository import UserRepository
-from app.services.branch_service import BranchService
+from app.services.branch_service import KEEP, BranchService
 
 router = APIRouter()
 
@@ -50,6 +50,8 @@ def create_branch(
         address=str(data.get("address") or ""),
         city=str(data.get("city") or ""),
         postal_code=str(data.get("postal_code") or ""),
+        latitude=data.get("latitude"),
+        longitude=data.get("longitude"),
     )
     return {"message": "הסניף נוצר", "branch": item}
 
@@ -73,5 +75,7 @@ def update_branch(
         city=str(payload.get("city") or ""),
         postal_code=str(payload.get("postal_code") or ""),
         is_active=bool(payload.get("is_active", True)),
+        latitude=payload.get("latitude", KEEP),
+        longitude=payload.get("longitude", KEEP),
     )
     return {"message": "הסניף עודכן", "branch": item}

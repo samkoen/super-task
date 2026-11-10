@@ -37,7 +37,6 @@ function renderStack(requirements: CompletionRequirement[], states: SlotUiState[
     onCapture: vi.fn(),
     onSendText: vi.fn(),
     onOpenGuide: vi.fn(),
-    onChat: vi.fn(),
   };
   render(<TaskCardStack requirements={requirements} states={states} {...handlers} {...extra} />);
   return handlers;
@@ -118,7 +117,7 @@ describe("TaskCardStack", () => {
   it("sends the captured file with the card index and the recorded duration", () => {
     const handlers = renderStack(videos(2), [idle(), idle()]);
     fireEvent.click(screen.getByTestId("flow-primary"));
-    expect(handlers.onCapture).toHaveBeenCalledWith(0, expect.any(File), "video", 12);
+    expect(handlers.onCapture).toHaveBeenCalledWith(0, expect.any(File), "video", 12, undefined);
   });
 
   it("offers the example link only when the menahel configured a guide", () => {
@@ -142,10 +141,9 @@ describe("TaskCardStack", () => {
     expect((screen.getByTestId("flow-guide") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("opens the chat from the single card icon", () => {
-    const handlers = renderStack(videos(2), [idle(), idle()]);
-    fireEvent.click(screen.getByTestId("flow-card-chat"));
-    expect(handlers.onChat).toHaveBeenCalledWith(0);
+  it("has no chat icon on the subtask card (the chat lives in the page header)", () => {
+    renderStack(videos(2), [idle(), idle()]);
+    expect(screen.queryByTestId("flow-card-chat")).toBeNull();
   });
 
   it("uses the example image as illustration, with a neutral fallback", () => {

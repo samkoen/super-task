@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Box, Dialog } from "@mui/material";
+import FlowBottomNav, { flowBottomNavClearanceCss } from "./FlowBottomNav";
 import FlowGuideSheet from "./FlowGuideSheet";
 import FlowReview from "./FlowReview";
 import FlowSummary from "./FlowSummary";
@@ -8,11 +9,12 @@ import FlowToast from "./FlowToast";
 import TaskCardStack from "./TaskCardStack";
 import TaskFlowHeader from "./TaskFlowHeader";
 import { useTaskFlow } from "../../hooks/useTaskFlow";
-import { he } from "../../i18n/he";
 import type { SubmitSlotResponse, TaskCompletion, TaskStatus } from "../../services/taskService";
 import { flowScreenBackground } from "../../styles/flowTokens";
 import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
+import type { GeoPoint } from "../../utils/geoCheck";
+import { handedOverCount } from "../../utils/slotUploadState";
 
 export type TaskFlowTask = {
   id: string;
@@ -21,6 +23,8 @@ export type TaskFlowTask = {
   status: TaskStatus;
   completion?: TaskCompletion | null;
   completion_requirements?: CompletionRequirement[] | null;
+  /** Nom du menahel : sous-titre du chat de la tâche. */
+  manager_name?: string | null;
   photo_required?: boolean;
   min_video_seconds?: number | null;
 };
@@ -32,6 +36,10 @@ export type TaskFlowScreenProps = {
   /** Avatar et salutation de l'en-tête (« שלום אבי, בוקר טוב. »). */
   employeeName?: string | null;
   photoUrl?: string | null;
+  /** Nom du snif de l'oved : « צולם בסניף … » dans la revue vidéo. */
+  branch?: string | null;
+  /** Coordonnées GPS du snif (si le menahel les a définies) : vérifie « צולם בסניף ». */
+  branchCenter?: GeoPoint | null;
   onClose: () => void;
   /** Fin du flow : la page ferme l'écran et affiche la confirmation. */
   onFinished: () => void;
@@ -45,16 +53,21 @@ type Flow = ReturnType<typeof useTaskFlow>;
 
 const paperProps = { sx: { background: flowScreenBackground } };
 
-function useFinish(shiftOpening: boolean, onFinished: () => void) {
+/** Toutes les cartes confirmées : le récap (10) prend la main, c'est lui qui envoie au serveur. */
+function useFinish() {
   const [summary, setSummary] = useState(false);
-  const onAllHandedOver = useCallback(() => {
-    if (shiftOpening) setSummary(true);
-    else onFinished();
-  }, [shiftOpening, onFinished]);
+  const onAllHandedOver = useCallback(() => setSummary(true), []);
   return { summary, onAllHandedOver };
 }
 
-function ReviewLayer({ flow, requirements }: { flow: Flow; requirements: CompletionRequirement[] }) {
+type ReviewLayerProps = {
+  flow: Flow;
+  requirements: CompletionRequirement[];
+  branch?: string | null;
+  branchCenter?: GeoPoint | null;
+};
+
+function ReviewLayer({ flow, requirements, branch, branchCenter }: ReviewLayerProps) {
   const index = flow.reviewIndex;
   const state = index !== null ? flow.states[index] : null;
   const req = index !== null ? requirements[index] : null;
@@ -65,8 +78,15 @@ function ReviewLayer({ flow, requirements }: { flow: Flow; requirements: Complet
       previewUrl={state?.previewUrl}
       durationSeconds={state?.durationSeconds}
       minSeconds={req?.min_seconds}
-      onConfirm={() => index !== null && void flow.confirm(index)}
+      lightOk={state?.lightOk}
+      capturedAt={state?.capturedAt}
+      branch={branch}
+      branchCenter={branchCenter}
+      location={state?.location}
+      progress={{ done: handedOverCount(flow.states), total: flow.states.length }}
+      onConfirm={() => index !== null && flow.confirmSlot(index)}
       onRetake={() => index !== null && flow.retakeSlot(index)}
+      onTrim={(range) => (index !== null ? flow.trimSlot(index, range) : Promise.resolve())}
     />
   );
 }
@@ -76,17 +96,17 @@ function FlowBody({ props, flow, requirements, onGuide, onChat }: {
   flow: Flow;
   requirements: CompletionRequirement[];
   onGuide: (index: number) => void;
-  onChat: (index: number) => void;
+  onChat: () => void;
 }) {
   return (
-    <Box data-testid="task-flow" sx={{ width: "100%", maxWidth: 393, mx: "auto", pb: 4 }}>
+    <Box data-testid="task-flow" sx={{ width: "100%", maxWidth: 393, mx: "auto", pb: flowBottomNavClearanceCss() }}>
       <TaskFlowHeader
         title={props.task.title}
         dueAt={props.task.due_at}
         employeeName={props.employeeName}
         photoUrl={props.photoUrl}
         onBack={props.onClose}
-        onOpenChats={props.onOpenChats}
+        onOpenChat={onChat}
       />
       <Box sx={{ px: "24px" }}>
         <TaskCardStack
@@ -94,11 +114,11 @@ function FlowBody({ props, flow, requirements, onGuide, onChat }: {
           states={flow.states}
           retake={flow.retake}
           onCapture={flow.capture}
-          onSendText={(index, text) => void flow.submitText(index, text)}
+          onSendText={flow.saveText}
           onOpenGuide={onGuide}
-          onChat={onChat}
         />
       </Box>
+      <FlowBottomNav onHome={props.onClose} onChat={props.onOpenChats} />
     </Box>
   );
 }
@@ -107,7 +127,7 @@ function FlowBody({ props, flow, requirements, onGuide, onChat }: {
 export default function TaskFlowScreen(props: TaskFlowScreenProps) {
   const { task, shiftOpening = false } = props;
   const requirements = effectiveRequirements(task);
-  const { summary, onAllHandedOver } = useFinish(shiftOpening, props.onFinished);
+  const { summary, onAllHandedOver } = useFinish();
   const flow = useTaskFlow({
     occurrenceId: task.id,
     requirements,
@@ -117,30 +137,37 @@ export default function TaskFlowScreen(props: TaskFlowScreenProps) {
     onServerUpdate: props.onServerUpdate,
   });
   const [guideIndex, setGuideIndex] = useState<number | null>(null);
-  const [chat, setChat] = useState<{ index: number | null } | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   if (summary) {
     return (
       <Dialog open fullScreen dir="rtl" PaperProps={paperProps}>
-        <FlowSummary title={he.flowSummaryTitleOpen} requirements={requirements} states={flow.states} onContinue={props.onFinished} />
+        <FlowSummary
+          shiftOpening={shiftOpening}
+          requirements={requirements}
+          states={flow.states}
+          sending={flow.sending}
+          onSend={() => void flow.sendAll()}
+          onContinue={props.onFinished}
+        />
       </Dialog>
     );
   }
   return (
     <Dialog open fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus>
-      <FlowBody props={props} flow={flow} requirements={requirements} onGuide={setGuideIndex} onChat={(index) => setChat({ index })} />
+      <FlowBody props={props} flow={flow} requirements={requirements} onGuide={setGuideIndex} onChat={() => setChatOpen(true)} />
       <FlowToast toast={flow.toast} onClose={flow.closeToast} />
       <FlowGuideSheet req={guideIndex !== null ? requirements[guideIndex] : null} index={guideIndex ?? 0} onClose={() => setGuideIndex(null)} />
-      <ReviewLayer flow={flow} requirements={requirements} />
+      <ReviewLayer flow={flow} requirements={requirements} branch={props.branch} branchCenter={props.branchCenter} />
       <FlowTaskChat
-        open={chat !== null}
-        initialIndex={chat?.index ?? null}
+        open={chatOpen}
         occurrenceId={task.id}
         title={task.title}
         status={task.status}
-        completion={task.completion}
+        managerName={task.manager_name}
         requirements={requirements}
-        onClose={() => setChat(null)}
+        statuses={flow.states.map((state) => state.status)}
+        onClose={() => setChatOpen(false)}
         onOccurrenceUpdated={props.onChatUpdated}
       />
     </Dialog>

@@ -600,6 +600,12 @@ class TaskOccurrenceRepository:
         row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))
         return row.name if row else None
 
+    def get_branch_coordinates(self, branch_id: str) -> dict | None:
+        row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))
+        if not row or row.latitude is None or row.longitude is None:
+            return None
+        return {"lat": row.latitude, "lng": row.longitude}
+
     def get_branch_city(self, branch_id: str) -> str | None:
         row = self._db.get(orm.Branch, mp.parse_uuid(branch_id))
         city = (row.city or "").strip() if row else ""

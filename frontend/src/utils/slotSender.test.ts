@@ -71,4 +71,11 @@ describe("attachmentFromUpload", () => {
     const item = { ...entry("audio"), durationSeconds: null, capturedAt: "" };
     expect(attachmentFromUpload(item, "/u/a.webm")).toEqual({ kind: "audio", url: "/u/a.webm" });
   });
+
+  it("joint le GPS du tournage aux photos/vidéos, jamais à l'audio", () => {
+    const location = { lat: 31.77, lng: 35.21, accuracy: 9 };
+    expect(attachmentFromUpload({ ...entry("video"), location }, "/u/v.webm").location).toEqual(location);
+    expect(attachmentFromUpload({ ...entry("audio"), location }, "/u/a.webm")).not.toHaveProperty("location");
+    expect(attachmentFromUpload({ ...entry("video"), location: null }, "/u/v.webm")).not.toHaveProperty("location");
+  });
 });

@@ -495,6 +495,7 @@ export const taskService = {
       audio_url?: string;
       file_url?: string;
       file_name?: string;
+      slot_index?: number;
     },
   ) => {
     const response = await api.post<{

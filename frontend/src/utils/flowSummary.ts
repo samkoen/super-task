@@ -1,7 +1,7 @@
 import type { CompletionRequirement } from "./completionMedia";
 import { slotDisplayTitle } from "./completionSlotView";
 import { tabStatusText } from "./flowStack";
-import { isHandedOver, type SlotUiState } from "./slotUploadState";
+import { isHandedOver, needsSending, type SlotUiState } from "./slotUploadState";
 
 export type SummaryRow = { index: number; title: string; status: SlotUiState["status"]; statusText: string; sent: boolean };
 
@@ -17,6 +17,14 @@ export function summaryRows(requirements: CompletionRequirement[], states: SlotU
       sent: state.status === "sent",
     };
   });
+}
+
+/** Écran 10 : « ready » = rien n'est parti (bouton אישור ושליחה), « sending » = envoi en cours, « done » = c'est parti. */
+export type SummaryPhase = "ready" | "sending" | "done";
+
+export function summaryPhase(states: SlotUiState[], sending: boolean): SummaryPhase {
+  if (sending || states.some((s) => s.status === "uploading")) return "sending";
+  return needsSending(states) ? "ready" : "done";
 }
 
 export function hasPendingUpload(states: SlotUiState[]): boolean {

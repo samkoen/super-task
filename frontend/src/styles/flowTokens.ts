@@ -16,6 +16,10 @@ export const flowColor = {
   green300: "#bddebf",
   green700: "#2e854d",
   navy800: "#12213f",
+  ink: "#12223f",
+  yellow300: "#ffd873",
+  rec: "#e5322d",
+  minMarker: "#8cd999",
   line: "#d9e3f2",
   alphaNeutral900_66: "rgba(17,21,29,0.66)",
   alphaNeutral900_60: "rgba(17,21,29,0.60)",
@@ -23,10 +27,20 @@ export const flowColor = {
   alphaNeutral1000_10: "rgba(0,0,0,0.1)",
   alphaNavy800_18: "rgba(18,33,63,0.18)",
   alphaNavy800_72: "rgba(18,33,63,0.72)",
+  alphaNavy800_60: "rgba(18,33,63,0.6)",
   alphaNeutral0_80: "rgba(255,255,255,0.8)",
   alphaNeutral0_19: "rgba(255,255,255,0.19)",
   alphaOrange500_20: "rgba(247,112,30,0.2)",
+  /** Chat de tâche (écran 12) : surface inverse / action principale et teintes task/2. */
+  inverse: "#0e1430",
+  alphaGreen300_60: "rgba(189,222,191,0.6)",
+  alphaGreen300_45: "rgba(189,222,191,0.45)",
+  alphaGreen700_20: "rgba(46,133,77,0.2)",
+  alphaGreen700_60: "rgba(46,133,77,0.6)",
+  alphaNeutral0_70: "rgba(255,255,255,0.7)",
 } as const;
+
+export const flowShadow = { floating: "0px 6px 18px rgba(13,20,48,0.25)" } as const;
 
 export const flowRadius = { xs: 6, sm: 12, md: 16, xl2: 28, full: 999 } as const;
 export const flowSpace = { s4: 4, s12: 12, s16: 16, s24: 24 } as const;

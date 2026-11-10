@@ -11,12 +11,11 @@ let queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: (e
 vi.mock("../../utils/slotSender", () => ({ getSlotUploadQueue: () => queue }));
 vi.mock("../../services/taskService", () => ({ taskService: { submitSlot: vi.fn() } }));
 vi.mock("../notifications/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
-vi.mock("../tasks/TaskChatDialog", () => ({
-  default: ({ open, initialDraft, topSlot }: { open: boolean; initialDraft?: string; topSlot?: ReactNode }) =>
+vi.mock("./FlowTaskChat", () => ({
+  default: ({ open, occurrenceId, statuses, onClose }: { open: boolean; occurrenceId: string; statuses: string[]; onClose: () => void }) =>
     open ? (
-      <div data-testid="chat">
-        {topSlot}
-        <span data-testid="chat-draft">{initialDraft ?? ""}</span>
+      <div data-testid="task-chat" data-occurrence={occurrenceId} data-statuses={statuses.join(",")}>
+        <button type="button" data-testid="task-chat-close" onClick={onClose} />
       </div>
     ) : null,
 }));
@@ -77,52 +76,65 @@ describe("TaskFlowScreen", () => {
     expect(screen.getAllByTestId("flow-tab-next")).toHaveLength(1);
   });
 
-  it("sends a card as soon as it is captured and tells how many remain", async () => {
-    send.mockResolvedValueOnce(response([1], false));
+  it("keeps a card as soon as it is captured, without sending, and tells how many remain", async () => {
     const { onFinished } = renderScreen();
     fireEvent.click(screen.getByTestId("flow-primary"));
     await waitFor(() => expect(screen.getByTestId("flow-toast-subtitle").textContent).toBe(he.flowToastRemaining(1)));
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("flow-tab-done").textContent).toContain(he.flowTabSent(""));
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByTestId("flow-tab-done").textContent).toContain(he.flowTabReady);
     expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1");
     expect(onFinished).not.toHaveBeenCalled();
   });
 
-  it("returns to the tasks once every card of an ordinary task is sent", async () => {
+  it("sends everything only from the summary (אישור ושליחה), for an ordinary task too", async () => {
     send.mockResolvedValueOnce(response([1], false)).mockResolvedValueOnce(response([], true));
     const { onFinished } = renderScreen();
     fireEvent.click(screen.getByTestId("flow-primary"));
     await waitFor(() => expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1"));
     fireEvent.click(screen.getByTestId("flow-primary"));
-    await waitFor(() => expect(onFinished).toHaveBeenCalledTimes(1));
-  });
-
-  it("shows the summary for a shift opening, then goes to the daily tasks", async () => {
-    send.mockResolvedValue(response([], true));
-    const { onFinished } = renderScreen({ shiftOpening: true }, [{ kind: "photo", title: "מדף" }]);
-    fireEvent.click(screen.getByTestId("flow-primary"));
-    await waitFor(() => expect(screen.getByTestId("flow-summary")).toBeTruthy());
+    const sendButton = await screen.findByTestId("flow-summary-send");
+    expect(sendButton.textContent).toBe(he.flowSummarySend);
+    expect(send).not.toHaveBeenCalled();
+    fireEvent.click(sendButton);
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    const done = await screen.findByTestId("flow-summary-continue");
     expect(onFinished).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("flow-summary-continue"));
+    fireEvent.click(done);
     expect(onFinished).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the file on the device when offline and shows the saved toast", async () => {
-    send.mockRejectedValue({ isAxiosError: true, code: "ERR_NETWORK", message: "Network Error" });
-    renderScreen();
+  it("shows the summary for a shift opening, then goes to the daily tasks after sending", async () => {
+    send.mockResolvedValue(response([], true));
+    const { onFinished } = renderScreen({ shiftOpening: true }, [{ kind: "photo", title: "מדף" }]);
     fireEvent.click(screen.getByTestId("flow-primary"));
-    await waitFor(() => expect(screen.getByTestId("flow-toast-title").textContent).toBe(he.flowToastSavedOnDevice));
-    expect(await queue.list("occ1")).toHaveLength(1);
-    expect(screen.getByTestId("flow-tab-done").textContent).toContain(he.flowTabWaiting);
+    fireEvent.click(await screen.findByTestId("flow-summary-send"));
+    const done = await screen.findByTestId("flow-summary-continue");
+    expect(done.textContent).toBe(he.flowSummaryStartDay);
+    expect(onFinished).not.toHaveBeenCalled();
+    fireEvent.click(done);
+    expect(onFinished).toHaveBeenCalledTimes(1);
   });
 
-  it("reviews a video before sending it, and blocks a video that is too short", async () => {
+  it("keeps the file on the device when offline: the summary shows it as waiting for upload", async () => {
+    send.mockRejectedValue({ isAxiosError: true, code: "ERR_NETWORK", message: "Network Error" });
+    renderScreen({}, [{ kind: "photo", title: "מדף" }]);
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    fireEvent.click(await screen.findByTestId("flow-summary-send"));
+    await waitFor(() => expect(screen.getByTestId("flow-summary-pending")).toBeTruthy());
+    expect(await queue.list("occ1")).toHaveLength(1);
+    expect(screen.getAllByTestId("flow-summary-row")[0].textContent).toContain(he.flowTabWaiting);
+  });
+
+  it("reviews a video before keeping it: nothing is sent on confirm, only from the summary", async () => {
     send.mockResolvedValueOnce(response([], true));
     renderScreen({}, [{ kind: "video", title: "גיבוי", min_seconds: 10 }]);
     fireEvent.click(screen.getByTestId("flow-primary"));
     expect(await screen.findByTestId("flow-review-video")).toBeTruthy();
-    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByTestId("flow-review-confirm").textContent).toBe(he.flowReviewConfirm);
     fireEvent.click(screen.getByTestId("flow-review-confirm"));
+    const sendButton = await screen.findByTestId("flow-summary-send");
+    expect(send).not.toHaveBeenCalled();
+    fireEvent.click(sendButton);
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
   });
 
@@ -135,18 +147,35 @@ describe("TaskFlowScreen", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("opens the chat from the card icon on that subtask, and the chat list from the top icon", () => {
+  it("has no chat icon on the subtask cards", () => {
+    renderScreen();
+    expect(screen.queryByTestId("flow-card-chat")).toBeNull();
+  });
+
+  it("opens this task's chat (not the general chat list) from the top icon, and closes it back to the flow", () => {
     const { onOpenChats } = renderScreen();
-    fireEvent.click(screen.getByTestId("flow-card-chat"));
-    expect(screen.getByTestId("chat-draft").textContent).toBe(he.subtaskQuestionDraft("מדף"));
+    expect(screen.queryByTestId("task-chat")).toBeNull();
     fireEvent.click(screen.getByTestId("task-flow-chats"));
-    expect(onOpenChats).toHaveBeenCalledTimes(1);
+    const chat = screen.getByTestId("task-chat");
+    expect(chat.getAttribute("data-occurrence")).toBe("occ1");
+    expect(chat.getAttribute("data-statuses")).toBe("idle,idle");
+    expect(onOpenChats).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("task-chat-close"));
+    expect(screen.queryByTestId("task-chat")).toBeNull();
   });
 
   it("opens the example sheet from the card link", () => {
     renderScreen({}, [{ kind: "photo", title: "מדף", example_url: "/e.png" }]);
     fireEvent.click(screen.getByTestId("flow-guide"));
     expect(screen.getByTestId("flow-guide-image").getAttribute("src")).toBe("/e.png");
+  });
+
+  it("shows the bottom nav and wires home and chat", () => {
+    const { onClose, onOpenChats } = renderScreen();
+    fireEvent.click(screen.getByTestId("flow-nav-chat"));
+    expect(onOpenChats).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("flow-nav-home"));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("goes back from the header", () => {

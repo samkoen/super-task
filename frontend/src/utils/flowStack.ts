@@ -81,5 +81,6 @@ export function tabStatusText(state: SlotUiState): string {
   if (state.status === "sent") return he.flowTabSent(formatClock(state.sentAt));
   if (state.status === "failed") return he.flowTabFailed;
   if (state.status === "uploading") return he.flowTabUploading;
+  if (state.status === "ready") return he.flowTabReady;
   return he.flowTabWaiting;
 }

@@ -37,33 +37,52 @@ describe("useSlotUploads", () => {
     URL.createObjectURL = vi.fn(() => "blob:preview");
   });
 
-  it("filmé puis confirmé : part tout de suite, sans attendre les autres cartes", async () => {
-    const { hook, onSent } = setup(async () => ({ task_submitted: false }));
+  it("confirmed card is kept on the device: nothing is sent yet", async () => {
+    const send = vi.fn(async () => ({}));
+    const { hook, onSent } = setup(send);
     act(() => hook.result.current.film(1, file(), 9));
     expect(hook.result.current.states[1].status).toBe("filmed");
-    await act(async () => {
-      await hook.result.current.confirm(1);
-    });
-    expect(hook.result.current.states.map((s) => s.status)).toEqual(["idle", "sent", "idle"]);
-    expect(onSent).toHaveBeenCalledWith(1, { task_submitted: false });
+    act(() => hook.result.current.keep(1));
+    expect(hook.result.current.states.map((s) => s.status)).toEqual(["idle", "ready", "idle"]);
+    expect(send).not.toHaveBeenCalled();
+    expect(submitSlot).not.toHaveBeenCalled();
+    expect(onSent).not.toHaveBeenCalled();
   });
 
-  it("hors ligne : la vidéo reste sur l'appareil et le toast « sauvé » est demandé", async () => {
+  it("sendAll uploads every kept card and marks them sent", async () => {
+    const send = vi.fn(async () => ({ task_submitted: false }));
+    const { hook, onSent } = setup(send);
+    act(() => hook.result.current.film(0, file(), 9));
+    act(() => hook.result.current.keep(0));
+    act(() => hook.result.current.film(1, file(), 8));
+    act(() => hook.result.current.keep(1));
+    await act(async () => {
+      await hook.result.current.sendAll();
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.states.map((s) => s.status)).toEqual(["sent", "sent", "idle"]);
+    expect(onSent).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.sending).toBe(false);
+  });
+
+  it("offline: sendAll leaves the file in the device queue and asks for the saved notice", async () => {
     const { hook, onSent, onSavedOnDevice } = setup(async () => ({}), { value: false });
     act(() => hook.result.current.film(0, file(), 9));
+    act(() => hook.result.current.keep(0));
     await act(async () => {
-      await hook.result.current.confirm(0);
+      await hook.result.current.sendAll();
     });
     expect(hook.result.current.states[0].status).toBe("queued");
     expect(onSavedOnDevice).toHaveBeenCalledWith(0);
     expect(onSent).not.toHaveBeenCalled();
   });
 
-  it("le retour du réseau envoie la file puis passe la carte en envoyée", async () => {
+  it("network back: the queue sends the file and the card becomes sent", async () => {
     const { hook, queue, online, onSent } = setup(async () => ({ task_submitted: true }), { value: false });
     act(() => hook.result.current.film(0, file(), 9));
+    act(() => hook.result.current.keep(0));
     await act(async () => {
-      await hook.result.current.confirm(0);
+      await hook.result.current.sendAll();
     });
     online.value = true;
     await act(async () => {
@@ -73,53 +92,62 @@ describe("useSlotUploads", () => {
     expect(onSent).toHaveBeenCalledWith(0, { task_submitted: true });
   });
 
-  it("refus du serveur : carte en échec et message remonté", async () => {
+  it("server refusal: card fails with the message, and sendAll retries it", async () => {
     const refusal = Object.assign(new Error("trop court"), { response: { status: 400 } });
-    const { hook, onFailed } = setup(async () => {
-      throw refusal;
-    });
+    const send = vi.fn().mockRejectedValueOnce(refusal).mockResolvedValueOnce({ task_submitted: true });
+    const { hook, onFailed } = setup(send);
     act(() => hook.result.current.film(0, file(), 2));
+    act(() => hook.result.current.keep(0));
     await act(async () => {
-      await hook.result.current.confirm(0);
+      await hook.result.current.sendAll();
     });
     expect(hook.result.current.states[0].status).toBe("failed");
     expect(onFailed).toHaveBeenCalledWith(0, "trop court");
+    await act(async () => {
+      await hook.result.current.sendAll();
+    });
+    expect(hook.result.current.states[0].status).toBe("sent");
   });
 
-  it("annuler la revue libère la carte et rien n'est envoyé", async () => {
+  it("a discarded video is never sent", async () => {
     const send = vi.fn(async () => ({}));
     const { hook } = setup(send);
     act(() => hook.result.current.film(0, file(), 9));
     act(() => hook.result.current.discard(0));
+    act(() => hook.result.current.keep(0));
     await act(async () => {
-      await hook.result.current.confirm(0);
+      await hook.result.current.sendAll();
     });
     expect(hook.result.current.states[0].status).toBe("idle");
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("une case message est envoyée directement au serveur", async () => {
+  it("a message card is kept locally, then sent to the server only by sendAll", async () => {
     submitSlot.mockResolvedValue({ task_submitted: false });
     const { hook, onSent } = setup(async () => ({}));
+    act(() => hook.result.current.keepText(2, "tout est propre"));
+    expect(hook.result.current.states[2]).toMatchObject({ status: "ready", text: "tout est propre" });
+    expect(submitSlot).not.toHaveBeenCalled();
     await act(async () => {
-      await hook.result.current.submitText(2, "tout est propre");
+      await hook.result.current.sendAll();
     });
     expect(submitSlot).toHaveBeenCalledWith("occ", 2, { kind: "message", text: "tout est propre" });
     expect(hook.result.current.states[2]).toMatchObject({ status: "sent", text: "tout est propre" });
     expect(onSent).toHaveBeenCalled();
   });
 
-  it("échec réseau d'un message : la case redevient libre", async () => {
+  it("network failure on a message: the card stays ready to be sent again", async () => {
     submitSlot.mockRejectedValue(new Error("Failed to fetch"));
     const { hook, onFailed } = setup(async () => ({}));
+    act(() => hook.result.current.keepText(2, "x"));
     await act(async () => {
-      await hook.result.current.submitText(2, "x");
+      await hook.result.current.sendAll();
     });
-    expect(hook.result.current.states[2].status).toBe("idle");
+    expect(hook.result.current.states[2]).toMatchObject({ status: "ready", text: "x" });
     expect(onFailed).toHaveBeenCalled();
   });
 
-  it("au démarrage, retrouve les vidéos restées sur l'appareil", async () => {
+  it("at startup, finds the videos left on the device", async () => {
     const queue = createSlotUploadQueue({
       storage: createMemorySlotStorage(),
       send: async () => ({}),
@@ -135,5 +163,60 @@ describe("useSlotUploads", () => {
     });
     const hook = renderHook(() => useSlotUploads({ occurrenceId: "occ", requirements, queue }));
     await waitFor(() => expect(hook.result.current.states[1].status).toBe("queued"));
+  });
+});
+
+describe("useSlotUploads — GPS du tournage", () => {
+  const position = { lat: 31.77, lng: 35.21, accuracy: 8 };
+
+  function gpsHook(locate: () => Promise<typeof position | null>) {
+    const send = vi.fn(async (_entry: unknown) => ({}));
+    const queue = createSlotUploadQueue({
+      storage: createMemorySlotStorage(),
+      send: (entry) => send(entry),
+      isOnline: () => true,
+    });
+    const hook = renderHook(() => useSlotUploads({ occurrenceId: "occ", requirements, queue, locate }));
+    return { hook, send };
+  }
+
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+  });
+
+  it("garde la position sur la carte filmée puis l'envoie avec le fichier", async () => {
+    const { hook, send } = gpsHook(async () => position);
+    act(() => hook.result.current.film(0, file(), 9));
+    await waitFor(() => expect(hook.result.current.states[0].location).toEqual(position));
+    act(() => hook.result.current.keep(0));
+    await act(async () => {
+      await hook.result.current.sendAll();
+    });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ location: position }));
+  });
+
+  it("GPS refusé : la carte reste utilisable et l'envoi part sans position", async () => {
+    const { hook, send } = gpsHook(async () => null);
+    act(() => hook.result.current.film(0, file(), 9));
+    act(() => hook.result.current.keep(0));
+    await act(async () => {
+      await hook.result.current.sendAll();
+    });
+    expect(hook.result.current.states[0].location ?? null).toBeNull();
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ location: null }));
+  });
+
+  it("une position tardive d'une ancienne prise n'est pas collée à la nouvelle", async () => {
+    let resolveFirst: (value: typeof position) => void = () => undefined;
+    const locate = vi
+      .fn<() => Promise<typeof position | null>>()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(async () => null);
+    const { hook } = gpsHook(locate);
+    act(() => hook.result.current.film(0, file(), 9));
+    act(() => hook.result.current.discard(0));
+    act(() => hook.result.current.film(0, file(), 7));
+    await act(async () => resolveFirst(position));
+    expect(hook.result.current.states[0].location ?? null).toBeNull();
   });
 });

@@ -13,10 +13,9 @@ export type TaskCardStackProps = {
   requirements: CompletionRequirement[];
   states: SlotUiState[];
   disabled?: boolean;
-  onCapture: (index: number, file: File, kind: MediaKind, durationSeconds?: number) => void;
+  onCapture: (index: number, file: File, kind: MediaKind, durationSeconds?: number, lightOk?: boolean | null) => void;
   onSendText: (index: number, text: string) => void;
   onOpenGuide: (index: number) => void;
-  onChat: (index: number) => void;
   /** Demande de refilmer la carte `index` : incrémenter `nonce` rouvre la caméra. */
   retake?: { index: number; nonce: number } | null;
 };
@@ -33,10 +32,9 @@ function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number
       disabled={props.disabled}
       progress={{ done: states.filter((s) => isHandedOver(s.status)).length, total: states.length }}
       autoCaptureNonce={retake?.index === index ? retake.nonce : undefined}
-      onCapture={(file, kind, seconds) => props.onCapture(index, file, kind, seconds)}
+      onCapture={(file, kind, seconds, lightOk) => props.onCapture(index, file, kind, seconds, lightOk)}
       onSendText={(text) => props.onSendText(index, text)}
       onOpenGuide={() => props.onOpenGuide(index)}
-      onChat={() => props.onChat(index)}
     />
   );
 }

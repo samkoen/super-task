@@ -56,6 +56,7 @@ export function attachmentFromUpload(entry: QueuedSlot, url: string, posterUrl?:
     url,
     duration_seconds: entry.durationSeconds ?? undefined,
     captured_at: entry.capturedAt || undefined,
+    ...(entry.location && entry.kind !== "audio" ? { location: entry.location } : {}),
     ...(entry.kind === "video" && posterUrl ? { poster_url: posterUrl } : {}),
   };
 }

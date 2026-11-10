@@ -22,7 +22,7 @@ function renderReview(extra: Partial<Parameters<typeof FlowReview>[0]> = {}) {
 }
 
 describe("FlowReview", () => {
-  it("shows the real duration and sends on confirm", () => {
+  it("shows the real duration and calls onConfirm (nothing is sent at this step)", () => {
     const { onConfirm } = renderReview();
     expect(screen.getByTestId("flow-review-length").textContent).toContain(he.flowReviewLengthOk(12));
     fireEvent.click(screen.getByTestId("flow-review-confirm"));
@@ -38,6 +38,20 @@ describe("FlowReview", () => {
     expect(onConfirm).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("flow-review-retake"));
     expect(onRetake).toHaveBeenCalled();
+  });
+
+  it("shows the measured lighting and the branch/time of the shot, without blocking", () => {
+    const { onConfirm } = renderReview({ lightOk: false, branch: "12", capturedAt: new Date(2026, 10, 10, 9, 5).toISOString() });
+    expect(screen.getByTestId("flow-review-light").textContent).toContain(he.flowReviewLightLow);
+    expect(screen.getByTestId("flow-review-shot").textContent).toContain("12");
+    expect(screen.getByTestId("flow-review-shot").textContent).toContain("09:05");
+    fireEvent.click(screen.getByTestId("flow-review-confirm"));
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it("hides the lighting row when it was not measured", () => {
+    renderReview({ lightOk: null });
+    expect(screen.queryByTestId("flow-review-light")).toBeNull();
   });
 
   it("offers no trimming control", () => {

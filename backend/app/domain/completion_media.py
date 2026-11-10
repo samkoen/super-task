@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.domain.geo import normalize_location
+
 VALID_KINDS = ("photo", "video", "audio", "message")
 VISUAL_KINDS = frozenset({"photo", "video"})
 MAX_MIN_VIDEO_SECONDS = 600
@@ -457,6 +459,9 @@ def _normalize_attachment(item: object) -> dict:
     captured = normalize_captured_at(item.get("captured_at"))
     if captured:
         entry["captured_at"] = captured
+    location = normalize_location(item.get("location"))
+    if location and kind in VISUAL_KINDS:
+        entry["location"] = location
     return entry
 
 

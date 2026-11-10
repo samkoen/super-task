@@ -8,6 +8,9 @@ export interface Branch {
   address: string;
   city: string;
   postal_code: string;
+  /** Position GPS du snif (contrôle « צולם בסניף » des médias de l'oved). */
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   is_active: boolean;
   network_name?: string;
 }

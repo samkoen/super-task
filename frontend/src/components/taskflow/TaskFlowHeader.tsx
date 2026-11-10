@@ -15,8 +15,8 @@ type Props = {
   employeeName?: string | null;
   photoUrl?: string | null;
   onBack: () => void;
-  /** Icône du haut : mène à la liste des chats de tâches. */
-  onOpenChats: () => void;
+  /** Icône du haut : ouvre le chat de cette tâche (pas la liste générale). */
+  onOpenChat: () => void;
 };
 
 type RoundButtonProps = {
@@ -88,12 +88,12 @@ function TitleBlock({ title, due }: { title: string; due: string }) {
   );
 }
 
-function Toolbar({ onBack, onOpenChats }: Pick<Props, "onBack" | "onOpenChats">) {
+function Toolbar({ onBack, onOpenChat }: Pick<Props, "onBack" | "onOpenChat">) {
   return (
     <Box sx={{ direction: "ltr", display: "flex", alignItems: "center", justifyContent: "space-between", pt: "16px", pb: "12px" }}>
       <RoundButton label={he.flowBack} testId="task-flow-back" icon={arrowLeftIcon} iconSize={22} onClick={onBack} />
       <Box sx={{ display: "flex", gap: "12px" }}>
-        <RoundButton label={he.flowOpenChats} testId="task-flow-chats" icon={messageIcon} iconSize={19} onClick={onOpenChats} />
+        <RoundButton label={he.flowOpenTaskChat} testId="task-flow-chats" icon={messageIcon} iconSize={19} onClick={onOpenChat} />
         <NotificationBell
           renderTrigger={(open, unread) => (
             <RoundButton label={he.notificationsTitle} testId="task-flow-bell" icon={bellIcon} iconSize={22} onClick={open}>
@@ -110,7 +110,7 @@ function Toolbar({ onBack, onOpenChats }: Pick<Props, "onBack" | "onOpenChats">)
  * En-tête du FLOW 1 (Figma « Home Header » + « toolbar ») : avatar et salutation, titre de la tâche
  * avec « בשעה 6:30 », puis retour à gauche, chats et cloche à droite.
  */
-export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, onBack, onOpenChats }: Props) {
+export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, onBack, onOpenChat }: Props) {
   return (
     <Box
       component="header"
@@ -121,7 +121,7 @@ export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, o
         <Greeting name={employeeName} photoUrl={photoUrl} />
         <TitleBlock title={title} due={formatDueHour(dueAt)} />
       </Box>
-      <Toolbar onBack={onBack} onOpenChats={onOpenChats} />
+      <Toolbar onBack={onBack} onOpenChat={onOpenChat} />
     </Box>
   );
 }
