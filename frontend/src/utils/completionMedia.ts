@@ -6,10 +6,13 @@ export type CompletionRequirement = {
   title?: string;
   hint?: string;
   example_url?: string;
+  /** Vidéo « איך מצלמים » du menahel, lue dans le guide de la carte (photo et vidéo seulement). */
+  guide_video_url?: string;
   /** Carte +תמונה : ne pas replier en puce de רשימת פריטים. */
   slot?: boolean;
   /** Fichier local — upload seulement à la soumission. */
   pending_example?: File | null;
+  pending_guide_video?: File | null;
 };
 
 /** Contrôle V/X du menahel sur une sous-tâche rendue. */
@@ -27,6 +30,8 @@ export type CompletionAttachment = {
   text?: string;
   duration_seconds?: number;
   captured_at?: string;
+  /** GPS de l'appareil au moment du tournage (photo/vidéo), si l'oved l'a autorisé. */
+  location?: { lat: number; lng: number; accuracy?: number };
   poster_url?: string;
   review?: SlotReview;
 };
@@ -56,22 +61,38 @@ function readExampleUrl(item: { example_url?: unknown }): string | undefined {
   return url || undefined;
 }
 
+function readGuideVideoUrl(item: { guide_video_url?: unknown }): string | undefined {
+  if (typeof item.guide_video_url !== "string") return undefined;
+  const url = item.guide_video_url.trim();
+  return url || undefined;
+}
+
 function readSlotHint(item: { hint?: unknown }): string | undefined {
   if (typeof item.hint !== "string") return undefined;
   const hint = item.hint.trim().slice(0, MAX_SLOT_HINT);
   return hint || undefined;
 }
 
+type RawVisualGuide = {
+  title?: unknown;
+  hint?: unknown;
+  example_url?: unknown;
+  guide_video_url?: unknown;
+  slot?: unknown;
+};
+
 function withVisualGuide(
-  item: { title?: unknown; hint?: unknown; example_url?: unknown; slot?: unknown },
-): Pick<CompletionRequirement, "title" | "hint" | "example_url" | "slot"> {
+  item: RawVisualGuide,
+): Pick<CompletionRequirement, "title" | "hint" | "example_url" | "guide_video_url" | "slot"> {
   const title = readSlotTitle(item);
   const hint = readSlotHint(item);
   const example_url = readExampleUrl(item);
+  const guide_video_url = readGuideVideoUrl(item);
   return {
     ...(title ? { title } : {}),
     ...(hint ? { hint } : {}),
     ...(example_url ? { example_url } : {}),
+    ...(guide_video_url ? { guide_video_url } : {}),
     ...(item.slot === true ? { slot: true } : {}),
   };
 }
@@ -93,9 +114,7 @@ export function normalizeRequirements(raw: unknown): CompletionRequirement[] {
       });
       continue;
     }
-    const guide = withVisualGuide(
-      item as { title?: unknown; hint?: unknown; example_url?: unknown; slot?: unknown },
-    );
+    const guide = withVisualGuide(item as RawVisualGuide);
     if (kind !== "video") {
       out.push({ kind, ...guide });
       continue;
@@ -123,7 +142,8 @@ function isBarePhotoOnly(list: CompletionRequirement[]): boolean {
     item.kind === "photo" &&
     !item.title &&
     !item.hint &&
-    !item.example_url
+    !item.example_url &&
+    !item.guide_video_url
   );
 }
 
@@ -284,6 +304,26 @@ export function setRequirementExample(
   );
 }
 
+/** Vidéo « איך מצלמים » d'une carte ; `file` est envoyé à la soumission (url = aperçu local). */
+export function setRequirementGuideVideo(
+  list: CompletionRequirement[],
+  index: number,
+  guide_video_url: string,
+  pending_guide_video: File | null,
+): CompletionRequirement[] {
+  return list.map((item, i) =>
+    i === index && !kindSkipsExample(item.kind) ? { ...item, guide_video_url, pending_guide_video } : item,
+  );
+}
+
+export function clearRequirementGuideVideo(list: CompletionRequirement[], index: number): CompletionRequirement[] {
+  return list.map((item, i) => {
+    if (i !== index) return item;
+    const { guide_video_url: _url, pending_guide_video: _file, ...rest } = item;
+    return rest;
+  });
+}
+
 export function countVisualKinds(list: CompletionRequirement[]): { photos: number; videos: number } {
   return {
     photos: list.filter((item) => item.kind === "photo").length,
@@ -303,18 +343,24 @@ export function toApiRequirement(item: CompletionRequirement): CompletionRequire
   if (kindSkipsExample(item.kind)) return next;
   const url = (item.example_url || "").trim();
   if (url && !url.startsWith("blob:")) next.example_url = url;
+  const guideVideo = (item.guide_video_url || "").trim();
+  if (guideVideo && !guideVideo.startsWith("blob:")) next.guide_video_url = guideVideo;
   return next;
 }
 
 export async function resolveRequirementExamples(
   list: CompletionRequirement[],
   uploadPhoto: (file: File) => Promise<{ url: string }>,
+  uploadVideo?: (file: File) => Promise<{ url: string }>,
 ): Promise<CompletionRequirement[]> {
   const out: CompletionRequirement[] = [];
   for (const item of list) {
     const next = toApiRequirement(item);
     if (!kindSkipsExample(item.kind) && item.pending_example) {
       next.example_url = (await uploadPhoto(item.pending_example)).url;
+    }
+    if (!kindSkipsExample(item.kind) && item.pending_guide_video && uploadVideo) {
+      next.guide_video_url = (await uploadVideo(item.pending_guide_video)).url;
     }
     out.push(next);
   }

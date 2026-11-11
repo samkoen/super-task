@@ -174,6 +174,8 @@ def branch_orm_to_domain(row: orm.Branch | None) -> Branch | None:
         address=row.address,
         city=row.city,
         postal_code=row.postal_code,
+        latitude=row.latitude,
+        longitude=row.longitude,
         is_active=row.is_active,
         created_at=parse_datetime_iso(row.created_at),
         updated_at=parse_datetime_iso(row.updated_at),
@@ -428,6 +430,7 @@ def task_message_orm_to_domain(row: orm.TaskMessage | None) -> TaskMessage | Non
         audio_transcript_sender=getattr(row, "audio_transcript_sender", None),
         file_url=getattr(row, "file_url", None),
         file_name=getattr(row, "file_name", None),
+        slot_index=getattr(row, "slot_index", None),
         created_at=parse_datetime_iso(row.created_at),
     )
 

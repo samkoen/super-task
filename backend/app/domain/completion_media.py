@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.domain.geo import normalize_location
+
 VALID_KINDS = ("photo", "video", "audio", "message")
 VISUAL_KINDS = frozenset({"photo", "video"})
 MAX_MIN_VIDEO_SECONDS = 600
@@ -281,13 +283,14 @@ def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
     for item in requirements:
         if not isinstance(item, dict) or item.get("kind") in {"audio", "message"}:
             continue
-        url = str(item.get("example_url") or "").strip()
-        if url:
-            urls.append(url)
+        for key in ("example_url", "guide_video_url"):
+            url = str(item.get(key) or "").strip()
+            if url:
+                urls.append(url)
     return urls
 
 
-_GUIDE_KEYS = ("title", "hint", "example_url")
+_GUIDE_KEYS = ("title", "hint", "example_url", "guide_video_url")
 
 
 def _is_bare_photo_list(requirements: list[dict]) -> bool:
@@ -409,6 +412,9 @@ def _slot_guide_fields(item: dict) -> dict:
         extra["hint"] = hint
     if example_url:
         extra["example_url"] = example_url
+    guide_video_url = _optional_text(item.get("guide_video_url"), max_len=MAX_EXAMPLE_URL)
+    if guide_video_url:
+        extra["guide_video_url"] = guide_video_url
     if item.get("slot") is True:
         extra["slot"] = True
     return extra
@@ -453,6 +459,9 @@ def _normalize_attachment(item: object) -> dict:
     captured = normalize_captured_at(item.get("captured_at"))
     if captured:
         entry["captured_at"] = captured
+    location = normalize_location(item.get("location"))
+    if location and kind in VISUAL_KINDS:
+        entry["location"] = location
     return entry
 
 

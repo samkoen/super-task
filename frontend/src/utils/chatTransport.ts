@@ -12,6 +12,8 @@ export type ChatSendPayload = {
   audio_url?: string;
   file_url?: string;
   file_name?: string;
+  /** Étape (sous-tâche) visée par le message du chat tâche ; absent = général. */
+  slot_index?: number;
 };
 
 export type ChatSendResult = {

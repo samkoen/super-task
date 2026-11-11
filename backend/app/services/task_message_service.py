@@ -34,6 +34,7 @@ from app.domain.task_chat import (
     can_manager_post,
     has_message_content,
     message_event_type,
+    normalize_slot_index,
     next_status_after_employee_message,
     next_status_after_manager_message,
 )
@@ -175,9 +176,11 @@ class TaskMessageService:
         audio_url: str | None = None,
         file_url: str | None = None,
         file_name: str | None = None,
+        slot_index: object = None,
     ) -> dict:
         if not has_message_content(body, photo_url, video_url, audio_url, file_url):
             raise ValueError("נדרש טקסט או מדיה להודעה")
+        step = normalize_slot_index(slot_index)
 
         occurrence = self._require_occurrence(occurrence_id)
         self._assert_can_access(actor, occurrence)
@@ -204,6 +207,7 @@ class TaskMessageService:
             audio_url=audio_url,
             file_url=file_url,
             file_name=stored_file_name(file_name, has_file=bool((file_url or "").strip())),
+            slot_index=step,
         )
 
         if self._reads:

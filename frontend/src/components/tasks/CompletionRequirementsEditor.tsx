@@ -11,7 +11,9 @@ import {
   addRequirement,
   MAX_COMPLETION_REQUIREMENTS,
   removeRequirement,
+  clearRequirementGuideVideo,
   setRequirementExample,
+  setRequirementGuideVideo,
   setRequirementHint,
   setRequirementTitle,
   commitVideoSeconds,
@@ -51,6 +53,7 @@ function useOpenRequirement(
 
   const remove = (index: number) => {
     revokeIfBlob(value[index]?.example_url);
+    revokeIfBlob(value[index]?.guide_video_url);
     onChange(removeRequirement(value, index));
     setOpenIndex((current) => nextOpenIndexAfterRemove(current, index));
   };
@@ -287,6 +290,14 @@ function RequirementSquare({
         onExample={(url, file) => {
           revokeIfBlob(req.example_url);
           onChange(setRequirementExample(value, index, url, file));
+        }}
+        onGuideVideo={(url, file) => {
+          revokeIfBlob(req.guide_video_url);
+          onChange(setRequirementGuideVideo(value, index, url, file));
+        }}
+        onGuideVideoClear={() => {
+          revokeIfBlob(req.guide_video_url);
+          onChange(clearRequirementGuideVideo(value, index));
         }}
       />
     </Box>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Box, Button, ButtonBase, Dialog, IconButton, Typography } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -28,6 +28,7 @@ export default function TaskChatDialog({
   completion,
   onOccurrenceUpdated,
   initialDraft,
+  topSlot,
 }: {
   /** Message pré-écrit dans la zone de saisie. */
   initialDraft?: string;
@@ -42,6 +43,8 @@ export default function TaskChatDialog({
   /** undefined = charger la tâche ; null = déjà connu, sans média. */
   completion?: TaskCompletion | null;
   onOccurrenceUpdated?: (status: string, notice?: string) => void;
+  /** Contenu au-dessus du fil (ex. sélecteur de sous-tâche du FLOW 1). */
+  topSlot?: ReactNode;
 }) {
   const media = useTaskChatCompletion(open, occurrenceId, completion);
   return (
@@ -54,6 +57,7 @@ export default function TaskChatDialog({
     >
       <FullscreenBackAppBar title={title || he.taskChatTitle} onBack={onClose} />
       <Box sx={fullscreenChatBodySx}>
+        {topSlot}
         <TaskChatMediaStrip completion={media} employee={employee} />
         {open && occurrenceId ? (
           <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

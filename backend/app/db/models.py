@@ -121,6 +121,8 @@ class Branch(Base):
     address: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     city: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     postal_code: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -412,6 +414,8 @@ class TaskMessage(Base):
     audio_transcript_sender: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Étape (sous-tâche) visée par le message ; NULL = général.
+    slot_index: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

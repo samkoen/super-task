@@ -12,11 +12,14 @@ import {
   parseRequirementWords,
   resolveRequirementExamples,
   sanitizeVideoSecondsDraft,
+  clearRequirementGuideVideo,
+  setRequirementGuideVideo,
   setRequirementHint,
   setRequirementTitle,
   setVideoSeconds,
   commitVideoSeconds,
   wordsToPhotoRequirements,
+  type CompletionRequirement,
 } from "./completionMedia";
 
 describe("completionMedia", () => {
@@ -203,5 +206,42 @@ describe("completionMedia", () => {
     expect(resolved).toEqual([
       { kind: "photo", title: "מדף", example_url: "/uploads/task_photos/ex.jpg" },
     ]);
+  });
+
+  it("uploads the pending guide video and never sends a blob url", async () => {
+    const file = new File(["x"], "how.mp4", { type: "video/mp4" });
+    const uploadPhoto = vi.fn(async () => ({ url: "/p.jpg" }));
+    const uploadVideo = vi.fn(async () => ({ url: "/uploads/task_videos/how.mp4" }));
+    const resolved = await resolveRequirementExamples(
+      [
+        { kind: "video", min_seconds: 10, guide_video_url: "blob:http://localhost/2", pending_guide_video: file },
+        { kind: "photo", guide_video_url: "blob:http://localhost/3" },
+        { kind: "audio", guide_video_url: "/ignored.mp4" },
+      ],
+      uploadPhoto,
+      uploadVideo,
+    );
+    expect(uploadVideo).toHaveBeenCalledTimes(1);
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    expect(resolved[0].guide_video_url).toBe("/uploads/task_videos/how.mp4");
+    expect(resolved[1].guide_video_url).toBeUndefined();
+    expect(resolved[2].guide_video_url).toBeUndefined();
+  });
+
+  it("keeps a saved guide video through normalization and treats it as a guide", () => {
+    const [req] = normalizeRequirements([{ kind: "photo", guide_video_url: " /v.mp4 " }]);
+    expect(req.guide_video_url).toBe("/v.mp4");
+    const list = [{ kind: "photo" as const, guide_video_url: "/v.mp4" }];
+    expect(effectiveRequirements({ completion_requirements: list })).toEqual(list);
+  });
+
+  it("sets and clears the guide video of one card, except audio and message", () => {
+    const file = new File(["x"], "how.mp4", { type: "video/mp4" });
+    const list: CompletionRequirement[] = [{ kind: "video", min_seconds: 10 }, { kind: "audio" }];
+    const set = setRequirementGuideVideo(list, 0, "blob:v", file);
+    expect(set[0].guide_video_url).toBe("blob:v");
+    expect(set[0].pending_guide_video).toBe(file);
+    expect(setRequirementGuideVideo(list, 1, "blob:v", file)[1]).toEqual({ kind: "audio" });
+    expect(clearRequirementGuideVideo(set, 0)[0]).toEqual({ kind: "video", min_seconds: 10 });
   });
 });

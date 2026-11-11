@@ -52,3 +52,20 @@ def test_composer_send_does_not_archive_the_chat_task(
     body = occ.json()
     assert body["status"] == "awaiting_response"
     assert not body.get("chat_resolved_at")
+
+
+def test_message_keeps_the_step_it_refers_to(client_emp, client_mgr, occurrence_id, mock_i18n):
+    posted = client_emp.post(
+        _messages_url(occurrence_id), json={"body": "question sur l'etape", "slot_index": 1}
+    )
+    assert posted.status_code == 201, posted.text
+    assert posted.json()["chat_message"]["slot_index"] == 1
+    general = client_emp.post(_messages_url(occurrence_id), json={"body": "question generale"})
+    assert general.json()["chat_message"]["slot_index"] is None
+    thread = client_mgr.get(_messages_url(occurrence_id)).json()["messages"]
+    assert [m["slot_index"] for m in thread] == [1, None]
+
+
+def test_message_with_invalid_step_is_refused(client_emp, occurrence_id, mock_i18n):
+    response = client_emp.post(_messages_url(occurrence_id), json={"body": "x", "slot_index": -3})
+    assert response.status_code == 400
