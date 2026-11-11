@@ -1,6 +1,7 @@
 import { Box, ButtonBase, CircularProgress, Typography } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import arrowLeftIcon from "../../assets/flow1/icon-arrow-left.svg";
 import { he } from "../../i18n/he";
 import { flowColor, flowRadius, flowScreenBackground, flowSize, flowText } from "../../styles/flowTokens";
 import { hasPendingUpload, summaryPhase, summaryRows, type SummaryPhase } from "../../utils/flowSummary";
@@ -18,6 +19,8 @@ type Props = {
   onSend: () => void;
   /** Bouton final une fois tout envoyé. */
   onContinue: () => void;
+  /** Retour aux cartes, tant que rien n'est parti au serveur. */
+  onBack?: () => void;
 };
 
 function Row({ title, statusText, sent }: { title: string; statusText: string; sent: boolean }) {
@@ -35,6 +38,21 @@ function Row({ title, statusText, sent }: { title: string; statusText: string; s
         <Typography sx={{ ...flowText.button, color: flowColor.neutral900, overflowWrap: "anywhere" }}>{title}</Typography>
         <Typography sx={{ ...flowText.caption, color: flowColor.alphaNeutral900_66 }}>{statusText}</Typography>
       </Box>
+    </Box>
+  );
+}
+
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <Box sx={{ alignSelf: "stretch", display: "flex", justifyContent: "flex-end" }}>
+      <ButtonBase
+        aria-label={he.flowBack}
+        data-testid="flow-summary-back"
+        onClick={onBack}
+        sx={{ width: flowSize.roundButton, height: flowSize.roundButton, borderRadius: "50%", bgcolor: flowColor.neutral0 }}
+      >
+        <Box component="img" src={arrowLeftIcon} alt="" sx={{ width: 22, height: 22, display: "block" }} />
+      </ButtonBase>
     </Box>
   );
 }
@@ -66,7 +84,7 @@ function ActionButton({ phase, shiftOpening, onSend, onContinue }: Pick<Props, "
  * D'abord « אישור ושליחה » (rien n'est encore envoyé), puis, une fois envoyé, les heures d'envoi et le bouton final.
  * Un fichier qui attend le réseau reste visible avec son statut « ממתין להעלאה ».
  */
-export default function FlowSummary({ shiftOpening, requirements, states, sending, onSend, onContinue }: Props) {
+export default function FlowSummary({ shiftOpening, requirements, states, sending, onSend, onContinue, onBack }: Props) {
   const rows = summaryRows(requirements, states);
   const phase = summaryPhase(states, sending);
   const sentCount = rows.filter((r) => r.sent).length;
@@ -77,7 +95,8 @@ export default function FlowSummary({ shiftOpening, requirements, states, sendin
       dir="rtl"
       sx={{ minHeight: "100dvh", background: flowScreenBackground, display: "flex", flexDirection: "column", alignItems: "center" }}
     >
-      <Box sx={{ width: "100%", maxWidth: 393, px: `${flowSize.contentPaddingX}px`, pt: "calc(64px + env(safe-area-inset-top, 0px))", pb: 3, display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+      <Box sx={{ width: "100%", maxWidth: 393, px: `${flowSize.contentPaddingX}px`, pt: "calc(24px + env(safe-area-inset-top, 0px))", pb: 3, display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+        {phase === "ready" && onBack ? <BackButton onBack={onBack} /> : null}
         <Box sx={{ width: 72, height: 72, display: "grid", placeItems: "center", borderRadius: "50%", bgcolor: flowColor.green300, alignSelf: "center" }}>
           <CheckRoundedIcon sx={{ fontSize: 40, color: flowColor.green700 }} />
         </Box>

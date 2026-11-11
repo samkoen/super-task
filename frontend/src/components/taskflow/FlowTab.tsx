@@ -89,14 +89,13 @@ function StatusBadge({ state }: { state: SlotUiState }) {
 
 /** Onglet d'une carte déjà remise : vignette, « נשלח 06:43 » (ou « ממתין להעלאה »), coche. */
 export function FlowDoneTab({ index, state, variant, onSelect, zIndex }: Omit<TabProps, "title" | "tone">) {
-  const failed = state.status === "failed";
   return (
     <ButtonBase
       data-testid="flow-tab-done"
       data-status={state.status}
       data-index={index}
       data-variant={variant}
-      disabled={!failed}
+      disabled={!onSelect}
       onClick={onSelect}
       sx={{
         zIndex,

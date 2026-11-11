@@ -6,13 +6,14 @@ import { getCurrentLocation } from "../utils/geoPosition";
 import type { TrimRange } from "../utils/flowTrim";
 import { getSlotUploadQueue } from "../utils/slotSender";
 import { trimVideo, type TrimResult } from "../utils/videoTrim";
-import { slotQueueId, type SlotUploadQueue } from "../utils/slotUploadQueue";
+import { slotQueueId, type QueuedSlot, type SlotUploadQueue } from "../utils/slotUploadQueue";
 import {
   applyQueueEvent,
   discardFilmed,
   markFilmed,
   markReady,
   markTrimmed,
+  mergeStoredSlots,
   slotStatesFromCompletion,
   withLocation,
   type SlotUiState,
@@ -55,6 +56,17 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
+/** Le serveur a déjà ces cases : leur copie locale ne doit ni s'afficher ni repartir. */
+async function withoutDelivered(
+  queue: SlotUploadQueue,
+  known: SlotUiState[],
+  queued: QueuedSlot[],
+): Promise<QueuedSlot[]> {
+  const delivered = queued.filter((entry) => known[entry.slotIndex]?.status === "sent");
+  await Promise.all(delivered.map((entry) => queue.dropDelivered(entry.id).catch(() => undefined)));
+  return queued.filter((entry) => known[entry.slotIndex]?.status !== "sent");
+}
+
 /** Charge l'état au départ : ce que le serveur a déjà + ce qui attend sur l'appareil. */
 function useInitialStates(
   occurrenceId: string,
@@ -68,14 +80,16 @@ function useInitialStates(
   const latest = useLatest({ requirements, completion });
   useEffect(() => {
     const { requirements: reqs, completion: done } = latest.current;
-    setStates(slotStatesFromCompletion(reqs, done));
+    const picture = (queued: QueuedSlot[] = []) => slotStatesFromCompletion(reqs, done, queued);
+    setStates((current) => mergeStoredSlots(current, picture()));
     let cancelled = false;
     void queue
       .pruneHeld()
       .catch(() => undefined)
       .then(() => queue.list(occurrenceId))
+      .then((queued) => withoutDelivered(queue, picture(), queued))
       .then((queued) => {
-        if (!cancelled && queued.length) setStates(slotStatesFromCompletion(reqs, done, queued));
+        if (!cancelled) setStates((current) => mergeStoredSlots(current, picture(queued)));
       });
     return () => {
       cancelled = true;
@@ -102,6 +116,8 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const [isSending, setSending] = useState(false);
   /** Écritures disque en cours par case : l'envoi final et le re-tournage les attendent. */
   const holds = useRef(new Map<number, Promise<void>>());
+  /** Découpe en cours : une confirmation attend son résultat et garde le fichier coupé. */
+  const trims = useRef(new Map<number, Promise<void>>());
 
   /** La case est refilmée : le média confirmé précédent (sur disque) n'a plus d'objet. */
   const dropHeld = useCallback(
@@ -143,7 +159,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   );
 
   /** Découpe la vidéo en cours de revue ; ignoré si l'oved l'a refilmée entre-temps. */
-  const trim = useCallback(
+  const cut = useCallback(
     async (index: number, range: TrimRange) => {
       const kept = files.current.get(index);
       const preview = statesRef.current[index]?.previewUrl;
@@ -156,6 +172,19 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       );
     },
     [setStates, trimmer, statesRef],
+  );
+
+  const trim = useCallback(
+    async (index: number, range: TrimRange) => {
+      const run = cut(index, range);
+      trims.current.set(index, run);
+      try {
+        await run;
+      } finally {
+        if (trims.current.get(index) === run) trims.current.delete(index);
+      }
+    },
+    [cut],
   );
 
   const discard = useCallback(
@@ -187,8 +216,13 @@ export function useSlotUploads(options: SlotUploadsOptions) {
    */
   const keep = useCallback(
     (index: number) => {
-      setStates((prev) => markReady(prev, index, new Date().toISOString()));
-      holds.current.set(index, holdOnDisk(index, requirements[index]?.kind ?? "message"));
+      const cutting = trims.current.get(index);
+      const job = (async () => {
+        if (cutting) await cutting.catch(() => undefined);
+        setStates((prev) => markReady(prev, index, new Date().toISOString()));
+        await holdOnDisk(index, requirements[index]?.kind ?? "message");
+      })();
+      holds.current.set(index, job);
     },
     [setStates, holdOnDisk, requirements],
   );

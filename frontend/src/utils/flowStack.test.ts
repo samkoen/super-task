@@ -41,6 +41,10 @@ describe("pile de cartes", () => {
     expect(stackLayout(states("idle"), null)).toEqual({ active: 0, above: [], below: [] });
   });
 
+  it("une carte confirmée mais pas envoyée se rouvre si l'oved la touche", () => {
+    expect(stackLayout(states("ready", "ready"), 1)).toEqual({ active: 1, above: [0], below: [] });
+  });
+
   it("tout est remis : plus de carte active", () => {
     expect(stackLayout(states("sent", "queued"), 0)).toEqual({ active: null, above: [0, 1], below: [] });
     expect(resolveActive(states("sent"), null)).toBeNull();

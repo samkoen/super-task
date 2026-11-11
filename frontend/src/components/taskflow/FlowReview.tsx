@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Box, ButtonBase, Dialog, Typography } from "@mui/material";
 import checkIcon from "../../assets/flow1/icon-check.svg";
 import FlowPageHeader from "./FlowPageHeader";
@@ -110,6 +111,7 @@ function Actions({ canSend, onConfirm, onRetake }: { canSend: boolean; onConfirm
  */
 export default function FlowReview(props: Props) {
   const { open, title, previewUrl, durationSeconds, minSeconds, onConfirm, onRetake } = props;
+  const [trimming, setTrimming] = useState(false);
   const checks = buildReviewChecks({
     durationSeconds,
     minSeconds,
@@ -127,11 +129,11 @@ export default function FlowReview(props: Props) {
       >
         <FlowPageHeader title={he.flowReviewTitle(title)} titleColor={flowColor.neutral900} progress={props.progress} onBack={onRetake} />
         <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <FlowVideoPlayer src={previewUrl} durationSeconds={durationSeconds} onTrim={props.onTrim} />
+          <FlowVideoPlayer src={previewUrl} durationSeconds={durationSeconds} onTrim={props.onTrim} onTrimActivity={setTrimming} />
           <Checks checks={checks} />
         </Box>
         <Box sx={{ flex: 1, minHeight: "18px" }} />
-        <Actions canSend={canSendReview(checks)} onConfirm={onConfirm} onRetake={onRetake} />
+        <Actions canSend={canSendReview(checks) && !trimming} onConfirm={onConfirm} onRetake={onRetake} />
       </Box>
     </Dialog>
   );

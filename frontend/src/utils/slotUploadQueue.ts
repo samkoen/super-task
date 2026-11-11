@@ -28,8 +28,10 @@ export type QueuedSlot = {
    * `held` : confirmé par l'oved, gardé sur disque, mais pas encore envoyé (attend « אישור ושליחה ») :
    * le renvoi automatique l'ignore.
    * `failed` : erreur définitive (le serveur a refusé) — pas de renvoi automatique.
+   * `acked` : le serveur a accepté le fichier, mais la copie locale n'a pas pu être effacée.
+   * On ne la renvoie jamais.
    */
-  status: "pending" | "failed" | "held";
+  status: "pending" | "failed" | "held" | "acked";
   lastError?: string;
 };
 
@@ -195,26 +197,50 @@ export function createSlotUploadQueue(options: {
     await Promise.all(stale.map((entry) => storage.remove(entry.id)));
   };
 
+  /** Le serveur a déjà le fichier : on retire la copie, sinon on la marque pour ne plus jamais l'envoyer. */
+  const dropDelivered = async (id: string) => {
+    try {
+      await storage.remove(id);
+    } catch {
+      await markAcked(id);
+    }
+  };
+
+  const markAcked = async (id: string) => {
+    try {
+      const entry = (await storage.getAll()).find((row) => row.id === id);
+      if (!entry || entry.status === "acked") return;
+      await storage.put({ ...entry, status: "acked", lastError: undefined });
+    } catch {
+      /* disque illisible : rien d'autre à tenter */
+    }
+  };
+
+  const rememberFailure = async (entry: QueuedSlot, error: unknown): Promise<"stop" | "next"> => {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    if (isRetryableSlotError(error)) {
+      const next = { ...entry, attempts: entry.attempts + 1, lastError: message };
+      await storage.put(next);
+      emit({ type: "queued", entry: next });
+      return "stop";
+    }
+    const failed: QueuedSlot = { ...entry, attempts: entry.attempts + 1, status: "failed", lastError: message };
+    await storage.put(failed);
+    emit({ type: "failed", entry: failed });
+    return "next";
+  };
+
   const sendOne = async (entry: QueuedSlot): Promise<"sent" | "stop" | "next"> => {
     emit({ type: "uploading", entry });
+    let result: unknown;
     try {
-      const result = await send(entry);
-      await storage.remove(entry.id);
-      emit({ type: "sent", entry, result });
-      return "sent";
+      result = await send(entry);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error ?? "");
-      if (isRetryableSlotError(error)) {
-        const next = { ...entry, attempts: entry.attempts + 1, lastError: message };
-        await storage.put(next);
-        emit({ type: "queued", entry: next });
-        return "stop";
-      }
-      const failed: QueuedSlot = { ...entry, attempts: entry.attempts + 1, status: "failed", lastError: message };
-      await storage.put(failed);
-      emit({ type: "failed", entry: failed });
-      return "next";
+      return rememberFailure(entry, error);
     }
+    await dropDelivered(entry.id);
+    emit({ type: "sent", entry, result });
+    return "sent";
   };
 
   const run = async () => {
@@ -243,7 +269,7 @@ export function createSlotUploadQueue(options: {
   /** Remet une entrée refusée en attente (action « réessayer »). */
   const retry = async (id: string): Promise<void> => {
     const entry = (await storage.getAll()).find((row) => row.id === id);
-    if (!entry) return;
+    if (!entry || entry.status === "acked") return;
     const next: QueuedSlot = { ...entry, status: "pending", lastError: undefined };
     await storage.put(next);
     emit({ type: "queued", entry: next });
@@ -256,7 +282,7 @@ export function createSlotUploadQueue(options: {
     };
   };
 
-  return { enqueue, hold, release, dropHeld, pruneHeld, flush, list, retry, subscribe, remove: (id: string) => storage.remove(id) };
+  return { enqueue, hold, release, dropHeld, dropDelivered, pruneHeld, flush, list, retry, subscribe, remove: (id: string) => storage.remove(id) };
 }
 
 export type AutoFlushEnv = {

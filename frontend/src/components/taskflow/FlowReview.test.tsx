@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FlowReview from "./FlowReview";
 import { he } from "../../i18n/he";
 
@@ -57,5 +57,21 @@ describe("FlowReview", () => {
   it("offers no trimming control", () => {
     renderReview();
     expect(screen.queryByLabelText(/trim|חיתוך|גזירה/i)).toBeNull();
+  });
+
+  it("blocks confirm while the cut is being written", async () => {
+    let finish: () => void = () => {};
+    const { onConfirm } = renderReview({
+      onTrim: () => new Promise<void>((resolve) => (finish = resolve)),
+    });
+    fireEvent.click(screen.getByTestId("flow-trim-button"));
+    fireEvent.keyDown(screen.getByTestId("flow-trim-start"), { key: "ArrowLeft" });
+    fireEvent.click(screen.getByTestId("flow-trim-apply"));
+    const confirm = screen.getByTestId("flow-review-confirm") as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+    await act(async () => finish());
+    await waitFor(() => expect((screen.getByTestId("flow-review-confirm") as HTMLButtonElement).disabled).toBe(false));
   });
 });

@@ -1,6 +1,8 @@
+import { CacheProvider } from "@emotion/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import FlowTaskChat from "./FlowTaskChat";
+import { emotionCache } from "../../emotion/caches";
 import { he } from "../../i18n/he";
 import { taskService } from "../../services/taskService";
 
@@ -38,18 +40,20 @@ const message = (over: Record<string, unknown>) => ({
 function renderChat(extra: Partial<Parameters<typeof FlowTaskChat>[0]> = {}) {
   const onClose = vi.fn();
   render(
-    <FlowTaskChat
-      open
-      occurrenceId="o1"
-      title="בדיקת מלאי במחלקה"
-      status="in_progress"
-      managerName="רונית"
-      requirements={reqs}
-      statuses={["sent", "idle"]}
-      pollMs={false}
-      onClose={onClose}
-      {...extra}
-    />,
+    <CacheProvider value={emotionCache}>
+      <FlowTaskChat
+        open
+        occurrenceId="o1"
+        title="בדיקת מלאי במחלקה"
+        status="in_progress"
+        managerName="רונית"
+        requirements={reqs}
+        statuses={["sent", "idle"]}
+        pollMs={false}
+        onClose={onClose}
+        {...extra}
+      />
+    </CacheProvider>,
   );
   return { onClose };
 }

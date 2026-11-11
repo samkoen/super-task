@@ -104,6 +104,35 @@ describe("useSlotUploads: confirmed media survives a reload", () => {
     expect(hook.result.current.states[0].status).toBe("sent");
   });
 
+  it("drops the local copy when the server already has the slot, so it is not sent again", async () => {
+    const send = vi.fn(async () => ({}));
+    const { queue, storage } = makeQueue(send);
+    await queue.enqueue({
+      occurrenceId: "occ",
+      slotIndex: 0,
+      kind: "video",
+      file: file(),
+      durationSeconds: 9,
+      capturedAt: "t",
+    });
+    const completion = { completion_attachments: [{ kind: "video", url: "/u/1.webm", captured_at: "t" }] };
+    renderHook(() =>
+      useSlotUploads({
+        occurrenceId: "occ",
+        requirements,
+        completion: completion as never,
+        queue,
+        locate: async () => null,
+        onSent: vi.fn(),
+        onSavedOnDevice: vi.fn(),
+        onFailed: vi.fn(),
+      }),
+    );
+    await waitFor(async () => expect(await storage.getAll()).toEqual([]));
+    await queue.flush();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("a text message is not written to disk", async () => {
     const { queue, storage } = makeQueue();
     const hook = mount(queue);

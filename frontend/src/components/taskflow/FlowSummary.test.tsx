@@ -19,6 +19,19 @@ function renderSummary(states: SlotUiState[], extra: Partial<Parameters<typeof F
 }
 
 describe("FlowSummary", () => {
+  it("before sending, the back arrow returns to the cards and does not send", () => {
+    const onBack = vi.fn();
+    const { onSend } = renderSummary([ready, ready], { onBack });
+    fireEvent.click(screen.getByTestId("flow-summary-back"));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("hides the back arrow once the send has finished", () => {
+    renderSummary([sent, sent], { onBack: vi.fn() });
+    expect(screen.queryByTestId("flow-summary-back")).toBeNull();
+  });
+
   it("before sending: the button says אישור ושליחה and triggers the upload", () => {
     const { onSend, onContinue } = renderSummary([ready, ready]);
     const button = screen.getByTestId("flow-summary-send");

@@ -17,6 +17,8 @@ type Props = {
   durationSeconds: number | null | undefined;
   /** Découpe la vidéo sur la portion choisie ; sans elle, le bouton « חיתוך » n'est pas proposé. */
   onTrim?: (range: TrimRange) => Promise<unknown>;
+  /** Vrai tant que la découpe réécrit le fichier : la confirmation doit attendre. */
+  onTrimActivity?: (busy: boolean) => void;
 };
 
 /** Les .webm de MediaRecorder annoncent une durée infinie : on force le navigateur à la calculer. */
@@ -112,7 +114,7 @@ function TopRow({ trim, speed, onSpeed }: { trim: ReturnType<typeof useTrimMode>
 }
 
 /** Figma « video-player » (345 × 372, rayon 24) : vidéo filmée, bouton de lecture, barre, temps et découpe. */
-export default function FlowVideoPlayer({ src, durationSeconds, onTrim }: Props) {
+export default function FlowVideoPlayer({ src, durationSeconds, onTrim, onTrimActivity }: Props) {
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -121,6 +123,10 @@ export default function FlowVideoPlayer({ src, durationSeconds, onTrim }: Props)
   const total = playerTotalSeconds(durationSeconds, mediaDuration);
   const trim = useTrimMode({ total, src, onTrim });
   const { range } = trim;
+  useEffect(() => {
+    onTrimActivity?.(trim.busy);
+    return () => onTrimActivity?.(false);
+  }, [trim.busy, onTrimActivity]);
 
   useEffect(() => {
     if (video.current) video.current.playbackRate = speed;

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Box, Dialog } from "@mui/material";
+import { Box, ButtonBase, Dialog } from "@mui/material";
 import FlowBottomNav, { flowBottomNavClearanceCss } from "./FlowBottomNav";
 import FlowGuideSheet from "./FlowGuideSheet";
 import FlowReview from "./FlowReview";
@@ -10,11 +10,13 @@ import TaskCardStack from "./TaskCardStack";
 import TaskFlowHeader from "./TaskFlowHeader";
 import { useTaskFlow } from "../../hooks/useTaskFlow";
 import type { SubmitSlotResponse, TaskCompletion, TaskStatus } from "../../services/taskService";
-import { flowScreenBackground } from "../../styles/flowTokens";
+import { he } from "../../i18n/he";
+import { flowColor, flowRadius, flowScreenBackground, flowSize, flowText } from "../../styles/flowTokens";
 import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
 import type { GeoPoint } from "../../utils/geoCheck";
-import { handedOverCount } from "../../utils/slotUploadState";
+import { readyForSummary } from "../../utils/flowSummary";
+import { handedOverCount, needsSending } from "../../utils/slotUploadState";
 
 export type TaskFlowTask = {
   id: string;
@@ -57,7 +59,8 @@ const paperProps = { sx: { background: flowScreenBackground } };
 function useFinish() {
   const [summary, setSummary] = useState(false);
   const onAllHandedOver = useCallback(() => setSummary(true), []);
-  return { summary, onAllHandedOver };
+  const leaveSummary = useCallback(() => setSummary(false), []);
+  return { summary, onAllHandedOver, leaveSummary };
 }
 
 type ReviewLayerProps = {
@@ -91,12 +94,25 @@ function ReviewLayer({ flow, requirements, branch, branchCenter }: ReviewLayerPr
   );
 }
 
-function FlowBody({ props, flow, requirements, onGuide, onChat }: {
+function OpenSummaryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <ButtonBase
+      data-testid="flow-open-summary"
+      onClick={onClick}
+      sx={{ width: "100%", maxWidth: flowSize.cardWidth, mx: "auto", mt: 2, height: flowSize.roundButton, borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral900, color: flowColor.neutral0, ...flowText.button }}
+    >
+      {he.flowSummaryTitleReady}
+    </ButtonBase>
+  );
+}
+
+function FlowBody({ props, flow, requirements, onGuide, onChat, onOpenSummary }: {
   props: TaskFlowScreenProps;
   flow: Flow;
   requirements: CompletionRequirement[];
   onGuide: (index: number) => void;
   onChat: () => void;
+  onOpenSummary: () => void;
 }) {
   return (
     <Box data-testid="task-flow" sx={{ width: "100%", maxWidth: 393, mx: "auto", pb: flowBottomNavClearanceCss() }}>
@@ -117,6 +133,7 @@ function FlowBody({ props, flow, requirements, onGuide, onChat }: {
           onSendText={flow.saveText}
           onOpenGuide={onGuide}
         />
+        {readyForSummary(flow.states) && needsSending(flow.states) ? <OpenSummaryButton onClick={onOpenSummary} /> : null}
       </Box>
       <FlowBottomNav onHome={props.onClose} onChat={props.onOpenChats} />
     </Box>
@@ -127,7 +144,7 @@ function FlowBody({ props, flow, requirements, onGuide, onChat }: {
 export default function TaskFlowScreen(props: TaskFlowScreenProps) {
   const { task, shiftOpening = false } = props;
   const requirements = effectiveRequirements(task);
-  const { summary, onAllHandedOver } = useFinish();
+  const { summary, onAllHandedOver, leaveSummary } = useFinish();
   const flow = useTaskFlow({
     occurrenceId: task.id,
     requirements,
@@ -149,13 +166,14 @@ export default function TaskFlowScreen(props: TaskFlowScreenProps) {
           sending={flow.sending}
           onSend={() => void flow.sendAll()}
           onContinue={props.onFinished}
+          onBack={leaveSummary}
         />
       </Dialog>
     );
   }
   return (
     <Dialog open fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus>
-      <FlowBody props={props} flow={flow} requirements={requirements} onGuide={setGuideIndex} onChat={() => setChatOpen(true)} />
+      <FlowBody props={props} flow={flow} requirements={requirements} onGuide={setGuideIndex} onChat={() => setChatOpen(true)} onOpenSummary={onAllHandedOver} />
       <FlowToast toast={flow.toast} onClose={flow.closeToast} />
       <FlowGuideSheet req={guideIndex !== null ? requirements[guideIndex] : null} index={guideIndex ?? 0} onClose={() => setGuideIndex(null)} />
       <ReviewLayer flow={flow} requirements={requirements} branch={props.branch} branchCenter={props.branchCenter} />

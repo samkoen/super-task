@@ -209,3 +209,23 @@ describe("startSlotAutoFlush", () => {
     expect(doc.removeEventListener).toHaveBeenCalled();
   });
 });
+
+describe("envoi accepté mais copie locale impossible à effacer", () => {
+  it("marque la copie et ne la renvoie jamais, même avec réessayer", async () => {
+    const send = vi.fn(async (_id: string) => ({ ok: true }));
+    const memory = createMemorySlotStorage();
+    const storage = { ...memory, remove: async () => { throw new Error("disk"); } };
+    const queue = createSlotUploadQueue({ storage, send: (entry) => send(entry.id), isOnline: () => true });
+    const events: SlotQueueEvent[] = [];
+    queue.subscribe((event) => events.push(event));
+    await queue.enqueue(item(0));
+    await queue.flush();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(events.map((event) => event.type)).toEqual(["queued", "uploading", "sent"]);
+    expect((await memory.getAll())[0].status).toBe("acked");
+    await queue.retry(slotQueueId("occ-1", 0));
+    await queue.flush();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect((await memory.getAll())[0].status).toBe("acked");
+  });
+});

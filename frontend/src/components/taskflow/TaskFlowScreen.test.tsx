@@ -103,6 +103,39 @@ describe("TaskFlowScreen", () => {
     expect(onFinished).toHaveBeenCalledTimes(1);
   });
 
+  it("returns to the cards before sending, and the summary can be opened again", async () => {
+    const { onFinished } = renderScreen();
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    await waitFor(() => expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1"));
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    fireEvent.click(await screen.findByTestId("flow-summary-back"));
+    expect(screen.getByTestId("task-flow")).toBeTruthy();
+    expect(send).not.toHaveBeenCalled();
+    expect(onFinished).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("flow-open-summary"));
+    expect(await screen.findByTestId("flow-summary-send")).toBeTruthy();
+  });
+
+  it("reopens a confirmed video, and the summary stays closed until it is confirmed again", async () => {
+    const videos = [
+      { kind: "video", title: "גיבוי", min_seconds: 5 },
+      { kind: "video", title: "מקרר", min_seconds: 5 },
+    ];
+    renderScreen({}, videos);
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    fireEvent.click(await screen.findByTestId("flow-review-confirm"));
+    await waitFor(() => expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1"));
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    fireEvent.click(await screen.findByTestId("flow-review-confirm"));
+    fireEvent.click(await screen.findByTestId("flow-summary-back"));
+    fireEvent.click(screen.getAllByTestId("flow-tab-done")[0]);
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("0");
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    expect(await screen.findByTestId("flow-review")).toBeTruthy();
+    expect(screen.queryByTestId("flow-open-summary")).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("shows the summary for a shift opening, then goes to the daily tasks after sending", async () => {
     send.mockResolvedValue(response([], true));
     const { onFinished } = renderScreen({ shiftOpening: true }, [{ kind: "photo", title: "מדף" }]);

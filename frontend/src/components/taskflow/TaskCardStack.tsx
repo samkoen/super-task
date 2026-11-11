@@ -6,7 +6,7 @@ import type { MediaKind } from "../media/MediaCaptureActions";
 import { flowSize, flowToneForIndex } from "../../styles/flowTokens";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
-import { stackLayout } from "../../utils/flowStack";
+import { canRevisit, stackLayout } from "../../utils/flowStack";
 import { isHandedOver, type SlotUiState } from "../../utils/slotUploadState";
 
 export type TaskCardStackProps = {
@@ -54,7 +54,14 @@ export default function TaskCardStack(props: TaskCardStackProps) {
       sx={{ width: "100%", maxWidth: flowSize.cardWidth, mx: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}
     >
       {layout.above.map((index, order) => (
-        <FlowDoneTab key={index} index={index} state={states[index]} variant={order === 0 ? "narrow" : "wide"} zIndex={order + 1} />
+        <FlowDoneTab
+          key={index}
+          index={index}
+          state={states[index]}
+          variant={order === 0 ? "narrow" : "wide"}
+          zIndex={order + 1}
+          onSelect={canRevisit(states[index]) ? () => setPreferred(index) : undefined}
+        />
       ))}
       {layout.active !== null ? <ActiveCard props={props} index={layout.active} /> : null}
       {layout.below.map((index, order) => (

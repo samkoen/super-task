@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompletionRequirement } from "../utils/completionMedia";
 import { createMemorySlotStorage, createSlotUploadQueue } from "../utils/slotUploadQueue";
@@ -83,6 +83,49 @@ describe("useSlotUploads.trim", () => {
     act(() => hook.result.current.film(0, original(), 12));
     await expect(hook.result.current.trim(0, { start: 1, end: 3 })).rejects.toThrow("boom");
     expect(hook.result.current.states[0].durationSeconds).toBe(12);
+  });
+});
+
+describe("confirmation pendant la découpe", () => {
+  function open(trimmer: (src: string) => Promise<{ file: File; durationSeconds: number }>) {
+    const storage = createMemorySlotStorage();
+    const queue = createSlotUploadQueue({ storage, send: async () => ({}), isOnline: () => true });
+    const hook = renderHook(() =>
+      useSlotUploads({
+        occurrenceId: "occ",
+        requirements,
+        completion: null as never,
+        queue,
+        locate: async () => null,
+        trimmer,
+        onSent: vi.fn(),
+        onSavedOnDevice: vi.fn(),
+        onFailed: vi.fn(),
+      }),
+    );
+    return { hook, storage };
+  }
+
+  it("garde le fichier coupé quand אישור arrive avant la fin de la découpe", async () => {
+    const trimmed = new File(["short"], "t.webm", { type: "video/webm" });
+    let finish: (value: { file: File; durationSeconds: number }) => void = () => {};
+    const { hook, storage } = open(() => new Promise((resolve) => (finish = resolve)));
+    act(() => hook.result.current.film(0, original(), 12));
+    let pending = Promise.resolve();
+    act(() => {
+      pending = hook.result.current.trim(0, { start: 1, end: 4 });
+    });
+    act(() => hook.result.current.keep(0));
+    expect(await storage.getAll()).toEqual([]);
+    await act(async () => {
+      finish({ file: trimmed, durationSeconds: 3 });
+      await pending;
+    });
+    await waitFor(async () => expect((await storage.getAll())[0]?.durationSeconds).toBe(3));
+    const [kept] = await storage.getAll();
+    expect(kept.file).toBe(trimmed);
+    expect(kept.status).toBe("held");
+    expect(hook.result.current.states[0]).toMatchObject({ status: "ready", durationSeconds: 3 });
   });
 });
 

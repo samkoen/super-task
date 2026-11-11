@@ -9,12 +9,29 @@ import {
   firstOpenIndex,
   handedOverCount,
   markFilmed,
+  mergeStoredSlots,
   nextOpenIndex,
   sentCount,
   slotStatesFromCompletion,
   waitingUploadCount,
   withLocation,
 } from "./slotUploadState";
+
+describe("mergeStoredSlots", () => {
+  it("remplit une case libre et laisse une case déjà en file tranquille", () => {
+    const current = emptySlotStates(reqs(2)).map((state, index) =>
+      index === 1 ? { ...state, status: "queued" as const } : state,
+    );
+    const stored = emptySlotStates(reqs(2)).map((state) => ({ ...state, status: "ready" as const }));
+    const merged = mergeStoredSlots(current, stored);
+    expect(merged.map((state) => state.status)).toEqual(["ready", "queued"]);
+  });
+
+  it("rend le même tableau quand rien ne change", () => {
+    const current = emptySlotStates(reqs(1));
+    expect(mergeStoredSlots(current, current)).toBe(current);
+  });
+});
 
 describe("withLocation", () => {
   const position = { lat: 31.77, lng: 35.21 };
@@ -82,6 +99,21 @@ describe("slotUploadState", () => {
     };
     const [first] = slotStatesFromCompletion(reqs(1), completion);
     expect(first).toMatchObject({ status: "idle", remark: "trop sombre", sentAt: null });
+  });
+
+  it("une copie locale ne recouvre pas une case déjà reçue, et une copie acquittée ne repart pas", () => {
+    const sent = {
+      completion_attachments: [{ kind: "video" as const, url: "/u/1.webm", captured_at: "t" }],
+    };
+    expect(slotStatesFromCompletion(reqs(1), sent, [entry(0)])[0].status).toBe("sent");
+    expect(slotStatesFromCompletion(reqs(1), sent, [entry(0, { status: "held" })])[0].status).toBe("sent");
+    expect(slotStatesFromCompletion(reqs(1), null, [entry(0, { status: "acked" })])[0].status).toBe("idle");
+    const rejected = {
+      completion_attachments: [
+        { kind: "video" as const, url: "/u/1.webm", review: { status: "rejected" as const, remark: "x" } },
+      ],
+    };
+    expect(slotStatesFromCompletion(reqs(1), rejected, [entry(0, { status: "held" })])[0].status).toBe("ready");
   });
 
   it("les entrées en attente sur l'appareil passent en queued, les refusées en failed", () => {

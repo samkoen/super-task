@@ -13,8 +13,14 @@ export type StackLayout = {
  * `preferred` est la carte que l'oved a touchée en dernier : il choisit librement l'ordre.
  * Si cette carte est déjà remise, on passe à la suivante encore ouverte.
  */
+/** Une carte confirmée mais pas encore envoyée peut être rouverte pour être refaite. */
+export function canRevisit(state: SlotUiState | undefined): boolean {
+  return state?.status === "ready";
+}
+
 export function resolveActive(states: SlotUiState[], preferred: number | null): number | null {
   if (!states.length) return null;
+  if (canRevisit(states[preferred ?? -1])) return preferred;
   if (preferred !== null && states[preferred] && !isHandedOver(states[preferred].status)) return preferred;
   if (preferred !== null && states[preferred]) return nextOpenIndex(states, preferred);
   const first = firstOpenIndex(states);

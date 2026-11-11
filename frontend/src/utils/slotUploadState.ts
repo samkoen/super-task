@@ -65,7 +65,8 @@ function previewOf(entry: QueuedSlot): string | null {
 }
 
 function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): SlotUiState {
-  if (!entry) return state;
+  // Déjà reçu par le serveur, ou copie locale qu'on ne renverra plus : la file ne réécrit pas l'état.
+  if (!entry || state.status === "sent" || entry.status === "acked") return state;
   if (entry.status === "held") {
     // Confirmé avant un rechargement : la carte est « prête », il ne manque que l'envoi final.
     return {
@@ -85,6 +86,16 @@ function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): Slot
     durationSeconds: entry.durationSeconds,
     error: entry.lastError ?? null,
   };
+}
+
+/**
+ * Rechargement : une case déjà touchée dans cette session (filmée, confirmée, en file) gagne.
+ * La copie disque ne remplit que les cases encore libres.
+ */
+export function mergeStoredSlots(current: SlotUiState[], stored: SlotUiState[]): SlotUiState[] {
+  if (current.length !== stored.length) return stored;
+  const next = current.map((state, index) => (state.status === "idle" ? stored[index] : state));
+  return next.some((state, index) => state !== current[index]) ? next : current;
 }
 
 /** Ce que le serveur a déjà reçu, puis ce qui attend encore sur l'appareil. */
