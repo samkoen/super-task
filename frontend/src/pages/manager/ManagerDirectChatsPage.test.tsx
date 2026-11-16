@@ -101,7 +101,8 @@ describe("ManagerDirectChatsPage", () => {
     withTaskChat();
     render(<ManagerDirectChatsPage />);
     await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
-    expect(screen.getByText("דן כהן")).toBeTruthy();
+    // L'oved apparaît deux fois : sa ligne directe et le fil de tâche qui porte son nom.
+    expect(screen.getAllByText("דן כהן")).toHaveLength(2);
     expect(screen.getByText(he.managerChatTaskContext)).toBeTruthy();
     expect(screen.getByTestId("manager-chats-filter-all")).toBeTruthy();
     expect(screen.getByLabelText(he.directChatSearch)).toBeTruthy();
@@ -112,7 +113,9 @@ describe("ManagerDirectChatsPage", () => {
     render(<ManagerDirectChatsPage />);
     await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
     fireEvent.click(screen.getByTestId("manager-chats-filter-tasks"));
-    expect(screen.queryByText("דן כהן")).toBeNull();
+    // Seule reste la ligne de tâche (qui porte le nom de l'oved) ; la ligne directe a disparu.
+    expect(screen.getAllByText("דן כהן")).toHaveLength(1);
+    expect(screen.queryByText("שלום")).toBeNull();
     expect(screen.getByText("מדף חלב")).toBeTruthy();
   });
 
@@ -133,8 +136,11 @@ describe("ManagerDirectChatsPage", () => {
       peer: { id: "e1", full_name: "דן כהן", role: "employee" },
     });
     render(<ManagerDirectChatsPage />);
-    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /דן כהן/ }));
+    await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
+    const directRow = screen
+      .getAllByRole("button", { name: /דן כהן/ })
+      .find((row) => !row.textContent?.includes("מדף חלב"));
+    fireEvent.click(directRow!);
     await waitFor(() => expect(screen.getByText("direct-thread")).toBeTruthy());
     expect(directChatService.openWith).toHaveBeenCalledWith("e1");
   });
