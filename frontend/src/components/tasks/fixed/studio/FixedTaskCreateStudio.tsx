@@ -16,7 +16,7 @@ import {
   type WizardForm,
 } from "../../../../utils/fixedTaskWizard";
 import { displayHour } from "../../../../utils/studioRequirements";
-import { isOnce, onceBlocker, onceDefaults, onceScheduleLine, studioPayload } from "../../../../utils/studioOnce";
+import { isOnce, onceBlocker, onceScheduleLine, studioPayload } from "../../../../utils/studioOnce";
 import BranchChecklist from "../../BranchChecklist";
 import type { NewTaskFormSubmitPayload } from "../../NewTaskFormDialog";
 import BranchAssigneeRows from "../BranchAssigneeRows";
@@ -43,7 +43,7 @@ export type FixedTaskCreateStudioProps = {
   onError?: (message: string) => void;
   /** Garde le brouillon si l'écran est démonté (navigation). */
   rememberKey?: string;
-  /** Studio unique : la pastille « פעם אחת » crée une tâche ponctuelle. */
+  /** Studio unique : si `initialForm` est une tâche ponctuelle, « מתי » ne montre que la date et l'heure. */
   allowOnce?: boolean;
   /** Pré-remplissage d'un formulaire neuf (« פעם אחת », bibliothèque, signalement). */
   initialForm?: Partial<WizardForm>;
@@ -68,18 +68,9 @@ function headerLine(form: WizardForm): string {
   return isOnce(form) ? onceScheduleLine(form.dueAt) : scheduleLine(form.dueTime, form.recurrence);
 }
 
+/** « מתי » : le type (חד־פעמית ou récurrente) est fixé à l'ouverture, on n'en change plus ici. */
 function WhenSection({ form, patch, allowOnce, disabled }: { form: WizardForm; patch: Patch; allowOnce?: boolean; disabled: boolean }) {
-  const once = allowOnce
-    ? {
-        active: isOnce(form),
-        dueAt: form.dueAt,
-        onChange: ({ active, dueAt }: { active?: boolean; dueAt?: string }) => {
-          if (active === true) patch({ taskKind: "ad_hoc", dueAt: form.dueAt || (onceDefaults().dueAt as string) });
-          if (active === false) patch({ taskKind: "fixed" });
-          if (dueAt !== undefined) patch({ dueAt });
-        },
-      }
-    : undefined;
+  const once = allowOnce && isOnce(form) ? { dueAt: form.dueAt, onChange: (dueAt: string) => patch({ dueAt }) } : undefined;
   return (
     <StudioSection title={he.studioWhenTitle} testId="studio-when">
       <StudioSchedule

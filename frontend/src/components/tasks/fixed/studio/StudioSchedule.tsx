@@ -23,32 +23,28 @@ export type StudioScheduleValue = {
   monthlyDay: number;
 };
 
-/** « פעם אחת » : une date et une heure au lieu d'une récurrence (studio de création seulement). */
+/**
+ * Tâche « חד־פעמית » : une date et une heure au lieu d'une récurrence.
+ * Le type de tâche est choisi dans le « + » ; ici on ne peut plus en changer.
+ */
 export type StudioOnceValue = {
-  active: boolean;
   /** « YYYY-MM-DDTHH:mm » */
   dueAt: string;
-  onChange: (patch: { active?: boolean; dueAt?: string }) => void;
+  onChange: (dueAt: string) => void;
 };
 
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
-type PillsProps = { value: StudioScheduleValue; onChange: (patch: Partial<StudioScheduleValue>) => void; once?: StudioOnceValue; disabled?: boolean };
+type PillsProps = { value: StudioScheduleValue; onChange: (patch: Partial<StudioScheduleValue>) => void; disabled?: boolean };
 
-function RecurrencePills({ value, onChange, once, disabled }: PillsProps) {
+function RecurrencePills({ value, onChange, disabled }: PillsProps) {
   const pickRecurrence = (option: TaskRecurrence) => {
     onChange({ recurrence: option, weeklyDays: weekdaysOnRecurrenceChange(option, value.weeklyDays) });
-    if (once?.active) once.onChange({ active: false });
   };
   return (
     <Box role="radiogroup" aria-label={he.recurrence} sx={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-      {once ? (
-        <ButtonBase role="radio" aria-checked={once.active} disabled={disabled} onClick={() => once.onChange({ active: true })} sx={studioPillSx(once.active)}>
-          {he.studioOnce}
-        </ButtonBase>
-      ) : null}
       {FIXED_RECURRENCE_OPTIONS.map((option) => {
-        const selected = !once?.active && value.recurrence === option;
+        const selected = value.recurrence === option;
         return (
           <ButtonBase
             key={option}
@@ -157,15 +153,15 @@ function OnceFields({ once, disabled }: { once: StudioOnceValue; disabled?: bool
   const { date, time } = splitDueAt(once.dueAt);
   return (
     <>
-      <DateField value={date} onChange={(next) => once.onChange({ dueAt: joinDueAt(next, time) })} disabled={disabled} />
-      <TimeField value={time} onChange={(next) => once.onChange({ dueAt: joinDueAt(date, next) })} disabled={disabled} />
+      <DateField value={date} onChange={(next) => once.onChange(joinDueAt(next, time))} disabled={disabled} />
+      <TimeField value={time} onChange={(next) => once.onChange(joinDueAt(date, next))} disabled={disabled} />
     </>
   );
 }
 
 /**
  * Section « מתי » : fréquence, jours, heure. En édition, la fréquence est fixe (`recurrenceLocked`).
- * Avec `once`, la première pastille est « פעם אחת » (date + heure).
+ * Avec `once` (tâche חד־פעמית) : seulement la date et l'heure, sans pastilles de récurrence.
  */
 export default function StudioSchedule({
   value,
@@ -180,10 +176,9 @@ export default function StudioSchedule({
   once?: StudioOnceValue;
   disabled?: boolean;
 }) {
-  if (once?.active) {
+  if (once) {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-        <RecurrencePills value={value} onChange={onChange} once={once} disabled={disabled} />
         <OnceFields once={once} disabled={disabled} />
       </Box>
     );
@@ -193,7 +188,7 @@ export default function StudioSchedule({
       {recurrenceLocked ? (
         <LockedRecurrence recurrence={value.recurrence} />
       ) : (
-        <RecurrencePills value={value} onChange={onChange} once={once} disabled={disabled} />
+        <RecurrencePills value={value} onChange={onChange} disabled={disabled} />
       )}
       {usesWeeklyDays(value.recurrence) ? (
         <WeekdayCircles

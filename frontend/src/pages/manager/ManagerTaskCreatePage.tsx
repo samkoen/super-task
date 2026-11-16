@@ -66,7 +66,8 @@ function useStartingPoint() {
 
 /**
  * Studio unique (étape 5) : « + › משימה חדשה », un modèle de la bibliothèque ou un signalement
- * ouvrent tous le même écran ; « פעם אחת » est choisi d'office, la récurrence reste à un geste.
+ * ouvrent tous le même écran. Le type vient du point d'entrée (חד־פעמית, ou celui du modèle) et
+ * n'est plus modifiable dans « מתי » ; une tâche récurrente se crée via « + › משימה קבועה ».
  */
 export default function ManagerTaskCreatePage() {
   const { user } = useAuth();
