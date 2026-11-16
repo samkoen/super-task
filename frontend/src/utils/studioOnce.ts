@@ -94,6 +94,28 @@ export function formFromIssue(prefill: AdHocTaskPrefillFromIssue, dayIso = today
   };
 }
 
+/** Paramètre d'adresse du studio : l'oved pour qui la tâche est créée (fiche employé). */
+export const STUDIO_ASSIGNEE_QUERY = "assignee";
+
+/** Studio ouvert depuis la fiche d'un oved : lui et son snif sont déjà choisis. */
+export function studioPathForEmployee(basePath: string, userId: string, branchId?: string | null): string {
+  const params = new URLSearchParams({ [STUDIO_ASSIGNEE_QUERY]: userId });
+  if (branchId) params.set("branch", branchId);
+  return `${basePath}/new?${params.toString()}`;
+}
+
+/** Retour après création ou annulation : l'écran d'origine (fiche employé) s'il est une adresse menahel/admin. */
+export function studioReturnPath(value: unknown): string | null {
+  return typeof value === "string" && /^\/(manager|admin)(\/|\?|$)/.test(value) ? value : null;
+}
+
+/** « פעם אחת » pour cet oved ; avec un snif, il est aussi le seul snif visé (menahel reshet). */
+export function formForAssignee(userId: string, branchId?: string | null, dayIso = todayIso()): Partial<WizardForm> {
+  const base: Partial<WizardForm> = { ...onceDefaults(dayIso), assigneeUserId: userId };
+  if (!branchId) return base;
+  return { ...base, branchId, selectedBranchIds: [branchId], branchesTouched: true, branchChoices: { [branchId]: userId } };
+}
+
 /** Menahel réseau arrivé depuis un snif précis : la tâche vise ce snif par défaut. */
 export function formForScopeBranch(branchId: string | null | undefined): Partial<WizardForm> {
   return branchId ? { selectedBranchIds: [branchId], branchesTouched: true } : {};

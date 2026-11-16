@@ -77,6 +77,23 @@ function AnalysisPanel({ data, stages, onOpenTask }: { data: ManagerDashboard; s
   );
 }
 
+/** Fenêtres de l'accueil (un seul état) et ouverture d'une tâche du tableau d'analyse. */
+function useHomeDialogs(onError: (m: string) => void) {
+  const [dialogs, setDialogsState] = useState<ManagerHomeDialogsState>(NO_DIALOG);
+  const setDialogs = useCallback((patch: Partial<ManagerHomeDialogsState>) => setDialogsState((d) => ({ ...d, ...patch })), []);
+  return { dialogs, setDialogs, openTask: useOpenTask(setDialogs, onError) };
+}
+
+/** « לטיפולך » : un message ouvre le chat direct, une question son chat de tâche, une preuve la revue. */
+function useInboxOpener(data: ManagerDashboard | null, inbox: ReturnType<typeof useManagerInboxChats>, setDialogs: (p: Partial<ManagerHomeDialogsState>) => void, openReview: (taskId: string) => void) {
+  return (item: InboxItem) => {
+    if (item.kind === "chat" && item.chat) { void inbox.openCard(item.chat); return; }
+    if (!item.taskId) return;
+    if (item.kind === "question") setDialogs({ chatTask: findQueuedTask(data?.task_queues, item.taskId) ?? null });
+    else openReview(item.taskId);
+  };
+}
+
 /**
  * Accueil menahel (Figma « Menahel · בית (snif) ») : l'état du snif, ce qui attend le menahel
  * (« לטיפולך »), puis l'équipe. En mode « כל הרשת », seulement les snifim qui demandent une action.
@@ -87,31 +104,19 @@ export default function ManagerDashboardPage() {
   const navigate = useNavigate();
   const home = useManagerHomeData();
   const inbox = useManagerInboxChats();
-  const [dialogs, setDialogsState] = useState<ManagerHomeDialogsState>(NO_DIALOG);
+  const { dialogs, setDialogs, openTask } = useHomeDialogs(showError);
   const [analysisOpen, setAnalysisOpen] = useState(false);
-  const setDialogs = useCallback((patch: Partial<ManagerHomeDialogsState>) => setDialogsState((d) => ({ ...d, ...patch })), []);
-  const openTask = useOpenTask(setDialogs, showError);
   const { data, load } = home;
   const review = useReviewLauncher(data);
-
+  const openInboxItem = useInboxOpener(data, inbox, setDialogs, review.open);
   useTaskChangeListener(useCallback(() => { void load(true); void inbox.reload(); }, [load, inbox.reload]));
   const network = Boolean(data && isNetworkOverview(data));
   useManagerPageHeader(homeTitle(data, user?.branch_name, he.managerHomeNetworkTitle), formatHebrewDayNoYear(todayIso()));
-
-  const openInboxItem = (item: InboxItem) => {
-    if (item.kind === "chat" && item.chat) { void inbox.openCard(item.chat); return; }
-    if (!item.taskId) return;
-    if (item.kind === "question") setDialogs({ chatTask: findQueuedTask(data?.task_queues, item.taskId) ?? null });
-    else review.open(item.taskId);
-  };
   const refresh = (message?: string) => { if (message) showSuccess(message); void load(true); };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {home.canPickBranch ? <ManagerScopePicker value={home.selectedBranch} branches={home.branches} onChange={home.setSelectedBranch} /> : null}
-      {home.loading && !data ? <ListSkeleton variant="dashboard" /> : null}
-      {home.error ? <Alert severity="error" onClose={() => home.setError("")}>{home.error}</Alert> : null}
-      {inbox.openError ? <Alert severity="error" onClose={inbox.clearOpenError}>{inbox.openError}</Alert> : null}
+      <HomeTop home={home} inbox={inbox} />
       {data && network ? (
         <ManagerNetworkHome
           overview={buildNetworkOverview(data.branches)}
@@ -134,17 +139,27 @@ export default function ManagerDashboardPage() {
       <ManagerHomeDialogs
         state={{ ...dialogs, directChat: inbox.openChat }}
         branchId={home.scopeBranchId || data?.branch?.id || ""}
-        dueOn={todayIso()}
-        onCloseChatTask={() => setDialogs({ chatTask: null })}
-        onCloseReview={() => setDialogs({ reviewTarget: null })}
-        onCloseEdit={() => setDialogs({ editOccurrenceId: null })}
-        onCloseMember={() => setDialogs({ member: null })}
+        onPatch={setDialogs}
         onCloseDirectChat={inbox.closeChat}
         onDone={refresh}
         onDirectSent={() => void inbox.reload()}
       />
       <ManagerReviewScreen request={review.request} onClose={review.close} onDone={refresh} />
     </Box>
+  );
+}
+
+type HomeTopProps = { home: ReturnType<typeof useManagerHomeData>; inbox: ReturnType<typeof useManagerInboxChats> };
+
+/** Périmètre (menahel reshet), chargement et erreurs, au-dessus de l'accueil. */
+function HomeTop({ home, inbox }: HomeTopProps) {
+  return (
+    <>
+      {home.canPickBranch ? <ManagerScopePicker value={home.selectedBranch} branches={home.branches} onChange={home.setSelectedBranch} /> : null}
+      {home.loading && !home.data ? <ListSkeleton variant="dashboard" /> : null}
+      {home.error ? <Alert severity="error" onClose={() => home.setError("")}>{home.error}</Alert> : null}
+      {inbox.openError ? <Alert severity="error" onClose={inbox.clearOpenError}>{inbox.openError}</Alert> : null}
+    </>
   );
 }
 

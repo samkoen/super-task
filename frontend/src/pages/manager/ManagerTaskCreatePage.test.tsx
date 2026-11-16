@@ -99,6 +99,21 @@ describe("ManagerTaskCreatePage", () => {
     expect((await screen.findByTestId("where")).textContent).toBe("/manager/tasks");
   });
 
+  it("opens the studio for one oved from his sheet and goes back to it", async () => {
+    renderPage("/manager/tasks/new?assignee=u1&branch=b1", { returnTo: "/manager/employees?branch=b1&employee=u1" });
+    await screen.findByTestId("studio");
+    expect(lastStudio.initialForm).toMatchObject({ taskKind: "ad_hoc", assigneeUserId: "u1", branchId: "b1", branchChoices: { b1: "u1" } });
+    expect(lastStudio.rememberKey).toBeUndefined();
+    fireEvent.click(screen.getByText("create"));
+    await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/manager/employees?branch=b1&employee=u1"));
+  });
+
+  it("ignores a return address outside the manager screens", async () => {
+    renderPage("/manager/tasks/new?assignee=u1", { returnTo: "https://evil.example" });
+    fireEvent.click(await screen.findByText("cancel"));
+    expect((await screen.findByTestId("where")).textContent).toBe("/manager/tasks");
+  });
+
   it("fills the studio from an issue report", async () => {
     renderPage("/manager/tasks/new", {
       adHocPrefillFromIssue: {

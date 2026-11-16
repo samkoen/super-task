@@ -3,7 +3,10 @@ import { he } from "../i18n/he";
 import type { TaskGalleryItem } from "../services/taskGalleryService";
 import { newWizardForm, wizardContext } from "./fixedTaskWizard";
 import {
+  formForAssignee,
   formFromGalleryItem,
+  studioPathForEmployee,
+  studioReturnPath,
   formFromIssue,
   joinDueAt,
   onceBlocker,
@@ -61,5 +64,26 @@ describe("studioOnce", () => {
       reference_photo_url: "x.jpg", reference_video_url: "", reference_audio_url: "",
     });
     expect(form).toMatchObject({ taskKind: "ad_hoc", title: "נזילה", assigneeUserId: "u9", selectedBranchIds: ["b2"], branchChoices: { b2: "u9" } });
+  });
+
+  it("opens the studio for one oved of one snif (employee sheet)", () => {
+    expect(studioPathForEmployee("/manager/tasks", "u1", "b2")).toBe("/manager/tasks/new?assignee=u1&branch=b2");
+    expect(studioPathForEmployee("/manager/tasks", "u1")).toBe("/manager/tasks/new?assignee=u1");
+    const form = formForAssignee("u1", "b2", "2026-11-16");
+    expect(form).toMatchObject({ taskKind: "ad_hoc", assigneeUserId: "u1", branchId: "b2", selectedBranchIds: ["b2"], branchChoices: { b2: "u1" } });
+    expect(formForAssignee("u1", null)).not.toHaveProperty("selectedBranchIds");
+  });
+
+  it("sends the task to the oved chosen from his sheet", () => {
+    const base = { ...newWizardForm("b1"), ...formForAssignee("u1", "b1", "2026-11-16"), title: "ספירה", dueAt: "2026-11-16T15:00" };
+    expect(studioPayload(base, ctxFor(base))).toMatchObject({ task_kind: "ad_hoc", assignee_user_id: "u1", branch_id: "b1" });
+  });
+
+  it("only returns to a menahel or admin screen", () => {
+    expect(studioReturnPath("/manager/employees?employee=u1")).toBe("/manager/employees?employee=u1");
+    expect(studioReturnPath("/admin")).toBe("/admin");
+    expect(studioReturnPath("https://evil.example")).toBeNull();
+    expect(studioReturnPath("/managerX")).toBeNull();
+    expect(studioReturnPath(undefined)).toBeNull();
   });
 });

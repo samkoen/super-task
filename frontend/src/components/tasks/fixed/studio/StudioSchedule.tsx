@@ -191,10 +191,7 @@ export default function StudioSchedule({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "14px" }}>
       {recurrenceLocked ? (
-        <Box>
-          <Typography sx={{ ...flowText.button, color: flowColor.navy800 }}>{he.recurrenceLabels[value.recurrence]}</Typography>
-          <Typography sx={{ ...flowText.label, color: flowColor.alphaNeutral900_60 }}>{he.studioRecurrenceLocked}</Typography>
-        </Box>
+        <LockedRecurrence recurrence={value.recurrence} />
       ) : (
         <RecurrencePills value={value} onChange={onChange} once={once} disabled={disabled} />
       )}
@@ -207,21 +204,37 @@ export default function StudioSchedule({
         />
       ) : null}
       {value.recurrence === "monthly" ? (
-        <TextField
-          select
-          label={he.monthlyDay}
-          value={String(value.monthlyDay)}
-          disabled={disabled || recurrenceLocked}
-          onChange={(e) => onChange({ monthlyDay: Number(e.target.value) })}
-          sx={studioFieldSx}
-          fullWidth
-        >
-          {MONTH_DAYS.map((day) => (
-            <MenuItem key={day} value={String(day)}>{day}</MenuItem>
-          ))}
-        </TextField>
+        <MonthDayField value={value.monthlyDay} onChange={(monthlyDay) => onChange({ monthlyDay })} disabled={disabled || recurrenceLocked} />
       ) : null}
       <TimeField value={value.dueTime} onChange={(dueTime) => onChange({ dueTime })} disabled={disabled} />
     </Box>
+  );
+}
+
+/** Fréquence figée en édition : on l'affiche sans pastilles. */
+function LockedRecurrence({ recurrence }: { recurrence: StudioScheduleValue["recurrence"] }) {
+  return (
+    <Box>
+      <Typography sx={{ ...flowText.button, color: flowColor.navy800 }}>{he.recurrenceLabels[recurrence]}</Typography>
+      <Typography sx={{ ...flowText.label, color: flowColor.alphaNeutral900_60 }}>{he.studioRecurrenceLocked}</Typography>
+    </Box>
+  );
+}
+
+function MonthDayField({ value, onChange, disabled }: { value: number; onChange: (day: number) => void; disabled?: boolean }) {
+  return (
+    <TextField
+      select
+      label={he.monthlyDay}
+      value={String(value)}
+      disabled={disabled}
+      onChange={(e) => onChange(Number(e.target.value))}
+      sx={studioFieldSx}
+      fullWidth
+    >
+      {MONTH_DAYS.map((day) => (
+        <MenuItem key={day} value={String(day)}>{day}</MenuItem>
+      ))}
+    </TextField>
   );
 }

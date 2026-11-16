@@ -18,7 +18,7 @@ import { clearFixedTaskCreateDraft } from "../../utils/fixedTaskScreenDraft";
 import type { WizardForm } from "../../utils/fixedTaskWizard";
 import type { AdHocTaskPrefillFromIssue } from "../../utils/issueReportTaskPrefill";
 import { withManagerBranchQuery } from "../../utils/managerScopeBranch";
-import { formForScopeBranch, formFromGalleryItem, formFromIssue, onceDefaults } from "../../utils/studioOnce";
+import { formForAssignee, formForScopeBranch, formFromGalleryItem, formFromIssue, onceDefaults, STUDIO_ASSIGNEE_QUERY, studioReturnPath } from "../../utils/studioOnce";
 
 export const MANAGER_ONCE_TASK_DRAFT_KEY = "manager-once-task";
 
@@ -43,20 +43,25 @@ function useStudioPeople(canPickBranch: boolean) {
   return { employees: useMemo(() => withSelfAssignee(team, user), [team, user]), branches, loading };
 }
 
-/** D'où vient la création : bibliothèque (modèle choisi), signalement, ou une tâche neuve. */
+type CreateState = { adHocPrefillFromIssue?: AdHocTaskPrefillFromIssue; returnTo?: string } | null;
+
+/** D'où vient la création : bibliothèque (modèle choisi), signalement, fiche d'un oved, ou une tâche neuve. */
 function useStartingPoint() {
   const [params] = useSearchParams();
-  const issue = (useLocation().state as { adHocPrefillFromIssue?: AdHocTaskPrefillFromIssue } | null)?.adHocPrefillFromIssue;
+  const state = useLocation().state as CreateState;
+  const issue = state?.adHocPrefillFromIssue;
   const fromLibrary = params.get("library") === "1";
   const scopeBranch = params.get("branch");
+  const assignee = params.get(STUDIO_ASSIGNEE_QUERY);
   const [galleryItem, setGalleryItem] = useState<TaskGalleryItem | null>(null);
   const initial: Partial<WizardForm> | null = useMemo(() => {
     if (fromLibrary) return galleryItem ? { ...formForScopeBranch(scopeBranch), ...formFromGalleryItem(galleryItem) } : null;
     if (issue) return formFromIssue(issue);
+    if (assignee) return formForAssignee(assignee, scopeBranch);
     return { ...formForScopeBranch(scopeBranch), ...onceDefaults() };
-  }, [fromLibrary, galleryItem, issue, scopeBranch]);
-  const remembers = !fromLibrary && !issue;
-  return { initial, fromLibrary, galleryItem, setGalleryItem, remembers, scopeBranch };
+  }, [fromLibrary, galleryItem, issue, assignee, scopeBranch]);
+  const remembers = !fromLibrary && !issue && !assignee;
+  return { initial, fromLibrary, galleryItem, setGalleryItem, remembers, scopeBranch, returnTo: studioReturnPath(state?.returnTo) };
 }
 
 /**
@@ -71,7 +76,7 @@ export default function ManagerTaskCreatePage() {
   const canPickBranch = user?.role === "network_manager" || user?.role === "admin";
   const people = useStudioPeople(canPickBranch);
   const start = useStartingPoint();
-  const listPath = withManagerBranchQuery(admin ? "/admin/tasks" : "/manager/tasks", start.scopeBranch);
+  const listPath = start.returnTo ?? withManagerBranchQuery(admin ? "/admin/tasks" : "/manager/tasks", start.scopeBranch);
   const leave = useCallback(() => {
     clearFixedTaskCreateDraft(MANAGER_ONCE_TASK_DRAFT_KEY);
     navigate(listPath);

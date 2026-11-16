@@ -1,13 +1,12 @@
-import { Box, Dialog } from "@mui/material";
 import type { TeamMember, TimelineTask } from "../../../services/dashboardService";
 import type { TaskOccurrence } from "../../../services/taskService";
 import { he } from "../../../i18n/he";
+import { rosterEntry } from "../../../utils/managerTeam";
 import TaskChatDialog from "../../tasks/TaskChatDialog";
 import TaskCompletionReviewDialog from "../../tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../tasks/TaskOccurrenceEditDialog";
-import DirectChatThread from "../../chat/DirectChatThread";
-import FullscreenBackAppBar, { fullscreenChatBodySx, fullscreenChatDialogPaperSx } from "../../chat/FullscreenBackAppBar";
-import EmployeeTasksDrawer from "../EmployeeTasksDrawer";
+import DirectChatScreen from "../../chat/DirectChatScreen";
+import ManagerEmployeeSheet from "../../team/ManagerEmployeeSheet";
 
 export type ManagerHomeDialogsState = {
   chatTask: TimelineTask | null;
@@ -20,19 +19,23 @@ export type ManagerHomeDialogsState = {
 type Props = {
   state: ManagerHomeDialogsState;
   branchId: string;
-  dueOn: string;
-  onCloseChatTask: () => void;
-  onCloseReview: () => void;
-  onCloseEdit: () => void;
-  onCloseMember: () => void;
+  /** Ferme une fenêtre de l'accueil (le chat direct a sa propre fermeture). */
+  onPatch: (patch: Partial<ManagerHomeDialogsState>) => void;
   onCloseDirectChat: () => void;
   onDone: (message?: string) => void;
   onDirectSent: () => void;
 };
 
-/** Fenêtres ouvertes depuis l'accueil : chat de tâche, revue de preuve, édition, tâches d'un oved, chat direct. */
-export default function ManagerHomeDialogs({ state, branchId, dueOn, onDone, onDirectSent, ...close }: Props) {
+/** Fenêtres ouvertes depuis l'accueil : chat de tâche, revue de preuve, édition, fiche d'un oved, chat direct. */
+export default function ManagerHomeDialogs({ state, branchId, onPatch, onCloseDirectChat, onDone, onDirectSent }: Props) {
   const { chatTask, reviewTarget, editOccurrenceId, member, directChat } = state;
+  const close = {
+    onCloseChatTask: () => onPatch({ chatTask: null }),
+    onCloseReview: () => onPatch({ reviewTarget: null }),
+    onCloseEdit: () => onPatch({ editOccurrenceId: null }),
+    onCloseMember: () => onPatch({ member: null }),
+    onCloseDirectChat,
+  };
   return (
     <>
       <TaskChatDialog
@@ -47,13 +50,8 @@ export default function ManagerHomeDialogs({ state, branchId, dueOn, onDone, onD
       />
       <TaskCompletionReviewDialog task={reviewTarget} onClose={close.onCloseReview} onDone={(message) => onDone(message)} />
       <TaskOccurrenceEditDialog occurrenceId={editOccurrenceId} onClose={close.onCloseEdit} onSaved={(message) => onDone(message)} />
-      <EmployeeTasksDrawer member={member} branchId={branchId} dueOn={dueOn} onClose={close.onCloseMember} onChanged={() => onDone()} />
-      <Dialog fullScreen open={Boolean(directChat)} onClose={close.onCloseDirectChat} dir="rtl" PaperProps={{ sx: fullscreenChatDialogPaperSx }}>
-        <FullscreenBackAppBar title={directChat?.title ?? ""} onBack={close.onCloseDirectChat} />
-        <Box sx={fullscreenChatBodySx}>
-          {directChat ? <DirectChatThread conversationId={directChat.id} onSent={onDirectSent} /> : null}
-        </Box>
-      </Dialog>
+      <ManagerEmployeeSheet entry={member ? rosterEntry(null, member, branchId) : null} onClose={close.onCloseMember} onChanged={() => onDone()} />
+      <DirectChatScreen chat={directChat} onClose={close.onCloseDirectChat} onSent={onDirectSent} />
     </>
   );
 }
