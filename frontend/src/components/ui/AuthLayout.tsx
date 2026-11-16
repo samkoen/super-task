@@ -6,7 +6,6 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import SpeedIcon from "@mui/icons-material/Speed";
 import { he } from "../../i18n/he";
 import { dialogActionsPbCss, systemTopInsetCss } from "../../utils/systemInsets";
-import { EMPLOYEE_BRAND_GRADIENT, EMPLOYEE_INK } from "../../styles/employeeUi";
 
 type AuthLayoutProps = {
   title: string;
@@ -19,8 +18,12 @@ const highlights = [
   { icon: <SpeedIcon fontSize="small" />, label: he.managerArea },
 ];
 
+/** Couleurs identiques au header / sidebar de l'appli */
+const SIDEBAR_BG = "#0B1220";
+const SIDEBAR_ACCENT = "#1A9B86";
 const DOT_PATTERN = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`;
 
+/** Panneau gauche desktop */
 const desktopPanelSx = {
   flex: 1,
   display: { xs: "none", md: "flex" },
@@ -30,11 +33,11 @@ const desktopPanelSx = {
   overflow: "hidden",
   p: { md: 6, lg: 8 },
   color: "#fff",
-  bgcolor: "#0B1220",
+  bgcolor: SIDEBAR_BG,
   backgroundImage: `
-    radial-gradient(ellipse 70% 60% at 20% 20%, ${alpha("#1A9B86", 0.35)} 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 20% 20%, ${alpha(SIDEBAR_ACCENT, 0.35)} 0%, transparent 55%),
     radial-gradient(ellipse 50% 40% at 90% 80%, ${alpha("#0A6B5C", 0.25)} 0%, transparent 50%),
-    linear-gradient(160deg, #111827 0%, #0B1220 45%, #061018 100%)
+    linear-gradient(160deg, #111827 0%, ${SIDEBAR_BG} 45%, #061018 100%)
   `,
 } as const;
 
@@ -99,7 +102,10 @@ function DesktopPanel() {
   );
 }
 
-/** Bandeau de marque sur mobile : logo + nom, le formulaire remonte par-dessus. */
+/**
+ * Bandeau de marque mobile : même style que le header de l'appli (dark navy + accent teal).
+ * Remplace l'ancien dégradé vert clair pour cohérence visuelle.
+ */
 function MobileBrandBand() {
   return (
     <Box
@@ -113,41 +119,38 @@ function MobileBrandBand() {
         position: "relative",
         overflow: "hidden",
         color: "#fff",
-        background: EMPLOYEE_BRAND_GRADIENT,
+        bgcolor: SIDEBAR_BG,
+        backgroundImage: `
+          radial-gradient(ellipse 80% 120% at 100% 0%, ${alpha(SIDEBAR_ACCENT, 0.28)} 0%, transparent 50%),
+          linear-gradient(90deg, #111827 0%, ${SIDEBAR_BG} 100%)
+        `,
         pt: `calc(${systemTopInsetCss()} + 36px)`,
         pb: 7,
         px: 3,
-        "&::after": {
-          content: '""',
-          position: "absolute",
-          width: 240,
-          height: 240,
-          borderRadius: "50%",
-          insetInlineEnd: -80,
-          top: -100,
-          background: alpha("#fff", 0.08),
-          pointerEvents: "none",
-        },
       }}
     >
-      <Box
-        sx={{
-          p: 1,
-          borderRadius: "26px",
-          bgcolor: "#fff",
-          boxShadow: `0 10px 28px ${alpha("#000", 0.25)}`,
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
-        <AppBrandMark size={76} />
+      <Box sx={{ position: "absolute", inset: 0, opacity: 0.25, backgroundImage: DOT_PATTERN, pointerEvents: "none" }} />
+      <Box sx={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+        <Box
+          sx={{
+            p: 1,
+            borderRadius: "26px",
+            bgcolor: alpha("#fff", 0.08),
+            border: `1px solid ${alpha("#fff", 0.12)}`,
+            boxShadow: `0 10px 28px ${alpha("#000", 0.3)}`,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          <AppBrandMark size={76} />
+        </Box>
+        <Typography variant="h4" component="p" fontWeight={900} sx={{ mt: 1 }}>
+          {he.appName}
+        </Typography>
+        <Typography variant="body1" sx={{ color: alpha("#fff", 0.75), fontWeight: 600 }}>
+          {he.appSubtitle}
+        </Typography>
       </Box>
-      <Typography variant="h4" component="p" fontWeight={900} sx={{ mt: 1 }}>
-        {he.appName}
-      </Typography>
-      <Typography variant="body1" sx={{ color: alpha("#fff", 0.85), fontWeight: 600 }}>
-        {he.appSubtitle}
-      </Typography>
     </Box>
   );
 }
@@ -160,6 +163,8 @@ const formPanelSx = {
   justifyContent: { xs: "flex-start", md: "center" },
   p: { xs: 0, md: 4 },
   position: "relative",
+  /* Sur mobile, l'arrière-plan sous la fiche reste dark pour éviter le flash blanc */
+  bgcolor: { xs: SIDEBAR_BG, md: "background.default" },
 } as const;
 
 const formCardSx = {
@@ -170,10 +175,10 @@ const formCardSx = {
   position: "relative",
   bgcolor: "background.paper",
   borderRadius: { xs: "30px 30px 0 0", md: "20px" },
-  border: { xs: "none", md: `1px solid ${alpha(EMPLOYEE_INK, 0.07)}` },
+  border: { xs: "none", md: `1px solid ${alpha("#0F172A", 0.07)}` },
   boxShadow: {
-    xs: `0 -10px 30px ${alpha(EMPLOYEE_INK, 0.12)}`,
-    md: `0 4px 6px ${alpha(EMPLOYEE_INK, 0.03)}, 0 20px 48px ${alpha(EMPLOYEE_INK, 0.08)}`,
+    xs: `0 -10px 30px ${alpha("#000", 0.25)}`,
+    md: `0 4px 6px ${alpha("#0F172A", 0.03)}, 0 20px 48px ${alpha("#0F172A", 0.08)}`,
   },
   p: { xs: 3, sm: 4 },
   pb: { xs: dialogActionsPbCss(), md: 4 },

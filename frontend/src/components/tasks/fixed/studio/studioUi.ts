@@ -1,4 +1,5 @@
 import { flowColor, flowRadius, flowSize, flowText } from "../../../../styles/flowTokens";
+import { withSystemBottomInsetCss } from "../../../../utils/systemInsets";
 
 /**
  * Habillage du studio menahel : mêmes jetons que le FLOW 1 de l'oved (Figma « Super-Man app »),
@@ -93,7 +94,7 @@ export const studioSheetPaperSx = {
   mx: "auto",
   px: `${flowSize.contentPaddingX}px`,
   pt: "12px",
-  pb: "calc(24px + env(safe-area-inset-bottom, 0px))",
+  pb: withSystemBottomInsetCss("24px"),
   gap: "16px",
   display: "flex",
   flexDirection: "column",
