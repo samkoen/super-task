@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Box } from "@mui/material";
+import { Box, ButtonBase } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { ApiError, type User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
 import ManagerScopePicker from "../../components/dashboard/home/ManagerScopePicker";
@@ -10,26 +11,12 @@ import ManagerTasksDayBoard from "../../components/tasks/today/ManagerTasksDayBo
 import ManagerTasksFilters from "../../components/tasks/today/ManagerTasksFilters";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
-import TaskGalleryPickerDialog from "../../components/tasks/TaskGalleryPickerDialog";
-import GalleryQuickAssignDialog, {
-  type GalleryQuickAssignPayload,
-} from "../../components/tasks/GalleryQuickAssignDialog";
-import NewTaskPhotoStep from "../../components/tasks/NewTaskPhotoStep";
-import NewTaskFormDialog, {
-  type NewTaskFormSubmitPayload,
-} from "../../components/tasks/NewTaskFormDialog";
-import { taskGalleryService, type TaskGalleryItem } from "../../services/taskGalleryService";
-import {
-  resolveTaskReferenceMedia,
-  type TaskReferenceMediaValue,
-} from "../../components/tasks/TaskReferenceMediaEditor";
 import ConfirmDeleteDialog from "../../components/ui/ConfirmDeleteDialog";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useFeedback } from "../../context/FeedbackContext";
 import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
 import type { AdHocTaskPrefillFromIssue } from "../../utils/issueReportTaskPrefill";
 import {
-  datetimeLocalForNewTask,
   defaultRangeFrom,
   formatHebrewDayNoYear,
   shiftDay,
@@ -42,7 +29,7 @@ import {
   MANAGER_TASK_STATUS_FILTERS,
   parseManagerTasksSearchParams,
 } from "../../utils/managerTaskFilters";
-import { writeManagerScopeBranchId } from "../../utils/managerScopeBranch";
+import { withManagerBranchQuery, writeManagerScopeBranchId } from "../../utils/managerScopeBranch";
 import { dashboardTaskUsesReview } from "../../utils/dashboardTaskOpen";
 import { dayNavLabel, groupTasksByPeriod, reviewQueueFromTasks } from "../../utils/managerTasksDay";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
@@ -51,24 +38,46 @@ import { taskService, type TaskOccurrence } from "../../services/taskService";
 import { userService } from "../../services/userService";
 import { useAuth } from "../../context/AuthContext";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
-import { ensureTaskTitle } from "../../utils/ensureTaskTitle";
-import { mediaFromPhotoFile, revokeTaskMediaBlobs } from "../../utils/newTaskMedia";
-import { isAssignToGallery } from "../../constants/taskAssignment";
-import { groupedCreateApiFields } from "../../utils/fixedTaskCreateScope";
-import { weeklyDaysPayload, normalizeFixedRecurrence } from "../../utils/taskRecurrence";
 import {
   defaultApplyAdHocEditToNetwork,
   isNetworkAdHocOccurrence,
   networkAdHocIds,
 } from "../../utils/adHocNetworkTasks";
 import { he } from "../../i18n/he";
-import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
+import { flowColor, flowRadius, flowText } from "../../styles/flowTokens";
 
-const EMPTY_REFERENCE_MEDIA: TaskReferenceMediaValue = {
-  reference_photo_url: "",
-  reference_video_url: "",
-  reference_audio_url: "",
-};
+type LegacyCreateState = {
+  adHocPrefillFromIssue?: AdHocTaskPrefillFromIssue;
+  openNewTask?: boolean;
+  openGalleryTask?: boolean;
+} | null;
+
+/** Anciens liens (« משימה חדשה », bibliothèque, signalement) : tous mènent au studio unique. */
+function useLegacyCreateRedirect(basePath: string) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const state = location.state as LegacyCreateState;
+    if (!state) return;
+    if (state.openGalleryTask) navigate(withManagerBranchQuery(`${basePath}/new?library=1`), { replace: true });
+    else if (state.openNewTask) navigate(withManagerBranchQuery(`${basePath}/new`), { replace: true });
+    else if (state.adHocPrefillFromIssue) navigate(`${basePath}/new`, { replace: true, state });
+  }, [location.state, basePath, navigate]);
+}
+
+/** Admin : pas de « + » dans une barre du haut, le bouton est posé sur la page. */
+function AdminNewTaskButton({ onClick }: { onClick: () => void }) {
+  return (
+    <ButtonBase
+      data-testid="tasks-new"
+      onClick={onClick}
+      sx={{ alignSelf: "flex-start", height: 40, px: "16px", gap: "6px", borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral900, color: flowColor.neutral0, ...flowText.button }}
+    >
+      <AddRoundedIcon fontSize="small" />
+      {he.newTask}
+    </ButtonBase>
+  );
+}
 
 export default function ManagerTasksPage() {
   const { user } = useAuth();
@@ -80,23 +89,11 @@ export default function ManagerTasksPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [photoStepOpen, setPhotoStepOpen] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [formMedia, setFormMedia] = useState<TaskReferenceMediaValue>(EMPTY_REFERENCE_MEDIA);
-  const [formPrefill, setFormPrefill] = useState<
-    | (Partial<Pick<NewTaskFormSubmitPayload, "title" | "description" | "assignee_user_id">> & {
-        branch_id?: string;
-      })
-    | undefined
-  >(undefined);
-  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
-  const [galleryAssignItem, setGalleryAssignItem] = useState<TaskGalleryItem | null>(null);
   const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
   const [deleting, setDeleting] = useState<TaskOccurrence | null>(null);
   const [deleteAllBranches, setDeleteAllBranches] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
-  const [saving, setSaving] = useState(false);
   // Filtres lus dans l'adresse dès le premier rendu : le premier chargement vise déjà le bon snif.
   const [initialUrl] = useState(() => parseManagerTasksSearchParams(searchParams));
   const [filterBranch, setFilterBranch] = useState(initialUrl.branchId ?? "");
@@ -237,220 +234,8 @@ export default function ManagerTasksPage() {
   }, [filterEmployee, filterEmployees, loading, employees.length, syncFiltersToUrl]);
 
 
-  const defaultDueAt = datetimeLocalForNewTask(
-    dateViewMode === "day" ? filterDay : filterFrom,
-  );
-
-  const openNewTaskForm = (
-    media?: TaskReferenceMediaValue,
-    prefill?: Partial<Pick<NewTaskFormSubmitPayload, "title" | "description" | "assignee_user_id">> & {
-      branch_id?: string;
-    },
-  ) => {
-    setFormMedia(media ?? EMPTY_REFERENCE_MEDIA);
-    setFormPrefill(prefill);
-    setFormOpen(true);
-  };
-
-  const closeForm = () => {
-    if (saving) return;
-    revokeTaskMediaBlobs(formMedia);
-    setFormOpen(false);
-    setFormMedia(EMPTY_REFERENCE_MEDIA);
-    setFormPrefill(undefined);
-  };
-
-  useEffect(() => {
-    const state = location.state as {
-      adHocPrefillFromIssue?: AdHocTaskPrefillFromIssue;
-      openNewTask?: boolean;
-      openGalleryTask?: boolean;
-    } | null;
-    if (!state) return;
-    if (state.openGalleryTask) {
-      setGalleryPickerOpen(true);
-      navigate(location.pathname + location.search, { replace: true, state: {} });
-      return;
-    }
-    if (state.openNewTask) {
-      setPhotoStepOpen(true);
-      navigate(location.pathname + location.search, { replace: true, state: {} });
-      return;
-    }
-    const fromIssue = state.adHocPrefillFromIssue;
-    if (!fromIssue) return;
-    openNewTaskForm(
-      {
-        reference_photo_url: fromIssue.reference_photo_url,
-        reference_video_url: fromIssue.reference_video_url,
-        reference_audio_url: fromIssue.reference_audio_url,
-      },
-      {
-        title: fromIssue.title,
-        description: fromIssue.description,
-        assignee_user_id: fromIssue.assignee_user_id,
-        branch_id: fromIssue.branch_id,
-      },
-    );
-    navigate(location.pathname + location.search, { replace: true, state: {} });
-    // Intentionally once when arriving with navigation state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state]);
-
-  const handleCreateTask = async (payload: NewTaskFormSubmitPayload) => {
-    setSaving(true);
-    try {
-      const title = await ensureTaskTitle(payload.title, payload.description);
-      const media = await resolveTaskReferenceMedia(payload.media);
-      const completion_requirements = await resolveTaskCompletionGuides(
-        payload.completion_requirements,
-      );
-      if (isAssignToGallery(payload.assignee_user_id)) {
-        const res = await taskGalleryService.create({
-          branch_id: payload.branch_id,
-          title,
-          description: payload.description,
-          task_kind: payload.task_kind,
-          recurrence: payload.task_kind === "fixed" ? payload.recurrence : null,
-          due_time: payload.task_kind === "fixed" ? payload.due_time : null,
-          weekly_days:
-            payload.task_kind === "fixed"
-              ? weeklyDaysPayload(payload.recurrence, payload.weekly_days) ?? null
-              : null,
-          monthly_day:
-            payload.task_kind === "fixed" && payload.recurrence === "monthly"
-              ? payload.monthly_day
-              : null,
-          photo_required: true,
-          completion_requirements,
-          ...media,
-          start_url: payload.start_url,
-        });
-        revokeTaskMediaBlobs(formMedia);
-        setFormOpen(false);
-        setFormMedia(EMPTY_REFERENCE_MEDIA);
-        setFormPrefill(undefined);
-        showSuccess(res.message || he.taskGalleryAdded);
-        await load();
-        return;
-      }
-      if (payload.task_kind === "fixed") {
-        const res = await taskService.createTemplate({
-          ...groupedCreateApiFields(payload),
-          title,
-          description: payload.description,
-          recurrence: payload.recurrence,
-          due_time: payload.due_time,
-          weekly_days: weeklyDaysPayload(payload.recurrence, payload.weekly_days),
-          monthly_day: payload.recurrence === "monthly" ? payload.monthly_day : undefined,
-          ops_category: payload.ops_category,
-          min_video_seconds: payload.min_video_seconds,
-          completion_requirements,
-          is_work_start: payload.is_work_start,
-          is_work_end: payload.is_work_end,
-          start_url: payload.start_url,
-          opened_by_delivery_note: payload.opened_by_delivery_note,
-          delivery_note_task_type: payload.delivery_note_task_type,
-          ...media,
-        });
-        revokeTaskMediaBlobs(formMedia);
-        setFormOpen(false);
-        setFormMedia(EMPTY_REFERENCE_MEDIA);
-        setFormPrefill(undefined);
-        const createdCount = res.templates?.length ?? (res.template ? 1 : 0);
-        showSuccess(
-          payload.apply_to_network
-            ? he.managerFixedTasksCreatedNetwork(createdCount)
-            : res.message,
-        );
-      } else {
-        const res = await taskService.createAdHoc({
-          ...groupedCreateApiFields(payload),
-          title,
-          description: payload.description,
-          due_at: new Date(payload.due_at).toISOString(),
-          photo_required: true,
-          min_video_seconds: payload.min_video_seconds,
-          completion_requirements,
-          start_url: payload.start_url,
-          ...media,
-        });
-        revokeTaskMediaBlobs(formMedia);
-        setFormOpen(false);
-        setFormMedia(EMPTY_REFERENCE_MEDIA);
-        setFormPrefill(undefined);
-        const createdCount = res.occurrences?.length ?? (res.occurrence ? 1 : 0);
-        showSuccess(
-          payload.apply_to_network
-            ? he.managerAdHocCreatedNetwork(createdCount)
-            : res.message,
-        );
-      }
-      await load();
-    } catch (e) {
-      if (e instanceof Error && e.message === "TITLE_OR_DESCRIPTION_REQUIRED") {
-        showError(he.taskTitleOrDescriptionRequired);
-      } else {
-        showError(e instanceof ApiError ? e.message : he.errorGeneric);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleGalleryQuickAssign = async ({
-    item,
-    branch_id,
-    assignee_user_id,
-    due_at,
-  }: GalleryQuickAssignPayload) => {
-    setSaving(true);
-    try {
-      const media = {
-        reference_photo_url: item.reference_photo_url || undefined,
-        reference_video_url: item.reference_video_url || undefined,
-        reference_audio_url: item.reference_audio_url || undefined,
-      };
-      if (item.task_kind === "fixed") {
-        const res = await taskService.createTemplate({
-          branch_id,
-          title: item.title,
-          description: item.description,
-          recurrence: normalizeFixedRecurrence(item.recurrence),
-          due_time: item.due_time || "09:00",
-          weekly_days: weeklyDaysPayload(
-            normalizeFixedRecurrence(item.recurrence),
-            item.weekly_days,
-          ),
-          monthly_day: item.monthly_day ?? undefined,
-          assignee_user_id,
-          source_gallery_item_id: item.id,
-          start_url: item.start_url,
-          ...media,
-        });
-        showSuccess(res.message);
-      } else {
-        const res = await taskService.createAdHoc({
-          branch_id,
-          title: item.title,
-          description: item.description,
-          due_at: new Date(due_at).toISOString(),
-          assignee_user_id,
-          photo_required: true,
-          source_gallery_item_id: item.id,
-          start_url: item.start_url,
-          ...media,
-        });
-        showSuccess(res.message);
-      }
-      setGalleryAssignItem(null);
-      await load();
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const tasksBasePath = location.pathname.startsWith("/admin") ? "/admin/tasks" : "/manager/tasks";
+  useLegacyCreateRedirect(tasksBasePath);
 
   /** Toujours confirmé : la suppression part maintenant de la fiche de la tâche. */
   const handleCancel = (task: TaskOccurrence) => {
@@ -512,6 +297,7 @@ export default function ManagerTasksPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {user?.role === "admin" ? <AdminNewTaskButton onClick={() => navigate(`${tasksBasePath}/new`)} /> : null}
       {canPickBranch ? (
         <ManagerScopePicker
           value={filterBranch}
@@ -568,64 +354,6 @@ export default function ManagerTasksPage() {
           showSuccess(message);
           void load(true);
         }}
-      />
-
-      <NewTaskPhotoStep
-        open={photoStepOpen}
-        onClose={() => setPhotoStepOpen(false)}
-        onSkip={() => {
-          setPhotoStepOpen(false);
-          openNewTaskForm();
-        }}
-        onPhoto={(file) => {
-          setPhotoStepOpen(false);
-          openNewTaskForm(mediaFromPhotoFile(file));
-        }}
-      />
-
-      <NewTaskFormDialog
-        open={formOpen}
-        onClose={closeForm}
-        onSubmit={handleCreateTask}
-        forcedTaskKind="ad_hoc"
-        branches={branches}
-        employees={employees}
-        isBranchManager={isBranchManager}
-        canPickBranch={canPickBranch}
-        defaultBranchId={formPrefill?.branch_id || scopeBranchId || user?.branch_id || ""}
-        defaultDueAt={defaultDueAt}
-        defaultAssigneeId={
-          formPrefill?.assignee_user_id
-          || (isBranchManager && filterEmployee ? filterEmployee : "")
-        }
-        initialMedia={formMedia}
-        initialPrefill={formPrefill}
-        saving={saving}
-        onError={showError}
-        currentUserId={user?.id}
-      />
-
-      <TaskGalleryPickerDialog
-        open={galleryPickerOpen}
-        onClose={() => setGalleryPickerOpen(false)}
-        onSelect={(item) => {
-          setGalleryPickerOpen(false);
-          setGalleryAssignItem(item);
-        }}
-      />
-
-      <GalleryQuickAssignDialog
-        open={galleryAssignItem !== null}
-        item={galleryAssignItem}
-        branches={branches}
-        employees={employees}
-        canPickBranch={canPickBranch}
-        defaultBranchId={scopeBranchId || user?.branch_id || ""}
-        defaultDueAt={defaultDueAt}
-        saving={saving}
-        onClose={() => setGalleryAssignItem(null)}
-        onSubmit={handleGalleryQuickAssign}
-        currentUserId={user?.id}
       />
 
       <TaskOccurrenceEditDialog

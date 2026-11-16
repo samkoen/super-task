@@ -72,7 +72,8 @@ export function restoreWizardForm(
   return {
     ...base,
     ...draft,
-    taskKind: "fixed",
+    // Le type vient de l'écran (studio « פעם אחת » ou tâche fixe), pas du brouillon.
+    taskKind: base.taskKind,
     step: draft.step ?? base.step,
     branchChoices: draft.branchChoices ?? base.branchChoices,
     branchesTouched: draft.branchesTouched ?? base.branchesTouched,

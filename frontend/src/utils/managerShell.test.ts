@@ -80,12 +80,9 @@ describe("managerShell", () => {
     expect(managerMorePath("systemBugs")).toBe("/system-bugs");
   });
 
-  it("routes each create choice to the existing screens", () => {
-    expect(managerCreateNavigation("adHoc", "")).toEqual({ pathname: "/manager/tasks", state: { openNewTask: true } });
-    expect(managerCreateNavigation("library", "b1")).toEqual({
-      pathname: "/manager/tasks?branch=b1",
-      state: { openGalleryTask: true },
-    });
+  it("routes every create choice to the single studio", () => {
+    expect(managerCreateNavigation("adHoc", "")).toEqual({ pathname: "/manager/tasks/new" });
+    expect(managerCreateNavigation("library", "b1")).toEqual({ pathname: "/manager/tasks/new?library=1&branch=b1" });
     expect(managerCreateNavigation("fixed")).toEqual({ pathname: "/manager/fixed-tasks/new" });
   });
 });

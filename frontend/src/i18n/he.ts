@@ -1487,6 +1487,13 @@ export const he = {
   flowStartBranchTag: (branch: string) => `סניף ${branch}`,
   // ---------------------------------------------------------------- Studio menahel (tâche fixe, style FLOW 1)
   studioKickerCreate: "משימה קבועה חדשה",
+  studioKickerOnce: "משימה חדשה",
+  studioOnce: "פעם אחת",
+  studioDate: "תאריך",
+  studioNeedDueAt: "צריך לבחור תאריך ושעה",
+  studioAddSteps: "הוספת שלבי צילום",
+  studioAddStepsHint: "לא חובה: העובד יצלם לפי השלבים שתגדירו",
+  studioLibraryPick: "בחירת משימה מהספרייה",
   studioKickerEdit: "עריכת משימה קבועה",
   studioTitlePlaceholder: "שם המשימה, למשל: פתיחת משמרת",
   studioPreview: "תצוגת עובד",

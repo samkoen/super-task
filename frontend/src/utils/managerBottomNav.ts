@@ -30,9 +30,7 @@ export function shouldShowManagerChrome(
   return role === "branch_manager" || role === "network_manager";
 }
 
+/** « משימה חדשה » : le studio unique, sur le snif courant. */
 export function managerNewTaskNavigation(branchId?: string | null) {
-  return {
-    pathname: withManagerBranchQuery("/manager/tasks", branchId),
-    state: { openNewTask: true },
-  } as const;
+  return { pathname: withManagerBranchQuery("/manager/tasks/new", branchId) } as const;
 }

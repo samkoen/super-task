@@ -94,3 +94,62 @@ describe("FixedTaskCreateStudio", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 });
+
+describe("FixedTaskCreateStudio — פעם אחת", () => {
+  function renderOnce(onSubmit = vi.fn().mockResolvedValue(undefined)) {
+    render(
+      <FixedTaskCreateStudio
+        branches={[]}
+        employees={employees}
+        canPickBranch={false}
+        defaultBranchId="b1"
+        currentUserId="m1"
+        saving={false}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        allowOnce
+        initialForm={{ taskKind: "ad_hoc", dueAt: "2026-11-16T15:00" }}
+      />,
+    );
+    return onSubmit;
+  }
+
+  it("shows the short version: date and time, steps folded", () => {
+    renderOnce();
+    expect(screen.getByRole("radio", { name: he.studioOnce }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByLabelText(he.studioDate) as HTMLInputElement).value).toBe("2026-11-16");
+    expect((screen.getByLabelText(he.dueTime) as HTMLInputElement).value).toBe("15:00");
+    expect(screen.getByTestId("studio-add-steps")).toBeTruthy();
+    expect(screen.queryByTestId("studio-empty-stack")).toBeNull();
+    fireEvent.click(screen.getByTestId("studio-add-steps"));
+    expect(screen.getByTestId("studio-empty-stack")).toBeTruthy();
+  });
+
+  it("creates a one-time task with its date", async () => {
+    const onSubmit = renderOnce();
+    fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "ניקוי מקרר" } });
+    fireEvent.change(screen.getByLabelText(he.dueTime), { target: { value: "16:30" } });
+    fireEvent.click(screen.getByTestId("studio-assignee-u1"));
+    fireEvent.click(screen.getByRole("button", { name: he.studioCreate }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ task_kind: "ad_hoc", due_at: "2026-11-16T16:30", title: "ניקוי מקרר", assignee_user_id: "u1" });
+  });
+
+  it("switches to a recurring task with one tap", async () => {
+    const onSubmit = renderOnce();
+    fireEvent.click(screen.getByRole("radio", { name: he.recurrenceLabels.daily }));
+    expect(screen.queryByLabelText(he.studioDate)).toBeNull();
+    fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "פתיחה" } });
+    fireEvent.click(screen.getByTestId("studio-assignee-u1"));
+    fireEvent.click(screen.getByRole("button", { name: he.studioCreate }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0].task_kind).toBe("fixed");
+  });
+
+  it("blocks when the date is cleared", () => {
+    renderOnce();
+    fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "ניקוי" } });
+    fireEvent.change(screen.getByLabelText(he.studioDate), { target: { value: "" } });
+    expect(screen.getByTestId("studio-blocker").textContent).toBe(he.studioNeedDueAt);
+  });
+});

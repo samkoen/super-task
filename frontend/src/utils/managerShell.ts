@@ -110,12 +110,9 @@ export const MANAGER_CREATE_CHOICES: ManagerCreateChoice[] = ["adHoc", "fixed", 
 
 export type ManagerNavigationTarget = { pathname: string; state?: Record<string, boolean> };
 
-/** Où mène chaque choix du rond « + » (en attendant le studio unique, étape 5). */
+/** Où mène chaque choix du rond « + » : tous ouvrent le studio unique (étape 5). */
 export function managerCreateNavigation(choice: ManagerCreateChoice, branchId?: string | null): ManagerNavigationTarget {
   if (choice === "fixed") return { pathname: "/manager/fixed-tasks/new" };
-  if (choice === "library") {
-    return { pathname: withManagerBranchQuery("/manager/tasks", branchId), state: { openGalleryTask: true } };
-  }
-  const nav = managerNewTaskNavigation(branchId);
-  return { pathname: nav.pathname, state: { ...nav.state } };
+  if (choice === "library") return { pathname: withManagerBranchQuery("/manager/tasks/new?library=1", branchId) };
+  return { pathname: managerNewTaskNavigation(branchId).pathname };
 }

@@ -37,18 +37,12 @@ describe("managerBottomNav", () => {
   });
 
   it("opens new task via tasks page state", () => {
-    expect(managerNewTaskNavigation()).toEqual({
-      pathname: "/manager/tasks",
-      state: { openNewTask: true },
-    });
+    expect(managerNewTaskNavigation()).toEqual({ pathname: "/manager/tasks/new" });
   });
 
   it("keeps current snif on the new-task path", () => {
     store.set(MANAGER_SCOPE_BRANCH_STORAGE_KEY, "snif-1");
-    expect(managerNewTaskNavigation()).toEqual({
-      pathname: "/manager/tasks?branch=snif-1",
-      state: { openNewTask: true },
-    });
+    expect(managerNewTaskNavigation()).toEqual({ pathname: "/manager/tasks/new?branch=snif-1" });
   });
 
   it("keeps content and floating buttons above the pill, safe-area included", () => {
