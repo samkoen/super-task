@@ -13,6 +13,7 @@ import ManagerTeamList from "../../components/team/ManagerTeamList";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 import { useEmployeeAccounts } from "../../hooks/useEmployeeAccounts";
 import { useManagerTeamData } from "../../hooks/useManagerTeamData";
 import { he } from "../../i18n/he";
@@ -65,10 +66,11 @@ type ToolbarProps = { team: ReturnType<typeof useManagerTeamData>; onNewEmployee
 /** Périmètre (menahel reshet), retards du jour, et « עובד חדש » discret au bout. */
 function TeamToolbar({ team, onNewEmployee }: ToolbarProps) {
   const summary = teamSummary(team.roster);
+  const shellScope = useShellManagerScope();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-        {team.canPickBranch ? <ManagerScopePicker value={team.selectedBranch} branches={team.branches} onChange={team.setSelectedBranch} /> : null}
+        {team.canPickBranch && !shellScope ? <ManagerScopePicker value={team.selectedBranch} branches={team.branches} onChange={team.setSelectedBranch} /> : null}
         {summary.late > 0 ? <HomeChip tone="warning">{he.managerHomeOverdue(summary.late)}</HomeChip> : null}
         <Box sx={{ flex: 1 }} />
         <NewEmployeeButton onClick={onNewEmployee} />

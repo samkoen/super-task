@@ -21,6 +21,10 @@ type Props = {
   muteIncoming?: boolean;
   /** Bouton rond facultatif propre à la page (ex. « שליחה לכולם »), à gauche du « + ». */
   action?: ManagerHeaderAction;
+  /** Pastille de périmètre (menahel reshet), posée sous le titre. */
+  scope?: ReactNode;
+  /** Sur ordinateur l'avatar est en bas du rail : l'en-tête ne garde que la salutation. */
+  showAvatar?: boolean;
   onBack: () => void;
   onCreate: () => void;
   onOpenMore: () => void;
@@ -106,12 +110,17 @@ function TitleBlock({ title, subtitle }: { title: string; subtitle?: string }) {
  * En-tête commun à tous les écrans menahel, comme le Figma (« Home Header » + « toolbar ») :
  * avatar et salutation, titre de l'écran, puis retour éventuel, « + » et cloche à gauche.
  */
-export default function ManagerTopBar({ name, photoUrl, title, subtitle, showBack, muteIncoming, action, onBack, onCreate, onOpenMore }: Props) {
+export default function ManagerTopBar({ name, photoUrl, title, subtitle, showBack, muteIncoming, action, scope, showAvatar = true, onBack, onCreate, onOpenMore }: Props) {
   return (
     <Box component="header" data-testid="manager-topbar" sx={{ pt: `calc(8px + ${systemTopInsetCss()})` }}>
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "16px" }}>
-        <GreetingButton name={name} photoUrl={photoUrl} onClick={onOpenMore} />
+        {showAvatar ? (
+          <GreetingButton name={name} photoUrl={photoUrl} onClick={onOpenMore} />
+        ) : (
+          <Typography data-testid="manager-topbar-greeting" sx={{ ...flowText.bodyLarge, color: flowColor.alphaNeutral1000_53 }}>{greetingFor(name)}</Typography>
+        )}
         {title ? <TitleBlock title={title} subtitle={subtitle} /> : null}
+        {scope}
       </Box>
       <Box sx={{ direction: "ltr", display: "flex", gap: "12px", pt: "16px", pb: "16px" }}>
         {showBack ? (

@@ -12,6 +12,7 @@ import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 import { useManagerTaskActions } from "../../hooks/useManagerTaskActions";
 import { useManagerTasksFilters, type ManagerTasksFilterValues } from "../../hooks/useManagerTasksFilters";
 import { useManagerTasksList } from "../../hooks/useManagerTasksList";
@@ -85,9 +86,11 @@ type FiltersBarProps = {
 function ManagerTasksFiltersBar({ canPickBranch, branches, employees, tasksFilters }: FiltersBarProps) {
   const { filters: f, update, moveDay } = tasksFilters;
   const dayLabel = f.mode === "day" ? dayNavLabel(f.day) : `${formatHebrewDayNoYear(f.from)} – ${formatHebrewDayNoYear(f.to)}`;
+  // Dans la coque, le périmètre est la pastille de l'en-tête ; l'admin garde ce sélecteur.
+  const shellScope = useShellManagerScope();
   return (
     <>
-      {canPickBranch ? <ManagerScopePicker value={f.branch} branches={branches} onChange={(branch) => update({ branch })} /> : null}
+      {canPickBranch && !shellScope ? <ManagerScopePicker value={f.branch} branches={branches} onChange={(branch) => update({ branch })} /> : null}
       <ManagerTasksFilters
         employees={employees.map((u) => ({ value: u.id, label: u.full_name }))}
         statuses={MANAGER_TASK_STATUS_FILTERS.map((value) => ({ value, label: he.taskStatusLabels[value] }))}

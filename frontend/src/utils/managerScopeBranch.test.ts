@@ -1,7 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import {
   MANAGER_SCOPE_BRANCH_STORAGE_KEY,
+  branchScopeLabel,
+  filterBranchesByName,
   parseBranchFromSearch,
+  searchWithBranch,
   readManagerScopeBranchId,
   withManagerBranchQuery,
   writeManagerScopeBranchId,
@@ -47,5 +50,27 @@ describe("managerScopeBranch", () => {
   it("parses branch from search", () => {
     expect(parseBranchFromSearch("?branch=abc")).toBe("abc");
     expect(parseBranchFromSearch(new URLSearchParams("branch=xyz"))).toBe("xyz");
+  });
+
+  it("sets or removes branch= and keeps the other params", () => {
+    const prev = new URLSearchParams("status=overdue&branch=old");
+    expect(searchWithBranch(prev, "b2").toString()).toBe("status=overdue&branch=b2");
+    expect(searchWithBranch(prev, "  ").toString()).toBe("status=overdue");
+    expect(prev.get("branch")).toBe("old");
+  });
+
+  it("labels the scope: network, a known branch, or a fallback while loading", () => {
+    const labels = { network: "כל הרשת", fallback: "סניף" };
+    const branches = [{ id: "b1", name: "חיפה" }];
+    expect(branchScopeLabel("", branches, labels)).toBe("כל הרשת");
+    expect(branchScopeLabel("b1", branches, labels)).toBe("חיפה");
+    expect(branchScopeLabel("b9", [], labels)).toBe("סניף");
+  });
+
+  it("finds branches by name, case-insensitive, all when the query is blank", () => {
+    const branches = [{ name: "Haifa Port" }, { name: "תל אביב" }];
+    expect(filterBranchesByName(branches, "port")).toEqual([{ name: "Haifa Port" }]);
+    expect(filterBranchesByName(branches, "   ")).toBe(branches);
+    expect(filterBranchesByName(branches, "אילת")).toEqual([]);
   });
 });

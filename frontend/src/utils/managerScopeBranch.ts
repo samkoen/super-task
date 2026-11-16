@@ -36,6 +36,32 @@ export function withManagerBranchQuery(
   return qs ? `${base}?${qs}` : base;
 }
 
+/** Copie des paramètres d'adresse avec `branch=` posé (ou retiré si vide) ; le reste est gardé. */
+export function searchWithBranch(prev: URLSearchParams, branchId: string): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  const id = branchId.trim();
+  if (id) next.set(MANAGER_SCOPE_BRANCH_QUERY, id);
+  else next.delete(MANAGER_SCOPE_BRANCH_QUERY);
+  return next;
+}
+
+/** Libellé de la pastille de périmètre : nom du snif, sinon « כל הרשת » quand rien n'est choisi. */
+export function branchScopeLabel(
+  branchId: string,
+  branches: { id: string; name: string }[],
+  labels: { network: string; fallback: string },
+): string {
+  if (!branchId) return labels.network;
+  return branches.find((b) => b.id === branchId)?.name || labels.fallback;
+}
+
+/** Recherche de snif par nom (insensible à la casse, espaces ignorés). */
+export function filterBranchesByName<T extends { name: string }>(branches: T[], query: string): T[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return branches;
+  return branches.filter((b) => b.name.toLowerCase().includes(needle));
+}
+
 export function parseBranchFromSearch(search: string | URLSearchParams): string {
   const params =
     typeof search === "string"

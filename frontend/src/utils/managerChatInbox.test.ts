@@ -5,6 +5,7 @@ import {
   buildManagerInboxEntries,
   directUnreadOf,
   filterManagerInbox,
+  scopeManagerInbox,
   sortManagerInbox,
   taskWaitsForManager,
   type ManagerEmployeeTaskChats,
@@ -77,5 +78,30 @@ describe("managerChatInbox", () => {
     expect(filterManagerInbox(entries, "all", "תל").map((e) => e.kind)).toEqual(["direct"]);
     expect(filterManagerInbox(entries, "all", "מדף").map((e) => e.kind)).toEqual(["task"]);
     expect(filterManagerInbox(entries, "all", "ירושלים")).toEqual([]);
+  });
+});
+
+describe("scopeManagerInbox", () => {
+  const entries = buildManagerInboxEntries(
+    [
+      card({ counterpart_user_id: "e1", branch_id: "b1" }),
+      card({ counterpart_user_id: "e2", branch_id: "b2" }),
+      card({ id: null, kind: "up", counterpart_user_id: "nm", branch_id: null }),
+    ],
+    [{ card: card({ counterpart_user_id: "e2", branch_id: "b2" }), tasks: [taskChat({ id: "o2", branch_id: "b2" })] }],
+  );
+
+  it("keeps the chosen branch plus the rows outside any branch", () => {
+    const keys = scopeManagerInbox(entries, "b2").map((e) => e.key);
+    expect(keys).toEqual(["direct-down-e2", "direct-up-nm", "task-o2"]);
+  });
+
+  it("keeps everything for the whole network", () => {
+    expect(scopeManagerInbox(entries, "")).toHaveLength(entries.length);
+  });
+
+  it("falls back to the oved's branch when the task card has none", () => {
+    const [entry] = buildManagerInboxEntries([], [{ card: card({ branch_id: "b1" }), tasks: [taskChat({ branch_id: null })] }]);
+    expect(entry.branchId).toBe("b1");
   });
 });

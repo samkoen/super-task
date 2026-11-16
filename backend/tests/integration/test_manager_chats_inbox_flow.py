@@ -89,13 +89,16 @@ def test_branch_manager_only_sees_his_branch(app, client_mgr, second_branch_seed
 
 
 def test_network_manager_gets_every_branch_in_one_call(app, client_nm, client_mgr, second_branch_seed):
-    """Menahel reshet (« כל הרשת ») : les fils de tous les snifim en une seule requête."""
+    """Menahel reshet (« כל הרשת ») : les fils de tous les snifim en une seule requête,
+    chacun avec son snif pour que la pastille de périmètre (étape 8) puisse restreindre la boîte."""
     world = second_branch_seed
     a = _create_task(client_mgr, world["branch_id"], world["employee_id"])
     b = _create_task(login_client(app, MGR_B_EMAIL), world["branch_b_id"], world["employee_b_id"])
     items = _all_day_chats(client_nm)
     assert items[a]["assignee_user_id"] == world["employee_id"]
     assert items[b]["assignee_user_id"] == world["employee_b_id"]
+    assert items[a]["branch_id"] == world["branch_id"]
+    assert items[b]["branch_id"] == world["branch_b_id"]
 
 
 def test_employee_cannot_list_the_manager_inbox(client_emp, world_seed):

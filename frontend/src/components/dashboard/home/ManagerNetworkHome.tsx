@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Box, ButtonBase, Collapse, Typography } from "@mui/material";
+import { Box, ButtonBase, Collapse, TextField, Typography } from "@mui/material";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import summaryDone from "../../../assets/flow1/summary-done.png";
@@ -7,6 +7,8 @@ import type { BranchSummary, HealthLevel } from "../../../services/dashboardServ
 import { he } from "../../../i18n/he";
 import { flowColor, flowRadius, flowText } from "../../../styles/flowTokens";
 import type { NetworkOverview } from "../../../utils/managerHome";
+import { filterBranchesByName } from "../../../utils/managerScopeBranch";
+import ManagerColumns from "./ManagerColumns";
 import { HomeSectionTitle, homeCardSx } from "./homeUi";
 
 /** Couleur seulement quand il faut agir : un snif qui va bien n'a pas de pastille colorée. */
@@ -33,8 +35,28 @@ function BranchRow({ branch, onOpen, plain }: { branch: BranchSummary; onOpen: (
   );
 }
 
+/** Recherche dans la liste complète, utile seulement pour une grande reshet. */
+const SEARCH_FROM = 6;
+
+function BranchSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={he.managerScopeSearch}
+      inputProps={{ "aria-label": he.managerScopeSearch, "data-testid": "network-all-search" }}
+      sx={{ px: "8px", pb: "8px", "& .MuiOutlinedInput-root": { borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral100 } }}
+    />
+  );
+}
+
+/** « כל הסניפים (N) › » : une ligne repliée ; ouverte, la liste du pire au meilleur, avec recherche. */
 function AllBranches({ branches, onOpen }: { branches: BranchSummary[]; onOpen: (id: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const shown = filterBranchesByName(branches, query);
   return (
     <Box sx={{ ...homeCardSx, p: "8px", gap: 0 }}>
       <ButtonBase data-testid="network-all-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)} sx={{ justifyContent: "space-between", px: "16px", py: "12px", borderRadius: `${flowRadius.md}px` }}>
@@ -42,8 +64,29 @@ function AllBranches({ branches, onOpen }: { branches: BranchSummary[]; onOpen: 
         <ExpandMoreRoundedIcon sx={{ color: flowColor.neutral600, transform: open ? "rotate(180deg)" : "none" }} />
       </ButtonBase>
       <Collapse in={open} unmountOnExit>
-        {branches.map((b) => <BranchRow key={b.branch_id} branch={b} onOpen={onOpen} plain />)}
+        {branches.length > SEARCH_FROM ? <BranchSearch value={query} onChange={setQuery} /> : null}
+        {shown.map((b) => <BranchRow key={b.branch_id} branch={b} onOpen={onOpen} plain />)}
+        {query && !shown.length ? (
+          <Typography data-testid="network-all-empty" sx={{ ...flowText.body, color: flowColor.alphaNeutral900_60, textAlign: "center", py: 1 }}>{he.managerScopeNoResults}</Typography>
+        ) : null}
       </Collapse>
+    </Box>
+  );
+}
+
+/** Snifim qui demandent une action, ou l'illustration « כל הסניפים תקינים ». */
+function AttentionSection({ attention, onOpen }: { attention: BranchSummary[]; onOpen: (id: string) => void }) {
+  return (
+    <Box component="section" sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <HomeSectionTitle>{he.managerHomeAttentionTitle}</HomeSectionTitle>
+      {attention.length ? (
+        attention.map((b) => <BranchRow key={b.branch_id} branch={b} onOpen={onOpen} />)
+      ) : (
+        <Box data-testid="network-all-healthy" sx={{ ...homeCardSx, alignItems: "center" }}>
+          <Box component="img" src={summaryDone} alt="" sx={{ width: 80, height: 80, objectFit: "contain" }} />
+          <Typography sx={{ ...flowText.h2, color: flowColor.neutral900 }}>{he.managerHomeAllHealthy}</Typography>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -63,24 +106,24 @@ type Props = {
 export default function ManagerNetworkHome({ overview, onOpenBranch, inbox }: Props) {
   const { healthy, attention, all } = overview;
   return (
-    <Box data-testid="manager-network-home" sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      <Typography data-testid="network-status" sx={{ ...flowText.bodyLarge, color: flowColor.neutral900 }}>
-        {he.managerHomeNetworkStatus(healthy, attention.length)}
-      </Typography>
-      {inbox}
-      <Box component="section" sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <HomeSectionTitle>{he.managerHomeAttentionTitle}</HomeSectionTitle>
-        {attention.length ? (
-          attention.map((b) => <BranchRow key={b.branch_id} branch={b} onOpen={onOpenBranch} />)
-        ) : (
-          <Box data-testid="network-all-healthy" sx={{ ...homeCardSx, alignItems: "center" }}>
-            <Box component="img" src={summaryDone} alt="" sx={{ width: 80, height: 80, objectFit: "contain" }} />
-            <Typography sx={{ ...flowText.h2, color: flowColor.neutral900 }}>{he.managerHomeAllHealthy}</Typography>
-          </Box>
-        )}
-      </Box>
-      {/* Repliée seulement si elle apporte quelque chose : inutile quand tous les snifim sont déjà au-dessus. */}
-      {all.length > attention.length ? <AllBranches branches={all} onOpen={onOpenBranch} /> : null}
+    <Box data-testid="manager-network-home">
+      <ManagerColumns
+        first={
+          <>
+            <Typography data-testid="network-status" sx={{ ...flowText.bodyLarge, color: flowColor.neutral900 }}>
+              {he.managerHomeNetworkStatus(healthy, attention.length)}
+            </Typography>
+            {inbox}
+          </>
+        }
+        second={
+          <>
+            <AttentionSection attention={attention} onOpen={onOpenBranch} />
+            {/* Repliée seulement si elle apporte quelque chose : inutile quand tous les snifim sont déjà au-dessus. */}
+            {all.length > attention.length ? <AllBranches branches={all} onOpen={onOpenBranch} /> : null}
+          </>
+        }
+      />
     </Box>
   );
 }

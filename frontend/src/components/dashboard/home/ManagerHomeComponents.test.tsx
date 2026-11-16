@@ -120,8 +120,33 @@ describe("ManagerNetworkHome", () => {
 
   it("places the inbox right under the status sentence", () => {
     render(<ManagerNetworkHome overview={{ healthy: 1, attention: [], all: [b("g", "green")] }} onOpenBranch={vi.fn()} inbox={<div data-testid="slot-inbox" />} />);
-    const home = screen.getByTestId("manager-network-home");
-    expect(home.children[1].getAttribute("data-testid")).toBe("slot-inbox");
+    // Première colonne (ordinateur) / haut de page (mobile) : la phrase d'état, puis la pile.
+    const first = screen.getByTestId("manager-column-first");
+    expect(first.children[0].getAttribute("data-testid")).toBe("network-status");
+    expect(first.children[1].getAttribute("data-testid")).toBe("slot-inbox");
+  });
+
+  it("puts the branches needing action and the full list in the second column", () => {
+    render(<ManagerNetworkHome overview={{ healthy: 1, attention: [b("r", "red", 2)], all: [b("r", "red", 2), b("g", "green")] }} onOpenBranch={vi.fn()} />);
+    const second = screen.getByTestId("manager-column-second");
+    expect(second.textContent).toContain(he.managerHomeAttentionTitle);
+    expect(second.querySelector("[data-testid='network-all-toggle']")).toBeTruthy();
+  });
+
+  it("searches the full list of a large network", () => {
+    const all = ["א", "ב", "ג", "ד", "ה", "ו", "חיפה"].map((id) => b(id, "green"));
+    render(<ManagerNetworkHome overview={{ healthy: 7, attention: [], all }} onOpenBranch={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("network-all-toggle"));
+    fireEvent.change(screen.getByTestId("network-all-search"), { target: { value: "חיפה" } });
+    expect(screen.getAllByTestId("network-branch").map((r) => r.textContent)).toEqual([expect.stringContaining("סניף חיפה")]);
+    fireEvent.change(screen.getByTestId("network-all-search"), { target: { value: "אילת" } });
+    expect(screen.getByTestId("network-all-empty")).toBeTruthy();
+  });
+
+  it("offers no search for a small network", () => {
+    render(<ManagerNetworkHome overview={{ healthy: 2, attention: [], all: [b("a", "green"), b("b", "green")] }} onOpenBranch={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("network-all-toggle"));
+    expect(screen.queryByTestId("network-all-search")).toBeNull();
   });
 
   it("celebrates a fully healthy network", () => {

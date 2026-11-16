@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Alert, Box } from "@mui/material";
 import ListSkeleton from "../../components/ui/ListSkeleton";
+import ManagerColumns from "../../components/dashboard/home/ManagerColumns";
 import ManagerHomeDialogs, { type ManagerHomeDialogsState } from "../../components/dashboard/home/ManagerHomeDialogs";
 import ManagerInboxStack from "../../components/dashboard/home/ManagerInboxStack";
 import ManagerNetworkHome from "../../components/dashboard/home/ManagerNetworkHome";
@@ -16,6 +17,7 @@ import StoreStatusKpiRow from "../../components/dashboard/StoreStatusKpiRow";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 import { useManagerHomeData } from "../../hooks/useManagerHomeData";
 import { useManagerInboxChats } from "../../hooks/useManagerInboxChats";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
@@ -151,11 +153,12 @@ export default function ManagerDashboardPage() {
 
 type HomeTopProps = { home: ReturnType<typeof useManagerHomeData>; inbox: ReturnType<typeof useManagerInboxChats> };
 
-/** Périmètre (menahel reshet), chargement et erreurs, au-dessus de l'accueil. */
+/** Périmètre (admin hors coque ; dans la coque il est dans l'en-tête), chargement et erreurs. */
 function HomeTop({ home, inbox }: HomeTopProps) {
+  const shellScope = useShellManagerScope();
   return (
     <>
-      {home.canPickBranch ? <ManagerScopePicker value={home.selectedBranch} branches={home.branches} onChange={home.setSelectedBranch} /> : null}
+      {home.canPickBranch && !shellScope ? <ManagerScopePicker value={home.selectedBranch} branches={home.branches} onChange={home.setSelectedBranch} /> : null}
       {home.loading && !home.data ? <ListSkeleton variant="dashboard" /> : null}
       {home.error ? <Alert severity="error" onClose={() => home.setError("")}>{home.error}</Alert> : null}
       {inbox.openError ? <Alert severity="error" onClose={inbox.clearOpenError}>{inbox.openError}</Alert> : null}
@@ -180,13 +183,18 @@ function BranchHome({ data, chats, analysisOpen, analysis, onToggleAnalysis, onO
   const items = useMemo(() => buildManagerInbox(data.task_queues, chats), [data.task_queues, chats]);
   const team = useMemo(() => buildTeamNow(data.team), [data.team]);
   const own = ownTasksSummary(data.my_work);
+  // Ordinateur : l'état du snif et « לטיפולך » d'un côté, l'équipe de l'autre ; mobile : même ordre empilé.
   return (
-    <>
-      {own ? <ManagerOwnTasksLine summary={own} onOpen={onOpenOwnTasks} /> : null}
-      <ManagerPulseCard pulse={pulse} analysisOpen={analysisOpen} onToggleAnalysis={onToggleAnalysis} />
-      {analysisOpen ? analysis : null}
-      <ManagerInboxStack items={items} onOpen={onOpenInbox} />
-      <ManagerTeamNow entries={team} onOpen={onOpenMember} />
-    </>
+    <ManagerColumns
+      first={
+        <>
+          {own ? <ManagerOwnTasksLine summary={own} onOpen={onOpenOwnTasks} /> : null}
+          <ManagerPulseCard pulse={pulse} analysisOpen={analysisOpen} onToggleAnalysis={onToggleAnalysis} />
+          {analysisOpen ? analysis : null}
+          <ManagerInboxStack items={items} onOpen={onOpenInbox} />
+        </>
+      }
+      second={<ManagerTeamNow entries={team} onOpen={onOpenMember} />}
+    />
   );
 }

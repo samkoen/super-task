@@ -16,6 +16,8 @@ export interface ManagerInboxEntry {
   unread: number;
   /** « ממתין לי » : remonte en tête de la boîte. */
   waiting: boolean;
+  /** Snif de la ligne ; `null` = hors snif (mon manager, conversation réseau), gardée partout. */
+  branchId: string | null;
   direct?: DirectChatCard;
   task?: ManagerInboxTask;
 }
@@ -57,6 +59,7 @@ function directEntry(card: DirectChatCard): ManagerInboxEntry {
     lastAt: card.last_at,
     unread,
     waiting: unread > 0,
+    branchId: card.kind === "down" ? card.branch_id ?? null : null,
     direct: card,
   };
 }
@@ -72,6 +75,7 @@ function taskEntry(card: DirectChatCard, task: ManagerDayTaskChat): ManagerInbox
     lastAt: task.last_at,
     unread,
     waiting: taskWaitsForManager(task.status, unread),
+    branchId: task.branch_id ?? card.branch_id ?? null,
     task: {
       occurrenceId: task.id,
       title: task.title,
@@ -104,6 +108,15 @@ export function sortManagerInbox(entries: ManagerInboxEntry[]): ManagerInboxEntr
     if (a.waiting !== b.waiting) return a.waiting ? -1 : 1;
     return timeMs(b.lastAt) - timeMs(a.lastAt);
   });
+}
+
+/**
+ * Périmètre du menahel reshet (étape 8) : un snif choisi ne garde que ses lignes, plus celles
+ * qui n'appartiennent à aucun snif (son propre manager, une conversation réseau).
+ */
+export function scopeManagerInbox(entries: ManagerInboxEntry[], branchId: string): ManagerInboxEntry[] {
+  if (!branchId) return entries;
+  return entries.filter((entry) => !entry.branchId || entry.branchId === branchId);
 }
 
 /** Filtre par pastille puis par recherche (titre ou contexte). */

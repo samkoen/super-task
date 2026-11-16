@@ -20,8 +20,10 @@ import FullscreenBackAppBar, {
 } from "../../components/chat/FullscreenBackAppBar";
 import TaskChatDialog from "../../components/tasks/TaskChatDialog";
 import { directChatService, type DirectChatCard } from "../../services/directChatService";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 import {
   filterManagerInbox,
+  scopeManagerInbox,
   type ManagerChatsFilter,
   type ManagerInboxEntry,
   type ManagerInboxTask,
@@ -104,7 +106,12 @@ function useUnifiedChatsState() {
     [openBroadcast],
   );
 
-  const visible = useMemo(() => filterManagerInbox(chats.entries, filter, query), [chats.entries, filter, query]);
+  // Menahel reshet : le snif choisi dans l'en-tête restreint la boîte (vide = toute la reshet).
+  const scopeBranchId = useShellManagerScope()?.branchId ?? "";
+  const visible = useMemo(
+    () => filterManagerInbox(scopeManagerInbox(chats.entries, scopeBranchId), filter, query),
+    [chats.entries, scopeBranchId, filter, query],
+  );
   return {
     ...chats, filter, setFilter, query, setQuery, open, setOpen, task, setTask,
     broadcastOpen, setBroadcastOpen, openDirect, broadcastAction, visible,

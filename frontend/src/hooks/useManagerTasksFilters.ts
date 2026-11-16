@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { defaultRangeFrom, shiftDay, todayIso, type TaskDateViewMode } from "../utils/dateView";
 import { buildManagerTasksPath, parseManagerTasksSearchParams } from "../utils/managerTaskFilters";
-import { writeManagerScopeBranchId } from "../utils/managerScopeBranch";
+import { parseBranchFromSearch, writeManagerScopeBranchId } from "../utils/managerScopeBranch";
 
 export type ManagerTasksFilterValues = {
   branch: string;
@@ -55,6 +55,18 @@ function useFiltersFromUrl(canPickBranch: boolean, apply: (patch: Partial<Manage
   }, [location.search, searchParams, canPickBranch, apply]);
 }
 
+/**
+ * Le snif suit l'adresse, même quand elle n'a plus d'autre paramètre : la pastille de périmètre
+ * de l'en-tête (étape 8) peut passer à « כל הרשת » en retirant seulement `branch=`.
+ */
+function useBranchFromUrl(canPickBranch: boolean, apply: (patch: Partial<ManagerTasksFilterValues>) => void) {
+  const [searchParams] = useSearchParams();
+  const branch = parseBranchFromSearch(searchParams);
+  useEffect(() => {
+    if (canPickBranch) apply({ branch });
+  }, [branch, canPickBranch, apply]);
+}
+
 /** Filtres de l'onglet משימות (snif, oved, statut, jour), gardés dans l'adresse. */
 export function useManagerTasksFilters(canPickBranch: boolean) {
   const navigate = useNavigate();
@@ -62,6 +74,7 @@ export function useManagerTasksFilters(canPickBranch: boolean) {
   const [filters, setFilters] = useState(() => initialFilters(searchParams));
   const apply = useCallback((patch: Partial<ManagerTasksFilterValues>) => setFilters((f) => ({ ...f, ...patch })), []);
   useFiltersFromUrl(canPickBranch, apply);
+  useBranchFromUrl(canPickBranch, apply);
 
   /** Change un filtre et réécrit l'adresse. */
   const update = useCallback((patch: Partial<ManagerTasksFilterValues>) => {

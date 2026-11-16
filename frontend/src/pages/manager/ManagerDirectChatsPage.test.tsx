@@ -4,6 +4,7 @@ import ManagerDirectChatsPage from "./ManagerDirectChatsPage";
 import { he } from "../../i18n/he";
 import { directChatService, type DirectChatInbox } from "../../services/directChatService";
 import { taskService } from "../../services/taskService";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 
 const { showError, showSuccess } = vi.hoisted(() => ({
   showError: vi.fn(),
@@ -48,6 +49,8 @@ vi.mock("../../hooks/useDirectChatLiveSync", () => ({
 vi.mock("../../hooks/useTaskChangeListener", () => ({
   useTaskChangeListener: () => undefined,
 }));
+
+vi.mock("../../context/ManagerScopeContext", () => ({ useShellManagerScope: vi.fn(() => null) }));
 
 function inbox(): DirectChatInbox {
   return {
@@ -143,6 +146,27 @@ describe("ManagerDirectChatsPage", () => {
     fireEvent.click(directRow!);
     await waitFor(() => expect(screen.getByText("direct-thread")).toBeTruthy());
     expect(directChatService.openWith).toHaveBeenCalledWith("e1");
+  });
+
+  it("keeps only the snif chosen in the header (menahel reshet), plus his own manager", async () => {
+    const base = inbox();
+    vi.mocked(directChatService.inbox).mockResolvedValue({
+      ...base,
+      items: [
+        { ...base.items[0], branch_id: "b1" },
+        { ...base.items[0], id: "c2", counterpart_user_id: "e2", counterpart_name: "רונית לוי", branch_id: "b2", branch_name: "חיפה" },
+      ],
+    });
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({
+      items: [{ id: "o2", assignee_user_id: "e2", branch_id: "b2", title: "קופה", status: "in_progress", last_preview: null, last_at: null, unread_count: 0 }],
+    });
+    vi.mocked(useShellManagerScope).mockReturnValue({ branchId: "b2", branchName: "חיפה", branches: [], setBranch: vi.fn() });
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText("קופה")).toBeTruthy());
+    expect(screen.queryByText("דן כהן")).toBeNull();
+    expect(screen.getAllByText("רונית לוי").length).toBeGreaterThan(0);
+    expect(screen.getByText("רשת לוי")).toBeTruthy();
+    vi.mocked(useShellManagerScope).mockReturnValue(null);
   });
 
   it("shows the empty state when there is nothing", async () => {

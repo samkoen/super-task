@@ -60,6 +60,8 @@ export interface ManagerDayTaskChat extends EmployeeTaskChat {
   unread_count: number;
   /** Oved assigné ; renseigné par le backend pour rattacher la carte à son oved. */
   assignee_user_id?: string | null;
+  /** Snif de la tâche : la boîte « שיחות » se restreint au snif choisi par le menahel reshet. */
+  branch_id?: string | null;
 }
 
 export interface TaskTemplate {

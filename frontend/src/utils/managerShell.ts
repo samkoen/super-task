@@ -17,6 +17,15 @@ export const MANAGER_TABS: { tab: ManagerTab; path: string }[] = [
   { tab: "home", path: "/manager" },
 ];
 
+/** Rail vertical sur ordinateur (étape 8) : lu de haut en bas, comme le doc « בית · משימות · צוות · שיחות ». */
+export const MANAGER_RAIL_ORDER: ManagerTab[] = ["home", "tasks", "team", "chats"];
+
+/** Largeur du rail sur ordinateur ; le contenu est décalé d'autant côté début (droite en RTL). */
+export const MANAGER_RAIL_WIDTH_PX = 104;
+
+/** Deux colonnes FLOW de 480 au plus, séparées de 24, au lieu d'une page de 1280. */
+export const MANAGER_DESKTOP_CONTENT_MAX_PX = 480 * 2 + 24;
+
 const TAB_PREFIXES: { tab: ManagerTab; prefixes: string[] }[] = [
   { tab: "tasks", prefixes: ["/manager/tasks", "/manager/fixed-tasks", "/manager/gallery", "/manager/issues"] },
   { tab: "team", prefixes: ["/manager/employees", "/manager/invitations"] },

@@ -80,6 +80,11 @@ describe("ManagerShell", () => {
     expect(screen.getByTestId("where").textContent).toBe("/manager/tasks/new?library=1");
   });
 
+  it("gives a branch manager no scope pill (single snif)", () => {
+    renderShell("/manager");
+    expect(screen.queryByTestId("manager-scope-pill")).toBeNull();
+  });
+
   it("switches tabs from the pill", () => {
     renderShell("/manager");
     fireEvent.click(screen.getByTestId("manager-pill-team"));
