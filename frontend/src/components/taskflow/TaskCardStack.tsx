@@ -16,8 +16,12 @@ export type TaskCardStackProps = {
   onCapture: (index: number, file: File, kind: MediaKind, durationSeconds?: number, lightOk?: boolean | null) => void;
   onSendText: (index: number, text: string) => void;
   onOpenGuide: (index: number) => void;
+  /** « לא ניתן לצלם » sur la carte active (ouvre la feuille de raison). */
+  onSkip?: (index: number) => void;
   /** Demande de refilmer la carte `index` : incrémenter `nonce` rouvre la caméra. */
   retake?: { index: number; nonce: number } | null;
+  /** Carte à ouvrir en premier (« לצלם עכשיו » depuis le récap). */
+  focusIndex?: number | null;
 };
 
 function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number }) {
@@ -35,6 +39,7 @@ function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number
       onCapture={(file, kind, seconds, lightOk) => props.onCapture(index, file, kind, seconds, lightOk)}
       onSendText={(text) => props.onSendText(index, text)}
       onOpenGuide={() => props.onOpenGuide(index)}
+      onSkip={props.onSkip ? () => props.onSkip?.(index) : undefined}
     />
   );
 }
@@ -45,7 +50,7 @@ function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number
  */
 export default function TaskCardStack(props: TaskCardStackProps) {
   const { requirements, states } = props;
-  const [preferred, setPreferred] = useState<number | null>(null);
+  const [preferred, setPreferred] = useState<number | null>(props.focusIndex ?? null);
   const layout = stackLayout(states, preferred);
   if (!requirements.length) return null;
   return (

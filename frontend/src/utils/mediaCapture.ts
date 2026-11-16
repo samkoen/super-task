@@ -203,7 +203,7 @@ export function capturePhotoFromVideo(video: HTMLVideoElement): Promise<Blob | n
   });
 }
 
-/** Aligné sur le back (1280) — Vercel refuse un body > ~4,5 Mo. */
+/** Aligné sur le back (1280) — payloads trop gros cassent CapacitorHttp. */
 export const PHOTO_UPLOAD_MAX_EDGE = 1280;
 export const PHOTO_PREVIEW_MAX_EDGE = PHOTO_UPLOAD_MAX_EDGE;
 export const PHOTO_JPEG_QUALITY = 0.72;
@@ -304,7 +304,7 @@ export async function normalizePhotoOrientation(blob: Blob): Promise<Blob> {
   return (await encodePhotoJpeg(blob)) ?? blob;
 }
 
-/** Au-delà, un PNG redevient un JPEG (Vercel refuse un body > ~4,5 Mo). */
+/** Au-delà, un PNG redevient un JPEG (payload trop gros pour CapacitorHttp). */
 export const PNG_UPLOAD_MAX_BYTES = 2_500_000;
 
 /** Un PNG garde sa transparence (illustrations d'exemple) tant qu'il reste léger. */
@@ -316,7 +316,7 @@ async function encodeKeepingAlpha(file: File): Promise<File | null> {
   return blobToFile(png, `${base}.png`, "image/png");
 }
 
-/** JPEG ≤ 1280 px (PNG léger conservé) — évite le 413 Vercel / CapacitorHttp. */
+/** JPEG ≤ 1280 px (PNG léger conservé) — évite un 413 CapacitorHttp. */
 export async function compressPhotoForUpload(file: File): Promise<File> {
   const kept = await encodeKeepingAlpha(file);
   if (kept) return kept;

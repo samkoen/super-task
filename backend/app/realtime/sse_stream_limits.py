@@ -1,12 +1,8 @@
-"""Limites du stream SSE — Vercel tue l'invocation à maxDuration (120s)."""
-
-VERCEL_STREAM_MAX_SECONDS = 90
+"""Limites optionnelles du stream SSE (None = pas de plafond)."""
 
 
-def stream_max_seconds(*, is_vercel: bool) -> int | None:
-    """None = pas de plafond (uvicorn local)."""
-    if is_vercel:
-        return VERCEL_STREAM_MAX_SECONDS
+def stream_max_seconds() -> int | None:
+    """None = pas de plafond (processus long-running)."""
     return None
 
 

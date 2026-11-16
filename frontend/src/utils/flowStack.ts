@@ -15,7 +15,7 @@ export type StackLayout = {
  */
 /** Une carte confirmée mais pas encore envoyée peut être rouverte pour être refaite. */
 export function canRevisit(state: SlotUiState | undefined): boolean {
-  return state?.status === "ready";
+  return state?.status === "ready" || (state?.status === "skipped" && !state.skip?.sent);
 }
 
 export function resolveActive(states: SlotUiState[], preferred: number | null): number | null {
@@ -84,6 +84,7 @@ export function hasGuide(req: CompletionRequirement): boolean {
 
 /** Texte de l'onglet replié selon l'état d'envoi. */
 export function tabStatusText(state: SlotUiState): string {
+  if (state.status === "skipped") return he.flowTabSkipped;
   if (state.status === "sent") return he.flowTabSent(formatClock(state.sentAt));
   if (state.status === "failed") return he.flowTabFailed;
   if (state.status === "uploading") return he.flowTabUploading;

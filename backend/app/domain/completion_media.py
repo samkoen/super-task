@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.domain.geo import normalize_location
+from app.domain.slot_skip import is_skipped, normalize_skip, skip_audio_url
 
 VALID_KINDS = ("photo", "video", "audio", "message")
 VISUAL_KINDS = frozenset({"photo", "video"})
@@ -241,6 +242,9 @@ def attachment_urls(attachments: list[dict] | None) -> list[str]:
         annotated = str(review.get("annotated_url") or "").strip() if isinstance(review, dict) else ""
         if annotated:
             urls.append(annotated)
+        explanation = skip_audio_url(item)
+        if explanation:
+            urls.append(explanation)
     return urls
 
 
@@ -445,6 +449,8 @@ def _normalize_attachment(item: object) -> dict:
     kind = str(item.get("kind") or "").strip()
     if kind not in VALID_KINDS:
         raise ValueError("סוג מדיה לא תקין")
+    if item.get("skipped") is not None:
+        return {**_empty_slot(kind), "skipped": normalize_skip(item.get("skipped"))}
     if kind == "message":
         return {"kind": "message", "text": _normalize_message_text(item.get("text"))}
     url = str(item.get("url") or item.get("path") or "").strip()
@@ -509,6 +515,8 @@ def _normalize_message_text(value: object | None) -> str:
 
 def _assert_slot_matches(req: dict, att: dict) -> None:
     kind = req["kind"]
+    if is_skipped(att) and att.get("kind") == kind:
+        return
     if kind == "message":
         if att.get("kind") != "message" or not str(att.get("text") or "").strip():
             raise ValueError(_missing_kind_message(kind))

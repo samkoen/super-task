@@ -6,12 +6,10 @@ import sendIcon from "../../assets/flow1/chat-send.svg";
 import { he } from "../../i18n/he";
 import { flowColor, flowRadius, flowShadow, flowText } from "../../styles/flowTokens";
 import type { ChatMediaKind } from "../../utils/chatTransport";
-import type { StepChoice } from "../../utils/flowChat";
 
 type Props = {
-  choices: StepChoice[];
-  selected: number | null;
-  onSelect: (index: number | null) => void;
+  /** « כתבו הודעה על סרטון מקרר ריק... » une fois un sujet choisi. */
+  placeholder: string;
   body: string;
   onBodyChange: (value: string) => void;
   sending: boolean;
@@ -20,45 +18,6 @@ type Props = {
   onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
 };
 
-/** « Step Chip » : Selected = task/2 + bordure success, Default = neutral/100. */
-function StepChip({ choice, active, onSelect }: { choice: StepChoice; active: boolean; onSelect: () => void }) {
-  return (
-    <ButtonBase
-      data-testid="flow-chat-choice"
-      aria-pressed={active}
-      onClick={onSelect}
-      sx={{
-        ...flowText.label,
-        flexShrink: 0,
-        px: "12px",
-        py: "7px",
-        borderRadius: `${flowRadius.full}px`,
-        whiteSpace: "nowrap",
-        boxSizing: "border-box",
-        color: active ? flowColor.green700 : flowColor.navy800,
-        bgcolor: active ? flowColor.green300 : flowColor.neutral100,
-        border: active ? `1.5px solid ${flowColor.green700}` : "1.5px solid transparent",
-      }}
-    >
-      {choice.label}
-    </ButtonBase>
-  );
-}
-
-function StepChips({ choices, selected, onSelect }: Pick<Props, "choices" | "selected" | "onSelect">) {
-  if (choices.length <= 1) return null;
-  return (
-    <>
-      <Typography sx={{ ...flowText.caption, color: flowColor.alphaNavy800_60 }}>{he.flowChatWhichStep}</Typography>
-      <Box data-testid="flow-chat-picker" role="group" aria-label={he.flowChatWhichStep} sx={{ display: "flex", gap: "6px", overflowX: "auto", flexShrink: 0, "&::-webkit-scrollbar": { display: "none" } }}>
-        {choices.map((choice) => (
-          <StepChip key={choice.index ?? "general"} choice={choice} active={choice.index === selected} onSelect={() => onSelect(choice.index)} />
-        ))}
-      </Box>
-    </>
-  );
-}
-
 function SendButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
     <ButtonBase
@@ -66,24 +25,24 @@ function SendButton({ disabled, onClick }: { disabled: boolean; onClick: () => v
       data-testid="flow-chat-send"
       disabled={disabled}
       onClick={onClick}
-      sx={{ flexShrink: 0, width: 44, height: 44, borderRadius: "50%", bgcolor: flowColor.inverse, "&.Mui-disabled": { opacity: 0.4 } }}
+      sx={{ flexShrink: 0, width: 56, height: 56, borderRadius: "50%", bgcolor: flowColor.neutral900, "&.Mui-disabled": { opacity: 0.4 } }}
     >
-      <Box component="img" src={sendIcon} alt="" sx={{ width: 18, height: 18, display: "block" }} />
+      <Box component="img" src={sendIcon} alt="" sx={{ width: 20, height: 20, display: "block" }} />
     </ButtonBase>
   );
 }
 
-type FieldProps = Pick<Props, "body" | "onBodyChange" | "onSend"> & { busy: boolean; onCamera: () => void };
+type FieldProps = Pick<Props, "body" | "onBodyChange" | "onSend" | "placeholder"> & { busy: boolean; onCamera: () => void };
 
-function MessageField({ body, onBodyChange, onSend, busy, onCamera }: FieldProps) {
+function MessageField({ body, onBodyChange, onSend, placeholder, busy, onCamera }: FieldProps) {
   return (
-    <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "8px", px: "14px", py: "12px", borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral100 }}>
+    <Box sx={{ flex: 1, minWidth: 0, height: 56, display: "flex", alignItems: "center", gap: "8px", px: "20px", borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral100 }}>
       <InputBase
         fullWidth
         value={body}
         disabled={busy}
-        placeholder={he.flowChatPlaceholder}
-        inputProps={{ "aria-label": he.flowChatPlaceholder, "data-testid": "flow-chat-input", maxLength: 2000 }}
+        placeholder={placeholder}
+        inputProps={{ "aria-label": placeholder, "data-testid": "flow-chat-input", maxLength: 2000 }}
         onChange={(event) => onBodyChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
@@ -91,30 +50,29 @@ function MessageField({ body, onBodyChange, onSend, busy, onCamera }: FieldProps
             onSend();
           }
         }}
-        sx={{ ...flowText.body, p: 0, color: flowColor.navy800, "& input::placeholder": { color: flowColor.alphaNavy800_60, opacity: 1 } }}
+        sx={{ ...flowText.body, p: 0, color: flowColor.neutral900, "& input::placeholder": { color: flowColor.alphaNeutral900_66, opacity: 1 } }}
       />
       <ButtonBase aria-label={he.flowChatCamera} data-testid="flow-chat-camera" disabled={busy} onClick={onCamera} sx={{ flexShrink: 0, "&.Mui-disabled": { opacity: 0.4 } }}>
-        <Box component="img" src={cameraIcon} alt="" sx={{ width: 20, height: 20, display: "block" }} />
+        <Box component="img" src={cameraIcon} alt="" sx={{ width: 22, height: 22, display: "block" }} />
       </ButtonBase>
     </Box>
   );
 }
 
-/** « Chat Composer » : question « על איזה שלב ? », puces d'étapes, champ avec caméra et bouton d'envoi. */
+/** Zone de saisie du chat (écran 12) : champ avec caméra intégrée à gauche, bouton d'envoi rond noir. */
 export default function FlowChatComposer(props: Props) {
   const [photoOpen, setPhotoOpen] = useState(false);
   const canSend = Boolean(props.body.trim()) && !props.sending;
   return (
     <Box
       data-testid="flow-chat-composer"
-      sx={{ display: "flex", flexDirection: "column", gap: "10px", px: "16px", pt: "12px", pb: "calc(28px + env(safe-area-inset-bottom, 0px))", bgcolor: flowColor.neutral0, borderRadius: "24px 24px 0 0", boxShadow: flowShadow.floating }}
+      sx={{ display: "flex", flexDirection: "column", gap: "10px", px: "16px", pt: "16px", pb: "calc(28px + env(safe-area-inset-bottom, 0px))", bgcolor: flowColor.neutral0, borderRadius: "24px 24px 0 0", boxShadow: flowShadow.floating }}
     >
-      <StepChips choices={props.choices} selected={props.selected} onSelect={props.onSelect} />
       {props.error ? (
         <Typography role="alert" sx={{ ...flowText.caption, color: "#b3261e" }}>{props.error}</Typography>
       ) : null}
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <MessageField body={props.body} onBodyChange={props.onBodyChange} onSend={() => canSend && props.onSend()} busy={props.sending} onCamera={() => setPhotoOpen(true)} />
+        <MessageField body={props.body} onBodyChange={props.onBodyChange} onSend={() => canSend && props.onSend()} placeholder={props.placeholder} busy={props.sending} onCamera={() => setPhotoOpen(true)} />
         <SendButton disabled={!canSend} onClick={props.onSend} />
       </Box>
       <ChatPhotoCapture

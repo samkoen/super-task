@@ -15,6 +15,6 @@ export function flowToastContent(toast: FlowToastState): FlowToastContent {
 
 /** Nombre de cartes encore à confirmer (ni confirmées, ni envoyées, ni en file sur l'appareil). */
 export function remainingAfter(statuses: string[], justHandedOver: number): number {
-  const done = ["sent", "ready", "queued", "uploading"];
+  const done = ["sent", "ready", "queued", "uploading", "skipped"];
   return statuses.filter((s, i) => i !== justHandedOver && !done.includes(s)).length;
 }

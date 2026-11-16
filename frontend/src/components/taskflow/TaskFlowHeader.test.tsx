@@ -72,4 +72,19 @@ describe("TaskFlowHeader", () => {
     await waitFor(() => expect(notificationService.list).toHaveBeenCalled());
     expect(screen.queryByTestId("task-flow-bell-dot")).toBeNull();
   });
+  it("shows the « סיכום » icon between back and chat and opens the summary", () => {
+    const onOpenSummary = vi.fn();
+    setup(0, { onOpenSummary });
+    const summary = screen.getByRole("button", { name: he.flowOpenSummary });
+    fireEvent.click(summary);
+    expect(onOpenSummary).toHaveBeenCalledTimes(1);
+    const order = [screen.getByTestId("task-flow-back"), summary, screen.getByTestId("task-flow-chats")];
+    expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("has no « סיכום » icon when the screen gives no summary", () => {
+    setup();
+    expect(screen.queryByTestId("task-flow-summary")).toBeNull();
+  });
 });

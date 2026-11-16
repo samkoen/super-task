@@ -10,6 +10,7 @@ import ChatPhotoAnnotateReplyDialog from "../chat/ChatPhotoAnnotateReplyDialog";
 import TaskFormSection from "./form/TaskFormSection";
 import SlotReviewPanel from "./review/SlotReviewPanel";
 import SlotReviewFinish from "./review/SlotReviewFinish";
+import SkippedSlotsSection from "./review/SkippedSlotsSection";
 import { he } from "../../i18n/he";
 import { canReopenClosedTask } from "../../utils/taskReopenClosed";
 import { completionFinishedText } from "../../utils/completionFinishedAt";
@@ -287,6 +288,12 @@ export default function TaskCompletionReviewDialog({
           note={completion?.note}
           reason={completion?.not_completed_reason}
         />
+        {showCompletion && completion && (
+          <SkippedSlotsSection
+            requirements={normalizeRequirements(taskView?.completion_requirements)}
+            attachments={completion.completion_attachments}
+          />
+        )}
         {showCompletion && completion && slotMode && (
           <SlotReviewPanel
             items={reviewItems}

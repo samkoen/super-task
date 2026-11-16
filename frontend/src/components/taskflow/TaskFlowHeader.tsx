@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Avatar, Box, ButtonBase, Typography } from "@mui/material";
 import NotificationBell from "../notifications/NotificationBell";
+import summaryButton from "../../assets/flow1/btn-summary.svg";
 import arrowLeftIcon from "../../assets/flow1/icon-arrow-left.svg";
 import bellIcon from "../../assets/flow1/icon-bell.svg";
 import messageIcon from "../../assets/flow1/icon-message-circle.svg";
@@ -17,6 +18,8 @@ type Props = {
   onBack: () => void;
   /** Icône du haut : ouvre le chat de cette tâche (pas la liste générale). */
   onOpenChat: () => void;
+  /** Icône « סיכום » (presse-papiers, écran 03 du Figma) : ouvre le récap (10) à tout moment. */
+  onOpenSummary?: () => void;
 };
 
 type RoundButtonProps = {
@@ -80,7 +83,7 @@ function TitleBlock({ title, due }: { title: string; due: string }) {
         {title}
       </Typography>
       {due ? (
-        <Typography data-testid="task-flow-due" sx={{ ...flowText.bodyLarge, color: flowColor.navy800 }}>
+        <Typography data-testid="task-flow-due" sx={{ ...flowText.bodyLarge, color: flowColor.alphaBlack800_72 }}>
           {he.flowDueAtHour(due)}
         </Typography>
       ) : null}
@@ -88,11 +91,26 @@ function TitleBlock({ title, due }: { title: string; due: string }) {
   );
 }
 
-function Toolbar({ onBack, onOpenChat }: Pick<Props, "onBack" | "onOpenChat">) {
+/** Bouton « סיכום » : l'asset Figma `btn-summary` (cercle blanc 56 + icône clipboard-list) tel quel. */
+function SummaryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <ButtonBase
+      aria-label={he.flowOpenSummary}
+      data-testid="task-flow-summary"
+      onClick={onClick}
+      sx={{ flexShrink: 0, width: flowSize.roundButton, height: flowSize.roundButton, borderRadius: "50%" }}
+    >
+      <Box component="img" src={summaryButton} alt="" sx={{ width: flowSize.roundButton, height: flowSize.roundButton, display: "block" }} />
+    </ButtonBase>
+  );
+}
+
+function Toolbar({ onBack, onOpenChat, onOpenSummary }: Pick<Props, "onBack" | "onOpenChat" | "onOpenSummary">) {
   return (
     <Box sx={{ direction: "ltr", display: "flex", alignItems: "center", justifyContent: "space-between", pt: "16px", pb: "12px" }}>
       <RoundButton label={he.flowBack} testId="task-flow-back" icon={arrowLeftIcon} iconSize={22} onClick={onBack} />
       <Box sx={{ display: "flex", gap: "12px" }}>
+        {onOpenSummary ? <SummaryButton onClick={onOpenSummary} /> : null}
         <RoundButton label={he.flowOpenTaskChat} testId="task-flow-chats" icon={messageIcon} iconSize={19} onClick={onOpenChat} />
         <NotificationBell
           renderTrigger={(open, unread) => (
@@ -108,20 +126,20 @@ function Toolbar({ onBack, onOpenChat }: Pick<Props, "onBack" | "onOpenChat">) {
 
 /**
  * En-tête du FLOW 1 (Figma « Home Header » + « toolbar ») : avatar et salutation, titre de la tâche
- * avec « בשעה 6:30 », puis retour à gauche, chats et cloche à droite.
+ * avec « בשעה 6:30 », puis retour à gauche ; סיכום, chat et cloche à droite.
  */
-export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, onBack, onOpenChat }: Props) {
+export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, onBack, onOpenChat, onOpenSummary }: Props) {
   return (
     <Box
       component="header"
       data-testid="task-flow-header"
-      sx={{ px: `${flowSize.contentPaddingX}px`, pt: "calc(16px + env(safe-area-inset-top, 0px))" }}
+      sx={{ px: `${flowSize.contentPaddingX}px`, pt: "calc(8px + env(safe-area-inset-top, 0px))" }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "16px" }}>
         <Greeting name={employeeName} photoUrl={photoUrl} />
         <TitleBlock title={title} due={formatDueHour(dueAt)} />
       </Box>
-      <Toolbar onBack={onBack} onOpenChat={onOpenChat} />
+      <Toolbar onBack={onBack} onOpenChat={onOpenChat} onOpenSummary={onOpenSummary} />
     </Box>
   );
 }

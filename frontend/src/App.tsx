@@ -26,6 +26,7 @@ const ManagerIssuesPage = lazy(() => import("./pages/manager/ManagerIssuesPage")
 const ManagerTaskGalleryPage = lazy(() => import("./pages/manager/ManagerTaskGalleryPage"));
 const ManagerFixedTasksPage = lazy(() => import("./pages/manager/ManagerFixedTasksPage"));
 const ManagerFixedTaskDetailPage = lazy(() => import("./pages/manager/ManagerFixedTaskDetailPage"));
+const ManagerFixedTaskCreatePage = lazy(() => import("./pages/manager/ManagerFixedTaskCreatePage"));
 const ManagerEmployeesPage = lazy(() => import("./pages/manager/ManagerEmployeesPage"));
 const ManagerReportsPage = lazy(() => import("./pages/manager/ManagerReportsPage"));
 const ManagerProfilePage = lazy(() => import("./pages/manager/ManagerProfilePage"));
@@ -196,6 +197,14 @@ export default function App() {
             }
           />
           <Route
+            path="/admin/fixed-tasks/new"
+            element={
+              <LazyPage>
+                <ManagerFixedTaskCreatePage />
+              </LazyPage>
+            }
+          />
+          <Route
             path="/admin/fixed-tasks/:key"
             element={
               <LazyPage>
@@ -274,6 +283,14 @@ export default function App() {
             element={
               <LazyPage>
                 <ManagerFixedTasksPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/fixed-tasks/new"
+            element={
+              <LazyPage>
+                <ManagerFixedTaskCreatePage />
               </LazyPage>
             }
           />

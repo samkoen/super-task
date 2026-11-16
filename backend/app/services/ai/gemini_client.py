@@ -177,8 +177,8 @@ async def _generate_with_body(
     api_key = config.GEMINI_API_KEY
     if not api_key:
         hint = (
-            "הוסף GEMINI_API_KEY ב-Vercel → Settings → Environment Variables."
-            if config.IS_VERCEL
+            "הוסף GEMINI_API_KEY למשתני הסביבה."
+            if config.IS_PRODUCTION
             else "הוסף GEMINI_API_KEY לקובץ backend/.env."
         )
         raise GeminiError(f"שירות AI אינו מוגדר. {hint}")
@@ -340,8 +340,8 @@ async def generate_image_from_photo(
     api_key = config.GEMINI_API_KEY
     if not api_key:
         hint = (
-            "הוסף GEMINI_API_KEY ב-Vercel → Settings → Environment Variables."
-            if config.IS_VERCEL
+            "הוסף GEMINI_API_KEY למשתני הסביבה."
+            if config.IS_PRODUCTION
             else "הוסף GEMINI_API_KEY לקובץ backend/.env."
         )
         raise GeminiError(f"שירות AI אינו מוגדר. {hint}", retryable=False)

@@ -45,7 +45,6 @@ from app.core.config import (
     CORS_ALLOW_ORIGIN_REGEX,
     CORS_ALLOW_ORIGINS,
     IS_PRODUCTION,
-    IS_VERCEL,
     LOG_LEVEL,
     SECRET_KEY,
     UPLOADS_DIR,
@@ -70,28 +69,31 @@ def _configure_logging() -> None:
     logging.getLogger("app").setLevel(level)
 
 
-def _start_media_purge_loop():
+def _start_background_loops() -> list[asyncio.Task]:
     if os.environ.get("PYTEST_CURRENT_TEST"):
-        return None
+        return []
+    from app.services.employee_inactivity_loop import employee_inactivity_loop
     from app.services.media_purge_loop import media_purge_loop
 
-    return asyncio.create_task(media_purge_loop())
+    return [
+        asyncio.create_task(media_purge_loop()),
+        asyncio.create_task(employee_inactivity_loop()),
+    ]
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     run_startup_migrations(
         is_production=IS_PRODUCTION,
-        is_vercel=IS_VERCEL,
         database_url=os.environ.get("DATABASE_URL", ""),
     )
     sse_hub.bind_loop(asyncio.get_running_loop())
-    purge_task = _start_media_purge_loop()
+    loop_tasks = _start_background_loops()
     try:
         yield
     finally:
-        if purge_task is not None:
-            purge_task.cancel()
+        for task in loop_tasks:
+            task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -141,7 +143,7 @@ def create_app() -> FastAPI:
     (UPLOADS_DIR / "system_bug_screenshots").mkdir(exist_ok=True)
     (UPLOADS_DIR / "system_bug_audio").mkdir(exist_ok=True)
     (UPLOADS_DIR / "app_apks").mkdir(exist_ok=True)
-    # Prod/Vercel : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
+    # Prod : pas de StaticFiles public — lecture via /api/media/proxy (auth + ACL).
     if not IS_PRODUCTION:
         app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 

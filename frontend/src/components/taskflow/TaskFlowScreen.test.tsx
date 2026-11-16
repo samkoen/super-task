@@ -112,8 +112,36 @@ describe("TaskFlowScreen", () => {
     expect(screen.getByTestId("task-flow")).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
     expect(onFinished).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("flow-open-summary"));
+    fireEvent.click(screen.getByTestId("task-flow-summary"));
     expect(await screen.findByTestId("flow-summary-send")).toBeTruthy();
+  });
+
+  it("opens the summary early from the toolbar icon, sends what is filmed and goes back to the rest", async () => {
+    send.mockResolvedValue(response([], false));
+    const { onFinished } = renderScreen();
+    fireEvent.click(screen.getByTestId("flow-primary"));
+    await waitFor(() => expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1"));
+    fireEvent.click(screen.getByTestId("task-flow-summary"));
+    const rows = await screen.findAllByTestId("flow-summary-row");
+    expect(rows[1].getAttribute("data-not-yet")).toBe("true");
+    expect(screen.getByTestId("flow-summary-title").textContent).toBe(he.flowSummaryTitlePartial(1, 2));
+    fireEvent.click(screen.getByTestId("flow-summary-send"));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    const back = await screen.findByTestId("flow-summary-back-to-cards");
+    expect(back.textContent).toBe(he.flowSummaryBackToCards);
+    expect(screen.queryByTestId("flow-summary-continue")).toBeNull();
+    fireEvent.click(screen.getByTestId("flow-summary-film-now"));
+    await waitFor(() => expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1"));
+    expect(onFinished).not.toHaveBeenCalled();
+  });
+
+  it("an early summary with nothing filmed only offers to go back filming", async () => {
+    renderScreen();
+    fireEvent.click(screen.getByTestId("task-flow-summary"));
+    expect(await screen.findByTestId("flow-summary-back-to-cards")).toBeTruthy();
+    expect(screen.queryByTestId("flow-summary-send")).toBeNull();
+    fireEvent.click(screen.getByTestId("flow-summary-back-to-cards"));
+    expect(screen.getByTestId("task-flow")).toBeTruthy();
   });
 
   it("reopens a confirmed video, and the summary stays closed until it is confirmed again", async () => {
@@ -132,7 +160,7 @@ describe("TaskFlowScreen", () => {
     expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("0");
     fireEvent.click(screen.getByTestId("flow-primary"));
     expect(await screen.findByTestId("flow-review")).toBeTruthy();
-    expect(screen.queryByTestId("flow-open-summary")).toBeNull();
+    expect(screen.queryByTestId("flow-summary")).toBeNull();
     expect(send).not.toHaveBeenCalled();
   });
 

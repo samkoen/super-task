@@ -1,7 +1,6 @@
 import { type Ref } from "react";
 import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import ChatMessageMedia from "../chat/ChatMessageMedia";
-import linkIcon from "../../assets/flow1/chat-link.svg";
 import readIcon from "../../assets/flow1/chat-read.svg";
 import { he } from "../../i18n/he";
 import { flowColor, flowRadius, flowText } from "../../styles/flowTokens";
@@ -38,10 +37,10 @@ function StepTag({ label, mine }: { label: string; mine: boolean }) {
   return (
     <Box
       data-testid="flow-chat-step-tag"
-      sx={{ display: "flex", alignItems: "center", gap: "4px", px: "8px", py: "3px", borderRadius: `${flowRadius.full}px`, bgcolor: mine ? flowColor.green300 : flowColor.alphaGreen300_60 }}
+      sx={{ display: "flex", alignItems: "center", gap: "6px", px: "10px", py: "3px", borderRadius: `${flowRadius.full}px`, bgcolor: mine ? "rgba(255,255,255,0.16)" : flowColor.neutral100 }}
     >
-      <Box component="img" src={linkIcon} alt="" sx={{ width: 11, height: 11, display: "block" }} />
-      <Typography sx={{ ...flowText.caption, color: flowColor.green700, whiteSpace: "nowrap" }}>{label}</Typography>
+      <Box aria-hidden sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: mine ? flowColor.minMarker : flowColor.neutral0, border: mine ? "none" : `1px solid ${flowColor.neutral300}` }} />
+      <Typography sx={{ ...flowText.caption, fontWeight: 600, color: mine ? flowColor.neutral0 : flowColor.neutral900, whiteSpace: "nowrap" }}>{label}</Typography>
     </Box>
   );
 }
@@ -58,7 +57,7 @@ function bubbleSx(mine: boolean) {
     boxSizing: "border-box",
     alignSelf: mine ? "flex-end" : "flex-start",
     color: mine ? flowColor.neutral0 : flowColor.navy800,
-    bgcolor: mine ? flowColor.inverse : flowColor.neutral0,
+    bgcolor: mine ? flowColor.neutral900 : flowColor.neutral0,
     borderRadius: mine ? "18px 18px 18px 4px" : "18px 18px 4px 18px",
   } as const;
 }

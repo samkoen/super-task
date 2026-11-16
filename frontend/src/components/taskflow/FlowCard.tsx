@@ -3,6 +3,7 @@ import { Box, ButtonBase, TextField, Typography } from "@mui/material";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import MicNoneRoundedIcon from "@mui/icons-material/MicNoneRounded";
+import flagIcon from "../../assets/flow1/icon-flag.svg";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { he } from "../../i18n/he";
@@ -32,6 +33,8 @@ export type FlowCardProps = {
   onCapture: (file: File, kind: MediaKind, durationSeconds?: number, lightOk?: boolean | null) => void;
   onSendText: (text: string) => void;
   onOpenGuide: () => void;
+  /** « לא ניתן לצלם » : ouvre la feuille de raison (écran 05ב). Absent = bouton masqué. */
+  onSkip?: () => void;
   /** Change à chaque « צילום מחדש » : rouvre la caméra pour cette carte. */
   autoCaptureNonce?: number;
 };
@@ -189,12 +192,47 @@ function CardActions(props: FlowCardProps & { text: string }) {
   );
 }
 
+/** Écran 05א : « לא ניתן לצלם » en haut à gauche de la carte (pastille sombre + drapeau). */
+function SkipButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <ButtonBase
+      data-testid="flow-skip"
+      onClick={onClick}
+      disabled={disabled}
+      sx={{
+        // Zone de toucher ≥ 44 px, pastille visible de 28 px.
+        minHeight: 44,
+        m: "-8px 0",
+        "&.Mui-disabled": { opacity: 0.5 },
+      }}
+    >
+      <Box
+        sx={{
+          height: 28,
+          px: "10px",
+          gap: "4px",
+          display: "flex",
+          alignItems: "center",
+          borderRadius: `${flowRadius.full}px`,
+          bgcolor: flowColor.neutral900,
+          color: flowColor.neutral0,
+          ...flowText.label,
+        }}
+      >
+        {he.flowSkipButton}
+        <Box component="img" src={flagIcon} alt="" sx={{ width: 16, height: 16, display: "block" }} />
+      </Box>
+    </ButtonBase>
+  );
+}
+
 function CardHeader({ props }: { props: FlowCardProps }) {
   const { req, index, state } = props;
   const remark = state.remark?.trim();
   return (
     <>
-      <Box sx={{ display: "flex", direction: "ltr", alignItems: "center", justifyContent: "flex-end" }}>
+      <Box sx={{ display: "flex", direction: "ltr", alignItems: "center", justifyContent: props.onSkip ? "space-between" : "flex-end" }}>
+        {props.onSkip ? <SkipButton disabled={props.disabled} onClick={props.onSkip} /> : null}
         <Typography sx={{ ...flowText.label, color: flowColor.alphaNeutral900_66 }}>{stepNumber(index)}</Typography>
       </Box>
       <Typography component="h2" sx={{ ...flowText.h2, mt: "16px", color: flowColor.neutral900, textAlign: "right", overflowWrap: "anywhere" }}>

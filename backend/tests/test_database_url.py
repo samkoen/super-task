@@ -1,4 +1,4 @@
-"""Tests configuration Neon / Vercel."""
+"""Normalisation de l'URL PostgreSQL (postgres:// → postgresql://)."""
 from app.core.config import prepare_database_url
 
 

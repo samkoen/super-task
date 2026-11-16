@@ -27,6 +27,8 @@ export const flowColor = {
   alphaNeutral1000_10: "rgba(0,0,0,0.1)",
   alphaNavy800_18: "rgba(18,33,63,0.18)",
   alphaNavy800_72: "rgba(18,33,63,0.72)",
+  /** « בשעה 6:30 » sous le titre (Figma alpha/black-800-72). */
+  alphaBlack800_72: "rgba(26,26,26,0.72)",
   alphaNavy800_60: "rgba(18,33,63,0.6)",
   alphaNeutral0_80: "rgba(255,255,255,0.8)",
   alphaNeutral0_19: "rgba(255,255,255,0.19)",

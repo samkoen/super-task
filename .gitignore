@@ -9,10 +9,7 @@ node_modules/
 **/node_modules_old*/
 frontend/dist/
 backend/uploads/
-.vercel
-.vercel/
 .idea/
 .vscode/
 
-.vercel
 .env*

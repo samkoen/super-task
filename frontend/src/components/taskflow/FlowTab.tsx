@@ -67,7 +67,8 @@ function Thumbnail({ state }: { state: SlotUiState }) {
 
 function StatusBadge({ state }: { state: SlotUiState }) {
   const sent = state.status === "sent";
-  const Icon = sent ? CheckRoundedIcon : state.status === "failed" ? ErrorOutlineRoundedIcon : ScheduleRoundedIcon;
+  const skipped = state.status === "skipped";
+  const Icon = sent ? CheckRoundedIcon : state.status === "failed" || skipped ? ErrorOutlineRoundedIcon : ScheduleRoundedIcon;
   return (
     <Box
       data-testid="flow-tab-badge"
@@ -78,7 +79,7 @@ function StatusBadge({ state }: { state: SlotUiState }) {
         flexShrink: 0,
         display: "grid",
         placeItems: "center",
-        bgcolor: sent ? flowColor.green300 : flowColor.neutral300,
+        bgcolor: sent ? flowColor.green300 : skipped ? flowColor.yellow300 : flowColor.neutral300,
         borderRadius: `${flowRadius.sm}px 11.7px 11.7px 11.7px`,
       }}
     >

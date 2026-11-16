@@ -42,13 +42,13 @@ def is_production_target() -> bool:
     if os.environ.get("ENVIRONMENT", "").strip().lower() == "production":
         return True
     db_url = os.environ.get("DATABASE_URL", "").lower()
-    return ".neon.tech" in db_url or "vercel" in db_url
+    return ".neon.tech" in db_url
 
 
 def require_confirmation(force: bool) -> None:
     if force or not is_production_target():
         return
-    print("Cible production detectee (Neon/Vercel ou ENVIRONMENT=production).")
+    print("Cible production detectee (Neon ou ENVIRONMENT=production).")
     print("Relancez avec --confirm pour appliquer le seed.")
     sys.exit(1)
 
@@ -254,7 +254,7 @@ def main() -> None:
     parser.add_argument(
         "--confirm",
         action="store_true",
-        help="Requis sur Neon/Vercel (ENVIRONMENT=production)",
+        help="Requis sur Neon / ENVIRONMENT=production",
     )
     args = parser.parse_args()
     require_confirmation(args.confirm)

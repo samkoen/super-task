@@ -163,7 +163,7 @@ Issues : `POST /api/issue-reports`, uploads `issue_photos|videos|audio`.
 
 ## 6. Stockage médias
 
-**Vercel Blob n’est plus utilisé.** Anciennes URLs `*.blob.vercel-storage.com` : ignorées (pas de proxy, pas d’avatar).
+Anciennes URLs `*.blob.vercel-storage.com` : ignorées (pas de proxy, pas d’avatar).
 
 | Environnement | Comportement |
 |---------------|--------------|
@@ -277,4 +277,4 @@ GOOGLE_TTS_VOICE_FR=fr-FR-Neural2-A
 
 Sans `GEMINI_API_KEY` : pas de création par voix ni transcriptions audio.  
 Sans `GOOGLE_CLOUD_API_KEY` : traduction via LLM ; TTS Google indisponible (repli navigateur hébreu).  
-Sans `R2_*` en prod : uploads impossibles. `BLOB_READ_WRITE_TOKEN` est ignoré.
+Sans `R2_*` en prod : uploads impossibles.

@@ -5,13 +5,19 @@ import type { CaptureLocation } from "../utils/geoCheck";
 import { getCurrentLocation } from "../utils/geoPosition";
 import type { TrimRange } from "../utils/flowTrim";
 import { getSlotUploadQueue } from "../utils/slotSender";
+import { skipAttachment, type SkipDraft } from "../utils/slotSkip";
 import { trimVideo, type TrimResult } from "../utils/videoTrim";
 import { slotQueueId, type QueuedSlot, type SlotUploadQueue } from "../utils/slotUploadQueue";
 import {
   applyQueueEvent,
+  clearSkip,
   discardFilmed,
+  isSkipPending,
   markFilmed,
   markReady,
+  markSkipFailed,
+  markSkipSent,
+  markSkipped,
   markTrimmed,
   mergeStoredSlots,
   slotStatesFromCompletion,
@@ -249,6 +255,40 @@ export function useSlotUploads(options: SlotUploadsOptions) {
     [occurrenceId, setStates, callbacks],
   );
 
+  /** « לא ניתן לצלם » : la case est remise avec sa raison ; le fichier éventuel est abandonné. */
+  const skip = useCallback(
+    (index: number, draft: SkipDraft) => {
+      if (!draft.reasonCode) return;
+      files.current.delete(index);
+      dropHeld(index);
+      const reasonText = draft.reasonText.trim() || null;
+      setStates((prev) => markSkipped(prev, index, { reasonCode: draft.reasonCode!, reasonText, audio: draft.audio }));
+    },
+    [setStates, dropHeld],
+  );
+
+  const unskip = useCallback((index: number) => setStates((prev) => clearSkip(prev, index)), [setStates]);
+
+  /** Envoie la raison d'une case non filmée (avec son explication vocale, si elle existe). */
+  const sendSkip = useCallback(
+    async (index: number, state: SlotUiState) => {
+      const reason = state.skip;
+      if (!reason) return;
+      try {
+        const audioUrl = reason.audio ? (await taskService.uploadAudio(reason.audio)).url : reason.audioUrl ?? null;
+        const attachment = skipAttachment(requirements[index].kind, reason, audioUrl);
+        const response = await taskService.submitSlot(occurrenceId, index, attachment);
+        setStates((prev) => markSkipSent(prev, index, audioUrl));
+        callbacks.current.onSent?.(index, response);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error ?? "");
+        setStates((prev) => markSkipFailed(prev, index, message));
+        callbacks.current.onFailed?.(index, message);
+      }
+    },
+    [occurrenceId, requirements, setStates, callbacks],
+  );
+
   /** Média confirmé → file d'envoi : depuis le disque, sinon (écriture disque échouée) depuis la mémoire. */
   const enqueueKept = useCallback(
     async (index: number, kind: CompletionRequirement["kind"]) => {
@@ -278,6 +318,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       for (const { state, index } of todo) {
         if (state.status === "ready" && requirements[index]?.kind === "message") await sendText(index, state.text ?? "");
         else if (state.status === "ready") await enqueueKept(index, requirements[index].kind);
+        else if (isSkipPending(state)) await sendSkip(index, state);
         else if (state.status === "failed") await queue.retry(`${occurrenceId}:${index}`);
       }
       await queue.flush();
@@ -287,7 +328,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       sending.current = false;
       setSending(false);
     }
-  }, [queue, occurrenceId, requirements, sendText, enqueueKept, callbacks]);
+  }, [queue, occurrenceId, requirements, sendText, sendSkip, enqueueKept, callbacks]);
 
-  return { states, sending: isSending, film, trim, discard, keep, keepText, sendAll };
+  return { states, sending: isSending, film, trim, discard, keep, keepText, skip, unskip, sendAll };
 }

@@ -24,9 +24,20 @@ export type SlotReview = {
   reviewed_at?: string;
 };
 
+export type SkipReasonCode = "no_stock" | "area_blocked" | "camera_issue" | "other";
+
+/** « לא ניתן לצלם » : la case n'a pas de fichier, l'oved explique pourquoi (texte et/ou audio). */
+export type SlotSkip = {
+  reason_code: SkipReasonCode;
+  reason_text?: string;
+  audio_url?: string;
+};
+
 export type CompletionAttachment = {
   kind: CompletionKind;
   url?: string;
+  /** Présent quand la sous-tâche n'a pas été filmée : la raison de l'oved. */
+  skipped?: SlotSkip;
   text?: string;
   duration_seconds?: number;
   captured_at?: string;

@@ -178,7 +178,7 @@ describe("mediaCapture", () => {
     expect(photoPreviewSize(800, 600)).toEqual({ width: 800, height: 600 });
   });
 
-  it("photoPreviewSize downscales so the long edge matches the Vercel-safe max", () => {
+  it("photoPreviewSize downscales so the long edge matches the upload max", () => {
     expect(photoPreviewSize(4000, 3000)).toEqual({ width: PHOTO_UPLOAD_MAX_EDGE, height: 960 });
   });
 

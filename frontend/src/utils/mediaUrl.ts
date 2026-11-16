@@ -57,6 +57,3 @@ export function mediaStreamUrl(path: string | null | undefined): string | null {
   if (!url) return null;
   return withStreamQuery(url);
 }
-
-/** @deprecated alias — R2 only */
-export const isPrivateVercelBlobUrl = isPrivateObjectMediaUrl;

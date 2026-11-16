@@ -5,6 +5,7 @@ import { he } from "../i18n/he";
 import type { SubmitSlotResponse } from "../services/taskService";
 import { remainingAfter, type FlowToastState } from "../utils/flowToast";
 import { readyForSummary } from "../utils/flowSummary";
+import type { SkipDraft } from "../utils/slotSkip";
 
 export type TaskFlowOptions = Omit<SlotUploadsOptions, "onSent" | "onSavedOnDevice" | "onFailed"> & {
   /** Toutes les cartes sont confirmées : place au récap (10), qui fait l'envoi au serveur. */
@@ -31,10 +32,15 @@ export function useTaskFlow(options: TaskFlowOptions) {
       onError?.(message || he.flowToastFailed);
     },
   });
-  const { states, film, discard, keep, keepText } = uploads;
+  const { states, film, discard, keep, keepText, skip, unskip } = uploads;
 
   useEffect(() => {
-    if (finished.current || !touched.current || !readyForSummary(states)) return;
+    if (!readyForSummary(states)) {
+      // Une carte rouverte (refaite, « לצלם עכשיו ») : le récap se rouvre quand tout est de nouveau remis.
+      finished.current = false;
+      return;
+    }
+    if (finished.current || !touched.current) return;
     finished.current = true;
     onAllHandedOver();
   }, [states, onAllHandedOver]);
@@ -56,6 +62,16 @@ export function useTaskFlow(options: TaskFlowOptions) {
       setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
     },
     [keepText, states],
+  );
+
+  /** « לא ניתן לצלם » : la raison est gardée, la carte compte comme remise (l'envoi se fera au récap). */
+  const skipSlot = useCallback(
+    (index: number, draft: SkipDraft) => {
+      touched.current = true;
+      skip(index, draft);
+      setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
+    },
+    [skip, states],
   );
 
   const capture = useCallback(
@@ -88,6 +104,8 @@ export function useTaskFlow(options: TaskFlowOptions) {
     capture,
     confirmSlot,
     saveText,
+    skipSlot,
+    unskipSlot: unskip,
     retakeSlot,
     trimSlot: uploads.trim,
     reviewIndex: reviewIndex >= 0 ? reviewIndex : null,

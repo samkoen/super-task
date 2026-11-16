@@ -2,6 +2,7 @@
 
 Chaque case de ``completion_requirements`` est envoyée dès que l'oved valide son média.
 La liste de pièces jointes garde la position de la case : l'index d'une pièce = l'index de l'exigence.
+Une case peut aussi être « non filmée » : elle porte alors une raison (voir ``slot_skip``) au lieu d'un fichier.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from app.domain.completion_media import (
     normalize_attachments,
 )
 from app.domain.slot_review import SLOT_REJECTED, review_of, same_content
+from app.domain.slot_skip import is_skipped, same_skip
 
 _UNKNOWN_SLOT = "תת-משימה לא קיימת"
 _NO_SLOTS = "למשימה זו אין תתי-משימות לשליחה"
@@ -32,7 +34,7 @@ def parse_slot_index(value: object, *, count: int) -> int:
 
 
 def normalize_slot_attachment(requirement: dict, raw: object) -> dict:
-    """Pièce jointe d'une case : même type que l'exigence, remplie, durée vidéo suffisante."""
+    """Pièce jointe d'une case : même type que l'exigence, remplie (ou non filmée avec sa raison)."""
     if not isinstance(raw, dict):
         raise ValueError(_WRONG_KIND)
     item = normalize_attachments([raw])[0]
@@ -64,21 +66,27 @@ def empty_slot(kind: str) -> dict:
 
 
 def pending_slot_indices(requirements: list[dict], attachments: list[dict]) -> list[int]:
-    """Cases encore à envoyer : vides, ou refusées par le menahel et pas encore remplacées."""
+    """Cases encore à envoyer : vides, ou refusées par le menahel et pas encore remplacées.
+
+    Une case non filmée (avec sa raison) est considérée comme rendue.
+    """
     pending: list[int] = []
     for index in range(len(requirements)):
         item = attachments[index] if index < len(attachments) else None
-        if item is None or not attachment_is_filled(item) or _is_rejected(item):
+        if item is None or _is_rejected(item):
+            pending.append(index)
+        elif not attachment_is_filled(item) and not is_skipped(item):
             pending.append(index)
     return pending
 
 
 def slot_already_sent(stored: list[dict] | None, index: int, attachment: dict) -> bool:
-    """Renvoi du même fichier pour la même case (coupure réseau) : rien à refaire."""
+    """Renvoi du même fichier (ou de la même raison) pour la même case (coupure réseau) : rien à refaire."""
     items = stored or []
     if index >= len(items):
         return False
-    return same_content(items[index], attachment) and not _is_rejected(items[index])
+    same = same_skip(items[index], attachment) or same_content(items[index], attachment)
+    return same and not _is_rejected(items[index])
 
 
 def _is_rejected(item: dict) -> bool:

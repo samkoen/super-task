@@ -36,7 +36,7 @@ describe("FlowSummary", () => {
     const { onSend, onContinue } = renderSummary([ready, ready]);
     const button = screen.getByTestId("flow-summary-send");
     expect(button.textContent).toBe(he.flowSummarySend);
-    expect(he.flowSummarySend).toBe("אישור ושליחה");
+    expect(he.flowSummarySend).toBe("שליחת הסרטונים");
     expect(screen.getByTestId("flow-summary-title").textContent).toBe(he.flowSummaryTitleReady);
     expect(screen.getByText(he.flowSummarySubtitleReady(2, 2))).toBeTruthy();
     fireEvent.click(button);
@@ -89,5 +89,54 @@ describe("FlowSummary", () => {
   it("a refused card brings back the send button so it can be retried", () => {
     renderSummary([sent, { status: "failed", kind: "video" }]);
     expect(screen.getByTestId("flow-summary-send")).toBeTruthy();
+  });
+});
+
+const skipped = (over: Partial<NonNullable<SlotUiState["skip"]>> = {}): SlotUiState => ({
+  status: "skipped",
+  kind: "video",
+  skip: { reasonCode: "area_blocked", sent: false, ...over },
+});
+
+describe("FlowSummary: a card marked « לא ניתן לצלם » (screen 10ב)", () => {
+  it("announces a partial result and tells the reason goes to the manager", () => {
+    renderSummary([ready, skipped()]);
+    expect(screen.getByTestId("flow-summary-title").textContent).toBe(he.flowSummaryTitlePartial(1, 2));
+    expect(screen.getByTestId("flow-summary-subtitle").textContent).toBe(he.flowSummarySubtitlePartial(1));
+    expect(screen.getByTestId("flow-summary-card-title").textContent).toBe(he.flowSummaryCardPartial(1, 2));
+    expect(screen.getByTestId("flow-summary-send").textContent).toBe(he.flowSummarySend);
+  });
+
+  it("lists the skipped card with its reason and a « לצלם עכשיו » action", () => {
+    const { onSend } = renderSummary([ready, skipped()], { onFilmNow: vi.fn() });
+    const row = screen.getAllByTestId("flow-summary-row")[1];
+    expect(row.getAttribute("data-skipped")).toBe("true");
+    expect(row.textContent).toContain(he.flowSummarySkipped(he.flowSkipReasonAreaBlocked));
+    expect(row.textContent).toContain(he.flowSummaryFilmNow);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("shows the free text for the reason « אחר »", () => {
+    renderSummary([ready, skipped({ reasonCode: "other", reasonText: "הדלת נעולה" })]);
+    expect(screen.getAllByTestId("flow-summary-row")[1].textContent).toContain(he.flowSummarySkipped("הדלת נעולה"));
+  });
+
+  it("« לצלם עכשיו » reopens that card", () => {
+    const onFilmNow = vi.fn();
+    renderSummary([ready, skipped()], { onFilmNow });
+    fireEvent.click(screen.getByTestId("flow-summary-film-now"));
+    expect(onFilmNow).toHaveBeenCalledWith(1);
+  });
+
+  it("offers no « לצלם עכשיו » once the reason has reached the server", () => {
+    renderSummary([sent, skipped({ sent: true })], { onFilmNow: vi.fn() });
+    expect(screen.queryByTestId("flow-summary-film-now")).toBeNull();
+    expect(screen.getByTestId("flow-summary-continue")).toBeTruthy();
+  });
+
+  it("keeps the simple wording when every card was filmed", () => {
+    renderSummary([ready, ready]);
+    expect(screen.getByTestId("flow-summary-card-title").textContent).toBe(he.flowSummaryCardAll(2, 2));
+    expect(screen.queryByTestId("flow-summary-film-now")).toBeNull();
   });
 });

@@ -1,0 +1,27 @@
+# Dépendances et builds
+node_modules/
+**/node_modules/
+**/_nm_trash_*/
+**/node_modules_old*/
+frontend/dist/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/.gradle/
+
+# Caches Python / tests
+__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+.venv/
+venv/
+
+# Uploads et médias générés
+backend/uploads/
+
+# Secrets et divers
+.env*
+*.log
+.vercel/
+.idea/
+new_reshet_subscription.txt

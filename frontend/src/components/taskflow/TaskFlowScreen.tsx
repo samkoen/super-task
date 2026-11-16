@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
-import { Box, ButtonBase, Dialog } from "@mui/material";
+import { Box, Dialog } from "@mui/material";
 import FlowBottomNav, { flowBottomNavClearanceCss } from "./FlowBottomNav";
 import FlowGuideSheet from "./FlowGuideSheet";
 import FlowReview from "./FlowReview";
+import FlowSentDialog from "./FlowSentDialog";
+import FlowSkipSheet from "./FlowSkipSheet";
 import FlowSummary from "./FlowSummary";
 import FlowTaskChat from "./FlowTaskChat";
 import FlowToast from "./FlowToast";
@@ -10,13 +12,12 @@ import TaskCardStack from "./TaskCardStack";
 import TaskFlowHeader from "./TaskFlowHeader";
 import { useTaskFlow } from "../../hooks/useTaskFlow";
 import type { SubmitSlotResponse, TaskCompletion, TaskStatus } from "../../services/taskService";
-import { he } from "../../i18n/he";
-import { flowColor, flowRadius, flowScreenBackground, flowSize, flowText } from "../../styles/flowTokens";
+import { flowScreenBackground } from "../../styles/flowTokens";
 import { effectiveRequirements, type CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
 import type { GeoPoint } from "../../utils/geoCheck";
-import { readyForSummary } from "../../utils/flowSummary";
-import { handedOverCount, needsSending } from "../../utils/slotUploadState";
+import { hasPendingUpload, sentVideoCount, summaryPhase } from "../../utils/flowSummary";
+import { handedOverCount } from "../../utils/slotUploadState";
 
 export type TaskFlowTask = {
   id: string;
@@ -55,12 +56,20 @@ type Flow = ReturnType<typeof useTaskFlow>;
 
 const paperProps = { sx: { background: flowScreenBackground } };
 
-/** Toutes les cartes confirmées : le récap (10) prend la main, c'est lui qui envoie au serveur. */
+/**
+ * Récap (10) : il s'ouvre seul quand toutes les cartes sont remises, ou à tout moment avec l'icône
+ * « סיכום » de la barre du haut. C'est lui qui envoie au serveur.
+ */
 function useFinish() {
   const [summary, setSummary] = useState(false);
+  /** Carte à rouvrir en revenant du récap (« לצלם עכשיו »). */
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const onAllHandedOver = useCallback(() => setSummary(true), []);
-  const leaveSummary = useCallback(() => setSummary(false), []);
-  return { summary, onAllHandedOver, leaveSummary };
+  const leaveSummary = useCallback((focus: number | null = null) => {
+    setFocusIndex(focus);
+    setSummary(false);
+  }, []);
+  return { summary, focusIndex, onAllHandedOver, leaveSummary };
 }
 
 type ReviewLayerProps = {
@@ -94,23 +103,37 @@ function ReviewLayer({ flow, requirements, branch, branchCenter }: ReviewLayerPr
   );
 }
 
-function OpenSummaryButton({ onClick }: { onClick: () => void }) {
+/** Récap (10/10ב) puis, pour une ouverture de משמרת, popup « הסרטונים נשלחו » (11) une fois tout parti. */
+function SummaryLayer({ props, flow, requirements, onBack }: { props: TaskFlowScreenProps; flow: Flow; requirements: CompletionRequirement[]; onBack: (focus?: number | null) => void }) {
+  const shiftOpening = Boolean(props.shiftOpening);
+  const sentPopup = shiftOpening && summaryPhase(flow.states, flow.sending) === "done" && !hasPendingUpload(flow.states);
   return (
-    <ButtonBase
-      data-testid="flow-open-summary"
-      onClick={onClick}
-      sx={{ width: "100%", maxWidth: flowSize.cardWidth, mx: "auto", mt: 2, height: flowSize.roundButton, borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral900, color: flowColor.neutral0, ...flowText.button }}
-    >
-      {he.flowSummaryTitleReady}
-    </ButtonBase>
+    <Dialog open fullScreen dir="rtl" PaperProps={paperProps}>
+      <FlowSummary
+        shiftOpening={shiftOpening}
+        requirements={requirements}
+        states={flow.states}
+        sending={flow.sending}
+        onSend={() => void flow.sendAll()}
+        onContinue={props.onFinished}
+        onBack={() => onBack()}
+        onFilmNow={(index) => {
+          flow.unskipSlot(index);
+          onBack(index);
+        }}
+      />
+      <FlowSentDialog open={sentPopup} count={sentVideoCount(flow.states)} onContinue={props.onFinished} />
+    </Dialog>
   );
 }
 
-function FlowBody({ props, flow, requirements, onGuide, onChat, onOpenSummary }: {
+function FlowBody({ props, flow, requirements, focusIndex, onGuide, onSkip, onChat, onOpenSummary }: {
   props: TaskFlowScreenProps;
   flow: Flow;
   requirements: CompletionRequirement[];
+  focusIndex: number | null;
   onGuide: (index: number) => void;
+  onSkip: (index: number) => void;
   onChat: () => void;
   onOpenSummary: () => void;
 }) {
@@ -123,17 +146,19 @@ function FlowBody({ props, flow, requirements, onGuide, onChat, onOpenSummary }:
         photoUrl={props.photoUrl}
         onBack={props.onClose}
         onOpenChat={onChat}
+        onOpenSummary={onOpenSummary}
       />
       <Box sx={{ px: "24px" }}>
         <TaskCardStack
           requirements={requirements}
           states={flow.states}
           retake={flow.retake}
+          focusIndex={focusIndex}
           onCapture={flow.capture}
           onSendText={flow.saveText}
           onOpenGuide={onGuide}
+          onSkip={onSkip}
         />
-        {readyForSummary(flow.states) && needsSending(flow.states) ? <OpenSummaryButton onClick={onOpenSummary} /> : null}
       </Box>
       <FlowBottomNav onHome={props.onClose} onChat={props.onOpenChats} />
     </Box>
@@ -144,7 +169,7 @@ function FlowBody({ props, flow, requirements, onGuide, onChat, onOpenSummary }:
 export default function TaskFlowScreen(props: TaskFlowScreenProps) {
   const { task, shiftOpening = false } = props;
   const requirements = effectiveRequirements(task);
-  const { summary, onAllHandedOver, leaveSummary } = useFinish();
+  const { summary, focusIndex, onAllHandedOver, leaveSummary } = useFinish();
   const flow = useTaskFlow({
     occurrenceId: task.id,
     requirements,
@@ -154,28 +179,24 @@ export default function TaskFlowScreen(props: TaskFlowScreenProps) {
     onServerUpdate: props.onServerUpdate,
   });
   const [guideIndex, setGuideIndex] = useState<number | null>(null);
+  const [skipIndex, setSkipIndex] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
 
-  if (summary) {
-    return (
-      <Dialog open fullScreen dir="rtl" PaperProps={paperProps}>
-        <FlowSummary
-          shiftOpening={shiftOpening}
-          requirements={requirements}
-          states={flow.states}
-          sending={flow.sending}
-          onSend={() => void flow.sendAll()}
-          onContinue={props.onFinished}
-          onBack={leaveSummary}
-        />
-      </Dialog>
-    );
-  }
+  if (summary) return <SummaryLayer props={{ ...props, shiftOpening }} flow={flow} requirements={requirements} onBack={leaveSummary} />;
   return (
     <Dialog open fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus>
-      <FlowBody props={props} flow={flow} requirements={requirements} onGuide={setGuideIndex} onChat={() => setChatOpen(true)} onOpenSummary={onAllHandedOver} />
+      <FlowBody props={props} flow={flow} requirements={requirements} focusIndex={focusIndex} onGuide={setGuideIndex} onSkip={setSkipIndex} onChat={() => setChatOpen(true)} onOpenSummary={onAllHandedOver} />
       <FlowToast toast={flow.toast} onClose={flow.closeToast} />
       <FlowGuideSheet req={guideIndex !== null ? requirements[guideIndex] : null} index={guideIndex ?? 0} onClose={() => setGuideIndex(null)} />
+      <FlowSkipSheet
+        req={skipIndex !== null ? requirements[skipIndex] : null}
+        index={skipIndex ?? 0}
+        onClose={() => setSkipIndex(null)}
+        onConfirm={(index, draft) => {
+          flow.skipSlot(index, draft);
+          setSkipIndex(null);
+        }}
+      />
       <ReviewLayer flow={flow} requirements={requirements} branch={props.branch} branchCenter={props.branchCenter} />
       <FlowTaskChat
         open={chatOpen}

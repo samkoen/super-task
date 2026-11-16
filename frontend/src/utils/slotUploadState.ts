@@ -1,4 +1,4 @@
-import type { CompletionAttachment, CompletionRequirement } from "./completionMedia";
+import type { CompletionAttachment, CompletionRequirement, SkipReasonCode } from "./completionMedia";
 import { attachmentsFromCompletion, mapAttachmentsToSlots } from "./completionSlotView";
 import type { CaptureLocation } from "./geoCheck";
 import type { QueuedSlot, SlotQueueEvent } from "./slotUploadQueue";
@@ -7,9 +7,21 @@ import type { QueuedSlot, SlotQueueEvent } from "./slotUploadQueue";
  * État d'envoi d'une sous-tâche, du point de vue de l'oved :
  * idle → filmed (capturé, pas encore confirmé) → ready (confirmé, gardé sur l'appareil) → queued → uploading → sent,
  * ou failed quand le serveur refuse. L'envoi au serveur se fait à la fin, depuis l'écran récap (10).
+ * « skipped » : l'oved a déclaré « לא ניתן לצלם » (raison dans `skip`) ; la case compte comme remise.
  * Aucun titre ni nombre de cartes n'est figé ici.
  */
-export type SlotUploadStatus = "idle" | "filmed" | "ready" | "queued" | "uploading" | "sent" | "failed";
+export type SlotUploadStatus = "idle" | "filmed" | "ready" | "queued" | "uploading" | "sent" | "failed" | "skipped";
+
+/** Raison d'une case non filmée ; `sent` = le serveur la connaît (sinon elle part à l'envoi final). */
+export type SlotSkipState = {
+  reasonCode: SkipReasonCode;
+  reasonText?: string | null;
+  /** Explication vocale enregistrée sur l'appareil, pas encore envoyée. */
+  audio?: File | null;
+  /** Explication vocale déjà sur le serveur. */
+  audioUrl?: string | null;
+  sent: boolean;
+};
 
 export type SlotUiState = {
   status: SlotUploadStatus;
@@ -29,6 +41,8 @@ export type SlotUiState = {
   /** Remarque du menahel quand il a refusé cette sous-tâche. */
   remark?: string | null;
   error?: string | null;
+  /** Renseigné quand `status` vaut « skipped ». */
+  skip?: SlotSkipState | null;
 };
 
 type CompletionLike = Parameters<typeof attachmentsFromCompletion>[0];
@@ -57,6 +71,21 @@ function stateFromAttachment(
     return { ...base, status: "idle", remark: fill.review.remark || "", sentAt: null };
   }
   return base;
+}
+
+/** Le serveur a déjà la raison « לא ניתן לצלם » de cette case. */
+function skippedStateFromServer(req: CompletionRequirement, item: CompletionAttachment | undefined): SlotUiState | null {
+  if (!item?.skipped || item.kind !== req.kind) return null;
+  return {
+    status: "skipped",
+    kind: req.kind,
+    skip: {
+      reasonCode: item.skipped.reason_code,
+      reasonText: item.skipped.reason_text ?? null,
+      audioUrl: item.skipped.audio_url ?? null,
+      sent: true,
+    },
+  };
 }
 
 /** Aperçu local d'un média gardé sur disque (rien hors navigateur, ex. tests sans `URL.createObjectURL`). */
@@ -110,7 +139,7 @@ export function slotStatesFromCompletion(
     const fill = fills[index];
     const base: SlotUiState = fill
       ? stateFromAttachment(req, fill, attachments)
-      : { status: "idle", kind: req.kind };
+      : skippedStateFromServer(req, attachments[index]) ?? { status: "idle", kind: req.kind };
     return withQueueEntry(base, queued.find((entry) => entry.slotIndex === index));
   });
 }
@@ -134,7 +163,50 @@ export function markFilmed(
     previewUrl: media.previewUrl ?? null,
     remark: null,
     error: null,
+    skip: null,
   });
+}
+
+/** « לא ניתן לצלם » : la case est remise avec sa raison (rien à filmer), elle partira à l'envoi final. */
+export function markSkipped(
+  states: SlotUiState[],
+  index: number,
+  skip: Omit<SlotSkipState, "sent">,
+): SlotUiState[] {
+  const current = states[index];
+  if (!current || current.status === "sent" || current.status === "queued" || current.status === "uploading") return states;
+  return patch(states, index, {
+    status: "skipped",
+    skip: { ...skip, sent: false },
+    capturedAt: null,
+    durationSeconds: null,
+    lightOk: null,
+    location: null,
+    previewUrl: null,
+    remark: null,
+    error: null,
+  });
+}
+
+/** L'oved veut finalement filmer : la case redevient libre (la raison disparaît). */
+export function clearSkip(states: SlotUiState[], index: number): SlotUiState[] {
+  if (states[index]?.status !== "skipped") return states;
+  return patch(states, index, { status: "idle", skip: null, error: null });
+}
+
+/** Le serveur a pris la raison en compte. */
+export function markSkipSent(states: SlotUiState[], index: number, audioUrl?: string | null): SlotUiState[] {
+  const skip = states[index]?.skip;
+  if (states[index]?.status !== "skipped" || !skip) return states;
+  return patch(states, index, {
+    skip: { ...skip, sent: true, audio: null, audioUrl: audioUrl ?? skip.audioUrl ?? null },
+    error: null,
+  });
+}
+
+export function markSkipFailed(states: SlotUiState[], index: number, error: string): SlotUiState[] {
+  if (states[index]?.status !== "skipped") return states;
+  return patch(states, index, { error });
 }
 
 /** La vidéo filmée a été découpée : nouvelle durée et nouvel aperçu, le reste de la prise est conservé. */
@@ -195,16 +267,30 @@ export function applyQueueEvent(
 
 /** Remise au serveur faite ou en cours : l'oved n'a plus rien à filmer pour cette case. */
 export function isHandedOver(status: SlotUploadStatus): boolean {
-  return status === "sent" || status === "ready" || status === "queued" || status === "uploading";
+  return status === "sent" || status === "ready" || status === "queued" || status === "uploading" || status === "skipped";
 }
 
-/** Reste-t-il quelque chose à envoyer au serveur (confirmé mais pas parti, ou refusé) ? */
+/** Une raison « לא ניתן לצלם » que le serveur ne connaît pas encore. */
+export function isSkipPending(state: SlotUiState): boolean {
+  return state.status === "skipped" && !state.skip?.sent;
+}
+
+/** Reste-t-il quelque chose à envoyer au serveur (confirmé mais pas parti, raison à déclarer, ou refusé) ? */
 export function needsSending(states: SlotUiState[]): boolean {
-  return states.some((state) => state.status === "ready" || state.status === "failed");
+  return states.some((state) => state.status === "ready" || state.status === "failed" || isSkipPending(state));
 }
 
 export function handedOverCount(states: SlotUiState[]): number {
   return states.filter((state) => isHandedOver(state.status)).length;
+}
+
+/** Cases remises avec une vraie prise (hors « לא ניתן לצלם »). */
+export function filmedCount(states: SlotUiState[]): number {
+  return states.filter((state) => isHandedOver(state.status) && state.status !== "skipped").length;
+}
+
+export function skippedCount(states: SlotUiState[]): number {
+  return states.filter((state) => state.status === "skipped").length;
 }
 
 export function sentCount(states: SlotUiState[]): number {

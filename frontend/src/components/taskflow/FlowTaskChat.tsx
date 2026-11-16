@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, CircularProgress, Dialog, Typography } from "@mui/material";
 import FlowChatComposer from "./FlowChatComposer";
-import { FlowChatContextBar, FlowChatHeader } from "./FlowChatHeader";
+import { FlowChatHeader } from "./FlowChatHeader";
 import FlowChatMessages from "./FlowChatMessages";
+import FlowChatTopics from "./FlowChatTopics";
 import { useAuth } from "../../context/AuthContext";
 import { useChatThread } from "../../hooks/useChatThread";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
@@ -10,7 +11,7 @@ import { he } from "../../i18n/he";
 import { flowColor } from "../../styles/flowTokens";
 import type { TaskStatus } from "../../services/taskService";
 import type { CompletionRequirement } from "../../utils/completionMedia";
-import { chatProgress, stepChoices, stepTagLabel } from "../../utils/flowChat";
+import { composerPlaceholder, stepTagLabel, topicChoices } from "../../utils/flowChat";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { createTaskChatTransport } from "../../utils/taskChatTransport";
 import type { SlotUploadStatus } from "../../utils/slotUploadState";
@@ -22,7 +23,7 @@ type Props = {
   status?: TaskStatus;
   managerName?: string | null;
   requirements: CompletionRequirement[];
-  /** Statut de chaque carte : alimente la barre de progression du contexte. */
+  /** Statut de chaque carte : coche verte sur les sujets déjà remis. */
   statuses: SlotUploadStatus[];
   onClose: () => void;
   onOccurrenceUpdated?: () => void;
@@ -90,16 +91,14 @@ function ChatScreen(props: ScreenProps) {
     <Box data-testid="flow-task-chat" dir="rtl" sx={{ width: "100%", maxWidth: 393, height: "100dvh", mx: "auto", display: "flex", flexDirection: "column", bgcolor: flowColor.neutral100 }}>
       <Box sx={{ flexShrink: 0 }}>
         <FlowChatHeader title={props.title} managerName={props.managerName} onBack={props.onClose} />
-        <FlowChatContextBar progress={chatProgress(props.statuses)} onOpenTask={props.onClose} />
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", pt: "16px" }}>
+        {canCompose ? <FlowChatTopics choices={topicChoices(props.requirements, props.statuses)} selected={selected} onSelect={setSelected} /> : null}
         <Feed props={props} thread={thread} myId={user?.id} />
       </Box>
       {canCompose ? (
         <FlowChatComposer
-          choices={stepChoices(props.requirements)}
-          selected={selected}
-          onSelect={setSelected}
+          placeholder={composerPlaceholder(props.requirements, selected)}
           body={thread.body}
           onBodyChange={thread.setBody}
           sending={thread.sending}
@@ -116,7 +115,7 @@ const paperProps = { sx: { bgcolor: flowColor.neutral100 } };
 
 /**
  * Chat de la tâche (Figma écran 12), ouvert par l'icône de chat du haut de l'écran de tâche :
- * fil de la tâche, avancement par étape et choix de l'étape visée par chaque message.
+ * fil de la tâche et choix du sujet (sous-tâche) visé par chaque message.
  */
 export default function FlowTaskChat({ open, ...rest }: Props) {
   return (

@@ -33,8 +33,8 @@ def _uses_cloud_api() -> bool:
 
 
 def _raise_missing_config() -> None:
-    if config.IS_VERCEL:
-        hint = "הגדר OPENCODE_API_KEY ב-Vercel → Environment Variables."
+    if config.IS_PRODUCTION:
+        hint = "הגדר OPENCODE_API_KEY במשתני הסביבה."
     else:
         hint = (
             "הגדר OPENCODE_API_KEY (ענן) או OPENCODE_SERVER_URL + opencode serve (מקומי) "

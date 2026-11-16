@@ -63,11 +63,13 @@ describe("ManagerFixedTaskDetailPage", () => {
     ]);
   });
 
-  it("shows the general settings with the impact on branches", async () => {
+  it("shows the task in the studio and announces the impact once something changes", async () => {
     vi.mocked(fixedTaskService.get).mockResolvedValue(fixtureGroup({ overridden_count: 1 }));
     renderPage();
-    await waitFor(() => expect(screen.getByRole("heading", { name: "בדיקת קירור" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByDisplayValue("בדיקת קירור")).toBeTruthy());
     expect(screen.getByRole("tab", { name: he.fixedDetailTabGeneral })).toBeTruthy();
+    expect(screen.queryByTestId("studio-save-bar")).toBeNull();
+    fireEvent.change(screen.getByLabelText(he.description), { target: { value: "לבדוק טמפרטורה" } });
     expect(screen.getByTestId("fixed-impact").textContent).toBe(he.fixedDetailImpact(2, 1));
   });
 
@@ -77,13 +79,23 @@ describe("ManagerFixedTaskDetailPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByLabelText(he.taskTitle)).toBeTruthy());
     fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "כותרת חדשה" } });
-    fireEvent.click(screen.getByRole("button", { name: he.fixedDetailSave }));
+    fireEvent.click(screen.getByRole("button", { name: he.studioSave }));
     await waitFor(() => expect(fixedTaskService.updateDefaults).toHaveBeenCalled());
     const [key, payload] = vi.mocked(fixedTaskService.updateDefaults).mock.calls[0];
     expect(key).toBe("g1");
     expect(payload.title).toBe("כותרת חדשה");
     expect("assignee_user_id" in payload).toBe(false);
     await waitFor(() => expect(showSuccess).toHaveBeenCalledWith(he.fixedDetailSaved));
+  });
+
+  it("asks before leaving with unsaved changes", async () => {
+    vi.mocked(fixedTaskService.get).mockResolvedValue(fixtureGroup());
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText(he.taskTitle)).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "שינוי" } });
+    fireEvent.click(screen.getByTestId("studio-back"));
+    fireEvent.click(await screen.findByRole("button", { name: he.studioLeaveConfirm }));
+    await waitFor(() => expect(screen.getByTestId("list-route")).toBeTruthy());
   });
 
   it("switches to the branches tab and toggles a branch without touching the others", async () => {
@@ -140,6 +152,7 @@ describe("ManagerFixedTaskDetailPage", () => {
     vi.mocked(fixedTaskService.get).mockResolvedValue(fixtureGroup());
     vi.mocked(taskService.deleteTemplate).mockResolvedValue({ message: "", deleted_count: 2 });
     renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: he.studioMore }));
     fireEvent.click(await screen.findByRole("button", { name: he.fixedDetailDeleteNetwork }));
     fireEvent.click(await screen.findByRole("button", { name: he.taskDeleteConfirm }));
     await waitFor(() => expect(taskService.deleteTemplate).toHaveBeenCalledWith("t1", true));
