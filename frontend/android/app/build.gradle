@@ -47,6 +47,12 @@ android {
                 signingConfig signingConfigs.release
             }
         }
+        // Même signature que la prod, autre applicationId : les deux APK cohabitent sur le téléphone.
+        preview {
+            initWith release
+            applicationIdSuffix ".preview"
+            matchingFallbacks = ["release"]
+        }
     }
 }
 
