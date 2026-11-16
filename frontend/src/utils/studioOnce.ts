@@ -1,6 +1,7 @@
 /**
- * Studio unique (étape 5) : la même création pour une tâche fixe et une tâche « פעם אחת ».
- * Seule la section « מתי » change ; une tâche « פעם אחת » part en tâche ponctuelle (ad hoc).
+ * Studio unique (étape 5) : la même création pour une tâche fixe et une tâche « חד־פעמית ».
+ * Seule la section « מתי » change, selon le type choisi dans le « + » (non modifiable ensuite) ;
+ * une tâche « חד־פעמית » part en tâche ponctuelle (ad hoc).
  */
 import type { NewTaskFormSubmitPayload } from "../components/tasks/NewTaskFormDialog";
 import type { TaskGalleryItem } from "../services/taskGalleryService";

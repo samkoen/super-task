@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import FixedTaskCreateStudio from "./FixedTaskCreateStudio";
 import { he } from "../../../../i18n/he";
 import type { User } from "../../../../services/api";
+import type { WizardForm } from "../../../../utils/fixedTaskWizard";
 
 vi.mock("../../TaskReferenceMediaEditor", () => ({ default: () => null }));
 vi.mock("../../../notifications/NotificationBell", () => ({ default: () => null }));
@@ -96,7 +97,7 @@ describe("FixedTaskCreateStudio", () => {
 });
 
 describe("FixedTaskCreateStudio — פעם אחת", () => {
-  function renderOnce(onSubmit = vi.fn().mockResolvedValue(undefined)) {
+  function renderOnce(onSubmit = vi.fn().mockResolvedValue(undefined), initialForm: Partial<WizardForm> = { taskKind: "ad_hoc", dueAt: "2026-11-16T15:00" }) {
     render(
       <FixedTaskCreateStudio
         branches={[]}
@@ -108,7 +109,7 @@ describe("FixedTaskCreateStudio — פעם אחת", () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
         allowOnce
-        initialForm={{ taskKind: "ad_hoc", dueAt: "2026-11-16T15:00" }}
+        initialForm={initialForm}
       />,
     );
     return onSubmit;
@@ -116,7 +117,7 @@ describe("FixedTaskCreateStudio — פעם אחת", () => {
 
   it("shows the short version: date and time, steps folded", () => {
     renderOnce();
-    expect(screen.getByRole("radio", { name: he.studioOnce }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByRole("radio", { name: he.studioOnce })).toBeNull();
     expect((screen.getByLabelText(he.studioDate) as HTMLInputElement).value).toBe("2026-11-16");
     expect((screen.getByLabelText(he.dueTime) as HTMLInputElement).value).toBe("15:00");
     expect(screen.getByTestId("studio-add-steps")).toBeTruthy();
@@ -135,10 +136,17 @@ describe("FixedTaskCreateStudio — פעם אחת", () => {
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ task_kind: "ad_hoc", due_at: "2026-11-16T16:30", title: "ניקוי מקרר", assignee_user_id: "u1" });
   });
 
-  it("switches to a recurring task with one tap", async () => {
-    const onSubmit = renderOnce();
-    fireEvent.click(screen.getByRole("radio", { name: he.recurrenceLabels.daily }));
+  it("does not offer a recurrence for a one-time task", () => {
+    renderOnce();
+    expect(screen.queryByRole("radio", { name: he.recurrenceLabels.daily })).toBeNull();
+    expect(screen.queryByRole("radio", { name: he.recurrenceLabels.weekly })).toBeNull();
+  });
+
+  it("keeps a recurring library template recurring, without date or « פעם אחת »", async () => {
+    const onSubmit = renderOnce(vi.fn().mockResolvedValue(undefined), { taskKind: "fixed", recurrence: "daily", dueTime: "08:00" });
     expect(screen.queryByLabelText(he.studioDate)).toBeNull();
+    expect(screen.queryByRole("radio", { name: he.studioOnce })).toBeNull();
+    expect(screen.getByRole("radio", { name: he.recurrenceLabels.daily }).getAttribute("aria-checked")).toBe("true");
     fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "פתיחה" } });
     fireEvent.click(screen.getByTestId("studio-assignee-u1"));
     fireEvent.click(screen.getByRole("button", { name: he.studioCreate }));
