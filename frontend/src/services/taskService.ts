@@ -58,6 +58,8 @@ export interface EmployeeTaskChat {
 
 export interface ManagerDayTaskChat extends EmployeeTaskChat {
   unread_count: number;
+  /** Oved assigné ; renseigné par le backend pour rattacher la carte à son oved. */
+  assignee_user_id?: string | null;
 }
 
 export interface TaskTemplate {
@@ -468,6 +470,12 @@ export const taskService = {
 
   listEmployeeChats: async () => {
     const { data } = await api.get<{ items: EmployeeTaskChat[] }>("/tasks/employee-chats");
+    return data;
+  },
+
+  /** Tous les fils de tâche du jour visibles par le menahel, en un seul appel. */
+  listManagerAllDayChats: async () => {
+    const { data } = await api.get<{ items: ManagerDayTaskChat[] }>("/tasks/manager-day-chats");
     return data;
   },
 

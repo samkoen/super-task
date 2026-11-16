@@ -32,6 +32,7 @@ def manager_task_chat_card(occurrence, last_message, unread: int) -> dict:
         last_at = last_at_sort_key(last_message.created_at) or None
     return {
         "id": occurrence.id,
+        "assignee_user_id": getattr(occurrence, "assignee_user_id", None),
         "title": occurrence.title,
         "status": occurrence.status,
         "last_preview": preview,

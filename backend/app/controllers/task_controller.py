@@ -793,6 +793,17 @@ def list_employee_chats(
     return service.list_employee_chats(actor)
 
 
+@router.get("/manager-day-chats")
+@handle_controller_errors
+def list_manager_all_day_chats(
+    request: Request,
+    service: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    return service.list_manager_all_day_chats(actor)
+
+
 @router.get("/manager-day-chats/{employee_id}")
 @handle_controller_errors
 def list_manager_day_chats(

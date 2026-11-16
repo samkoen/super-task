@@ -24,7 +24,7 @@ vi.mock("../../services/directChatService", () => ({
 
 vi.mock("../../services/taskService", () => ({
   taskService: {
-    listManagerDayChats: vi.fn(),
+    listManagerAllDayChats: vi.fn(),
   },
 }));
 
@@ -81,10 +81,11 @@ function inbox(): DirectChatInbox {
 
 function withTaskChat() {
   vi.mocked(directChatService.inbox).mockResolvedValue(inbox());
-  vi.mocked(taskService.listManagerDayChats).mockResolvedValue({
+  vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({
     items: [
       {
         id: "o1",
+        assignee_user_id: "e1",
         title: "מדף חלב",
         status: "awaiting_response",
         last_preview: "אפשר?",

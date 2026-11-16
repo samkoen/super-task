@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { directChatService, type DirectChatCard } from "../services/directChatService";
-import { taskService } from "../services/taskService";
+import { taskService, type ManagerDayTaskChat } from "../services/taskService";
 import { apiErrorMessage } from "../utils/apiErrorMessage";
 import { he } from "../i18n/he";
 import {
@@ -19,19 +19,27 @@ function mergeDirects(items: DirectChatCard[], up: DirectChatCard | null): Direc
   return items;
 }
 
-/** Les fils de tâche de chaque oved, chargés en parallèle ; un échec isolé ne vide pas la boîte. */
-async function loadTaskChats(directs: DirectChatCard[]): Promise<ManagerEmployeeTaskChats[]> {
-  const ovdim = directs.filter((card) => card.kind === "down");
-  return Promise.all(
-    ovdim.map(async (card) => {
-      try {
-        const { items } = await taskService.listManagerDayChats(card.counterpart_user_id);
-        return { card, tasks: items };
-      } catch {
-        return { card, tasks: [] };
-      }
-    }),
-  );
+/** Rattache chaque fil de tâche à la carte de son oved ; un fil sans oved connu est écarté. */
+export function groupTaskChatsByOved(
+  directs: DirectChatCard[],
+  tasks: ManagerDayTaskChat[],
+): ManagerEmployeeTaskChats[] {
+  return directs
+    .filter((card) => card.kind === "down")
+    .map((card) => ({
+      card,
+      tasks: tasks.filter((task) => task.assignee_user_id === card.counterpart_user_id),
+    }));
+}
+
+/** Un seul appel pour tous les oveds ; s'il échoue, la boîte reste utilisable avec les directs. */
+async function fetchAllTaskChats(): Promise<ManagerDayTaskChat[]> {
+  try {
+    const { items } = await taskService.listManagerAllDayChats();
+    return items ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -45,10 +53,10 @@ export function useManagerUnifiedChats(onError: (message: string) => void) {
 
   const load = useCallback(async () => {
     try {
-      const inbox = await directChatService.inbox();
+      const [inbox, tasks] = await Promise.all([directChatService.inbox(), fetchAllTaskChats()]);
       const people = mergeDirects(inbox.items ?? [], inbox.up);
       setDirects(people);
-      setTaskChats(await loadTaskChats(people));
+      setTaskChats(groupTaskChatsByOved(people, tasks));
     } catch (error) {
       onError(apiErrorMessage(error, he.errorGeneric));
     } finally {

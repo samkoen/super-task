@@ -28,7 +28,7 @@ export interface ManagerInboxTask {
   employeeName: string;
 }
 
-/** Fils de tâche d'un oved, tels que renvoyés par `listManagerDayChats`. */
+/** Fils de tâche d'un oved (issus de `listManagerAllDayChats`, regroupés par oved). */
 export interface ManagerEmployeeTaskChats {
   card: DirectChatCard;
   tasks: ManagerDayTaskChat[];

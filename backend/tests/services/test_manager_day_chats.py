@@ -66,6 +66,33 @@ def test_manager_day_chats_denied_for_employee():
         svc.list_manager_day_chats(actor, "e2")
 
 
+def test_manager_all_day_chats_one_call_for_every_employee():
+    svc, messages, occs, _users = _svc()
+    occs.list_occurrences.return_value = [
+        SimpleNamespace(id="o1", title="מדף", status=task_status.PENDING, assignee_user_id="e1"),
+        SimpleNamespace(id="o2", title="קופה", status=task_status.PENDING, assignee_user_id="e2"),
+        SimpleNamespace(id="o3", title="פתוחה", status=task_status.PENDING, assignee_user_id=None),
+    ]
+    messages.last_messages_for.return_value = {}
+    messages.unread_counts.return_value = {"o2": 3}
+    actor = ActorContext("m1", roles.BRANCH_MANAGER, "n1", "b1")
+    result = svc.list_manager_all_day_chats(actor)
+    by_id = {i["id"]: i for i in result["items"]}
+    # Une seule requête d'occurrences, sans filtre d'assignee ; les tâches non assignées sont écartées.
+    occs.list_occurrences.assert_called_once()
+    assert occs.list_occurrences.call_args.kwargs["assignee_user_id"] is None
+    assert set(by_id) == {"o1", "o2"}
+    assert by_id["o2"]["assignee_user_id"] == "e2"
+    assert by_id["o2"]["unread_count"] == 3
+
+
+def test_manager_all_day_chats_denied_for_employee():
+    svc, *_ = _svc()
+    actor = ActorContext("e1", roles.EMPLOYEE, "n1", "b1")
+    with pytest.raises(PermissionError):
+        svc.list_manager_all_day_chats(actor)
+
+
 def test_unread_today_by_assignees_sums_per_employee():
     svc, messages, occs, _users = _svc()
     occs.list_occurrences.return_value = [

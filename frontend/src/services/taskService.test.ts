@@ -75,6 +75,13 @@ describe("taskService manager day chats", () => {
     expect(mockGet).toHaveBeenCalledWith("/tasks/manager-day-chats/e1");
     expect(data.items[0].unread_count).toBe(2);
   });
+
+  it("loads every employee's task threads in one call", async () => {
+    mockGet.mockResolvedValue({ data: { items: [{ id: "o1", assignee_user_id: "e1" }] } });
+    const data = await taskService.listManagerAllDayChats();
+    expect(mockGet).toHaveBeenCalledWith("/tasks/manager-day-chats");
+    expect(data.items[0].assignee_user_id).toBe("e1");
+  });
 });
 
 describe("taskService.submitSlot", () => {
