@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ManagerDirectChatsPage from "./ManagerDirectChatsPage";
 import { he } from "../../i18n/he";
-import { directChatService, type DirectChatCard, type DirectChatInbox } from "../../services/directChatService";
+import { directChatService, type DirectChatInbox } from "../../services/directChatService";
 import { taskService } from "../../services/taskService";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 
 const { showError, showSuccess } = vi.hoisted(() => ({
   showError: vi.fn(),
@@ -24,16 +25,17 @@ vi.mock("../../services/directChatService", () => ({
 
 vi.mock("../../services/taskService", () => ({
   taskService: {
-    listManagerDayChats: vi.fn(),
+    listManagerAllDayChats: vi.fn(),
   },
 }));
 
 vi.mock("../../components/chat/DirectChatThread", () => ({
-  default: () => <div>thread</div>,
+  default: () => <div>direct-thread</div>,
 }));
 
-vi.mock("../../components/tasks/TaskChatPanel", () => ({
-  default: () => <div>task-thread</div>,
+vi.mock("../../components/tasks/TaskChatDialog", () => ({
+  default: ({ open, occurrenceId }: { open: boolean; occurrenceId: string }) =>
+    open ? <div>task-thread-{occurrenceId}</div> : null,
 }));
 
 vi.mock("../../components/employee/EmployeeAvatar", () => ({
@@ -48,7 +50,9 @@ vi.mock("../../hooks/useTaskChangeListener", () => ({
   useTaskChangeListener: () => undefined,
 }));
 
-function inboxOved(overrides: Partial<DirectChatCard> = {}): DirectChatInbox {
+vi.mock("../../context/ManagerScopeContext", () => ({ useShellManagerScope: vi.fn(() => null) }));
+
+function inbox(): DirectChatInbox {
   return {
     items: [
       {
@@ -59,11 +63,9 @@ function inboxOved(overrides: Partial<DirectChatCard> = {}): DirectChatInbox {
         counterpart_role: "employee",
         branch_name: "תל אביב",
         last_preview: "שלום",
-        last_at: "2026-08-26T10:00:00+03:00",
-        unread_count: 3,
-        direct_unread_count: 1,
-        task_unread_count: 2,
-        ...overrides,
+        last_at: "2026-09-14T10:00:00+03:00",
+        unread_count: 0,
+        direct_unread_count: 0,
       },
     ],
     up: {
@@ -76,69 +78,112 @@ function inboxOved(overrides: Partial<DirectChatCard> = {}): DirectChatInbox {
       last_at: null,
       unread_count: 0,
     },
-    unread_count: 3,
+    unread_count: 0,
   };
 }
 
+function withTaskChat() {
+  vi.mocked(directChatService.inbox).mockResolvedValue(inbox());
+  vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({
+    items: [
+      {
+        id: "o1",
+        assignee_user_id: "e1",
+        title: "מדף חלב",
+        status: "awaiting_response",
+        last_preview: "אפשר?",
+        last_at: "2026-09-14T11:00:00+03:00",
+        unread_count: 1,
+      },
+    ],
+  });
+}
+
 describe("ManagerDirectChatsPage", () => {
-  it("lists ovdim with branch tag and the network-manager thread", async () => {
-    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
+  it("shows directs and task threads in one list, filter pills and search", async () => {
+    withTaskChat();
     render(<ManagerDirectChatsPage />);
-    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
-    expect(screen.getByText("תל אביב")).toBeTruthy();
-    expect(screen.getByText(he.directChatManagerTitle)).toBeTruthy();
-    expect(screen.getByText(he.directChatBroadcast)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
+    // L'oved apparaît deux fois : sa ligne directe et le fil de tâche qui porte son nom.
+    expect(screen.getAllByText("דן כהן")).toHaveLength(2);
+    expect(screen.getByText(he.managerChatTaskContext)).toBeTruthy();
+    expect(screen.getByTestId("manager-chats-filter-all")).toBeTruthy();
     expect(screen.getByLabelText(he.directChatSearch)).toBeTruthy();
   });
 
-  it("filters contacts by branch search", async () => {
-    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
+  it("keeps only task threads under the משימות pill", async () => {
+    withTaskChat();
     render(<ManagerDirectChatsPage />);
-    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText(he.directChatSearch), { target: { value: "חיפה" } });
-    expect(screen.getByText(he.directChatNoSearchResults)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(he.directChatSearch), { target: { value: "תל" } });
-    expect(screen.getByText("דן כהן")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("manager-chats-filter-tasks"));
+    // Seule reste la ligne de tâche (qui porte le nom de l'oved) ; la ligne directe a disparu.
+    expect(screen.getAllByText("דן כהן")).toHaveLength(1);
+    expect(screen.queryByText("שלום")).toBeNull();
+    expect(screen.getByText("מדף חלב")).toBeTruthy();
   });
 
-  it("opens employee day chats instead of the thread", async () => {
-    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
-    vi.mocked(taskService.listManagerDayChats).mockResolvedValue({
-      items: [
-        {
-          id: "o1",
-          title: "מדף",
-          status: "in_progress",
-          last_preview: "היי",
-          last_at: "2026-08-26T11:00:00+03:00",
-          unread_count: 2,
-        },
-      ],
-    });
+  it("opens the task thread without opening a direct conversation", async () => {
+    withTaskChat();
     render(<ManagerDirectChatsPage />);
-    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /דן כהן/ }));
-    await waitFor(() => expect(screen.getByText(he.employeeGeneralChat)).toBeTruthy());
-    expect(screen.getByText("מדף")).toBeTruthy();
-    expect(screen.queryByText("thread")).toBeNull();
+    await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /מדף חלב/ }));
+    await waitFor(() => expect(screen.getByText("task-thread-o1")).toBeTruthy());
     expect(directChatService.openWith).not.toHaveBeenCalled();
   });
 
-  it("opens the general thread from the employee list", async () => {
-    vi.mocked(directChatService.inbox).mockResolvedValue(inboxOved());
-    vi.mocked(taskService.listManagerDayChats).mockResolvedValue({ items: [] });
+  it("opens a direct conversation from a person row", async () => {
+    withTaskChat();
     vi.mocked(directChatService.openWith).mockResolvedValue({
       conversation: { id: "c1" },
       messages: [],
       peer: { id: "e1", full_name: "דן כהן", role: "employee" },
     });
     render(<ManagerDirectChatsPage />);
-    await waitFor(() => expect(screen.getByText("דן כהן")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /דן כהן/ }));
-    await waitFor(() => expect(screen.getByText(he.employeeGeneralChat)).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(he.employeeGeneralChat) }));
-    await waitFor(() => expect(screen.getByText("thread")).toBeTruthy());
-    fireEvent.click(screen.getAllByRole("button", { name: he.goBack })[0]);
-    await waitFor(() => expect(screen.queryByText("thread")).toBeNull());
+    await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
+    const directRow = screen
+      .getAllByRole("button", { name: /דן כהן/ })
+      .find((row) => !row.textContent?.includes("מדף חלב"));
+    fireEvent.click(directRow!);
+    await waitFor(() => expect(screen.getByText("direct-thread")).toBeTruthy());
+    expect(directChatService.openWith).toHaveBeenCalledWith("e1");
+  });
+
+  it("keeps only the snif chosen in the header (menahel reshet), plus his own manager", async () => {
+    const base = inbox();
+    vi.mocked(directChatService.inbox).mockResolvedValue({
+      ...base,
+      items: [
+        { ...base.items[0], branch_id: "b1" },
+        { ...base.items[0], id: "c2", counterpart_user_id: "e2", counterpart_name: "רונית לוי", branch_id: "b2", branch_name: "חיפה" },
+      ],
+    });
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({
+      items: [{ id: "o2", assignee_user_id: "e2", branch_id: "b2", title: "קופה", status: "in_progress", last_preview: null, last_at: null, unread_count: 0 }],
+    });
+    vi.mocked(useShellManagerScope).mockReturnValue({ branchId: "b2", branchName: "חיפה", branches: [], setBranch: vi.fn() });
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText("קופה")).toBeTruthy());
+    expect(screen.queryByText("דן כהן")).toBeNull();
+    expect(screen.getAllByText("רונית לוי").length).toBeGreaterThan(0);
+    expect(screen.getByText("רשת לוי")).toBeTruthy();
+    vi.mocked(useShellManagerScope).mockReturnValue(null);
+  });
+
+  it("lists the task thread of an oved who has no direct conversation", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue({ items: [], up: null, unread_count: 0 });
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({
+      items: [{ id: "o7", assignee_user_id: "e7", assignee_name: "מאיה כץ", title: "מקרר", status: "awaiting_response", last_preview: "?", last_at: null, unread_count: 1 }],
+    });
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText("מקרר")).toBeTruthy());
+    expect(screen.getByText("מאיה כץ")).toBeTruthy();
+    expect(screen.queryByText(he.managerChatsEmpty)).toBeNull();
+  });
+
+  it("shows the empty state when there is nothing", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue({ items: [], up: null, unread_count: 0 });
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({ items: [] });
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText(he.managerChatsEmpty)).toBeTruthy());
   });
 });

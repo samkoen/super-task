@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import {
   Box,
   CircularProgress,
@@ -43,6 +43,8 @@ export interface TaskOccurrenceEditDialogProps {
   onSaved?: (message: string) => void;
   /** Si fourni, évite un fetch team (page tâches). */
   employees?: User[];
+  /** Actions propres à la page appelante (« המשימה הבאה », suppression), sous le formulaire. */
+  footer?: (task: TaskOccurrence) => ReactNode;
 }
 
 export default function TaskOccurrenceEditDialog({
@@ -50,6 +52,7 @@ export default function TaskOccurrenceEditDialog({
   onClose,
   onSaved,
   employees: employeesProp,
+  footer,
 }: TaskOccurrenceEditDialogProps) {
   const { user } = useAuth();
   const { showError, showSuccess } = useFeedback();
@@ -255,6 +258,7 @@ export default function TaskOccurrenceEditDialog({
               }}
               disabled={saving}
             />
+            {footer ? footer(target) : null}
           </>
         )}
     </FormDialog>

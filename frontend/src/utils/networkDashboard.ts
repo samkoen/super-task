@@ -13,8 +13,10 @@ export function homeBranchAfterOverview(opts: {
   managesAllWorkers?: boolean;
   homeBranchId?: string | null;
   onlyBranchId?: string;
+  /** Le menahel a déjà choisi son périmètre (y compris « כל הרשת ») : on ne le remplace pas. */
+  explicitChoice?: boolean;
 }): string | null {
-  if (!opts.canPickBranch || opts.selectedBranch || !opts.overviewLoaded || opts.managesAllWorkers) {
+  if (!opts.canPickBranch || opts.selectedBranch || !opts.overviewLoaded || opts.managesAllWorkers || opts.explicitChoice) {
     return null;
   }
   return opts.homeBranchId || opts.onlyBranchId || null;

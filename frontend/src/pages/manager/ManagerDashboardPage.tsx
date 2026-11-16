@@ -1,453 +1,200 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Alert,
-  Box,
-  CircularProgress,
-  Dialog,
-  Grid,
-  MenuItem,
-  Paper,
-  TextField,
-  Typography,
-} from "@mui/material";
-import { ApiError } from "../../services/api";
-import { branchService, type Branch } from "../../services/branchService";
-import {
-  dashboardService,
-  type ManagerDashboard,
-  type TimelineTask,
-} from "../../services/dashboardService";
-import {
-  promotionStageService,
-  type PromotionStage,
-} from "../../services/promotionStageService";
-import DashboardDayNav from "../../components/dashboard/DashboardDayNav";
-import DepartmentProgressGrid from "../../components/dashboard/DepartmentProgressGrid";
-import HealthBadge from "../../components/dashboard/HealthBadge";
-import ManagerTodayBoard from "../../components/dashboard/ManagerTodayBoard";
-import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
-import TaskChatDialog from "../../components/tasks/TaskChatDialog";
-import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
-import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
-import EmployeeTaskDetailDialog from "../../components/tasks/EmployeeTaskDetailDialog";
-import EmployeeTaskTitle from "../../components/tasks/EmployeeTaskTitle";
-import IncompleteTaskSendDialog from "../../components/tasks/IncompleteTaskSendDialog";
-import DirectChatThread from "../../components/chat/DirectChatThread";
-import FullscreenBackAppBar, {
-  fullscreenChatBodySx,
-  fullscreenChatDialogPaperSx,
-} from "../../components/chat/FullscreenBackAppBar";
-import EmployeeShiftHeader from "../../components/employee/EmployeeShiftHeader";
-import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { Alert, Box } from "@mui/material";
 import ListSkeleton from "../../components/ui/ListSkeleton";
-import { taskService, type TaskOccurrence } from "../../services/taskService";
-import { useOwnTaskWork } from "../../hooks/useOwnTaskWork";
-import { useManagerInboxChats } from "../../hooks/useManagerInboxChats";
-import { authService } from "../../services/authService";
+import ManagerColumns from "../../components/dashboard/home/ManagerColumns";
+import ManagerHomeDialogs, { type ManagerHomeDialogsState } from "../../components/dashboard/home/ManagerHomeDialogs";
+import ManagerInboxStack from "../../components/dashboard/home/ManagerInboxStack";
+import ManagerNetworkHome from "../../components/dashboard/home/ManagerNetworkHome";
+import ManagerOwnTasksLine from "../../components/dashboard/home/ManagerOwnTasksLine";
+import ManagerPulseCard from "../../components/dashboard/home/ManagerPulseCard";
+import ManagerScopePicker from "../../components/dashboard/home/ManagerScopePicker";
+import ManagerReviewScreen, { type ManagerReviewRequest } from "../../components/review/ManagerReviewScreen";
+import ManagerTeamNow from "../../components/dashboard/home/ManagerTeamNow";
+import PromotionStagesAnalysisTable from "../../components/dashboard/PromotionStagesAnalysisTable";
+import StoreStatusAnalysisTable from "../../components/dashboard/StoreStatusAnalysisTable";
+import StoreStatusKpiRow from "../../components/dashboard/StoreStatusKpiRow";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
+import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
+import { useManagerHomeData } from "../../hooks/useManagerHomeData";
+import { useManagerInboxChats } from "../../hooks/useManagerInboxChats";
 import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+import { ApiError } from "../../services/api";
+import type { ManagerDashboard } from "../../services/dashboardService";
+import type { PromotionStage } from "../../services/promotionStageService";
+import { taskService } from "../../services/taskService";
 import { he } from "../../i18n/he";
 import { findQueuedTask } from "../../utils/dashboardCarousels";
 import { dashboardTaskUsesReview } from "../../utils/dashboardTaskOpen";
-import { employeeGreeting } from "../../utils/employeeNextTask";
-import { todayIso } from "../../utils/dateView";
+import { formatHebrewDayNoYear, todayIso } from "../../utils/dateView";
 import {
-  bindNotificationAudioUnlock,
-  playManagerQuestionSound,
-} from "../../utils/notificationSounds";
-import { buildQuestionsQueue } from "../../utils/dashboardCarousels";
-import { buildManagerTasksPath } from "../../utils/managerTaskFilters";
-import { managerNewTaskNavigation } from "../../utils/managerBottomNav";
-import {
-  parseBranchFromSearch,
-  writeManagerScopeBranchId,
-} from "../../utils/managerScopeBranch";
-import { managerDashboardMeta } from "../../utils/managerWelcomeSubtitle";
-import { homeBranchAfterOverview, showAllWorkersDashboard } from "../../utils/networkDashboard";
+  buildManagerInbox,
+  buildManagerPulse,
+  buildNetworkOverview,
+  buildTeamNow,
+  chatsForScope,
+  homeTitle,
+  ownTasksSummary,
+  type InboxItem,
+  type TeamNowEntry,
+} from "../../utils/managerHome";
+import { reviewQueueFromInbox } from "../../utils/managerReview";
 
-/** Masqué temporairement — remettre à true pour réafficher. */
-const SHOW_DEPARTMENT_PROGRESS = false;
+const NO_DIALOG: ManagerHomeDialogsState = { chatTask: null, reviewTarget: null, editOccurrenceId: null, member: null, directChat: null };
 
-export default function ManagerDashboardPage() {
-  const { user, refresh } = useAuth();
-  const { showSuccess, showError } = useFeedback();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [data, setData] = useState<ManagerDashboard | null>(null);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState(() => parseBranchFromSearch(searchParams) || "");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [reviewTarget, setReviewTarget] = useState<TaskOccurrence | null>(null);
-  const [chatTask, setChatTask] = useState<TimelineTask | null>(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [editOccurrenceId, setEditOccurrenceId] = useState<string | null>(null);
-  const [success, setSuccess] = useState("");
-  const [viewDay, setViewDay] = useState(todayIso);
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [stages, setStages] = useState<PromotionStage[]>([]);
-  const [avatarOpen, setAvatarOpen] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const prevQuestionCountRef = useRef<number | null>(null);
-  const inbox = useManagerInboxChats();
+/** Aucun snif choisi = vue réseau, y compris pour le menahel qui gère tous les oveds (décision du 16.11). */
+function isNetworkOverview(data: ManagerDashboard): boolean {
+  return !data.branch;
+}
 
-  const canPickBranch = user?.role === "admin" || user?.role === "network_manager";
-  const scopeBranchId = canPickBranch
-    ? selectedBranch
-    : user?.branch_id || selectedBranch || "";
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) {
-      setLoading(true);
-      setError("");
-    }
-    try {
-      const branchId = canPickBranch ? selectedBranch || undefined : undefined;
-      const dash = await dashboardService.getManager(branchId, viewDay);
-      setData(dash);
-      const bid = dash.branch?.id;
-      if (bid) {
-        try {
-          setStages(await promotionStageService.analysis(bid));
-        } catch {
-          setStages([]);
-        }
-      } else {
-        setStages([]);
-      }
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [canPickBranch, selectedBranch, viewDay]);
-
-  const openTaskChat = useCallback((taskId: string) => {
-    const task = findQueuedTask(data?.task_queues, taskId);
-    if (task) setChatTask(task);
-  }, [data]);
-
-  const ownWork = useOwnTaskWork(() => {
-    void load(true);
-  });
-
-  useTaskChangeListener(useCallback(() => {
-    load(true);
-    void inbox.reload();
-  }, [load, inbox.reload]));
-
-  useEffect(() => bindNotificationAudioUnlock(), []);
-
-  useEffect(() => {
-    writeManagerScopeBranchId(scopeBranchId);
-    if (!canPickBranch) return;
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (selectedBranch) next.set("branch", selectedBranch);
-        else next.delete("branch");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [scopeBranchId, selectedBranch, canPickBranch, setSearchParams]);
-
-  useEffect(() => {
-    if (!data?.task_queues) return;
-    const count = buildQuestionsQueue(data.task_queues).length;
-    const prev = prevQuestionCountRef.current;
-    if (prev !== null && count > prev) {
-      playManagerQuestionSound();
-    }
-    prevQuestionCountRef.current = count;
-  }, [data?.task_queues]);
-
-  useEffect(() => {
-    if (canPickBranch) {
-      branchService.list().then(setBranches).catch(() => setBranches([]));
-    }
-  }, [canPickBranch]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    const next = homeBranchAfterOverview({
-      canPickBranch,
-      selectedBranch,
-      overviewLoaded: Boolean(data) && !data?.branch,
-      managesAllWorkers: data?.manages_all_workers,
-      homeBranchId: user?.branch_id,
-      onlyBranchId: branches.length === 1 ? branches[0].id : undefined,
-    });
-    if (next) setSelectedBranch(next);
-  }, [canPickBranch, selectedBranch, data, user?.branch_id, branches]);
-
-  const openDashboardTask = useCallback(async (taskId: string) => {
-    setReviewLoading(true);
-    setError("");
+/** Ouvre une tâche du tableau : la revue si une preuve attend, sinon l'édition. */
+function useOpenTask(setDialogs: (patch: Partial<ManagerHomeDialogsState>) => void, onError: (m: string) => void) {
+  return useCallback(async (taskId: string) => {
     try {
       const occurrence = await taskService.getOccurrence(taskId);
-      if (dashboardTaskUsesReview(occurrence.status)) {
-        setEditOccurrenceId(null);
-        setReviewTarget(occurrence);
-        return;
-      }
-      setReviewTarget(null);
-      setEditOccurrenceId(taskId);
+      if (dashboardTaskUsesReview(occurrence.status)) setDialogs({ reviewTarget: occurrence });
+      else setDialogs({ editOccurrenceId: taskId });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setReviewLoading(false);
+      onError(e instanceof ApiError ? e.message : he.errorGeneric);
     }
-  }, []);
+  }, [setDialogs, onError]);
+}
 
-  const handleAvatarCapture = async (file: File) => {
-    setAvatarUploading(true);
-    try {
-      await authService.stylizeAvatar(file);
-      await refresh();
-      showSuccess(he.employeePhotoStylized);
-      setAvatarOpen(false);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
+/** « לבדיקה » ouvre la revue plein écran sur toute la file des preuves du périmètre. */
+function useReviewLauncher(data: ManagerDashboard | null) {
+  const [request, setRequest] = useState<ManagerReviewRequest | null>(null);
+  const open = (taskId: string) => setRequest({ startId: taskId, queue: reviewQueueFromInbox(buildManagerInbox(data?.task_queues, [])) });
+  return { request, open, close: useCallback(() => setRequest(null), []) };
+}
 
-  const handleAvatarDelete = async () => {
-    setAvatarUploading(true);
-    try {
-      await authService.deleteAvatar();
-      await refresh();
-      showSuccess(he.employeePhotoDeleted);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
-  const goTasks = (opts?: { openNewTask?: boolean; openGalleryTask?: boolean }) => {
-    const branchId = scopeBranchId || undefined;
-    if (opts?.openNewTask) {
-      const nav = managerNewTaskNavigation(branchId);
-      navigate(nav.pathname, { state: nav.state });
-      return;
-    }
-    navigate(
-      buildManagerTasksPath({ branchId }),
-      opts?.openGalleryTask ? { state: { openGalleryTask: true } } : undefined,
-    );
-  };
-
-  const photoUrl = user?.avatar_url;
-
+function AnalysisPanel({ data, stages, onOpenTask }: { data: ManagerDashboard; stages: PromotionStage[]; onOpenTask: (taskId: string) => void }) {
   return (
-    <Box>
-      <EmployeeShiftHeader
-        hero
-        greeting={employeeGreeting(new Date().getHours())}
-        dateNav={<DashboardDayNav day={viewDay} onChange={setViewDay} onDark />}
-        name={user?.full_name}
-        photoUrl={photoUrl}
-        photoEditable
-        onEditPhoto={() => setAvatarOpen(true)}
-        onDeletePhoto={photoUrl ? () => void handleAvatarDelete() : undefined}
-        slogan={user?.excellence_slogan}
-        meta={managerDashboardMeta({
-          branchName: data?.branch?.name || user?.branch_name,
-          networkName: data?.network_name || user?.network_name || branches[0]?.network_name,
-          role: user?.role,
-        })}
-        extra={
-          canPickBranch ? (
-            <ManagerBranchPicker
-              value={selectedBranch}
-              branches={branches}
-              onChange={setSelectedBranch}
-            />
-          ) : undefined
-        }
-      />
-      <EmployeeAvatarCapture
-        open={avatarOpen}
-        uploading={avatarUploading}
-        uploadingLabel={he.avatarStylizing}
-        onClose={() => setAvatarOpen(false)}
-        onCapture={handleAvatarCapture}
-      />
-
-      {loading && !data ? <ListSkeleton variant="dashboard" /> : null}
-
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
-      {inbox.openError ? (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={inbox.clearOpenError}>{inbox.openError}</Alert>
-      ) : null}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
-      {reviewLoading && (
-        <Box display="flex" justifyContent="center" py={1}>
-          <CircularProgress size={24} />
-        </Box>
-      )}
-
-      {data ? (
-        <ManagerTodayBoard
-          data={data}
-          title={showAllWorkersDashboard(data) ? he.dashboardAllWorkers : undefined}
-          hint={showAllWorkersDashboard(data) ? he.dashboardAllWorkersHint : undefined}
-          showAnalysis={showAnalysis}
-          analysisExtra={data.branch ? <PromotionStagesAnalysisTable stages={stages} /> : undefined}
-          chats={inbox.chats}
-          onToggleAnalysis={() => setShowAnalysis((v) => !v)}
-          onReviewTask={(id) => void openDashboardTask(id)}
-          onOpenTask={(id) => void openDashboardTask(id)}
-          onOpenOwnTask={(task) => {
-            if (dashboardTaskUsesReview(task.status)) {
-              void openDashboardTask(task.id);
-              return;
-            }
-            ownWork.open(task);
-          }}
-          onOpenChat={(card) => void inbox.openCard(card)}
-          onOpenTaskChat={openTaskChat}
-          onChanged={() => void load(true)}
-          onNewTask={() => goTasks({ openNewTask: true })}
-          onGalleryTask={() => goTasks({ openGalleryTask: true })}
-          onViewTasks={() => goTasks()}
-        />
-      ) : null}
-
-      {data && !data.branch && data.branches ? (
-        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          <Typography variant="subtitle1" fontWeight={700} mb={2}>{he.dashboardBranchOverview}</Typography>
-          <Grid container spacing={2}>
-            {data.branches.map((b) => (
-              <Grid item xs={12} sm={6} md={4} key={b.branch_id}>
-                <Paper
-                  variant="outlined"
-                  sx={{ p: 2, cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
-                  onClick={() => setSelectedBranch(b.branch_id)}
-                >
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography fontWeight={700}>{b.name}</Typography>
-                    <HealthBadge level={b.health} />
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {Math.round(b.completion_rate * 100)}% · {b.overdue} {he.dashboardOverdue}
-                  </Typography>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        </Paper>
-      ) : null}
-
-      {SHOW_DEPARTMENT_PROGRESS &&
-        data?.branch &&
-        data.by_department &&
-        data.by_department.length > 0 && (
-          <DepartmentProgressGrid departments={data.by_department} />
-        )}
-
-      <TaskChatDialog
-        open={Boolean(chatTask)}
-        occurrenceId={chatTask?.id ?? ""}
-        title={chatTask?.title ?? he.taskChatTitle}
-        status={chatTask?.status}
-        employee={false}
-        chatFollowUpAt={chatTask?.chat_follow_up_at}
-        chatResolvedAt={chatTask?.chat_resolved_at}
-        onClose={() => {
-          setChatTask(null);
-          void load(true);
-        }}
-      />
-      <TaskCompletionReviewDialog
-        task={reviewTarget}
-        onClose={() => setReviewTarget(null)}
-        onDone={(message) => {
-          setSuccess(message);
-          void load(true);
-        }}
-      />
-      <TaskOccurrenceEditDialog
-        occurrenceId={editOccurrenceId}
-        onClose={() => setEditOccurrenceId(null)}
-        onSaved={(message) => {
-          setSuccess(message);
-          void load(true);
-        }}
-      />
-      <EmployeeTaskDetailDialog
-        task={ownWork.detailTask}
-        language={ownWork.language}
-        titleNode={
-          ownWork.detailTask ? <EmployeeTaskTitle task={ownWork.detailTask} variant="h6" /> : null
-        }
-        onClose={ownWork.close}
-        capture={ownWork.capture}
-        onChatUpdated={() => {
-          void load(true);
-        }}
-      />
-      <IncompleteTaskSendDialog
-        open={ownWork.incompleteOpen}
-        saving={Boolean(ownWork.capture?.saving)}
-        onClose={ownWork.closeIncomplete}
-        onConfirm={ownWork.confirmIncomplete}
-      />
-      <Dialog
-        fullScreen
-        open={Boolean(inbox.openChat)}
-        onClose={inbox.closeChat}
-        dir="rtl"
-        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-      >
-        <FullscreenBackAppBar title={inbox.openChat?.title ?? ""} onBack={inbox.closeChat} />
-        <Box sx={fullscreenChatBodySx}>
-          {inbox.openChat ? (
-            <DirectChatThread conversationId={inbox.openChat.id} onSent={() => void inbox.reload()} />
-          ) : null}
-        </Box>
-      </Dialog>
+    <Box data-testid="manager-analysis" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <StoreStatusKpiRow storeKpis={data.store_kpis} />
+      <StoreStatusAnalysisTable team={data.team} onOpenTask={(task) => onOpenTask(task.id)} />
+      {data.branch ? <PromotionStagesAnalysisTable stages={stages} /> : null}
     </Box>
   );
 }
 
-function ManagerBranchPicker({
-  value,
-  branches,
-  onChange,
-}: {
-  value: string;
-  branches: Branch[];
-  onChange: (id: string) => void;
-}) {
+/** Fenêtres de l'accueil (un seul état) et ouverture d'une tâche du tableau d'analyse. */
+function useHomeDialogs(onError: (m: string) => void) {
+  const [dialogs, setDialogsState] = useState<ManagerHomeDialogsState>(NO_DIALOG);
+  const setDialogs = useCallback((patch: Partial<ManagerHomeDialogsState>) => setDialogsState((d) => ({ ...d, ...patch })), []);
+  return { dialogs, setDialogs, openTask: useOpenTask(setDialogs, onError) };
+}
+
+/** « לטיפולך » : un message ouvre le chat direct, une question son chat de tâche, une preuve la revue. */
+function useInboxOpener(data: ManagerDashboard | null, inbox: ReturnType<typeof useManagerInboxChats>, setDialogs: (p: Partial<ManagerHomeDialogsState>) => void, openReview: (taskId: string) => void) {
+  return (item: InboxItem) => {
+    if (item.kind === "chat" && item.chat) { void inbox.openCard(item.chat); return; }
+    if (!item.taskId) return;
+    if (item.kind === "question") setDialogs({ chatTask: findQueuedTask(data?.task_queues, item.taskId) ?? null });
+    else openReview(item.taskId);
+  };
+}
+
+/**
+ * Accueil menahel (Figma « Menahel · בית (snif) ») : l'état du snif, ce qui attend le menahel
+ * (« לטיפולך »), puis l'équipe. En mode « כל הרשת », seulement les snifim qui demandent une action.
+ */
+export default function ManagerDashboardPage() {
+  const { user } = useAuth();
+  const { showSuccess, showError } = useFeedback();
+  const navigate = useNavigate();
+  const home = useManagerHomeData();
+  const inbox = useManagerInboxChats();
+  const { dialogs, setDialogs, openTask } = useHomeDialogs(showError);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const { data, load } = home;
+  const review = useReviewLauncher(data);
+  const openInboxItem = useInboxOpener(data, inbox, setDialogs, review.open);
+  useTaskChangeListener(useCallback(() => { void load(true); void inbox.reload(); }, [load, inbox.reload]));
+  const network = Boolean(data && isNetworkOverview(data));
+  useManagerPageHeader(homeTitle(data, user?.branch_name, he.managerHomeNetworkTitle), formatHebrewDayNoYear(todayIso()));
+  const refresh = (message?: string) => { if (message) showSuccess(message); void load(true); };
+
   return (
-    <TextField
-      select
-      size="small"
-      label={he.dashboardSelectBranch}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      sx={{
-        minWidth: { xs: "100%", md: 220 },
-        bgcolor: "#fff",
-        borderRadius: "12px",
-        "& .MuiOutlinedInput-root": { borderRadius: "12px", fontWeight: 700 },
-      }}
-    >
-      <MenuItem value="">{he.dashboardNetworkOverview}</MenuItem>
-      {branches.map((b) => (
-        <MenuItem key={b.id} value={b.id}>
-          {b.name}
-        </MenuItem>
-      ))}
-    </TextField>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <HomeTop home={home} inbox={inbox} />
+      {data && network ? (
+        <ManagerNetworkHome
+          overview={buildNetworkOverview(data.branches)}
+          onOpenBranch={home.setSelectedBranch}
+          inbox={<ManagerInboxStack items={buildManagerInbox(data.task_queues, inbox.chats)} onOpen={openInboxItem} />}
+        />
+      ) : null}
+      {data && !network ? (
+        <BranchHome
+          data={data}
+          chats={chatsForScope(inbox.chats, data.branch?.id)}
+          analysisOpen={analysisOpen}
+          analysis={<AnalysisPanel data={data} stages={home.stages} onOpenTask={(id) => void openTask(id)} />}
+          onToggleAnalysis={() => setAnalysisOpen((v) => !v)}
+          onOpenInbox={openInboxItem}
+          onOpenMember={(entry) => setDialogs({ member: entry.member })}
+          onOpenOwnTasks={() => navigate("/employee")}
+        />
+      ) : null}
+      <ManagerHomeDialogs
+        state={{ ...dialogs, directChat: inbox.openChat }}
+        branchId={home.scopeBranchId || data?.branch?.id || ""}
+        onPatch={setDialogs}
+        onCloseDirectChat={inbox.closeChat}
+        onDone={refresh}
+        onDirectSent={() => void inbox.reload()}
+      />
+      <ManagerReviewScreen request={review.request} onClose={review.close} onDone={refresh} />
+    </Box>
+  );
+}
+
+type HomeTopProps = { home: ReturnType<typeof useManagerHomeData>; inbox: ReturnType<typeof useManagerInboxChats> };
+
+/** Périmètre (admin hors coque ; dans la coque il est dans l'en-tête), chargement et erreurs. */
+function HomeTop({ home, inbox }: HomeTopProps) {
+  const shellScope = useShellManagerScope();
+  return (
+    <>
+      {home.canPickBranch && !shellScope ? <ManagerScopePicker value={home.selectedBranch} branches={home.branches} onChange={home.setSelectedBranch} /> : null}
+      {home.loading && !home.data ? <ListSkeleton variant="dashboard" /> : null}
+      {home.error ? <Alert severity="error" onClose={() => home.setError("")}>{home.error}</Alert> : null}
+      {inbox.openError ? <Alert severity="error" onClose={inbox.clearOpenError}>{inbox.openError}</Alert> : null}
+    </>
+  );
+}
+
+type BranchHomeProps = {
+  data: ManagerDashboard;
+  chats: Parameters<typeof buildManagerInbox>[1];
+  analysisOpen: boolean;
+  analysis: ReactNode;
+  onToggleAnalysis: () => void;
+  onOpenInbox: (item: InboxItem) => void;
+  onOpenMember: (entry: TeamNowEntry) => void;
+  onOpenOwnTasks: () => void;
+};
+
+/** Accueil d'un snif : ligne « mes tâches », pouls, « לטיפולך », « הצוות עכשיו ». */
+function BranchHome({ data, chats, analysisOpen, analysis, onToggleAnalysis, onOpenInbox, onOpenMember, onOpenOwnTasks }: BranchHomeProps) {
+  const pulse = useMemo(() => buildManagerPulse(data), [data]);
+  const items = useMemo(() => buildManagerInbox(data.task_queues, chats), [data.task_queues, chats]);
+  const team = useMemo(() => buildTeamNow(data.team), [data.team]);
+  const own = ownTasksSummary(data.my_work);
+  // Ordinateur : l'état du snif et « לטיפולך » d'un côté, l'équipe de l'autre ; mobile : même ordre empilé.
+  return (
+    <ManagerColumns
+      first={
+        <>
+          {own ? <ManagerOwnTasksLine summary={own} onOpen={onOpenOwnTasks} /> : null}
+          <ManagerPulseCard pulse={pulse} analysisOpen={analysisOpen} onToggleAnalysis={onToggleAnalysis} />
+          {analysisOpen ? analysis : null}
+          <ManagerInboxStack items={items} onOpen={onOpenInbox} />
+        </>
+      }
+      second={<ManagerTeamNow entries={team} onOpen={onOpenMember} />}
+    />
   );
 }

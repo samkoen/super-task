@@ -27,6 +27,7 @@ const ManagerTaskGalleryPage = lazy(() => import("./pages/manager/ManagerTaskGal
 const ManagerFixedTasksPage = lazy(() => import("./pages/manager/ManagerFixedTasksPage"));
 const ManagerFixedTaskDetailPage = lazy(() => import("./pages/manager/ManagerFixedTaskDetailPage"));
 const ManagerFixedTaskCreatePage = lazy(() => import("./pages/manager/ManagerFixedTaskCreatePage"));
+const ManagerTaskCreatePage = lazy(() => import("./pages/manager/ManagerTaskCreatePage"));
 const ManagerEmployeesPage = lazy(() => import("./pages/manager/ManagerEmployeesPage"));
 const ManagerReportsPage = lazy(() => import("./pages/manager/ManagerReportsPage"));
 const ManagerProfilePage = lazy(() => import("./pages/manager/ManagerProfilePage"));
@@ -181,6 +182,14 @@ export default function App() {
             }
           />
           <Route
+            path="/admin/tasks/new"
+            element={
+              <LazyPage>
+                <ManagerTaskCreatePage />
+              </LazyPage>
+            }
+          />
+          <Route
             path="/admin/gallery"
             element={
               <LazyPage>
@@ -267,6 +276,14 @@ export default function App() {
             element={
               <LazyPage>
                 <ManagerTasksPage />
+              </LazyPage>
+            }
+          />
+          <Route
+            path="/manager/tasks/new"
+            element={
+              <LazyPage>
+                <ManagerTaskCreatePage />
               </LazyPage>
             }
           />

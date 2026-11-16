@@ -18,6 +18,7 @@ import { he } from "../../i18n/he";
 import ManagerNetworkChatSetting from "../../components/manager/ManagerNetworkChatSetting";
 import AppUpdateCard from "../../components/appUpdate/AppUpdateCard";
 import AgrolineConnectionCard from "../../components/tasks/AgrolineConnectionCard";
+import ManagerAvatarSection from "../../components/manager/ManagerAvatarSection";
 
 export default function ManagerProfilePage() {
   const { user, refresh } = useAuth();
@@ -95,6 +96,7 @@ export default function ManagerProfilePage() {
   return (
     <Box>
       <PageHeader title={he.myAccount} subtitle={he.myAccountSubtitle} />
+      <ManagerAvatarSection />
       {user.role === "network_manager" && <ManagerNetworkChatSetting />}
 
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3, maxWidth: 560 }}>

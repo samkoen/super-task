@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Button, Chip, Dialog, InputAdornment, List, ListItemAvatar, TextField } from "@mui/material";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Box, ButtonBase, Chip, Dialog, InputAdornment, List, ListItemAvatar, TextField } from "@mui/material";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import { ChatRowAvatar } from "../../components/chat/EmployeeChatRowItem";
-import { employeeBigButtonSx, employeeFieldSx } from "../../styles/employeeUi";
-import { ApiError } from "../../services/api";
+import { employeeFieldSx } from "../../styles/employeeUi";
+import { studioPillSx } from "../../components/tasks/fixed/studio/studioUi";
 import { useFeedback } from "../../context/FeedbackContext";
+import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
 import { he } from "../../i18n/he";
-import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
@@ -20,48 +20,38 @@ import FullscreenBackAppBar, {
 } from "../../components/chat/FullscreenBackAppBar";
 import TaskChatDialog from "../../components/tasks/TaskChatDialog";
 import { directChatService, type DirectChatCard } from "../../services/directChatService";
-import { taskService, type ManagerDayTaskChat } from "../../services/taskService";
-import { directChatTitle, sortDirectChatCards } from "../../utils/directChat";
+import { useShellManagerScope } from "../../context/ManagerScopeContext";
 import {
-  buildManagerEmployeeRows,
-  filterManagerContacts,
-  type ManagerEmployeeRow,
+  filterManagerInbox,
+  scopeManagerInbox,
+  type ManagerChatsFilter,
+  type ManagerInboxEntry,
+  type ManagerInboxTask,
 } from "../../utils/managerChatInbox";
-import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
-import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
+import { useManagerUnifiedChats } from "../../hooks/useManagerUnifiedChats";
+
+const BROADCAST_ICON = <CampaignOutlinedIcon sx={{ fontSize: 26, color: "#4b5563" }} />;
+
+const FILTERS: { id: ManagerChatsFilter; label: string }[] = [
+  { id: "all", label: he.managerChatsFilterAll },
+  { id: "tasks", label: he.managerChatsFilterTasks },
+  { id: "directs", label: he.managerChatsFilterDirects },
+];
 
 const chatListSx = { display: "flex", flexDirection: "column", gap: 1.25 } as const;
 
-async function fetchDirectThread(card: DirectChatCard) {
-  const opened = card.kind === "up"
-    ? await directChatService.openMine()
-    : await directChatService.openWith(card.counterpart_user_id);
-  return {
-    id: opened.conversation.id,
-    title: card.kind === "up" ? directChatTitle(card) : he.employeeGeneralChat,
-  };
-}
-
+/**
+ * Onglet שיחות unifié (étape 7) : une seule boîte dans le style de l'écran 12 du Figma. Les chats
+ * directs et les fils de tâche sont mélangés, « ממתין לי » en tête, filtrables par pastille.
+ * « שליחה לכולם » devient un rond dans l'en-tête de la coque.
+ */
 export default function ManagerDirectChatsPage() {
-  const { showError, showSuccess } = useFeedback();
-  const state = useManagerChatsState(showError);
+  const state = useUnifiedChatsState();
+  useManagerPageHeader(he.directChatTitle, undefined, state.broadcastAction);
 
   return (
     <Box>
-      <PageHeader
-        title={he.directChatTitle}
-        action={
-          <Button
-            variant="outlined"
-            startIcon={<CampaignOutlinedIcon />}
-            onClick={() => state.setBroadcastOpen(true)}
-            disabled={state.items.length === 0}
-            sx={{ ...employeeBigButtonSx, minHeight: 52, fontSize: "1.05rem" }}
-          >
-            {he.directChatBroadcast}
-          </Button>
-        }
-      />
+      <ChatsFilterPills active={state.filter} onSelect={state.setFilter} />
       <TextField
         fullWidth
         value={state.query}
@@ -77,260 +67,181 @@ export default function ManagerDirectChatsPage() {
           ),
         }}
       />
-      <ContactsBody state={state} />
-      <EmployeeChatsDialog state={state} />
+      <InboxBody state={state} />
       <DirectThreadDialog state={state} />
       <TaskThreadDialog state={state} />
-      <BroadcastDialog
-        open={state.broadcastOpen}
-        count={state.items.length}
-        onClose={() => state.setBroadcastOpen(false)}
-        onSent={() => {
-          showSuccess(he.directChatBroadcastSent(state.items.length));
-          state.setBroadcastOpen(false);
-          void state.load();
-        }}
-      />
+      <BroadcastDialog state={state} />
     </Box>
   );
 }
 
-function useManagerChatsState(showError: (msg: string) => void) {
-  const [items, setItems] = useState<DirectChatCard[]>([]);
-  const [up, setUp] = useState<DirectChatCard | null>(null);
-  const [loading, setLoading] = useState(true);
+function useUnifiedChatsState() {
+  const feedback = useFeedback();
+  const feedbackRef = useRef(feedback);
+  feedbackRef.current = feedback;
+  const onError = useCallback((message: string) => feedbackRef.current.showError(message), []);
+  const chats = useManagerUnifiedChats(onError);
+
+  const [filter, setFilter] = useState<ManagerChatsFilter>("all");
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<DirectChatCard | null>(null);
-  const [dayTasks, setDayTasks] = useState<ManagerDayTaskChat[]>([]);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [openTitle, setOpenTitle] = useState("");
-  const [taskChat, setTaskChat] = useState<ManagerDayTaskChat | null>(null);
+  const [open, setOpen] = useState<{ id: string; title: string } | null>(null);
+  const [task, setTask] = useState<ManagerInboxTask | null>(null);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
 
-  const load = useCallback(async () => {
+  const openDirect = useCallback(async (card: DirectChatCard) => {
     try {
-      const data = await directChatService.inbox();
-      const next = sortDirectChatCards(data.items);
-      setItems(next);
-      setUp(data.up);
-      setSelected((prev) => (prev ? next.find((c) => c.counterpart_user_id === prev.counterpart_user_id) ?? prev : null));
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setLoading(false);
+      const opened = card.kind === "up"
+        ? await directChatService.openMine(card.scope === "network" ? "network" : undefined)
+        : await directChatService.openWith(card.counterpart_user_id);
+      const title = card.kind === "up" ? he.directChatManagerTitle : card.counterpart_name;
+      setOpen({ id: opened.conversation.id, title });
+    } catch {
+      feedbackRef.current.showError(he.errorGeneric);
     }
-  }, [showError]);
+  }, []);
 
-  const loadDayTasks = useCallback(async (employeeId: string) => {
-    try {
-      const data = await taskService.listManagerDayChats(employeeId);
-      setDayTasks(data.items);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    }
-  }, [showError]);
+  const openBroadcast = useCallback(() => setBroadcastOpen(true), []);
+  const broadcastAction = useMemo(
+    () => ({ icon: BROADCAST_ICON, label: he.directChatBroadcast, onClick: openBroadcast, testId: "manager-chats-broadcast" }),
+    [openBroadcast],
+  );
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-  useDirectChatLiveSync(null, () => void load());
-  useTaskChangeListener(() => {
-    void load();
-    if (selected) void loadDayTasks(selected.counterpart_user_id);
-  });
-
-  const openDirect = async (card: DirectChatCard) => {
-    try {
-      const opened = await fetchDirectThread(card);
-      setOpenId(opened.id);
-      setOpenTitle(opened.title);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    }
-  };
-
-  const onContact = async (card: DirectChatCard) => {
-    if (card.kind === "up") {
-      await openDirect(card);
-      return;
-    }
-    setSelected(card);
-    await loadDayTasks(card.counterpart_user_id);
-  };
-
-  const rows = up ? [up, ...items] : items;
-  const visible = useMemo(() => filterManagerContacts(rows, query), [rows, query]);
+  // Menahel reshet : le snif choisi dans l'en-tête restreint la boîte (vide = toute la reshet).
+  const scopeBranchId = useShellManagerScope()?.branchId ?? "";
+  const visible = useMemo(
+    () => filterManagerInbox(scopeManagerInbox(chats.entries, scopeBranchId), filter, query),
+    [chats.entries, scopeBranchId, filter, query],
+  );
   return {
-    items, up, loading, query, setQuery, selected, setSelected, dayTasks, setDayTasks,
-    openId, setOpenId, openTitle, taskChat, setTaskChat, broadcastOpen, setBroadcastOpen,
-    load, loadDayTasks, openDirect, onContact, visible, rows,
+    ...chats, filter, setFilter, query, setQuery, open, setOpen, task, setTask,
+    broadcastOpen, setBroadcastOpen, openDirect, broadcastAction, visible,
   };
 }
 
-function ContactsBody({ state }: { state: ReturnType<typeof useManagerChatsState> }) {
+type State = ReturnType<typeof useUnifiedChatsState>;
+
+function ChatsFilterPills({ active, onSelect }: { active: ManagerChatsFilter; onSelect: (f: ManagerChatsFilter) => void }) {
+  return (
+    <Box role="tablist" aria-label={he.managerChatsFilterLabel} sx={{ display: "flex", gap: "8px", mb: 2, flexWrap: "wrap" }}>
+      {FILTERS.map(({ id, label }) => (
+        <ButtonBase
+          key={id}
+          role="tab"
+          aria-selected={active === id}
+          data-testid={`manager-chats-filter-${id}`}
+          onClick={() => onSelect(id)}
+          sx={studioPillSx(active === id)}
+        >
+          {label}
+        </ButtonBase>
+      ))}
+    </Box>
+  );
+}
+
+function InboxBody({ state }: { state: State }) {
   if (state.loading) return <ListSkeleton />;
   if (state.visible.length === 0) {
-    return (
-      <EmptyState
-        title={state.rows.length ? he.directChatNoSearchResults : he.directChatNoPeers}
-        icon={<ChatOutlinedIcon fontSize="inherit" />}
-      />
-    );
+    const title = state.entries.length ? he.directChatNoSearchResults : he.managerChatsEmpty;
+    return <EmptyState title={title} icon={<ChatOutlinedIcon fontSize="inherit" />} />;
   }
   return (
     <List disablePadding sx={chatListSx}>
-      {state.visible.map((card) => (
-        <ChatInboxRow
-          key={`${card.kind}-${card.counterpart_user_id}`}
-          title={directChatTitle(card)}
-          preview={card.last_preview || he.chatRowEmpty}
-          lastAt={card.last_at}
-          unreadCount={card.unread_count}
-          onClick={() => void state.onContact(card)}
-          leading={
-            <ListItemAvatar>
-              <EmployeeAvatar name={card.counterpart_name} photoUrl={card.counterpart_avatar_url} size={56} />
-            </ListItemAvatar>
-          }
-          titleExtra={
-            card.kind === "down" && card.branch_name ? (
-              <Chip label={card.branch_name} sx={{ fontWeight: 700, fontSize: "0.9rem" }} />
-            ) : null
-          }
-        />
+      {state.visible.map((entry) => (
+        <InboxRowItem key={entry.key} entry={entry} state={state} />
       ))}
     </List>
   );
 }
 
-function EmployeeChatsDialog({ state }: { state: ReturnType<typeof useManagerChatsState> }) {
-  const rows = state.selected ? buildManagerEmployeeRows(state.selected, state.dayTasks) : [];
-  const onBack = () => {
-    state.setSelected(null);
-    state.setDayTasks([]);
-    void state.load();
-  };
-  return (
-    <Dialog
-      fullScreen
-      open={Boolean(state.selected)}
-      onClose={onBack}
-      dir="rtl"
-      PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-    >
-      <FullscreenBackAppBar title={state.selected?.counterpart_name ?? ""} onBack={onBack} />
-      <Box sx={{ ...fullscreenChatBodySx, overflowY: "auto" }}>
-        <List disablePadding sx={chatListSx}>
-          {rows.map((row) => (
-            <EmployeeRow
-              key={row.kind === "general" ? "general" : row.id}
-              row={row}
-              onGeneral={() => state.selected && void state.openDirect(state.selected)}
-              onTask={state.setTaskChat}
-            />
-          ))}
-        </List>
-      </Box>
-    </Dialog>
-  );
-}
-
-function EmployeeRow({
-  row,
-  onGeneral,
-  onTask,
-}: {
-  row: ManagerEmployeeRow;
-  onGeneral: () => void;
-  onTask: (task: ManagerDayTaskChat) => void;
-}) {
-  const onClick = () => {
-    if (row.kind === "general") {
-      onGeneral();
-      return;
-    }
-    onTask({
-      id: row.id,
-      title: row.title,
-      status: row.status,
-      last_preview: row.last_preview,
-      last_at: row.last_at,
-      unread_count: row.unread_count,
-    });
-  };
+function InboxRowItem({ entry, state }: { entry: ManagerInboxEntry; state: State }) {
+  if (entry.kind === "task" && entry.task) {
+    const task = entry.task;
+    return (
+      <ChatInboxRow
+        title={entry.title}
+        preview={entry.preview || he.chatRowEmpty}
+        lastAt={entry.lastAt}
+        unreadCount={entry.unread}
+        onClick={() => state.setTask(task)}
+        leading={<ChatRowAvatar general={false} />}
+        titleExtra={
+          <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap">
+            <Chip label={he.managerChatTaskContext} size="small" color="warning" sx={{ fontWeight: 700 }} />
+            {entry.context ? <Chip label={entry.context} size="small" sx={{ fontWeight: 700 }} /> : null}
+          </Box>
+        }
+      />
+    );
+  }
+  const card = entry.direct!;
   return (
     <ChatInboxRow
-      title={row.title}
-      preview={row.last_preview || he.chatRowEmpty}
-      lastAt={row.last_at}
-      unreadCount={row.unread_count}
-      onClick={onClick}
-      leading={<ChatRowAvatar general={row.kind === "general"} />}
+      title={entry.title}
+      preview={entry.preview || he.chatRowEmpty}
+      lastAt={entry.lastAt}
+      unreadCount={entry.unread}
+      onClick={() => void state.openDirect(card)}
+      leading={
+        <ListItemAvatar>
+          <EmployeeAvatar name={card.counterpart_name} photoUrl={card.counterpart_avatar_url} size={56} />
+        </ListItemAvatar>
+      }
+      titleExtra={entry.context ? <Chip label={entry.context} sx={{ fontWeight: 700, fontSize: "0.9rem" }} /> : null}
     />
   );
 }
 
-function DirectThreadDialog({ state }: { state: ReturnType<typeof useManagerChatsState> }) {
+function DirectThreadDialog({ state }: { state: State }) {
   const onClose = () => {
-    state.setOpenId(null);
-    void state.load();
-    if (state.selected) void state.loadDayTasks(state.selected.counterpart_user_id);
+    state.setOpen(null);
+    void state.reload();
   };
   return (
-    <Dialog
-      fullScreen
-      open={Boolean(state.openId)}
-      onClose={onClose}
-      dir="rtl"
-      PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-    >
-      <FullscreenBackAppBar title={state.openTitle} onBack={onClose} />
+    <Dialog fullScreen open={Boolean(state.open)} onClose={onClose} dir="rtl" PaperProps={{ sx: fullscreenChatDialogPaperSx }}>
+      <FullscreenBackAppBar title={state.open?.title ?? ""} onBack={onClose} />
       <Box sx={fullscreenChatBodySx}>
-        {state.openId && <DirectChatThread conversationId={state.openId} onSent={() => void state.load()} />}
+        {state.open && <DirectChatThread conversationId={state.open.id} onSent={() => void state.reload()} />}
       </Box>
     </Dialog>
   );
 }
 
-function TaskThreadDialog({ state }: { state: ReturnType<typeof useManagerChatsState> }) {
+function TaskThreadDialog({ state }: { state: State }) {
+  const task = state.task;
   const onClose = () => {
-    state.setTaskChat(null);
-    void state.load();
-    if (state.selected) void state.loadDayTasks(state.selected.counterpart_user_id);
+    state.setTask(null);
+    void state.reload();
   };
-  const chat = state.taskChat;
   return (
     <TaskChatDialog
-      open={Boolean(chat)}
-      occurrenceId={chat?.id ?? ""}
-      title={chat?.title ?? he.taskChatTitle}
-      status={chat?.status}
+      open={Boolean(task)}
+      occurrenceId={task?.occurrenceId ?? ""}
+      title={task?.title ?? he.taskChatTitle}
+      status={task?.status}
       employee={false}
       onClose={onClose}
-      onOccurrenceUpdated={() => {
-        void state.load();
-        if (state.selected) void state.loadDayTasks(state.selected.counterpart_user_id);
-      }}
+      onOccurrenceUpdated={() => void state.reload()}
     />
   );
 }
 
-function BroadcastDialog({
-  open,
-  count: _count,
-  onClose,
-  onSent,
-}: {
-  open: boolean;
-  count: number;
-  onClose: () => void;
-  onSent: () => void;
-}) {
+function BroadcastDialog({ state }: { state: State }) {
+  const { showSuccess } = useFeedback();
+  const onClose = () => state.setBroadcastOpen(false);
   return (
-    <Dialog fullScreen open={open} onClose={onClose} dir="rtl" PaperProps={{ sx: fullscreenChatDialogPaperSx }}>
+    <Dialog fullScreen open={state.broadcastOpen} onClose={onClose} dir="rtl" PaperProps={{ sx: fullscreenChatDialogPaperSx }}>
       <FullscreenBackAppBar title={he.directChatBroadcast} onBack={onClose} />
       <Box sx={fullscreenChatBodySx}>
-        <DirectChatThread conversationId={null} broadcast onSent={onSent} />
+        <DirectChatThread
+          conversationId={null}
+          broadcast
+          onSent={() => {
+            showSuccess(he.directChatBroadcastSent(state.entries.filter((e) => e.kind === "direct").length));
+            state.setBroadcastOpen(false);
+            void state.reload();
+          }}
+        />
       </Box>
     </Dialog>
   );

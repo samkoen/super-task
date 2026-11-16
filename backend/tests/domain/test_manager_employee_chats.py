@@ -21,6 +21,22 @@ def test_manager_task_chat_card_without_message():
     assert card["unread_count"] == 0
 
 
+def test_manager_task_chat_card_carries_oved_and_branch():
+    occ = SimpleNamespace(id="o1", title="מדף", status="pending", assignee_user_id="e1", branch_id="b1")
+    card = manager_task_chat_card(occ, None, 0, "דן כהן")
+    assert card["assignee_user_id"] == "e1"
+    assert card["assignee_name"] == "דן כהן"
+    assert card["branch_id"] == "b1"
+
+
+def test_manager_task_chat_card_tolerates_missing_oved_and_branch():
+    occ = SimpleNamespace(id="o1", title="מדף", status="pending")
+    card = manager_task_chat_card(occ, None, 0)
+    assert card["assignee_user_id"] is None
+    assert card["assignee_name"] is None
+    assert card["branch_id"] is None
+
+
 def test_manager_task_chat_card_with_preview():
     occ = SimpleNamespace(id="o1", title="מדף", status="in_progress")
     msg = SimpleNamespace(

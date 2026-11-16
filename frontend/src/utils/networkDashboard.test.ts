@@ -50,4 +50,10 @@ describe("networkDashboard", () => {
       }),
     ).toBeNull();
   });
+
+  it("keeps « כל הרשת » once the manager chose it himself", () => {
+    const base = { canPickBranch: true, selectedBranch: "", overviewLoaded: true, managesAllWorkers: false, homeBranchId: "b1" };
+    expect(homeBranchAfterOverview({ ...base, explicitChoice: true })).toBeNull();
+    expect(homeBranchAfterOverview({ ...base, explicitChoice: false })).toBe("b1");
+  });
 });

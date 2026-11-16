@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { TextField, Typography } from "@mui/material";
+import { ButtonBase, TextField, Typography } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import type { User } from "../../../../services/api";
 import type { Branch } from "../../../../services/branchService";
 import { useFixedTaskWizardForm } from "../../../../hooks/useFixedTaskWizardForm";
@@ -11,11 +12,11 @@ import {
   firstBlockedStep,
   stepBlocker,
   wizardContext,
-  wizardPayload,
   type WizardContext,
   type WizardForm,
 } from "../../../../utils/fixedTaskWizard";
 import { displayHour } from "../../../../utils/studioRequirements";
+import { isOnce, onceBlocker, onceDefaults, onceScheduleLine, studioPayload } from "../../../../utils/studioOnce";
 import BranchChecklist from "../../BranchChecklist";
 import type { NewTaskFormSubmitPayload } from "../../NewTaskFormDialog";
 import BranchAssigneeRows from "../BranchAssigneeRows";
@@ -26,7 +27,7 @@ import StudioMoreSheet from "./StudioMoreSheet";
 import StudioPreview from "./StudioPreview";
 import StudioSchedule from "./StudioSchedule";
 import { StudioGroupTitle, StudioLeaveDialog, StudioSaveBar, StudioScreen, StudioSection } from "./StudioScreen";
-import { studioFieldSx } from "./studioUi";
+import { studioFieldSx, studioSectionSx } from "./studioUi";
 
 export type FixedTaskCreateStudioProps = {
   branches: Branch[];
@@ -42,6 +43,10 @@ export type FixedTaskCreateStudioProps = {
   onError?: (message: string) => void;
   /** Garde le brouillon si l'écran est démonté (navigation). */
   rememberKey?: string;
+  /** Studio unique : la pastille « פעם אחת » crée une tâche ponctuelle. */
+  allowOnce?: boolean;
+  /** Pré-remplissage d'un formulaire neuf (« פעם אחת », bibliothèque, signalement). */
+  initialForm?: Partial<WizardForm>;
 };
 
 type Patch = (changes: Partial<WizardForm>) => void;
@@ -52,10 +57,63 @@ export function scheduleLine(dueTime: string, recurrence: string): string {
   return [hour ? he.flowDueAtHour(hour) : "", label].filter(Boolean).join(" · ");
 }
 
-/** Le premier blocage, toutes étapes confondues (contenu, puis snif / oved). */
+/** Le premier blocage, toutes étapes confondues (contenu, date de « פעם אחת », puis snif / oved). */
 function blockerOf(form: WizardForm, ctx: WizardContext): string {
   const step = firstBlockedStep(form, ctx);
-  return step ? stepBlocker(step, form, ctx) : "";
+  if (step === "what") return stepBlocker(step, form, ctx);
+  return onceBlocker(form) || (step ? stepBlocker(step, form, ctx) : "");
+}
+
+function headerLine(form: WizardForm): string {
+  return isOnce(form) ? onceScheduleLine(form.dueAt) : scheduleLine(form.dueTime, form.recurrence);
+}
+
+function WhenSection({ form, patch, allowOnce, disabled }: { form: WizardForm; patch: Patch; allowOnce?: boolean; disabled: boolean }) {
+  const once = allowOnce
+    ? {
+        active: isOnce(form),
+        dueAt: form.dueAt,
+        onChange: ({ active, dueAt }: { active?: boolean; dueAt?: string }) => {
+          if (active === true) patch({ taskKind: "ad_hoc", dueAt: form.dueAt || (onceDefaults().dueAt as string) });
+          if (active === false) patch({ taskKind: "fixed" });
+          if (dueAt !== undefined) patch({ dueAt });
+        },
+      }
+    : undefined;
+  return (
+    <StudioSection title={he.studioWhenTitle} testId="studio-when">
+      <StudioSchedule
+        value={{ recurrence: form.recurrence, dueTime: form.dueTime, weeklyDays: form.weeklyDays, monthlyDay: form.monthlyDay }}
+        onChange={(changes) => patch(changes)}
+        once={once}
+        disabled={disabled}
+      />
+    </StudioSection>
+  );
+}
+
+/**
+ * Pile de cartes « שלבי צילום ». Version courte pour « פעם אחת » : repliée derrière un bouton
+ * tant qu'aucune étape n'est ajoutée.
+ */
+function StepsSection({ form, patch, disabled }: { form: WizardForm; patch: Patch; disabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (isOnce(form) && !open && form.completionRequirements.length === 0) {
+    return (
+      <ButtonBase data-testid="studio-add-steps" disabled={disabled} onClick={() => setOpen(true)} sx={{ ...studioSectionSx, alignItems: "flex-start", textAlign: "right" }}>
+        <Typography component="span" sx={{ ...flowText.h2, color: flowColor.neutral900, display: "flex", alignItems: "center", gap: "6px" }}>
+          <AddRoundedIcon /> {he.studioAddSteps}
+        </Typography>
+        <Typography component="span" sx={{ ...flowText.label, color: flowColor.alphaNeutral900_60 }}>{he.studioAddStepsHint}</Typography>
+      </ButtonBase>
+    );
+  }
+  return (
+    <>
+      <StudioGroupTitle title={he.studioStepsTitle} hint={he.studioStepsHint} />
+      <StudioCardStack value={form.completionRequirements} onChange={(completionRequirements) => patch({ completionRequirements })} disabled={disabled} />
+    </>
+  );
 }
 
 function hasContent(form: WizardForm): boolean {
@@ -119,7 +177,7 @@ function previewPerson(props: FixedTaskCreateStudioProps, form: WizardForm, ctx:
  * dans les cartes que l'oved verra, puis règle « מתי » et « מי מבצע » sur la même page.
  */
 export default function FixedTaskCreateStudio(props: FixedTaskCreateStudioProps) {
-  const { form, patch } = useFixedTaskWizardForm(props.defaultBranchId, props.rememberKey);
+  const { form, patch } = useFixedTaskWizardForm(props.defaultBranchId, props.rememberKey, props.initialForm);
   const [moreOpen, setMoreOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -137,16 +195,16 @@ export default function FixedTaskCreateStudio(props: FixedTaskCreateStudioProps)
   const person = previewPerson(props, form, ctx);
   const create = () => {
     if (blocker) return;
-    void props.onSubmit(wizardPayload(form, ctx)).catch(() => undefined);
+    void props.onSubmit(studioPayload(form, ctx)).catch(() => undefined);
   };
   const back = () => (hasContent(form) ? setLeaving(true) : props.onCancel());
 
   const header = (
     <StudioHeader
-      kicker={he.studioKickerCreate}
+      kicker={isOnce(form) ? he.studioKickerOnce : he.studioKickerCreate}
       title={form.title}
       onTitleChange={(title) => patch({ title })}
-      scheduleLine={scheduleLine(form.dueTime, form.recurrence)}
+      scheduleLine={headerLine(form)}
       onBack={back}
       onPreview={() => setPreviewOpen(true)}
       onMore={() => setMoreOpen(true)}
@@ -159,12 +217,7 @@ export default function FixedTaskCreateStudio(props: FixedTaskCreateStudioProps)
 
   return (
     <StudioScreen header={header} footer={footer}>
-      <StudioGroupTitle title={he.studioStepsTitle} hint={he.studioStepsHint} />
-      <StudioCardStack
-        value={form.completionRequirements}
-        onChange={(completionRequirements) => patch({ completionRequirements })}
-        disabled={props.saving}
-      />
+      <StepsSection form={form} patch={patch} disabled={props.saving} />
       <StudioSection title={he.studioDetailsTitle}>
         <TextField
           value={form.description}
@@ -178,17 +231,11 @@ export default function FixedTaskCreateStudio(props: FixedTaskCreateStudioProps)
           sx={studioFieldSx}
         />
       </StudioSection>
-      <StudioSection title={he.studioWhenTitle} testId="studio-when">
-        <StudioSchedule
-          value={{ recurrence: form.recurrence, dueTime: form.dueTime, weeklyDays: form.weeklyDays, monthlyDay: form.monthlyDay }}
-          onChange={(changes) => patch(changes)}
-          disabled={props.saving}
-        />
-      </StudioSection>
+      <WhenSection form={form} patch={patch} allowOnce={props.allowOnce} disabled={props.saving} />
       <WhoSection props={props} form={form} patch={patch} ctx={ctx} />
       {ctx.canPickBranch ? (
         <Typography data-testid="wizard-recap" sx={{ ...flowText.button, color: flowColor.navy800, px: "4px" }}>
-          {he.fixedWizardRecap(ctx.selectedIds.length, scheduleLine(form.dueTime, form.recurrence))}
+          {he.fixedWizardRecap(ctx.selectedIds.length, headerLine(form))}
         </Typography>
       ) : null}
       <StudioMoreSheet

@@ -1,39 +1,25 @@
 import { withManagerBranchQuery } from "./managerScopeBranch";
 import { withSystemBottomInsetCss } from "./systemInsets";
 
-export type ManagerBottomTab = "home" | "tasks" | "archive";
+/**
+ * Pilule du bas menahel (Figma « Bottom Nav ») : 53 px de haut, posée à 18 px du bord.
+ * Les onglets eux-mêmes sont dans `managerShell.ts`.
+ */
+export const MANAGER_PILL_HEIGHT_PX = 53;
+export const MANAGER_PILL_OFFSET_PX = 18;
+/** Marge sous le dernier contenu pour que la pilule ne le cache pas. */
+export const MANAGER_BOTTOM_CONTENT_GAP_PX = 24;
 
-/** Hauteur barre bas (px), hors safe-area système Android/iOS. */
-export const MANAGER_BOTTOM_NAV_HEIGHT_PX = 64;
-/** Marge sous le dernier contenu pour ne pas être masqué par la barre / FAB. */
-export const MANAGER_BOTTOM_CONTENT_GAP_PX = 48;
-
-/** Padding bas du scroll : barre + gap + safe-area (WebView Android). */
+/** Padding bas du scroll : pilule + décalage + marge + safe-area (WebView Android). */
 export function managerBottomContentPadCss(): string {
-  return withSystemBottomInsetCss(`${MANAGER_BOTTOM_NAV_HEIGHT_PX + MANAGER_BOTTOM_CONTENT_GAP_PX}px`);
+  return withSystemBottomInsetCss(
+    `${MANAGER_PILL_HEIGHT_PX + MANAGER_PILL_OFFSET_PX + MANAGER_BOTTOM_CONTENT_GAP_PX}px`,
+  );
 }
 
-/** Position verticale du FAB au-dessus de la barre. */
+/** Hauteur où poser un bouton flottant (lanceur de bug) juste au-dessus de la pilule. */
 export function managerFabBottomCss(): string {
-  return withSystemBottomInsetCss(`${MANAGER_BOTTOM_NAV_HEIGHT_PX + 12}px`);
-}
-
-export const MANAGER_BOTTOM_NAV_ITEMS: {
-  tab: ManagerBottomTab;
-  path: string;
-}[] = [
-  { tab: "home", path: "/manager" },
-  { tab: "tasks", path: "/manager/tasks" },
-  { tab: "archive", path: "/manager/gallery" },
-];
-
-export function resolveManagerBottomTab(pathname: string): ManagerBottomTab | null {
-  if (pathname === "/manager" || pathname === "/manager/") return "home";
-  if (pathname.startsWith("/manager/tasks")) return "tasks";
-  if (pathname.startsWith("/manager/gallery")) return "archive";
-  // Autres pages manager : aucun onglet actif, barre visible quand même
-  if (pathname.startsWith("/manager")) return null;
-  return null;
+  return withSystemBottomInsetCss(`${MANAGER_PILL_HEIGHT_PX + MANAGER_PILL_OFFSET_PX + 12}px`);
 }
 
 export function shouldShowManagerChrome(
@@ -44,14 +30,7 @@ export function shouldShowManagerChrome(
   return role === "branch_manager" || role === "network_manager";
 }
 
-/** Path onglet bas avec snif courant (storage / param explicite). */
-export function managerBottomNavPath(tabPath: string, branchId?: string | null): string {
-  return withManagerBranchQuery(tabPath, branchId);
-}
-
+/** « משימה חדשה » : le studio unique, sur le snif courant. */
 export function managerNewTaskNavigation(branchId?: string | null) {
-  return {
-    pathname: withManagerBranchQuery("/manager/tasks", branchId),
-    state: { openNewTask: true },
-  } as const;
+  return { pathname: withManagerBranchQuery("/manager/tasks/new", branchId) } as const;
 }

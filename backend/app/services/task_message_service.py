@@ -122,14 +122,42 @@ class TaskMessageService:
     def list_manager_day_chats(self, actor: ActorContext, employee_id: str) -> dict:
         self._assert_can_list_employee_day(actor, employee_id)
         occs = self._today_occurrences(actor, assignee_id=employee_id)
+        return {"items": sort_manager_day_chats(self._manager_chat_cards(actor, occs))}
+
+    def list_manager_all_day_chats(self, actor: ActorContext) -> dict:
+        """Tous les fils de tâche du jour visibles par le menahel, en un seul appel.
+
+        Remplace le fan-out par oved de la boîte « שיחות » unifiée : chaque carte porte
+        `assignee_user_id` pour que le front la rattache à son oved.
+        """
+        if not can_manage_tasks(actor):
+            raise PermissionError("אין הרשאה לרשימת שיחות")
+        occs = [o for o in self._today_occurrences(actor) if o.assignee_user_id]
+        return {"items": sort_manager_day_chats(self._manager_chat_cards(actor, occs))}
+
+    def _manager_chat_cards(self, actor: ActorContext, occs) -> list[dict]:
         ids = [o.id for o in occs]
         last = self._messages.last_messages_for(ids)
         unreads = self._messages.unread_counts(ids, actor.user_id)
-        items = [
-            manager_task_chat_card(occ, last.get(occ.id), unreads.get(occ.id, 0))
+        names = self._assignee_names(occs)
+        return [
+            manager_task_chat_card(
+                occ,
+                last.get(occ.id),
+                unreads.get(occ.id, 0),
+                names.get(getattr(occ, "assignee_user_id", None)),
+            )
             for occ in occs
         ]
-        return {"items": sort_manager_day_chats(items)}
+
+    def _assignee_names(self, occs) -> dict[str, str]:
+        """Un seul accès par oved distinct (pas par tâche)."""
+        names: dict[str, str] = {}
+        for uid in {getattr(o, "assignee_user_id", None) for o in occs} - {None}:
+            user = self._users.find_by_id(uid)
+            if user:
+                names[uid] = user.full_name
+        return names
 
     def unread_today_by_assignees(
         self, actor: ActorContext, assignee_ids: list[str]

@@ -60,7 +60,7 @@ export default function ManagerIssuesPage() {
   }, [load]);
 
   const handleCreateTask = (report: IssueReport) => {
-    navigate("/manager/tasks", {
+    navigate("/manager/tasks/new", {
       state: { adHocPrefillFromIssue: buildAdHocPrefillFromIssue(report) },
     });
   };
