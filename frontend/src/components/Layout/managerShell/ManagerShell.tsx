@@ -50,6 +50,7 @@ function ManagerShellBody({ children, overlays, muteIncoming, onLogout }: Props)
             photoUrl={user?.avatar_url}
             title={header?.title}
             subtitle={header?.subtitle}
+            action={header?.action}
             showBack={shell.showBack}
             muteIncoming={muteIncoming}
             onBack={shell.goBack}

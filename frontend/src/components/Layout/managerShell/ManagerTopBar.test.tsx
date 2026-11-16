@@ -44,4 +44,20 @@ describe("ManagerTopBar", () => {
     expect(h.onBack).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("manager-topbar-bell")).toBeTruthy();
   });
+
+  it("renders a page action round and fires it", () => {
+    const onClick = vi.fn();
+    render(
+      <ManagerTopBar
+        name="שמואל"
+        showBack={false}
+        action={{ icon: <span>★</span>, label: "שליחה לכולם", onClick, testId: "manager-chats-broadcast" }}
+        onBack={vi.fn()}
+        onCreate={vi.fn()}
+        onOpenMore={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("manager-chats-broadcast"));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 });

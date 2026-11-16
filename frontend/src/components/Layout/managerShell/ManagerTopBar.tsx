@@ -4,6 +4,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import arrowLeftIcon from "../../../assets/flow1/icon-arrow-left.svg";
 import bellIcon from "../../../assets/flow1/icon-bell.svg";
 import NotificationBell from "../../notifications/NotificationBell";
+import type { ManagerHeaderAction } from "../../../context/ManagerPageHeaderContext";
 import { useResolvedMediaSrc } from "../../../hooks/useResolvedMediaSrc";
 import { he } from "../../../i18n/he";
 import { flowColor, flowSize, flowText } from "../../../styles/flowTokens";
@@ -18,6 +19,8 @@ type Props = {
   subtitle?: string;
   showBack: boolean;
   muteIncoming?: boolean;
+  /** Bouton rond facultatif propre à la page (ex. « שליחה לכולם »), à gauche du « + ». */
+  action?: ManagerHeaderAction;
   onBack: () => void;
   onCreate: () => void;
   onOpenMore: () => void;
@@ -103,7 +106,7 @@ function TitleBlock({ title, subtitle }: { title: string; subtitle?: string }) {
  * En-tête commun à tous les écrans menahel, comme le Figma (« Home Header » + « toolbar ») :
  * avatar et salutation, titre de l'écran, puis retour éventuel, « + » et cloche à gauche.
  */
-export default function ManagerTopBar({ name, photoUrl, title, subtitle, showBack, muteIncoming, onBack, onCreate, onOpenMore }: Props) {
+export default function ManagerTopBar({ name, photoUrl, title, subtitle, showBack, muteIncoming, action, onBack, onCreate, onOpenMore }: Props) {
   return (
     <Box component="header" data-testid="manager-topbar" sx={{ pt: `calc(8px + ${systemTopInsetCss()})` }}>
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "16px" }}>
@@ -114,6 +117,11 @@ export default function ManagerTopBar({ name, photoUrl, title, subtitle, showBac
         {showBack ? (
           <RoundButton label={he.flowBack} testId="manager-topbar-back" onClick={onBack}>
             <IconImg src={arrowLeftIcon} size={22} />
+          </RoundButton>
+        ) : null}
+        {action ? (
+          <RoundButton label={action.label} testId={action.testId ?? "manager-topbar-action"} onClick={action.onClick}>
+            {action.icon}
           </RoundButton>
         ) : null}
         <RoundButton label={he.managerCreate} testId="manager-topbar-create" onClick={onCreate}>
