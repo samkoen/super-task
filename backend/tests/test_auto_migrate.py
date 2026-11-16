@@ -11,31 +11,20 @@ from app.db.auto_migrate import run_startup_migrations, should_auto_upgrade, upg
 def test_should_auto_upgrade_skips_local_dev():
     assert not should_auto_upgrade(
         is_production=False,
-        is_vercel=False,
         database_url="postgresql://u:p@localhost/super_db",
     )
 
 
-def test_should_auto_upgrade_skips_sqlite_even_on_vercel():
+def test_should_auto_upgrade_skips_sqlite_even_in_production():
     assert not should_auto_upgrade(
         is_production=True,
-        is_vercel=True,
         database_url="sqlite:///:memory:",
-    )
-
-
-def test_should_auto_upgrade_on_vercel_postgres():
-    assert should_auto_upgrade(
-        is_production=False,
-        is_vercel=True,
-        database_url="postgresql://u:p@ep-x.neon.tech/db",
     )
 
 
 def test_should_auto_upgrade_on_production_postgres():
     assert should_auto_upgrade(
         is_production=True,
-        is_vercel=False,
         database_url="postgresql+psycopg://u:p@db/super",
     )
 
@@ -45,7 +34,6 @@ def test_run_startup_migrations_skips_when_not_enabled(monkeypatch):
     monkeypatch.setattr("app.db.auto_migrate.upgrade_to_head", lambda: called.append(1))
     run_startup_migrations(
         is_production=False,
-        is_vercel=False,
         database_url="postgresql://u:p@localhost/super_db",
     )
     assert called == []
@@ -56,7 +44,6 @@ def test_run_startup_migrations_upgrades_when_enabled(monkeypatch):
     monkeypatch.setattr("app.db.auto_migrate.upgrade_to_head", lambda: called.append(1))
     run_startup_migrations(
         is_production=True,
-        is_vercel=True,
         database_url="postgresql://u:p@ep-x.neon.tech/db",
     )
     assert called == [1]

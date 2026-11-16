@@ -4,9 +4,8 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import NullPool
 
-from app.core.config import IS_SERVERLESS, prepare_database_url
+from app.core.config import prepare_database_url
 
 _engine = None
 SessionLocal: sessionmaker[Session] | None = None
@@ -48,10 +47,7 @@ def get_engine():
     }
     if connect_args:
         eng_kw["connect_args"] = connect_args
-    if IS_SERVERLESS:
-        eng_kw["poolclass"] = NullPool
-    else:
-        eng_kw["pool_recycle"] = 280
+    eng_kw["pool_recycle"] = 280
 
     _engine = create_engine(url, **eng_kw)
     SessionLocal = sessionmaker(

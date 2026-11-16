@@ -12,6 +12,8 @@
   file_name?: string | null;
   audio_transcript?: string | null;
   display_audio_transcript?: string | null;
+  /** Étape visée par le message (chat tâche) ; null = général. */
+  slot_index?: number | null;
   created_at: string;
 };
 

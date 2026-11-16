@@ -41,6 +41,7 @@ import { useEmployeeStartDoorOpen } from "../../hooks/useEmployeeStartDoorOpen";
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
 import { useNativeTaskChatAlerts } from "../../hooks/useNativeTaskChatAlerts";
+import { useSlotAutoFlush } from "../../hooks/useSlotAutoFlush";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
 import { SIDEBAR_WIDTH } from "../../constants/layout";
@@ -131,6 +132,7 @@ function Layout() {
   const startDoorOpen = useEmployeeStartDoorOpen();
   const chatUnread = useEmployeeChatUnread(employeeAlertsOn, user?.role);
   useEmployeeNotificationSounds(employeeAlertsOn, breakMuted);
+  useSlotAutoFlush(employeeAlertsOn);
   const chatAlerts = useNativeTaskChatAlerts({
     enabled: Boolean(user) && !loading,
     onBreak: breakMuted,

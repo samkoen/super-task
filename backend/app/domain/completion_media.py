@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.domain.geo import normalize_location
+from app.domain.slot_skip import is_skipped, normalize_skip, skip_audio_url
+
 VALID_KINDS = ("photo", "video", "audio", "message")
 VISUAL_KINDS = frozenset({"photo", "video"})
 MAX_MIN_VIDEO_SECONDS = 600
@@ -239,6 +242,9 @@ def attachment_urls(attachments: list[dict] | None) -> list[str]:
         annotated = str(review.get("annotated_url") or "").strip() if isinstance(review, dict) else ""
         if annotated:
             urls.append(annotated)
+        explanation = skip_audio_url(item)
+        if explanation:
+            urls.append(explanation)
     return urls
 
 
@@ -281,13 +287,14 @@ def requirement_example_urls(requirements: list[dict] | None) -> list[str]:
     for item in requirements:
         if not isinstance(item, dict) or item.get("kind") in {"audio", "message"}:
             continue
-        url = str(item.get("example_url") or "").strip()
-        if url:
-            urls.append(url)
+        for key in ("example_url", "guide_video_url"):
+            url = str(item.get(key) or "").strip()
+            if url:
+                urls.append(url)
     return urls
 
 
-_GUIDE_KEYS = ("title", "hint", "example_url")
+_GUIDE_KEYS = ("title", "hint", "example_url", "guide_video_url")
 
 
 def _is_bare_photo_list(requirements: list[dict]) -> bool:
@@ -409,6 +416,9 @@ def _slot_guide_fields(item: dict) -> dict:
         extra["hint"] = hint
     if example_url:
         extra["example_url"] = example_url
+    guide_video_url = _optional_text(item.get("guide_video_url"), max_len=MAX_EXAMPLE_URL)
+    if guide_video_url:
+        extra["guide_video_url"] = guide_video_url
     if item.get("slot") is True:
         extra["slot"] = True
     return extra
@@ -439,6 +449,8 @@ def _normalize_attachment(item: object) -> dict:
     kind = str(item.get("kind") or "").strip()
     if kind not in VALID_KINDS:
         raise ValueError("סוג מדיה לא תקין")
+    if item.get("skipped") is not None:
+        return {**_empty_slot(kind), "skipped": normalize_skip(item.get("skipped"))}
     if kind == "message":
         return {"kind": "message", "text": _normalize_message_text(item.get("text"))}
     url = str(item.get("url") or item.get("path") or "").strip()
@@ -453,6 +465,9 @@ def _normalize_attachment(item: object) -> dict:
     captured = normalize_captured_at(item.get("captured_at"))
     if captured:
         entry["captured_at"] = captured
+    location = normalize_location(item.get("location"))
+    if location and kind in VISUAL_KINDS:
+        entry["location"] = location
     return entry
 
 
@@ -500,6 +515,8 @@ def _normalize_message_text(value: object | None) -> str:
 
 def _assert_slot_matches(req: dict, att: dict) -> None:
     kind = req["kind"]
+    if is_skipped(att) and att.get("kind") == kind:
+        return
     if kind == "message":
         if att.get("kind") != "message" or not str(att.get("text") or "").strip():
             raise ValueError(_missing_kind_message(kind))

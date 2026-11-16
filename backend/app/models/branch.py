@@ -10,6 +10,8 @@ class Branch:
     address: str = ""
     city: str = ""
     postal_code: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
     is_active: bool = True
     created_at: str | None = None
     updated_at: str | None = None

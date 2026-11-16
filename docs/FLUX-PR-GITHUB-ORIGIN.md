@@ -1,6 +1,6 @@
 # Flux PR : GitHub + Origin + Bugbot
 
-GitHub est la source de vérité. Origin (Cursor) est un miroir. Vercel reste branché sur GitHub.
+GitHub est la source de vérité. Origin (Cursor) est un miroir. Render déploie depuis GitHub.
 
 Le remote local `origin` pointe vers GitHub (`samkoen/super-task`). Un `git push` part sur GitHub ; Origin se synchronise tout seul.
 
@@ -77,7 +77,7 @@ Lancer l’app et vérifier le flux. Ni Bugbot ni Cursor ne mergent à la place 
 
 Sur la PR GitHub (ou Origin) : **Merge**.
 
-`main` se met à jour sur GitHub → Origin sync → Vercel déploie si le projet est toujours lié à GitHub.
+`main` se met à jour sur GitHub → Origin sync → Render déploie si le projet est lié à GitHub.
 
 ## Récap
 
@@ -88,7 +88,7 @@ branche feat/…  →  code + push  →  PR vers main
         →  pytest / npm test
         →  test de l’app
         →  Merge
-        →  GitHub + Origin + Vercel à jour
+        →  GitHub + Origin + Render à jour
 ```
 
 ## À ne pas faire

@@ -34,6 +34,21 @@ def has_message_content(
     )
 
 
+def normalize_slot_index(value: object) -> int | None:
+    """Sous-tâche (étape) visée par un message : None = « כללי » ; sinon entier >= 0."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError("שלב לא תקין")
+    try:
+        index = int(value)
+    except ValueError as exc:
+        raise ValueError("שלב לא תקין") from exc
+    if index < 0:
+        raise ValueError("שלב לא תקין")
+    return index
+
+
 def can_employee_post(status: str) -> bool:
     return status in EMPLOYEE_CHAT_STATUSES
 

@@ -46,6 +46,7 @@ class BranchRepository:
         address: str,
         city: str,
         postal_code: str,
+        coordinates: tuple[float, float] | None = None,
     ) -> Branch:
         import uuid
 
@@ -56,6 +57,8 @@ class BranchRepository:
             address=address.strip(),
             city=city.strip(),
             postal_code=postal_code.strip(),
+            latitude=coordinates[0] if coordinates else None,
+            longitude=coordinates[1] if coordinates else None,
             is_active=True,
         )
         self._db.add(row)
@@ -73,6 +76,8 @@ class BranchRepository:
         city: str,
         postal_code: str,
         is_active: bool,
+        set_coordinates: bool = False,
+        coordinates: tuple[float, float] | None = None,
     ) -> Branch | None:
         row = self._db.get(orm.Branch, mp.parse_uuid(id_))
         if not row:
@@ -82,5 +87,8 @@ class BranchRepository:
         row.city = city.strip()
         row.postal_code = postal_code.strip()
         row.is_active = is_active
+        if set_coordinates:
+            row.latitude = coordinates[0] if coordinates else None
+            row.longitude = coordinates[1] if coordinates else None
         self._db.flush()
         return mp.branch_orm_to_domain(row)

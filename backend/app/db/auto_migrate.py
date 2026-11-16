@@ -1,4 +1,4 @@
-"""Alembic upgrade head au démarrage prod / Vercel."""
+"""Alembic upgrade head au démarrage prod."""
 from __future__ import annotations
 
 import logging
@@ -14,18 +14,14 @@ _BACKEND_DIR = Path(__file__).resolve().parents[2]
 _LOCK_KEY = 87451203
 
 
-def should_auto_upgrade(*, is_production: bool, is_vercel: bool, database_url: str) -> bool:
-    if not (is_production or is_vercel):
+def should_auto_upgrade(*, is_production: bool, database_url: str) -> bool:
+    if not is_production:
         return False
     return not (database_url or "").lower().startswith("sqlite")
 
 
-def run_startup_migrations(*, is_production: bool, is_vercel: bool, database_url: str) -> None:
-    if should_auto_upgrade(
-        is_production=is_production,
-        is_vercel=is_vercel,
-        database_url=database_url,
-    ):
+def run_startup_migrations(*, is_production: bool, database_url: str) -> None:
+    if should_auto_upgrade(is_production=is_production, database_url=database_url):
         upgrade_to_head()
 
 

@@ -9,6 +9,15 @@ import { ApiError } from "../../services/api";
 import { networkService, type Network } from "../../services/networkService";
 import { branchService, type Branch } from "../../services/branchService";
 import { he } from "../../i18n/he";
+import BranchLocationFields from "../../components/admin/BranchLocationFields";
+import {
+  coordinatesPayload,
+  coordinatesToFields,
+  emptyCoordinates,
+  type CoordinateFields,
+} from "../../utils/branchLocation";
+
+const numberOrNull = (value: unknown) => (typeof value === "number" ? value : null);
 
 const emptyForm = { network_id: "", name: "", address: "", city: "", postal_code: "" };
 
@@ -21,6 +30,7 @@ export default function AdminBranchPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [edit, setEdit] = useState<Branch | null>(null);
+  const [coords, setCoords] = useState<CoordinateFields>(emptyCoordinates);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,14 +50,15 @@ export default function AdminBranchPage() {
   const handleSave = async () => {
     try {
       if (edit) {
-        const res = await branchService.update(edit.id, { ...form, is_active: edit.is_active });
+        const res = await branchService.update(edit.id, { ...form, ...coordinatesPayload(coords), is_active: edit.is_active });
         setSuccess(res.message);
       } else {
-        const res = await branchService.create(form);
+        const res = await branchService.create({ ...form, ...coordinatesPayload(coords) });
         setSuccess(res.message);
       }
       setOpen(false);
       setForm(emptyForm);
+      setCoords(emptyCoordinates);
       setEdit(null);
       await load();
     } catch (e) {
@@ -58,6 +69,7 @@ export default function AdminBranchPage() {
   const openEdit = (s: Branch) => {
     setEdit(s);
     setForm({ network_id: s.network_id, name: s.name, address: s.address, city: s.city, postal_code: s.postal_code });
+    setCoords(coordinatesToFields(numberOrNull(s.latitude), numberOrNull(s.longitude)));
     setOpen(true);
   };
 
@@ -68,7 +80,7 @@ export default function AdminBranchPage() {
           <Typography variant="h5" fontWeight={700}>{he.adminBranches}</Typography>
           <Typography variant="body2" color="text.secondary">{he.adminBranchesSubtitle}</Typography>
         </Box>
-        <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setEdit(null); setForm(emptyForm); setOpen(true); }}>
+        <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setEdit(null); setForm(emptyForm); setCoords(emptyCoordinates); setOpen(true); }}>
           {he.newBranch}
         </Button>
       </Box>
@@ -110,6 +122,7 @@ export default function AdminBranchPage() {
           <TextField label={he.address} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} fullWidth />
           <TextField label={he.city} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} fullWidth />
           <TextField label={he.postalCode} value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} fullWidth dir="ltr" />
+          <BranchLocationFields value={coords} onChange={setCoords} />
           {edit && (
             <Box display="flex" alignItems="center" gap={1}>
               <Switch checked={edit.is_active} onChange={(e) => setEdit({ ...edit, is_active: e.target.checked })} />

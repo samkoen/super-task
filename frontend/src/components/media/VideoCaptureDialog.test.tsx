@@ -105,6 +105,26 @@ describe("VideoCaptureDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  it("hands the video over right after recording when the caller does its own review", async () => {
+    const onCapture = vi.fn();
+    render(
+      <VideoCaptureDialog open uploading={false} recorder={recorder({ blob: videoBlob(), elapsedSeconds: 12 })}
+        minSeconds={10} deferReview onClose={vi.fn()} onCapture={onCapture} />,
+    );
+    await waitFor(() => expect(onCapture).toHaveBeenCalledTimes(1));
+    expect(onCapture.mock.calls[0][1]).toBe(12);
+  });
+
+  it("keeps a too short video in the dialog even when the review is deferred", () => {
+    const onCapture = vi.fn();
+    render(
+      <VideoCaptureDialog open uploading={false} recorder={recorder({ blob: videoBlob(), elapsedSeconds: 4 })}
+        minSeconds={10} deferReview onClose={vi.fn()} onCapture={onCapture} />,
+    );
+    expect(onCapture).not.toHaveBeenCalled();
+    expect(screen.getByText(he.videoTooShort(10))).toBeTruthy();
+  });
+
   it("restarts the camera preview on retry", () => {
     const rec = recorder({ blob: videoBlob(), elapsedSeconds: 12 });
     renderDialog(rec, 10);

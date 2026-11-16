@@ -1,20 +1,18 @@
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Alert, Box, Tab, Tabs } from "@mui/material";
+import { Alert } from "@mui/material";
 import type { FixedTaskBranch, FixedTaskGroup } from "../../services/fixedTaskService";
 import ConfirmDeleteDialog from "../../components/ui/ConfirmDeleteDialog";
 import ListSkeleton from "../../components/ui/ListSkeleton";
-import PageHeader from "../../components/ui/PageHeader";
 import FixedTaskBranchesTab from "../../components/tasks/fixed/FixedTaskBranchesTab";
 import FixedTaskBranchSheet from "../../components/tasks/fixed/FixedTaskBranchSheet";
-import FixedTaskGeneralTab from "../../components/tasks/fixed/FixedTaskGeneralTab";
+import FixedTaskEditStudio, { type EditTabId } from "../../components/tasks/fixed/studio/FixedTaskEditStudio";
 import { useFixedTaskDetail } from "../../hooks/useFixedTaskDetail";
 import { he } from "../../i18n/he";
 import { assigneesForBranch } from "../../utils/assigneeOptions";
 import { asText } from "../../utils/asList";
-import { formatTemplateSchedule } from "../../utils/fixedTaskTemplates";
 
-type TabId = "general" | "branches";
+type TabId = EditTabId;
 type Detail = ReturnType<typeof useFixedTaskDetail>;
 type DeleteTarget = { templateId: string; all: boolean; name: string };
 
@@ -95,46 +93,34 @@ function DeleteHost({
 }
 
 function FixedTaskDetailView({ detail, group }: { detail: Detail; group: FixedTaskGroup }) {
+  const navigate = useNavigate();
   const listPath = useLocation().pathname.startsWith("/admin") ? "/admin/fixed-tasks" : "/manager/fixed-tasks";
-  const [tab, setTab] = useState<TabId | null>(null);
   const [openBranch, setOpenBranch] = useState<FixedTaskBranch | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
-  const tabs = availableTabs(group);
-  const activeTab = tab && tabs.includes(tab) ? tab : tabs[0];
   return (
-    <Box>
-      <PageHeader title={asText(group.title) || he.taskTitle} subtitle={formatTemplateSchedule(group)} />
-      {tabs.length > 1 ? (
-        <Tabs
-          value={activeTab}
-          onChange={(_, v: TabId) => setTab(v)}
-          sx={{ mb: 2, "& .MuiTab-root": { minHeight: 52, fontWeight: 800, fontSize: "1rem" } }}
-        >
-          <Tab value="general" label={he.fixedDetailTabGeneral} />
-          <Tab value="branches" label={he.fixedDetailTabBranches} />
-        </Tabs>
-      ) : null}
-      {activeTab === "general" ? (
-        <FixedTaskGeneralTab
-          key={group.key}
-          group={group}
-          employees={detail.employees}
-          currentUserId={detail.user?.id}
-          saving={detail.saving}
-          onSave={detail.saveGeneral}
-          onDelete={() =>
-            setDeleting({ templateId: group.template_ids[0], all: group.is_network, name: asText(group.title) })
-          }
-          onError={detail.showError}
-          onLinkCustomer={(name) => detail.linkCustomer(group.branches[0]?.branch_id ?? "", name)}
-        />
-      ) : (
-        <FixedTaskBranchesTab
-          group={group}
-          onOpenBranch={setOpenBranch}
-          onToggleActive={(b) => void detail.toggleBranch(b)}
-        />
-      )}
+    <>
+      <FixedTaskEditStudio
+        key={group.key}
+        group={group}
+        employees={detail.employees}
+        currentUserId={detail.user?.id}
+        saving={detail.saving}
+        tabs={availableTabs(group)}
+        branchesView={
+          <FixedTaskBranchesTab
+            group={group}
+            onOpenBranch={setOpenBranch}
+            onToggleActive={(b) => void detail.toggleBranch(b)}
+          />
+        }
+        onSave={detail.saveGeneral}
+        onDelete={() =>
+          setDeleting({ templateId: group.template_ids[0], all: group.is_network, name: asText(group.title) })
+        }
+        onBack={() => navigate(listPath)}
+        onError={detail.showError}
+        onLinkCustomer={(name) => detail.linkCustomer(group.branches[0]?.branch_id ?? "", name)}
+      />
       {openBranch ? (
         <BranchSheetHost
           detail={detail}
@@ -148,7 +134,7 @@ function FixedTaskDetailView({ detail, group }: { detail: Detail; group: FixedTa
         />
       ) : null}
       <DeleteHost detail={detail} group={group} target={deleting} listPath={listPath} onClose={() => setDeleting(null)} />
-    </Box>
+    </>
   );
 }
 
