@@ -41,7 +41,7 @@ function firstVisual(attachments: CompletionAttachment[] | undefined): Completio
 }
 
 /**
- * Contrôles automatiques réels : durée (vidéo seulement), lieu et heure du tournage.
+ * Contrôles automatiques réels : durée (vidéo seulement) et heure du tournage.
  * Rien n'est inventé : sans vidéo ni horodatage, la liste est vide et la carte n'est pas affichée.
  */
 export function managerReviewChecks(task: TaskOccurrence): ReviewCheck[] {
@@ -50,7 +50,8 @@ export function managerReviewChecks(task: TaskOccurrence): ReviewCheck[] {
   const checks = buildReviewChecks({
     durationSeconds: media.duration_seconds,
     minSeconds: task.min_video_seconds,
-    branch: task.branch_name,
+    // Sans coordonnées du snif on ne peut pas vérifier le lieu : seule l'heure est affirmée.
+    branch: null,
     capturedAt: media.captured_at,
     location: media.location ?? null,
     branchCenter: null,

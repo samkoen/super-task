@@ -76,6 +76,7 @@ describe("managerReviewChecks", () => {
       } as TaskOccurrence["completion"],
     }));
     expect(checks.map((c) => [c.id, c.ok])).toEqual([["length", false], ["shot", true]]);
+    expect(checks[1].text).not.toContain("שפע");
   });
 
   it("does not check a length on a photo", () => {

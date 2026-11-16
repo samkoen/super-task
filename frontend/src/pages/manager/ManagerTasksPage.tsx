@@ -1,18 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Box,
-  Button,
-  MenuItem,
-  Paper,
-  TextField,
-} from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
+import { Box } from "@mui/material";
 import { ApiError, type User } from "../../services/api";
 import { branchService, type Branch } from "../../services/branchService";
-import TaskOccurrenceGrid from "../../components/tasks/TaskOccurrenceGrid";
-import TaskOccurrenceGridByDay from "../../components/tasks/TaskOccurrenceGridByDay";
+import ManagerScopePicker from "../../components/dashboard/home/ManagerScopePicker";
+import ManagerReviewScreen, { type ManagerReviewRequest } from "../../components/review/ManagerReviewScreen";
+import ManagerTaskEditFooter from "../../components/tasks/today/ManagerTaskEditFooter";
+import ManagerTasksDayBoard from "../../components/tasks/today/ManagerTasksDayBoard";
+import ManagerTasksFilters from "../../components/tasks/today/ManagerTasksFilters";
 import TaskCompletionReviewDialog from "../../components/tasks/TaskCompletionReviewDialog";
 import TaskOccurrenceEditDialog from "../../components/tasks/TaskOccurrenceEditDialog";
 import TaskGalleryPickerDialog from "../../components/tasks/TaskGalleryPickerDialog";
@@ -28,17 +23,16 @@ import {
   resolveTaskReferenceMedia,
   type TaskReferenceMediaValue,
 } from "../../components/tasks/TaskReferenceMediaEditor";
-import SavedFiltersBar from "../../components/filters/SavedFiltersBar";
-import TaskDateViewBar from "../../components/filters/TaskDateViewBar";
 import ConfirmDeleteDialog from "../../components/ui/ConfirmDeleteDialog";
-import PageHeader from "../../components/ui/PageHeader";
 import ListSkeleton from "../../components/ui/ListSkeleton";
-import { managerTasksSavedFiltersClient } from "../../services/savedFiltersStorage";
 import { useFeedback } from "../../context/FeedbackContext";
+import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
 import type { AdHocTaskPrefillFromIssue } from "../../utils/issueReportTaskPrefill";
 import {
   datetimeLocalForNewTask,
   defaultRangeFrom,
+  formatHebrewDayNoYear,
+  shiftDay,
   todayIso,
   type TaskDateViewMode,
 } from "../../utils/dateView";
@@ -49,6 +43,8 @@ import {
   parseManagerTasksSearchParams,
 } from "../../utils/managerTaskFilters";
 import { writeManagerScopeBranchId } from "../../utils/managerScopeBranch";
+import { dashboardTaskUsesReview } from "../../utils/dashboardTaskOpen";
+import { dayNavLabel, groupTasksByPeriod, reviewQueueFromTasks } from "../../utils/managerTasksDay";
 import { userBelongsToBranch } from "../../utils/userBranchMembership";
 import { withSelfAssignee } from "../../utils/assigneeOptions";
 import { taskService, type TaskOccurrence } from "../../services/taskService";
@@ -63,13 +59,10 @@ import { weeklyDaysPayload, normalizeFixedRecurrence } from "../../utils/taskRec
 import {
   defaultApplyAdHocEditToNetwork,
   isNetworkAdHocOccurrence,
-  networkAdHocChipLabel,
   networkAdHocIds,
 } from "../../utils/adHocNetworkTasks";
 import { he } from "../../i18n/he";
 import { resolveTaskCompletionGuides } from "../../utils/resolveTaskCompletionGuides";
-
-const SAVED_FILTERS_EXPANDED_KEY = "super:saved-filters:manager_tasks:expanded";
 
 const EMPTY_REFERENCE_MEDIA: TaskReferenceMediaValue = {
   reference_photo_url: "",
@@ -104,14 +97,16 @@ export default function ManagerTasksPage() {
   const [deleteAllBranches, setDeleteAllBranches] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [filterBranch, setFilterBranch] = useState("");
-  const [filterEmployee, setFilterEmployee] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterDay, setFilterDay] = useState(() => todayIso());
-  const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>("day");
-  const [filterFrom, setFilterFrom] = useState(() => todayIso());
-  const [filterTo, setFilterTo] = useState(() => defaultRangeFrom(todayIso(), 7).to);
-  const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
+  // Filtres lus dans l'adresse dès le premier rendu : le premier chargement vise déjà le bon snif.
+  const [initialUrl] = useState(() => parseManagerTasksSearchParams(searchParams));
+  const [filterBranch, setFilterBranch] = useState(initialUrl.branchId ?? "");
+  const [filterEmployee, setFilterEmployee] = useState(initialUrl.employeeId);
+  const [filterStatus, setFilterStatus] = useState(initialUrl.status);
+  const [filterDay, setFilterDay] = useState(initialUrl.dueOn || todayIso());
+  const [dateViewMode, setDateViewMode] = useState<TaskDateViewMode>(initialUrl.dateViewMode);
+  const [filterFrom, setFilterFrom] = useState(initialUrl.rangeFrom || todayIso());
+  const [filterTo, setFilterTo] = useState(initialUrl.rangeTo || defaultRangeFrom(todayIso(), 7).to);
+  const [reviewRequest, setReviewRequest] = useState<ManagerReviewRequest | null>(null);
 
   const isBranchManager = user?.role === "branch_manager";
   const isNetworkManager = user?.role === "network_manager";
@@ -137,12 +132,12 @@ export default function ManagerTasksPage() {
   );
   const networkIds = useMemo(() => networkAdHocIds(occurrences), [occurrences]);
 
-  const hasListFilters = Boolean(filterEmployee || filterStatus || filterBranch);
+  useManagerPageHeader(he.managerTasks, formatHebrewDayNoYear(dateViewMode === "day" ? filterDay : filterFrom));
 
-  const loadInFlight = useRef(false);
+  // Seule la dernière demande compte : un changement de filtre pendant un chargement n'est plus perdu.
+  const loadSeq = useRef(0);
   const load = useCallback(async (silent = false) => {
-    if (loadInFlight.current) return;
-    loadInFlight.current = true;
+    const seq = ++loadSeq.current;
     if (!silent) setLoading(true);
     try {
       const branchId = scopeBranchId || undefined;
@@ -152,6 +147,7 @@ export default function ManagerTasksPage() {
           : { due_from: filterFrom, due_to: filterTo };
       // Afficher la liste dès que les occurrences arrivent (ne pas attendre branches/équipe).
       const occ = await taskService.listOccurrences({ branch_id: branchId, ...dateParams });
+      if (seq !== loadSeq.current) return;
       setOccurrences(occ);
       if (!silent) setLoading(false);
       void Promise.all([branchService.list(), userService.listTeam("employee")])
@@ -163,10 +159,9 @@ export default function ManagerTasksPage() {
           /* filtres incomplets — la liste reste utilisable */
         });
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       showError(e instanceof ApiError ? e.message : he.errorGeneric);
       if (!silent) setLoading(false);
-    } finally {
-      loadInFlight.current = false;
     }
   }, [scopeBranchId, filterDay, filterFrom, filterTo, dateViewMode, showError, user]);
 
@@ -191,7 +186,6 @@ export default function ManagerTasksPage() {
       setFilterBranch(parsed.branchId);
       writeManagerScopeBranchId(parsed.branchId);
     }
-    setActiveSavedFilterId(null);
   }, [location.search, searchParams, canPickBranch]);
 
   const syncFiltersToUrl = useCallback(
@@ -242,33 +236,6 @@ export default function ManagerTasksPage() {
     }
   }, [filterEmployee, filterEmployees, loading, employees.length, syncFiltersToUrl]);
 
-  const currentFilters = useMemo(
-    () => ({
-      ...(canPickBranch ? { filterBranch } : {}),
-      filterEmployee,
-      filterStatus,
-      filterDay,
-      dateViewMode,
-      filterFrom,
-      filterTo,
-    }),
-    [canPickBranch, filterBranch, filterEmployee, filterStatus, filterDay, dateViewMode, filterFrom, filterTo]
-  );
-
-  const handleSelectSavedFilter = (item: { id: string; filters: Record<string, string | number> }) => {
-    if (canPickBranch) {
-      setFilterBranch(String(item.filters.filterBranch ?? ""));
-    }
-    setFilterEmployee(String(item.filters.filterEmployee ?? ""));
-    setFilterStatus(String(item.filters.filterStatus ?? ""));
-    setFilterDay(String(item.filters.filterDay ?? todayIso()));
-    setDateViewMode((item.filters.dateViewMode as TaskDateViewMode) ?? "day");
-    setFilterFrom(String(item.filters.filterFrom ?? todayIso()));
-    setFilterTo(String(item.filters.filterTo ?? defaultRangeFrom(todayIso(), 7).to));
-    setActiveSavedFilterId(item.id);
-  };
-
-  const resetSavedFilterActive = () => setActiveSavedFilterId(null);
 
   const defaultDueAt = datetimeLocalForNewTask(
     dateViewMode === "day" ? filterDay : filterFrom,
@@ -283,10 +250,6 @@ export default function ManagerTasksPage() {
     setFormMedia(media ?? EMPTY_REFERENCE_MEDIA);
     setFormPrefill(prefill);
     setFormOpen(true);
-  };
-
-  const startNewTask = () => {
-    setPhotoStepOpen(true);
   };
 
   const closeForm = () => {
@@ -489,13 +452,13 @@ export default function ManagerTasksPage() {
     }
   };
 
+  /** Toujours confirmé : la suppression part maintenant de la fiche de la tâche. */
   const handleCancel = (task: TaskOccurrence) => {
-    if (canPickBranch && isNetworkAdHocOccurrence(task, networkIds)) {
-      setDeleting(task);
-      setDeleteAllBranches(defaultApplyAdHocEditToNetwork(task, canPickBranch, networkIds));
-      return;
-    }
-    void confirmCancel(task, false);
+    setEditOccurrenceId(null);
+    setDeleting(task);
+    setDeleteAllBranches(canPickBranch && isNetworkAdHocOccurrence(task, networkIds)
+      ? defaultApplyAdHocEditToNetwork(task, canPickBranch, networkIds)
+      : false);
   };
 
   const confirmCancel = async (task: TaskOccurrence, applyToNetwork: boolean) => {
@@ -529,179 +492,74 @@ export default function ManagerTasksPage() {
     }
   };
 
-  const handleOpenEdit = (task: TaskOccurrence) => {
-    setEditOccurrenceId(task.id);
+  /** Preuve à valider → revue plein écran ; tâche fermée → son résumé ; sinon la fiche. */
+  const openTask = (task: TaskOccurrence) => {
+    if (task.status === "pending_review") {
+      setReviewRequest({ startId: task.id, queue: reviewQueueFromTasks(displayedOccurrences) });
+    } else if (dashboardTaskUsesReview(task.status)) {
+      setReviewTarget(task);
+    } else {
+      setEditOccurrenceId(task.id);
+    }
+  };
+
+  const moveDay = (delta: number) => {
+    const day = shiftDay(filterDay, delta);
+    setFilterDay(day);
+    setDateViewMode("day");
+    syncFiltersToUrl({ filterDay: day, dateViewMode: "day" });
   };
 
   return (
-    <Box>
-      <PageHeader
-        title={he.managerTasks}
-        subtitle={
-          isBranchManager && user?.branch_name
-            ? `${he.branch}: ${user.branch_name}`
-            : he.managerTasksSubtitle
-        }
-        action={
-          <Box display="flex" gap={1} flexWrap="wrap">
-            <Button variant="contained" startIcon={<AddIcon />} onClick={startNewTask}>
-              {he.newTask}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<CollectionsBookmarkIcon />}
-              onClick={() => setGalleryPickerOpen(true)}
-            >
-              {he.newTaskFromGallery}
-            </Button>
-          </Box>
-        }
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {canPickBranch ? (
+        <ManagerScopePicker
+          value={filterBranch}
+          branches={branches}
+          onChange={(value) => {
+            setFilterBranch(value);
+            writeManagerScopeBranchId(value);
+            syncFiltersToUrl({ filterBranch: value });
+          }}
+        />
+      ) : null}
+      <ManagerTasksFilters
+        employees={filterEmployees.map((u) => ({ value: u.id, label: u.full_name }))}
+        statuses={MANAGER_TASK_STATUS_FILTERS.map((value) => ({ value, label: he.taskStatusLabels[value] }))}
+        employeeId={filterEmployee}
+        status={filterStatus}
+        dayLabel={dateViewMode === "day" ? dayNavLabel(filterDay) : `${formatHebrewDayNoYear(filterFrom)} – ${formatHebrewDayNoYear(filterTo)}`}
+        onEmployee={(value) => {
+          setFilterEmployee(value);
+          syncFiltersToUrl({ filterEmployee: value });
+        }}
+        onStatus={(value) => {
+          setFilterStatus(value);
+          syncFiltersToUrl({ filterStatus: value });
+        }}
+        onPrevDay={() => moveDay(-1)}
+        onNextDay={() => moveDay(1)}
       />
-
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3 }}>
-        <TaskDateViewBar
-          mode={dateViewMode}
-          onModeChange={(mode) => {
-            setDateViewMode(mode);
-            resetSavedFilterActive();
-            syncFiltersToUrl({ dateViewMode: mode });
-          }}
-          day={filterDay}
-          onDayChange={(day) => {
-            setFilterDay(day);
-            resetSavedFilterActive();
-            syncFiltersToUrl({ filterDay: day });
-          }}
-          rangeFrom={filterFrom}
-          rangeTo={filterTo}
-          onRangeChange={(from, to) => {
-            setFilterFrom(from);
-            setFilterTo(to);
-            resetSavedFilterActive();
-            syncFiltersToUrl({ filterFrom: from, filterTo: to, dateViewMode: "range" });
-          }}
-          trailing={
-            <>
-              {canPickBranch && (
-                <TextField
-                  select
-                  size="small"
-                  label={he.branch}
-                  value={filterBranch}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFilterBranch(value);
-                    setActiveSavedFilterId(null);
-                    writeManagerScopeBranchId(value);
-                    syncFiltersToUrl({ filterBranch: value });
-                  }}
-                  sx={{ minWidth: 140 }}
-                >
-                  <MenuItem value="">{he.all}</MenuItem>
-                  {branches.map((s) => (
-                    <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-                  ))}
-                </TextField>
-              )}
-              <TextField
-                select
-                size="small"
-                label={he.filterByEmployee}
-                value={filterEmployee}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFilterEmployee(value);
-                  setActiveSavedFilterId(null);
-                  syncFiltersToUrl({ filterEmployee: value });
-                }}
-                sx={{ minWidth: 160 }}
-              >
-                <MenuItem value="">{he.all}</MenuItem>
-                {filterEmployees.map((u) => (
-                  <MenuItem key={u.id} value={u.id}>{u.full_name}</MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                size="small"
-                label={he.filterByStatus}
-                value={filterStatus}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFilterStatus(value);
-                  setActiveSavedFilterId(null);
-                  if (value === "overdue") {
-                    const parsed = parseManagerTasksSearchParams(
-                      new URLSearchParams(`status=overdue&due_on=${filterDay}`)
-                    );
-                    setDateViewMode(parsed.dateViewMode);
-                    setFilterFrom(parsed.rangeFrom);
-                    setFilterTo(parsed.rangeTo);
-                    syncFiltersToUrl({
-                      filterStatus: value,
-                      dateViewMode: parsed.dateViewMode,
-                      filterFrom: parsed.rangeFrom,
-                      filterTo: parsed.rangeTo,
-                    });
-                  } else {
-                    syncFiltersToUrl({ filterStatus: value });
-                  }
-                }}
-                sx={{ minWidth: 150 }}
-              >
-                <MenuItem value="">{he.all}</MenuItem>
-                {MANAGER_TASK_STATUS_FILTERS.map((status) => (
-                  <MenuItem key={status} value={status}>
-                    {he.taskStatusLabels[status]}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </>
-          }
-        />
-        <SavedFiltersBar
-          filterClient={managerTasksSavedFiltersClient}
-          storageKeyExpanded={SAVED_FILTERS_EXPANDED_KEY}
-          filters={currentFilters}
-          activeSavedFilterId={activeSavedFilterId}
-          onSelectSaved={handleSelectSavedFilter}
-          onActiveFilterRemoved={() => setActiveSavedFilterId(null)}
-        />
-      </Paper>
 
       {loading ? (
         <ListSkeleton variant="cards" rows={6} />
-      ) : dateViewMode === "range" ? (
-        <TaskOccurrenceGridByDay
-          tasks={displayedOccurrences}
-          emptyMessage={hasListFilters ? he.noTasksFiltered : he.noTasks}
-          emptyDescription={hasListFilters ? he.noTasksFilteredHint : he.noTasksHint}
-          isBranchManager={isBranchManager}
-          onEdit={canManageTasks ? handleOpenEdit : undefined}
-          onCancel={canManageTasks ? handleCancel : undefined}
-          onReview={canManageTasks ? setReviewTarget : undefined}
-          onSetManagerNext={canManageTasks ? handleSetManagerNext : undefined}
-          onChatUpdated={canManageTasks ? () => void load(true) : undefined}
-          networkChipFor={(task) =>
-            networkAdHocChipLabel(task, displayedOccurrences, branches.length)
-          }
-        />
       ) : (
-        <TaskOccurrenceGrid
-          tasks={displayedOccurrences}
-          emptyMessage={hasListFilters ? he.noTasksFiltered : he.noTasks}
-          emptyDescription={hasListFilters ? he.noTasksFilteredHint : he.noTasksHint}
-          isBranchManager={isBranchManager}
-          onEdit={canManageTasks ? handleOpenEdit : undefined}
-          onCancel={canManageTasks ? handleCancel : undefined}
-          onReview={canManageTasks ? setReviewTarget : undefined}
-          onSetManagerNext={canManageTasks ? handleSetManagerNext : undefined}
-          onChatUpdated={canManageTasks ? () => void load(true) : undefined}
-          networkChipFor={(task) =>
-            networkAdHocChipLabel(task, displayedOccurrences, branches.length)
-          }
+        <ManagerTasksDayBoard
+          groups={groupTasksByPeriod(displayedOccurrences)}
+          shownDay={dateViewMode === "day" ? filterDay : ""}
+          emptyText={filterEmployee || filterStatus ? he.managerTasksEmptyFiltered : he.managerTasksEmpty}
+          onOpen={openTask}
         />
       )}
+
+      <ManagerReviewScreen
+        request={reviewRequest}
+        onClose={() => setReviewRequest(null)}
+        onDone={(message) => {
+          if (message) showSuccess(message);
+          void load(true);
+        }}
+      />
 
       <TaskCompletionReviewDialog
         task={reviewTarget}
@@ -777,6 +635,13 @@ export default function ManagerTasksPage() {
         onSaved={() => {
           void load(true);
         }}
+        footer={canManageTasks ? (task) => (
+          <ManagerTaskEditFooter
+            task={occurrences.find((o) => o.id === task.id) ?? task}
+            onSetManagerNext={handleSetManagerNext}
+            onDelete={handleCancel}
+          />
+        ) : undefined}
       />
 
       <ConfirmDeleteDialog
