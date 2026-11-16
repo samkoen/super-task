@@ -2,6 +2,7 @@ import { Box, ButtonBase, Typography } from "@mui/material";
 import backIcon from "../../assets/flow1/chat-back.svg";
 import { he } from "../../i18n/he";
 import { flowColor, flowText } from "../../styles/flowTokens";
+import { withSystemTopInsetCss } from "../../utils/systemInsets";
 
 type HeaderProps = {
   title: string;
@@ -14,7 +15,7 @@ export function FlowChatHeader({ title, managerName, onBack }: HeaderProps) {
   return (
     <Box
       data-testid="flow-chat-header"
-      sx={{ display: "flex", alignItems: "center", gap: "16px", px: "24px", pt: "calc(24px + env(safe-area-inset-top, 0px))", pb: "24px", bgcolor: flowColor.alphaNeutral0_70 }}
+      sx={{ display: "flex", alignItems: "center", gap: "16px", px: "24px", pt: withSystemTopInsetCss("24px"), pb: "24px", bgcolor: flowColor.alphaNeutral0_70 }}
     >
       <ButtonBase
         aria-label={he.flowBack}

@@ -6,6 +6,7 @@ import arrowLeftIcon from "../../../../assets/flow1/icon-arrow-left.svg";
 import { he } from "../../../../i18n/he";
 import { flowColor, flowSize, flowText } from "../../../../styles/flowTokens";
 import { studioBareInputSx } from "./studioUi";
+import { withSystemTopInsetCss } from "../../../../utils/systemInsets";
 
 type Props = {
   kicker: string;
@@ -40,7 +41,7 @@ function RoundButton({ label, testId, onClick, children }: { label: string; test
  */
 export default function StudioHeader({ kicker, title, onTitleChange, scheduleLine, onBack, onPreview, onMore, disabled }: Props) {
   return (
-    <Box component="header" data-testid="studio-header" sx={{ px: `${flowSize.contentPaddingX}px`, pt: "calc(8px + env(safe-area-inset-top, 0px))" }}>
+    <Box component="header" data-testid="studio-header" sx={{ px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("8px") }}>
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "12px" }}>
         <Typography sx={{ ...flowText.bodyLarge, color: flowColor.alphaNeutral1000_53 }}>{kicker}</Typography>
         <Box>

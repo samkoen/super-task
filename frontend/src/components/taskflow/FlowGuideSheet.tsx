@@ -8,6 +8,7 @@ import { flowColor, flowRadius, flowSize, flowText } from "../../styles/flowToke
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
 import { formatClipDuration } from "../../utils/flowGuide";
+import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 type Props = {
   /** Carte dont on affiche la consigne ; null = fermé. */
@@ -206,7 +207,7 @@ export default function FlowGuideSheet({ req, index, onClose }: Props) {
           mx: "auto",
           px: `${flowSize.contentPaddingX}px`,
           pt: "12px",
-          pb: "24px",
+          pb: withSystemBottomInsetCss("24px"),
           gap: "16px",
           display: "flex",
           flexDirection: "column",

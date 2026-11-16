@@ -8,6 +8,7 @@ import { flowColor, flowRadius, flowScreenBackground, flowSize, flowText } from 
 import type { TrimRange } from "../../utils/flowTrim";
 import type { CaptureLocation, GeoPoint } from "../../utils/geoCheck";
 import { allChecksPassed, buildReviewChecks, canSendReview, type ReviewCheck } from "../../utils/flowReview";
+import { withSystemTopInsetCss, withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 type Props = {
   open: boolean;
@@ -125,7 +126,7 @@ export default function FlowReview(props: Props) {
     <Dialog open={open} fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus>
       <Box
         data-testid="flow-review"
-        sx={{ width: "100%", maxWidth: 393, mx: "auto", flex: 1, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "30px", px: "24px", pt: "calc(38px + env(safe-area-inset-top, 0px))", pb: "calc(30px + env(safe-area-inset-bottom, 0px))", overflowY: "auto" }}
+        sx={{ width: "100%", maxWidth: 393, mx: "auto", flex: 1, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "30px", px: "24px", pt: withSystemTopInsetCss("38px"), pb: withSystemBottomInsetCss("30px"), overflowY: "auto" }}
       >
         <FlowPageHeader title={he.flowReviewTitle(title)} titleColor={flowColor.neutral900} progress={props.progress} onBack={onRetake} />
         <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>

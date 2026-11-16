@@ -11,6 +11,10 @@ export function withSystemBottomInsetCss(baseCss: string): string {
   return `calc(${baseCss} + ${systemBottomInsetCss()})`;
 }
 
+export function withSystemTopInsetCss(baseCss: string): string {
+  return `calc(${baseCss} + ${systemTopInsetCss()})`;
+}
+
 export function dialogActionsPbCss(): string {
   return withSystemBottomInsetCss("16px");
 }

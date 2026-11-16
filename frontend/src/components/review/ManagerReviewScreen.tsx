@@ -7,6 +7,7 @@ import { he } from "../../i18n/he";
 import { flowColor, flowScreenBackground, flowSize } from "../../styles/flowTokens";
 import { queuePosition, type ReviewQueueEntry } from "../../utils/managerReview";
 import ManagerReviewBody from "./ManagerReviewBody";
+import { withSystemTopInsetCss, withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 export type ManagerReviewRequest = { startId: string; queue: ReviewQueueEntry[] };
 
@@ -62,7 +63,7 @@ export default function ManagerReviewScreen({ request, onClose, onDone }: Props)
   const decided = (message?: string) => { onDone(message); advance(); };
   return (
     <Dialog open={Boolean(request)} onClose={onClose} fullScreen dir="rtl" PaperProps={{ sx: { background: flowScreenBackground } }} disableEnforceFocus>
-      <Box data-testid="manager-review-screen" sx={{ width: "100%", maxWidth: 440, mx: "auto", px: `${flowSize.contentPaddingX}px`, pt: "calc(20px + env(safe-area-inset-top, 0px))", pb: "calc(32px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Box data-testid="manager-review-screen" sx={{ width: "100%", maxWidth: 440, mx: "auto", px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("20px"), pb: withSystemBottomInsetCss("32px"), display: "flex", flexDirection: "column", gap: "16px" }}>
         {task && position ? (
           <ManagerReviewBody key={task.id} task={task} position={position} onBack={onClose} onDecided={decided} onStatusChanged={(_status, notice) => decided(notice)} />
         ) : (

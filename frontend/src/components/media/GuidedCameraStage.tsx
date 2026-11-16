@@ -9,6 +9,7 @@ import { flowColor, flowRadius, flowText } from "../../styles/flowTokens";
 import { formatRecordingClock } from "../../utils/captureProgress";
 import type { CaptureGuide } from "../../utils/captureGuide";
 import type { CameraFacing } from "../../utils/mediaCapture";
+import { withSystemTopInsetCss, withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 export type GuidedShutter = {
   kind: "photo" | "video";
@@ -274,8 +275,8 @@ export default function GuidedCameraStage(props: GuidedCameraStageProps) {
         flexDirection: "column",
         gap: 2,
         p: 2,
-        pt: "calc(16px + env(safe-area-inset-top, 0px))",
-        pb: "calc(16px + env(safe-area-inset-bottom, 0px))",
+        pt: withSystemTopInsetCss("16px"),
+        pb: withSystemBottomInsetCss("16px"),
         minHeight: 0,
         overflowY: "auto",
         bgcolor: flowColor.neutral900,

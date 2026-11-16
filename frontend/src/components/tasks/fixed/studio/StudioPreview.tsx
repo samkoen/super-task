@@ -10,6 +10,7 @@ import type { CompletionRequirement } from "../../../../utils/completionMedia";
 import { emptySlotStates } from "../../../../utils/slotUploadState";
 import { todayAt } from "../../../../utils/studioRequirements";
 import { STUDIO_MAX_WIDTH } from "./studioUi";
+import { withSystemTopInsetCss } from "../../../../utils/systemInsets";
 
 type Props = {
   open: boolean;
@@ -26,7 +27,7 @@ const noop = () => undefined;
 /** Bandeau collé en haut : rappelle qu'on regarde un aperçu et ramène à l'édition. */
 function PreviewBanner({ onClose }: { onClose: () => void }) {
   return (
-    <Box sx={{ position: "sticky", top: 0, zIndex: 20, px: "16px", pt: "calc(10px + env(safe-area-inset-top, 0px))", pb: "6px" }}>
+    <Box sx={{ position: "sticky", top: 0, zIndex: 20, px: "16px", pt: withSystemTopInsetCss("10px"), pb: "6px" }}>
       <Box
         sx={{
           maxWidth: STUDIO_MAX_WIDTH - 32,
