@@ -6,7 +6,7 @@ import ManagerShell from "./ManagerShell";
 import { useManagerChatUnread } from "../../../hooks/useManagerChatUnread";
 import { useManagerDesktop } from "../../../hooks/useManagerDesktop";
 import { he } from "../../../i18n/he";
-import { MANAGER_SCOPE_BRANCH_STORAGE_KEY } from "../../../utils/managerScopeBranch";
+import { MANAGER_SCOPE_BRANCH_STORAGE_KEY, wasManagerScopeChosen } from "../../../utils/managerScopeBranch";
 
 vi.mock("../../../context/AuthContext", () => ({
   useAuth: () => ({ user: { id: "nm1", full_name: "יצחק ריצ'רד", role: "network_manager", branch_id: null } }),
@@ -67,6 +67,14 @@ describe("ManagerShell — périmètre reshet", () => {
     expect(screen.getByTestId("manager-scope-pill").textContent).toContain(he.managerHomeNetworkTitle);
     fireEvent.click(screen.getByTestId("manager-pill-team"));
     expect(where()).toBe("/manager/employees");
+  });
+
+  it("records « כל הרשת » as the manager's own choice, so the home will not swap it for his snif", () => {
+    renderShell("/manager?branch=b1");
+    expect(wasManagerScopeChosen()).toBe(false);
+    fireEvent.click(screen.getByTestId("manager-scope-network"));
+    expect(where()).toBe("/manager");
+    expect(wasManagerScopeChosen()).toBe(true);
   });
 
   it("keeps the chosen snif in the session on a sub-page without branch=", () => {

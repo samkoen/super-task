@@ -47,6 +47,15 @@ function branchLabelOf(user: User | null, member: TeamMember | null): string {
   return labels.length ? labels.join(", ") : user?.branch_name || member?.branch_name || "";
 }
 
+/**
+ * Snif de la fiche (tâches du jour, « toutes les tâches », studio pré-rempli) : le snif regardé
+ * d'abord, si l'oved en fait partie (oved multi-snif) ; sinon son snif de rattachement.
+ */
+function entryBranchId(user: User | null, scopeBranchId: string): string {
+  if (scopeBranchId && (!user || userBelongsToBranch(user, scopeBranchId))) return scopeBranchId;
+  return user?.branch_id || scopeBranchId;
+}
+
 /** Une entrée de la liste : compte et/ou état du jour (l'un des deux peut manquer). */
 export function rosterEntry(user: User | null, member: TeamMember | null, fallbackBranchId = ""): TeamRosterEntry {
   const name = user?.full_name || member?.full_name || "";
@@ -60,7 +69,7 @@ export function rosterEntry(user: User | null, member: TeamMember | null, fallba
     late: memberLateCount(member),
     done: member?.completed_today ?? 0,
     total: member?.total_today ?? 0,
-    branchId: user?.branch_id || fallbackBranchId,
+    branchId: entryBranchId(user, fallbackBranchId),
     branchLabel: branchLabelOf(user, member),
     photoUrl: user?.avatar_url ?? null,
     user,

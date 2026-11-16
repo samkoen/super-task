@@ -119,23 +119,27 @@ export function scopeManagerInbox(entries: ManagerInboxEntry[], branchId: string
   return entries.filter((entry) => !entry.branchId || entry.branchId === branchId);
 }
 
+function inBranch(rowBranchId: string | null | undefined, branchId: string): boolean {
+  return !branchId || !rowBranchId || rowBranchId === branchId;
+}
+
 /**
- * Non-lus du point orange de « שיחות » pour un snif : ses contacts (directs + fils de tâche, déjà
- * additionnés par le backend sur chaque carte) et ceux hors snif (mon manager), comptés une fois.
+ * Non-lus du point orange de « שיחות » : exactement les lignes de la page — non-lus directs de
+ * chaque contact (mon manager compris, compté une fois) et non-lus de chaque fil de tâche du jour,
+ * y compris ceux d'un oved sans conversation directe. Un snif choisi garde ses lignes et celles
+ * hors snif, comme `scopeManagerInbox`.
  */
-export function scopedInboxUnread(
-  inbox: { items?: DirectChatCard[] | null; up?: DirectChatCard | null },
-  branchId: string,
-): number {
-  const cards = [...(inbox.up ? [inbox.up] : []), ...(inbox.items ?? [])];
+export function managerChatsUnread(directs: DirectChatCard[], tasks: ManagerDayTaskChat[], branchId: string): number {
   const seen = new Set<string>();
   let total = 0;
-  for (const card of cards) {
+  for (const card of directs) {
     const key = `${card.kind}-${card.counterpart_user_id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const inScope = card.kind === "up" || !card.branch_id || card.branch_id === branchId;
-    if (inScope) total += Math.max(0, card.unread_count ?? 0);
+    if (card.kind === "up" || inBranch(card.branch_id, branchId)) total += Math.max(0, directUnreadOf(card));
+  }
+  for (const task of tasks) {
+    if (inBranch(task.branch_id, branchId)) total += Math.max(0, task.unread_count ?? 0);
   }
   return total;
 }

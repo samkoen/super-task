@@ -7,6 +7,7 @@ import { he } from "../i18n/he";
 import { buildQuestionsQueue } from "../utils/dashboardCarousels";
 import { todayIso } from "../utils/dateView";
 import { homeBranchAfterOverview } from "../utils/networkDashboard";
+import { wasManagerScopeChosen } from "../utils/managerScopeBranch";
 import { playManagerQuestionSound } from "../utils/notificationSounds";
 import { useManagerBranchScope } from "./useManagerBranchScope";
 
@@ -52,8 +53,10 @@ export function useManagerHomeData() {
       canPickBranch, selectedBranch, overviewLoaded: Boolean(data) && !data?.branch,
       managesAllWorkers: data?.manages_all_workers, homeBranchId: user?.branch_id,
       onlyBranchId: branches.length === 1 ? branches[0].id : undefined,
+      explicitChoice: wasManagerScopeChosen(),
     });
-    if (next) setSelectedBranch(next);
+    // Choix automatique : il ne compte pas comme un choix du menahel.
+    if (next) setSelectedBranch(next, { explicit: false });
   }, [canPickBranch, selectedBranch, data, user?.branch_id, branches, setSelectedBranch]);
 
   return { ...scope, data, stages, loading, error, setError, load };

@@ -36,6 +36,26 @@ export function withManagerBranchQuery(
   return qs ? `${base}?${qs}` : base;
 }
 
+/** Le menahel a choisi son périmètre lui-même (pastille, sélecteur, tap sur un snif) dans la session. */
+export const MANAGER_SCOPE_CHOSEN_STORAGE_KEY = "super.managerScopeChosen";
+
+export function markManagerScopeChosen(): void {
+  try {
+    sessionStorage.setItem(MANAGER_SCOPE_CHOSEN_STORAGE_KEY, "1");
+  } catch {
+    /* private mode / unavailable */
+  }
+}
+
+/** Vrai après un choix explicite : l'accueil ne remplace plus « כל הרשת » par le snif de rattachement. */
+export function wasManagerScopeChosen(): boolean {
+  try {
+    return sessionStorage.getItem(MANAGER_SCOPE_CHOSEN_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Copie des paramètres d'adresse avec `branch=` posé (ou retiré si vide) ; le reste est gardé. */
 export function searchWithBranch(prev: URLSearchParams, branchId: string): URLSearchParams {
   const next = new URLSearchParams(prev);

@@ -6,7 +6,7 @@ import {
   directUnreadOf,
   filterManagerInbox,
   scopeManagerInbox,
-  scopedInboxUnread,
+  managerChatsUnread,
   sortManagerInbox,
   taskWaitsForManager,
   type ManagerEmployeeTaskChats,
@@ -107,27 +107,30 @@ describe("scopeManagerInbox", () => {
   });
 });
 
-describe("scopedInboxUnread", () => {
-  const up = card({ id: null, kind: "up", counterpart_user_id: "nm", branch_id: null, unread_count: 1 });
-  const inbox = {
+describe("managerChatsUnread", () => {
+  const up = card({ id: null, kind: "up", counterpart_user_id: "nm", branch_id: null, unread_count: 1, direct_unread_count: 1 });
+  const directs = [
     up,
-    items: [
-      card({ counterpart_user_id: "e1", branch_id: "b1", unread_count: 2 }),
-      card({ counterpart_user_id: "e2", branch_id: "b2", unread_count: 5 }),
-      card({ counterpart_user_id: "x", branch_id: null, unread_count: 3 }),
-    ],
-  };
+    card({ counterpart_user_id: "e1", branch_id: "b1", unread_count: 9, direct_unread_count: 2 }),
+    card({ counterpart_user_id: "e2", branch_id: "b2", unread_count: 5, direct_unread_count: 5 }),
+  ];
+  const tasks = [
+    taskChat({ id: "o1", branch_id: "b1", unread_count: 4 }),
+    // Oved sans conversation directe : ses non-lus de tâche comptent quand même.
+    taskChat({ id: "o9", assignee_user_id: "e9", branch_id: "b1", unread_count: 3 }),
+    taskChat({ id: "o2", branch_id: "b2", unread_count: 7 }),
+  ];
 
-  it("counts the chosen snif, the rows outside any snif and my manager", () => {
-    expect(scopedInboxUnread(inbox, "b1")).toBe(1 + 2 + 3);
+  it("counts direct unread (not the task part folded in the card) plus each task thread, for the whole network", () => {
+    expect(managerChatsUnread(directs, tasks, "")).toBe(1 + 2 + 5 + 4 + 3 + 7);
   });
 
-  it("counts my manager once even when he is also listed in the items", () => {
-    expect(scopedInboxUnread({ up, items: [up] }, "b1")).toBe(1);
+  it("restricts to the chosen snif, keeping my manager", () => {
+    expect(managerChatsUnread(directs, tasks, "b1")).toBe(1 + 2 + 4 + 3);
   });
 
-  it("is zero for an empty inbox and never negative", () => {
-    expect(scopedInboxUnread({ up: null, items: [] }, "b1")).toBe(0);
-    expect(scopedInboxUnread({ items: [card({ branch_id: "b1", unread_count: -4 })] }, "b1")).toBe(0);
+  it("counts my manager once and never goes negative", () => {
+    expect(managerChatsUnread([up, up], [], "b1")).toBe(1);
+    expect(managerChatsUnread([], [taskChat({ unread_count: -2 })], "")).toBe(0);
   });
 });

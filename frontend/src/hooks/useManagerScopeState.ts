@@ -5,6 +5,7 @@ import type { ManagerScope } from "../context/ManagerScopeContext";
 import { he } from "../i18n/he";
 import {
   branchScopeLabel,
+  markManagerScopeChosen,
   parseBranchFromSearch,
   searchWithBranch,
   writeManagerScopeBranchId,
@@ -17,7 +18,9 @@ import { isManagerTabRoot } from "../utils/managerShell";
  */
 export function useBranchQueryWriter() {
   const [, setSearchParams] = useSearchParams();
-  return useCallback((branchId: string) => {
+  // `explicit: false` = choix automatique (snif de rattachement) : il ne bloque pas les suivants.
+  return useCallback((branchId: string, opts?: { explicit?: boolean }) => {
+    if (opts?.explicit !== false) markManagerScopeChosen();
     writeManagerScopeBranchId(branchId);
     setSearchParams((prev) => searchWithBranch(prev, branchId), { replace: true });
   }, [setSearchParams]);

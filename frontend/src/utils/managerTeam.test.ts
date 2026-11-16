@@ -35,6 +35,17 @@ describe("managerTeam", () => {
     expect(roster.find((e) => e.id === "u3")?.state).toBe("unknown");
   });
 
+  it("opens a multi-snif oved's sheet on the snif looked at, not on his home snif", () => {
+    const multi = user("u3", { branch_id: "b2", branches: [{ branch_id: "b1", branch_name: "TEST", is_primary: false }] });
+    expect(buildTeamRoster([multi], null, "b1")[0].branchId).toBe("b1");
+    // Vue « כל הרשת » : son snif de rattachement.
+    expect(buildTeamRoster([multi], null, "")[0].branchId).toBe("b2");
+  });
+
+  it("keeps the home snif when the oved is not in the scope snif", () => {
+    expect(rosterEntry(user("u2", { branch_id: "b2" }), null, "b1").branchId).toBe("b2");
+  });
+
   it("puts the oveds with nothing going on first, the closed accounts last", () => {
     const users = [user("done"), user("off", { is_active: false }), user("idle"), user("work")];
     const team = [
