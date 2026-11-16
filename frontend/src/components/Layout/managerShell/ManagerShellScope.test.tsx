@@ -3,8 +3,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import ManagerShell from "./ManagerShell";
+import { useManagerChatUnread } from "../../../hooks/useManagerChatUnread";
 import { useManagerDesktop } from "../../../hooks/useManagerDesktop";
 import { he } from "../../../i18n/he";
+import { MANAGER_SCOPE_BRANCH_STORAGE_KEY } from "../../../utils/managerScopeBranch";
 
 vi.mock("../../../context/AuthContext", () => ({
   useAuth: () => ({ user: { id: "nm1", full_name: "יצחק ריצ'רד", role: "network_manager", branch_id: null } }),
@@ -13,7 +15,7 @@ vi.mock("../../../services/branchService", () => ({
   branchService: { list: vi.fn().mockResolvedValue([{ id: "b1", name: "חיפה" }, { id: "b2", name: "אילת" }]) },
 }));
 vi.mock("../../../hooks/useManagerDesktop", () => ({ useManagerDesktop: vi.fn(() => false) }));
-vi.mock("../../../hooks/useEmployeeChatUnread", () => ({ useEmployeeChatUnread: () => 2 }));
+vi.mock("../../../hooks/useManagerChatUnread", () => ({ useManagerChatUnread: vi.fn(() => 2) }));
 vi.mock("../../ui/PullToRefresh", () => ({ LivePullToRefresh: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("../../notifications/NotificationBell", () => ({
   default: ({ renderTrigger }: { renderTrigger: (open: () => void, unread: number) => JSX.Element }) => renderTrigger(() => undefined, 0),
@@ -57,6 +59,28 @@ describe("ManagerShell — périmètre reshet", () => {
     fireEvent.click(screen.getByTestId("manager-scope-network"));
     expect(where()).toBe("/manager/employees");
     expect(screen.getByTestId("manager-scope-pill").textContent).toContain(he.managerHomeNetworkTitle);
+  });
+
+  it("does not bring back a snif left in the session when the address says « כל הרשת »", () => {
+    sessionStorage.setItem(MANAGER_SCOPE_BRANCH_STORAGE_KEY, "b1");
+    renderShell("/manager");
+    expect(screen.getByTestId("manager-scope-pill").textContent).toContain(he.managerHomeNetworkTitle);
+    fireEvent.click(screen.getByTestId("manager-pill-team"));
+    expect(where()).toBe("/manager/employees");
+  });
+
+  it("keeps the chosen snif in the session on a sub-page without branch=", () => {
+    sessionStorage.setItem(MANAGER_SCOPE_BRANCH_STORAGE_KEY, "b1");
+    renderShell("/manager/reports");
+    expect(sessionStorage.getItem(MANAGER_SCOPE_BRANCH_STORAGE_KEY)).toBe("b1");
+  });
+
+  it("counts the שיחות dot for the chosen snif", async () => {
+    renderShell("/manager");
+    expect(useManagerChatUnread).toHaveBeenLastCalledWith("");
+    fireEvent.click(screen.getByTestId("manager-scope-pill"));
+    fireEvent.click(await screen.findByTestId("manager-scope-option-b2"));
+    expect(useManagerChatUnread).toHaveBeenLastCalledWith("b2");
   });
 
   it("reads the branch from a deep link and names it once the branches are loaded", async () => {

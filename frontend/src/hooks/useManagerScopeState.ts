@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { branchService, type Branch } from "../services/branchService";
 import type { ManagerScope } from "../context/ManagerScopeContext";
 import { he } from "../i18n/he";
@@ -9,6 +9,7 @@ import {
   searchWithBranch,
   writeManagerScopeBranchId,
 } from "../utils/managerScopeBranch";
+import { isManagerTabRoot } from "../utils/managerShell";
 
 /**
  * Écrit le snif choisi dans l'adresse (`?branch=`) et dans la session : les onglets de la pilule
@@ -40,12 +41,17 @@ function useBranchList(enabled: boolean): Branch[] {
  */
 export function useManagerScopeState(enabled: boolean): ManagerScope {
   const [searchParams] = useSearchParams();
+  const { pathname } = useLocation();
   const branches = useBranchList(enabled);
   const setBranch = useBranchQueryWriter();
   const branchId = parseBranchFromSearch(searchParams);
+  // Sur une racine d'onglet, la pastille affiche ce que dit l'adresse : la session (reprise par
+  // la pilule) doit dire la même chose, y compris « כל הרשת » (vide). Les sous-pages, elles,
+  // ne portent pas toujours `branch=` : on n'y efface pas le snif choisi.
+  const onTabRoot = isManagerTabRoot(pathname);
   useEffect(() => {
-    if (enabled && branchId) writeManagerScopeBranchId(branchId);
-  }, [enabled, branchId]);
+    if (enabled && (branchId || onTabRoot)) writeManagerScopeBranchId(branchId);
+  }, [enabled, branchId, onTabRoot]);
   return useMemo(() => ({
     branchId,
     branches,

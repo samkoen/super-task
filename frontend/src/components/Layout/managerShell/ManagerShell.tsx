@@ -3,7 +3,7 @@ import { Box } from "@mui/material";
 import { useAuth } from "../../../context/AuthContext";
 import { ManagerPageHeaderProvider, useManagerPageHeaderValue } from "../../../context/ManagerPageHeaderContext";
 import { ManagerScopeProvider, useShellManagerScope } from "../../../context/ManagerScopeContext";
-import { useEmployeeChatUnread } from "../../../hooks/useEmployeeChatUnread";
+import { useManagerChatUnread } from "../../../hooks/useManagerChatUnread";
 import { useManagerDesktop } from "../../../hooks/useManagerDesktop";
 import { useManagerShell } from "../../../hooks/useManagerShell";
 import { flowScreenBackground } from "../../../styles/flowTokens";
@@ -66,8 +66,8 @@ function ScopeControl() {
 function ManagerShellBody({ children, overlays, muteIncoming, onLogout }: Props) {
   const { user } = useAuth();
   const header = useManagerPageHeaderValue();
-  // Rôle non transmis exprès : on veut le total des non-lus de toutes les conversations menahel.
-  const chatUnread = useEmployeeChatUnread(true, undefined);
+  // Le point orange suit le périmètre choisi dans l'en-tête, comme la page « שיחות ».
+  const chatUnread = useManagerChatUnread(useShellManagerScope()?.branchId ?? "");
   const shell = useManagerShell();
   const desktop = useManagerDesktop();
 

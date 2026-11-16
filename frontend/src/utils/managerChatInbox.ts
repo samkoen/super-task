@@ -119,6 +119,27 @@ export function scopeManagerInbox(entries: ManagerInboxEntry[], branchId: string
   return entries.filter((entry) => !entry.branchId || entry.branchId === branchId);
 }
 
+/**
+ * Non-lus du point orange de « שיחות » pour un snif : ses contacts (directs + fils de tâche, déjà
+ * additionnés par le backend sur chaque carte) et ceux hors snif (mon manager), comptés une fois.
+ */
+export function scopedInboxUnread(
+  inbox: { items?: DirectChatCard[] | null; up?: DirectChatCard | null },
+  branchId: string,
+): number {
+  const cards = [...(inbox.up ? [inbox.up] : []), ...(inbox.items ?? [])];
+  const seen = new Set<string>();
+  let total = 0;
+  for (const card of cards) {
+    const key = `${card.kind}-${card.counterpart_user_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const inScope = card.kind === "up" || !card.branch_id || card.branch_id === branchId;
+    if (inScope) total += Math.max(0, card.unread_count ?? 0);
+  }
+  return total;
+}
+
 /** Filtre par pastille puis par recherche (titre ou contexte). */
 export function filterManagerInbox(
   entries: ManagerInboxEntry[],

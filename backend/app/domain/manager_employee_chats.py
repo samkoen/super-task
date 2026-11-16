@@ -18,7 +18,7 @@ def last_at_sort_key(value) -> str:
     return str(value)
 
 
-def manager_task_chat_card(occurrence, last_message, unread: int) -> dict:
+def manager_task_chat_card(occurrence, last_message, unread: int, assignee_name: str | None = None) -> dict:
     preview = None
     last_at = None
     if last_message:
@@ -33,6 +33,8 @@ def manager_task_chat_card(occurrence, last_message, unread: int) -> dict:
     return {
         "id": occurrence.id,
         "assignee_user_id": getattr(occurrence, "assignee_user_id", None),
+        # Nom de l'oved : le fil s'affiche même si l'oved n'a pas de carte dans la boîte directe.
+        "assignee_name": assignee_name,
         "branch_id": getattr(occurrence, "branch_id", None),
         "title": occurrence.title,
         "status": occurrence.status,

@@ -64,9 +64,17 @@ describe("groupTaskChatsByOved", () => {
     ]);
   });
 
-  it("drops tasks whose oved is unknown or missing", () => {
-    const groups = groupTaskChatsByOved([card("e1")], [task("o1", "ghost"), task("o2", null)]);
-    expect(groups[0].tasks).toEqual([]);
+  it("keeps the threads of an oved missing from the direct inbox, named from the task", () => {
+    const groups = groupTaskChatsByOved([card("e1")], [{ ...task("o1", "e9"), assignee_name: "רונית לוי", branch_id: "b2" }]);
+    expect(groups).toHaveLength(2);
+    const extra = groups[1];
+    expect(extra.card).toMatchObject({ counterpart_user_id: "e9", counterpart_name: "רונית לוי", kind: "down", branch_id: "b2" });
+    expect(extra.tasks.map((t) => t.id)).toEqual(["o1"]);
+  });
+
+  it("drops only tasks without any oved", () => {
+    const groups = groupTaskChatsByOved([card("e1")], [task("o2", null)]);
+    expect(groups.map((g) => g.tasks.length)).toEqual([0]);
   });
 });
 
@@ -77,6 +85,14 @@ describe("useManagerUnifiedChats", () => {
     expect(taskService.listManagerAllDayChats).toHaveBeenCalledTimes(1);
     // Le fil de tâche attend le menahel (awaiting_response) : il passe en tête.
     expect(result.current.entries.map((e) => e.kind)).toEqual(["task", "direct"]);
+  });
+
+  it("shows a task thread without adding a direct row for an oved absent from the inbox", async () => {
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({ items: [{ ...task("o9", "e9"), assignee_name: "רונית לוי" }] });
+    const { result } = renderHook(() => useManagerUnifiedChats(onError));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.entries.map((e) => e.key)).toEqual(["task-o9", "direct-down-e1"]);
+    expect(result.current.entries[0].context).toBe("רונית לוי");
   });
 
   it("keeps the inbox usable when the task chats call fails", async () => {

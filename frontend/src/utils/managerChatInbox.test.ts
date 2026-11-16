@@ -6,6 +6,7 @@ import {
   directUnreadOf,
   filterManagerInbox,
   scopeManagerInbox,
+  scopedInboxUnread,
   sortManagerInbox,
   taskWaitsForManager,
   type ManagerEmployeeTaskChats,
@@ -103,5 +104,30 @@ describe("scopeManagerInbox", () => {
   it("falls back to the oved's branch when the task card has none", () => {
     const [entry] = buildManagerInboxEntries([], [{ card: card({ branch_id: "b1" }), tasks: [taskChat({ branch_id: null })] }]);
     expect(entry.branchId).toBe("b1");
+  });
+});
+
+describe("scopedInboxUnread", () => {
+  const up = card({ id: null, kind: "up", counterpart_user_id: "nm", branch_id: null, unread_count: 1 });
+  const inbox = {
+    up,
+    items: [
+      card({ counterpart_user_id: "e1", branch_id: "b1", unread_count: 2 }),
+      card({ counterpart_user_id: "e2", branch_id: "b2", unread_count: 5 }),
+      card({ counterpart_user_id: "x", branch_id: null, unread_count: 3 }),
+    ],
+  };
+
+  it("counts the chosen snif, the rows outside any snif and my manager", () => {
+    expect(scopedInboxUnread(inbox, "b1")).toBe(1 + 2 + 3);
+  });
+
+  it("counts my manager once even when he is also listed in the items", () => {
+    expect(scopedInboxUnread({ up, items: [up] }, "b1")).toBe(1);
+  });
+
+  it("is zero for an empty inbox and never negative", () => {
+    expect(scopedInboxUnread({ up: null, items: [] }, "b1")).toBe(0);
+    expect(scopedInboxUnread({ items: [card({ branch_id: "b1", unread_count: -4 })] }, "b1")).toBe(0);
   });
 });

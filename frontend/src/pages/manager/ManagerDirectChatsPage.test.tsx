@@ -169,8 +169,20 @@ describe("ManagerDirectChatsPage", () => {
     vi.mocked(useShellManagerScope).mockReturnValue(null);
   });
 
+  it("lists the task thread of an oved who has no direct conversation", async () => {
+    vi.mocked(directChatService.inbox).mockResolvedValue({ items: [], up: null, unread_count: 0 });
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({
+      items: [{ id: "o7", assignee_user_id: "e7", assignee_name: "מאיה כץ", title: "מקרר", status: "awaiting_response", last_preview: "?", last_at: null, unread_count: 1 }],
+    });
+    render(<ManagerDirectChatsPage />);
+    await waitFor(() => expect(screen.getByText("מקרר")).toBeTruthy());
+    expect(screen.getByText("מאיה כץ")).toBeTruthy();
+    expect(screen.queryByText(he.managerChatsEmpty)).toBeNull();
+  });
+
   it("shows the empty state when there is nothing", async () => {
     vi.mocked(directChatService.inbox).mockResolvedValue({ items: [], up: null, unread_count: 0 });
+    vi.mocked(taskService.listManagerAllDayChats).mockResolvedValue({ items: [] });
     render(<ManagerDirectChatsPage />);
     await waitFor(() => expect(screen.getByText(he.managerChatsEmpty)).toBeTruthy());
   });

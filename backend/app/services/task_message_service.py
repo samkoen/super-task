@@ -139,10 +139,25 @@ class TaskMessageService:
         ids = [o.id for o in occs]
         last = self._messages.last_messages_for(ids)
         unreads = self._messages.unread_counts(ids, actor.user_id)
+        names = self._assignee_names(occs)
         return [
-            manager_task_chat_card(occ, last.get(occ.id), unreads.get(occ.id, 0))
+            manager_task_chat_card(
+                occ,
+                last.get(occ.id),
+                unreads.get(occ.id, 0),
+                names.get(getattr(occ, "assignee_user_id", None)),
+            )
             for occ in occs
         ]
+
+    def _assignee_names(self, occs) -> dict[str, str]:
+        """Un seul accès par oved distinct (pas par tâche)."""
+        names: dict[str, str] = {}
+        for uid in {getattr(o, "assignee_user_id", None) for o in occs} - {None}:
+            user = self._users.find_by_id(uid)
+            if user:
+                names[uid] = user.full_name
+        return names
 
     def unread_today_by_assignees(
         self, actor: ActorContext, assignee_ids: list[str]

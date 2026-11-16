@@ -19,17 +19,44 @@ function mergeDirects(items: DirectChatCard[], up: DirectChatCard | null): Direc
   return items;
 }
 
-/** Rattache chaque fil de tâche à la carte de son oved ; un fil sans oved connu est écarté. */
+/**
+ * Carte d'appoint pour un oved absent de la boîte directe (aucune conversation, hors liste) :
+ * elle sert seulement à nommer ses fils de tâche, elle ne crée pas de ligne directe.
+ */
+function ovedCardFromTask(task: ManagerDayTaskChat, ovedId: string): DirectChatCard {
+  return {
+    id: null,
+    kind: "down",
+    counterpart_user_id: ovedId,
+    counterpart_name: task.assignee_name || "",
+    counterpart_role: "employee",
+    branch_id: task.branch_id ?? null,
+    branch_name: null,
+    last_preview: null,
+    last_at: null,
+    unread_count: 0,
+  };
+}
+
+/**
+ * Rattache chaque fil de tâche à son oved : la carte de la boîte directe s'il y en a une, sinon
+ * une carte d'appoint, pour qu'aucun message d'oved ne disparaisse de « שיחות ».
+ */
 export function groupTaskChatsByOved(
   directs: DirectChatCard[],
   tasks: ManagerDayTaskChat[],
 ): ManagerEmployeeTaskChats[] {
-  return directs
-    .filter((card) => card.kind === "down")
-    .map((card) => ({
-      card,
-      tasks: tasks.filter((task) => task.assignee_user_id === card.counterpart_user_id),
-    }));
+  const groups = new Map<string, ManagerEmployeeTaskChats>();
+  for (const card of directs) {
+    if (card.kind === "down") groups.set(card.counterpart_user_id, { card, tasks: [] });
+  }
+  for (const task of tasks) {
+    const ovedId = task.assignee_user_id;
+    if (!ovedId) continue;
+    if (!groups.has(ovedId)) groups.set(ovedId, { card: ovedCardFromTask(task, ovedId), tasks: [] });
+    groups.get(ovedId)!.tasks.push(task);
+  }
+  return [...groups.values()];
 }
 
 /** Un seul appel pour tous les oveds ; s'il échoue, la boîte reste utilisable avec les directs. */

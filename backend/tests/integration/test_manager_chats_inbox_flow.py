@@ -59,6 +59,8 @@ def test_one_call_returns_the_day_threads_with_their_oved(client_mgr, world_seed
     occ_id = _create_task(client_mgr, world_seed["branch_id"], world_seed["employee_id"])
     items = _all_day_chats(client_mgr)
     assert items[occ_id]["assignee_user_id"] == world_seed["employee_id"]
+    # Nommé côté serveur : le fil s'affiche même sans conversation directe avec cet oved.
+    assert items[occ_id]["assignee_name"] == "Oved Test"
     assert items[occ_id]["unread_count"] == 0
     per_oved = client_mgr.get(f"{ALL_DAY_CHATS}/{world_seed['employee_id']}")
     assert per_oved.status_code == 200, per_oved.text

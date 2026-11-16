@@ -9,7 +9,7 @@ import { he } from "../../../i18n/he";
 vi.mock("../../../context/AuthContext", () => ({
   useAuth: () => ({ user: { id: "m1", full_name: "שמואל כהן", role: "branch_manager", branch_id: "b1" } }),
 }));
-vi.mock("../../../hooks/useEmployeeChatUnread", () => ({ useEmployeeChatUnread: () => 3 }));
+vi.mock("../../../hooks/useManagerChatUnread", () => ({ useManagerChatUnread: () => 3 }));
 vi.mock("../../ui/PullToRefresh", () => ({ LivePullToRefresh: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("../../notifications/NotificationBell", () => ({
   default: ({ renderTrigger }: { renderTrigger: (open: () => void, unread: number) => JSX.Element }) => renderTrigger(() => undefined, 0),
