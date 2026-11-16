@@ -3,6 +3,7 @@ import { Box, ButtonBase, CircularProgress, Dialog, Typography } from "@mui/mate
 import { he } from "../../../../i18n/he";
 import { flowColor, flowScreenBackground, flowText } from "../../../../styles/flowTokens";
 import { STUDIO_MAX_WIDTH, studioPrimarySx, studioSecondarySx, studioSectionSx } from "./studioUi";
+import { withSystemBottomInsetCss } from "../../../../utils/systemInsets";
 
 /** Écran plein du studio (fond du FLOW 1 avec la lueur orangée), colonne de 393 px centrée. */
 export function StudioScreen({ header, children, footer }: { header: ReactNode; children: ReactNode; footer?: ReactNode }) {
@@ -70,7 +71,7 @@ export function StudioSaveBar({
         zIndex: 30,
         px: "24px",
         pt: "14px",
-        pb: "calc(16px + env(safe-area-inset-bottom, 0px))",
+        pb: withSystemBottomInsetCss("16px"),
         background: `linear-gradient(to top, ${flowColor.neutral100} 70%, rgba(232,236,239,0))`,
         display: "flex",
         flexDirection: "column",

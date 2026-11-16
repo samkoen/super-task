@@ -2,7 +2,7 @@ import { AppBar, Button, Toolbar, Typography, alpha } from "@mui/material";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { he } from "../../i18n/he";
 import { EMPLOYEE_BRAND, EMPLOYEE_INK, EMPLOYEE_TOUCH_MIN } from "../../styles/employeeUi";
-import { systemTopInsetCss } from "../../utils/systemInsets";
+import { systemTopInsetCss, withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 interface FullscreenBackAppBarProps {
   title: string;
@@ -19,6 +19,8 @@ export const fullscreenChatDialogPaperSx = {
 /** Contenu sous la barre : occupe le reste sans pousser חזרה hors écran. */
 export const fullscreenChatBodySx = {
   p: 2,
+  /* La zone de saisie ne doit pas passer sous la barre de navigation Android */
+  pb: withSystemBottomInsetCss("16px"),
   flex: 1,
   minHeight: 0,
   display: "flex",

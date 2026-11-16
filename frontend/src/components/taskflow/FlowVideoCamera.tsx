@@ -21,6 +21,7 @@ import { flowColor, flowRadius } from "../../styles/flowTokens";
 import type { CaptureGuide } from "../../utils/captureGuide";
 import { formatRecordingClock } from "../../utils/captureProgress";
 import { durationLine, shouldAutoStop } from "../../utils/flowCamera";
+import { withSystemTopInsetCss, withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 type Recorder = ReturnType<typeof useVideoRecorder>;
 
@@ -149,7 +150,7 @@ export default function FlowVideoCamera(props: Props) {
   return (
     <Box
       data-testid="flow-video-camera"
-      sx={{ width: "100%", maxWidth: 393, mx: "auto", flex: 1, minHeight: 0, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "30px", px: "24px", pt: "calc(38px + env(safe-area-inset-top, 0px))", pb: "calc(21px + env(safe-area-inset-bottom, 0px))" }}
+      sx={{ width: "100%", maxWidth: 393, mx: "auto", flex: 1, minHeight: 0, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "30px", px: "24px", pt: withSystemTopInsetCss("38px"), pb: withSystemBottomInsetCss("21px") }}
     >
       <FlowPageHeader title={guide.title} progress={guide.progress} onBack={onClose} backDisabled={recording || handingOver} />
       <Viewport recorder={recorder} guide={guide} minSeconds={minSeconds} handingOver={handingOver} />

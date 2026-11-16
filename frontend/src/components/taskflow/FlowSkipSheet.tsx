@@ -8,6 +8,7 @@ import { flowColor, flowRadius, flowSize, flowText } from "../../styles/flowToke
 import type { CompletionRequirement, SkipReasonCode } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
 import { blobToFile } from "../../utils/mediaCapture";
+import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { emptySkipDraft, isSkipDraftValid, SKIP_REASON_CODES, SKIP_TEXT_MAX, skipReasonLabel, type SkipDraft } from "../../utils/slotSkip";
 
 type Props = {
@@ -231,7 +232,7 @@ export default function FlowSkipSheet({ req, index, onClose, onConfirm }: Props)
           mx: "auto",
           px: `${flowSize.contentPaddingX}px`,
           pt: "12px",
-          pb: "24px",
+          pb: withSystemBottomInsetCss("24px"),
           gap: "16px",
           display: "flex",
           flexDirection: "column",

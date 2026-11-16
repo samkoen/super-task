@@ -9,6 +9,7 @@ import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { he } from "../../i18n/he";
 import { flowColor, flowSize, flowText } from "../../styles/flowTokens";
 import { formatDueHour, greetingFor } from "../../utils/flowStack";
+import { withSystemTopInsetCss } from "../../utils/systemInsets";
 
 type Props = {
   title: string;
@@ -133,7 +134,7 @@ export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, o
     <Box
       component="header"
       data-testid="task-flow-header"
-      sx={{ px: `${flowSize.contentPaddingX}px`, pt: "calc(8px + env(safe-area-inset-top, 0px))" }}
+      sx={{ px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("8px") }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "16px" }}>
         <Greeting name={employeeName} photoUrl={photoUrl} />

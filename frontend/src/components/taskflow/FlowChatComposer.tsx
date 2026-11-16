@@ -6,6 +6,7 @@ import sendIcon from "../../assets/flow1/chat-send.svg";
 import { he } from "../../i18n/he";
 import { flowColor, flowRadius, flowShadow, flowText } from "../../styles/flowTokens";
 import type { ChatMediaKind } from "../../utils/chatTransport";
+import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 type Props = {
   /** « כתבו הודעה על סרטון מקרר ריק... » une fois un sujet choisi. */
@@ -66,7 +67,7 @@ export default function FlowChatComposer(props: Props) {
   return (
     <Box
       data-testid="flow-chat-composer"
-      sx={{ display: "flex", flexDirection: "column", gap: "10px", px: "16px", pt: "16px", pb: "calc(28px + env(safe-area-inset-bottom, 0px))", bgcolor: flowColor.neutral0, borderRadius: "24px 24px 0 0", boxShadow: flowShadow.floating }}
+      sx={{ display: "flex", flexDirection: "column", gap: "10px", px: "16px", pt: "16px", pb: withSystemBottomInsetCss("28px"), bgcolor: flowColor.neutral0, borderRadius: "24px 24px 0 0", boxShadow: flowShadow.floating }}
     >
       {props.error ? (
         <Typography role="alert" sx={{ ...flowText.caption, color: "#b3261e" }}>{props.error}</Typography>

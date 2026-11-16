@@ -20,6 +20,7 @@ import FlowPageHeader from "../taskflow/FlowPageHeader";
 import ManagerTaskDialogs from "../tasks/today/ManagerTaskDialogs";
 import ManagerTasksDayBoard from "../tasks/today/ManagerTasksDayBoard";
 import { EmployeeActions, EmployeeHero, EmployeeQuality } from "./ManagerEmployeeSheetParts";
+import { withSystemTopInsetCss, withSystemBottomInsetCss } from "../../utils/systemInsets";
 
 type Props = {
   entry: TeamRosterEntry | null;
@@ -70,7 +71,7 @@ export default function ManagerEmployeeSheet({ entry, onClose, onAccount, onChan
   return (
     <Dialog open={Boolean(entry)} onClose={onClose} fullScreen dir="rtl" PaperProps={{ sx: { background: flowScreenBackground } }} disableEnforceFocus>
       {entry ? (
-        <Box data-testid="employee-sheet" sx={{ width: "100%", maxWidth: 440, mx: "auto", px: `${flowSize.contentPaddingX}px`, pt: "calc(20px + env(safe-area-inset-top, 0px))", pb: "calc(32px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <Box data-testid="employee-sheet" sx={{ width: "100%", maxWidth: 440, mx: "auto", px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("20px"), pb: withSystemBottomInsetCss("32px"), display: "flex", flexDirection: "column", gap: "16px" }}>
           <FlowPageHeader title={entry.name} titleColor={flowColor.neutral900} onBack={onClose} />
           <EmployeeHero entry={entry} />
           <EmployeeActions onChat={() => void chat.open(entry.id, entry.name)} onNewTask={() => newTask(entry)} onAccount={onAccount ? () => onAccount(entry) : undefined} />

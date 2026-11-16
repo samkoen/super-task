@@ -5,6 +5,7 @@ import CloudOffRoundedIcon from "@mui/icons-material/CloudOffRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { flowColor, flowRadius, flowText } from "../../styles/flowTokens";
 import { flowToastContent, type FlowToastState } from "../../utils/flowToast";
+import { withSystemTopInsetCss } from "../../utils/systemInsets";
 
 const TOAST_MS = 3500;
 
@@ -27,7 +28,7 @@ export default function FlowToast({ toast, onClose, durationMs = TOAST_MS }: Pro
   const content = toast ? flowToastContent(toast) : null;
   const style = content ? toneStyle[content.tone] : toneStyle.success;
   return (
-    <Snackbar open={Boolean(toast)} anchorOrigin={{ vertical: "top", horizontal: "center" }} sx={{ top: "calc(72px + env(safe-area-inset-top, 0px)) !important" }}>
+    <Snackbar open={Boolean(toast)} anchorOrigin={{ vertical: "top", horizontal: "center" }} sx={{ top: `${withSystemTopInsetCss("72px")} !important` }}>
       <Box
         role="status"
         data-testid="flow-toast"

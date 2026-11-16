@@ -17,6 +17,7 @@ import {
 } from "../../utils/flowSummary";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { handedOverCount, type SlotUiState } from "../../utils/slotUploadState";
+import { withSystemBottomInsetCss, withSystemTopInsetCss } from "../../utils/systemInsets";
 
 type Props = {
   /** Ouverture de משמרת : le titre et le bouton final parlent de la journée, pas d'une simple tâche. */
@@ -185,7 +186,7 @@ export default function FlowSummary({ shiftOpening, requirements, states, sendin
       dir="rtl"
       sx={{ minHeight: "100dvh", background: flowScreenBackground, display: "flex", flexDirection: "column", alignItems: "center" }}
     >
-      <Box sx={{ width: "100%", maxWidth: 393, px: `${flowSize.contentPaddingX}px`, pt: "calc(24px + env(safe-area-inset-top, 0px))", pb: 3, display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+      <Box sx={{ width: "100%", maxWidth: 393, px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("24px"), pb: withSystemBottomInsetCss("24px"), display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
         {(phase === "ready" || phase === "incomplete") && onBack ? <BackButton onBack={onBack} /> : null}
         <Box component="img" src={summaryDone} alt="" sx={{ width: 280, maxWidth: "80%", alignSelf: "center", display: "block" }} />
         <Typography component="h1" data-testid="flow-summary-title" sx={{ ...flowText.h1, color: flowColor.neutral900, textAlign: "center" }}>

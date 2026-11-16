@@ -67,7 +67,7 @@ export default function EmployeeFormDialog({ accounts, branches }: Props) {
           />
         ) : null}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+      <DialogActions sx={{ px: 3, gap: 1 }}>
         <Button onClick={accounts.closeForm} disabled={accounts.saving}>{he.cancel}</Button>
         <Button data-testid="employee-form-submit" onClick={() => void accounts.save(edit, s.form, s.avatar)} disabled={accounts.saving} sx={{ ...studioPrimarySx, width: "auto", height: 44, px: 3 }}>
           {accounts.saving ? <CircularProgress size={22} color="inherit" /> : he.submit}

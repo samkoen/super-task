@@ -43,6 +43,7 @@ import type { ExtraSlot } from "../../utils/extraCompletionMedia";
 import type { PendingMedia } from "../../utils/pendingMedia";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import type { TaskCompletion, TaskStatus } from "../../services/taskService";
+import { withSystemTopInsetCss } from "../../utils/systemInsets";
 
 export interface EmployeeTaskDetailTask {
   id: string;
@@ -202,7 +203,7 @@ function TaskDialogHeader({
         display: "flex",
         flexDirection: "column",
         gap: 1.25,
-        pt: "calc(14px + env(safe-area-inset-top, 0px))",
+        pt: withSystemTopInsetCss("14px"),
         pb: 1.5,
         px: { xs: 2, sm: 3 },
         flexShrink: 0,
