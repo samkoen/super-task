@@ -19,8 +19,8 @@ describe("SystemBugLauncher", () => {
     expect(systemBugLauncherLeft(true)).toEqual({ xs: 8, sm: SIDEBAR_WIDTH + 8 });
   });
 
-  it("sits above the manager bottom nav", () => {
-    expect(systemBugLauncherBottom(true)).toContain("76px");
+  it("sits above the manager bottom pill", () => {
+    expect(systemBugLauncherBottom(true)).toContain("83px");
     expect(systemBugLauncherBottom(false)).toContain("16px");
   });
 

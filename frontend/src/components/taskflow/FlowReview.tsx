@@ -56,7 +56,7 @@ function CheckBadge({ ok }: { ok: boolean }) {
   );
 }
 
-function CheckRow({ check }: { check: ReviewCheck }) {
+export function CheckRow({ check }: { check: ReviewCheck }) {
   return (
     <Box
       data-testid={`flow-review-${check.id}`}

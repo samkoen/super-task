@@ -27,10 +27,8 @@ import RepeatIcon from "@mui/icons-material/Repeat";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
-import AssessmentIcon from "@mui/icons-material/Assessment";
 import AppBrandMark from "../ui/AppBrandMark";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import SettingsIcon from "@mui/icons-material/Settings";
 import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import NotificationBell from "../notifications/NotificationBell";
 import ChatAlertBanner from "../notifications/ChatAlertBanner";
@@ -55,8 +53,7 @@ import { isNativeApp } from "../../utils/isNativeApp";
 import { shouldUseMainNavOverlay } from "../../utils/mainNavOverlay";
 import { shouldShowAppBack } from "../../utils/navigationBack";
 import BackButton from "../ui/BackButton";
-import ManagerBottomNav from "./ManagerBottomNav";
-import ManagerNewTaskFab from "./ManagerNewTaskFab";
+import ManagerShell from "./managerShell/ManagerShell";
 import MobileMenuTopBar from "./MobileMenuTopBar";
 import EmployeeBranchSwitcher from "./EmployeeBranchSwitcher";
 import EmployeeBottomNav from "./EmployeeBottomNav";
@@ -65,10 +62,7 @@ import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
 import AppUpdateGuard from "../appUpdate/AppUpdateGuard";
 import { canViewSystemBugInbox, SYSTEM_BUG_INBOX_PATH } from "../../utils/systemBugInbox";
-import {
-  managerBottomContentPadCss,
-  shouldShowManagerChrome,
-} from "../../utils/managerBottomNav";
+import { shouldShowManagerChrome } from "../../utils/managerBottomNav";
 import { dialogActionsPbCss, systemTopInsetCss } from "../../utils/systemInsets";
 import { usesEmployeeChrome } from "../../utils/employeeSurface";
 import {
@@ -161,31 +155,6 @@ function Layout() {
         { text: he.invitations, icon: <MailOutlineIcon />, path: "/admin/invitations" },
         { text: he.adminAppReleases, icon: <SystemUpdateAltIcon />, path: "/admin/app-releases" },
       ]);
-    }
-    if (user.role === "network_manager" || user.role === "branch_manager") {
-      const items: NavItem[] = [
-        { text: he.managerArea, icon: <DashboardIcon />, path: "/manager" },
-      ];
-      if (user.role === "branch_manager") {
-        items.push({ text: he.employeeArea, icon: <TaskAltIcon />, path: "/employee" });
-      }
-      if (user.role === "network_manager") {
-        items.push({ text: he.adminBranches, icon: <StoreIcon />, path: "/manager/branches" });
-      }
-      items.push(
-        { text: he.managerEmployees, icon: <PeopleIcon />, path: "/manager/employees" },
-        { text: he.directChatTitle, icon: <ChatOutlinedIcon />, path: "/manager/chats" },
-        { text: he.managerReports, icon: <AssessmentIcon />, path: "/manager/reports" },
-        { text: he.adminDepartments, icon: <CategoryIcon />, path: "/manager/departments" },
-        { text: he.adminProducts, icon: <InventoryIcon />, path: "/manager/products" },
-        { text: he.managerTasks, icon: <TaskAltIcon />, path: "/manager/tasks" },
-        { text: he.managerFixedTasks, icon: <RepeatIcon />, path: "/manager/fixed-tasks" },
-        { text: he.taskGallery, icon: <CollectionsBookmarkIcon />, path: "/manager/gallery" },
-        { text: he.invitations, icon: <MailOutlineIcon />, path: "/manager/invitations" },
-        { text: he.managerSettings, icon: <SettingsIcon />, path: "/manager/settings" },
-        { text: he.myAccount, icon: <AccountCircleIcon />, path: "/manager/account" },
-      );
-      return withSystemBugInbox(user, items);
     }
     return withSystemBugInbox(user, [
       { text: he.employeeArea, icon: <DashboardIcon />, path: "/employee" },
@@ -428,6 +397,24 @@ function Layout() {
     );
   }
 
+  if (showManagerChrome) {
+    return (
+      <ManagerShell
+        muteIncoming={breakMuted}
+        onLogout={handleLogout}
+        overlays={
+          <>
+            <ChatAlertBanner alert={chatAlerts.banner} onOpen={chatAlerts.open} onClose={chatAlerts.dismiss} />
+            <AppUpdateGuard />
+            <SystemBugLauncher />
+          </>
+        }
+      >
+        <OutletSuspense />
+      </ManagerShell>
+    );
+  }
+
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden" }}>
       <Drawer
@@ -485,7 +472,7 @@ function Layout() {
           px: { xs: 1.5, sm: 3, md: 4 },
           pt: { xs: 1, sm: 3.5 },
           // pb sur le scroller est souvent ignoré par WebView Android → spacer ci-dessous
-          pb: showManagerChrome ? { xs: 0, sm: overlayNav ? 0 : 3.5 } : { xs: 10, sm: 3.5 },
+          pb: { xs: 10, sm: 3.5 },
         }}
       >
         <LivePullToRefresh>
@@ -502,26 +489,10 @@ function Layout() {
             </Box>
           )}
           <OutletSuspense />
-          {showManagerChrome && (
-            <Box
-              aria-hidden
-              sx={{
-                display: overlayNav ? "block" : { xs: "block", sm: "none" },
-                height: managerBottomContentPadCss(),
-                flexShrink: 0,
-              }}
-            />
-          )}
         </Box>
         </LivePullToRefresh>
       </Box>
 
-      {showManagerChrome && (
-        <>
-          <ManagerNewTaskFab forceVisible={overlayNav} />
-          <ManagerBottomNav forceVisible={overlayNav} />
-        </>
-      )}
       <ChatAlertBanner
         alert={chatAlerts.banner}
         onOpen={chatAlerts.open}

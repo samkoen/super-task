@@ -29,7 +29,7 @@ export function systemBugLauncherLeft(besideSidebar: boolean) {
   return { xs: 8, sm: SIDEBAR_WIDTH + 8 };
 }
 
-/** Au-dessus de la bottom nav menahel, sinon juste au-dessus du bord. */
+/** Au-dessus de la pilule menahel, sinon juste au-dessus du bord. */
 export function systemBugLauncherBottom(managerChrome: boolean, employeeNav = false) {
   if (employeeNav) return employeeBottomNavFabBottomCss();
   return managerChrome ? managerFabBottomCss() : withSystemBottomInsetCss("16px");
@@ -111,8 +111,9 @@ export default function SystemBugLauncher() {
 
   const overlayNav = shouldUseMainNavOverlay(isNativeApp());
   const employeeChrome = usesEmployeeChrome(user?.role, location.pathname);
-  const besideSidebar = Boolean(user) && !employeeChrome && !overlayNav;
   const managerChrome = shouldShowManagerChrome(user?.role, location.pathname);
+  // La coque menahel n'a plus de menu latéral : seul l'admin garde la barre de gauche.
+  const besideSidebar = Boolean(user) && !employeeChrome && !overlayNav && !managerChrome;
 
   const startReport = async () => {
     let shot: Blob | null = null;
