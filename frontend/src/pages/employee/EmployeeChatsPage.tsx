@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Dialog, List } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { Box, Dialog, IconButton, List, Typography } from "@mui/material";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import EmployeeChatRowItem from "../../components/chat/EmployeeChatRowItem";
 import ManagerPickerDialog from "../../components/chat/ManagerPickerDialog";
 import { ApiError } from "../../services/api";
 import { useFeedback } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
-import PageHeader from "../../components/ui/PageHeader";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import DirectChatThread from "../../components/chat/DirectChatThread";
@@ -35,6 +36,7 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function EmployeeChatsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { showError } = useFeedback();
   const [managers, setManagers] = useState<DirectChatCard[]>([]);
   const [tasks, setTasks] = useState<EmployeeTaskChat[]>([]);
@@ -103,7 +105,20 @@ export default function EmployeeChatsPage() {
 
   return (
     <Box>
-      <PageHeader title={he.directChatTitle} />
+      {/* Bouton retour vers l'accueil */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+        <IconButton
+          size="small"
+          onClick={() => navigate("/employee")}
+          aria-label={he.goBack}
+          sx={{ color: "text.secondary", borderRadius: "10px" }}
+        >
+          <ArrowForwardIcon fontSize="small" />
+        </IconButton>
+        <Typography variant="h4" component="h1" fontWeight={900} sx={{ fontSize: { xs: "1.5rem", sm: "1.75rem" } }}>
+          {he.directChatTitle}
+        </Typography>
+      </Box>
       {loading ? (
         <ListSkeleton />
       ) : (
