@@ -7,6 +7,7 @@ import ListSkeleton from "./components/ui/ListSkeleton";
 import PageErrorBoundary from "./components/ui/PageErrorBoundary";
 import { getHomePath } from "./config/routes";
 import { useAuth } from "./context/AuthContext";
+import { useAndroidBackButton } from "./hooks/useAndroidBackButton";
 
 const LoginPage = lazy(() => import("./pages/Login/Login"));
 const AcceptInvitePage = lazy(() => import("./pages/AcceptInvite/AcceptInvite"));
@@ -65,6 +66,7 @@ function HomeRedirect() {
  * le lazy-load de משימות (bug WebView Android très visible).
  */
 export default function App() {
+  useAndroidBackButton();
   return (
     <Routes>
       <Route
