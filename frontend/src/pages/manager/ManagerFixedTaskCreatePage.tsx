@@ -8,6 +8,7 @@ import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
 import { useFixedTaskCreate } from "../../hooks/useFixedTaskCreate";
+import { useGoBackOr } from "../../hooks/useGoBackOr";
 import { he } from "../../i18n/he";
 import { ApiError } from "../../services/api";
 import { asList } from "../../utils/asList";
@@ -46,6 +47,7 @@ export default function ManagerFixedTaskCreatePage() {
     navigate(listPath);
   }, [navigate, listPath]);
   const create = useFixedTaskCreate(backToList);
+  const goBack = useGoBackOr(listPath);
 
   if (loading) return <ListSkeleton variant="dashboard" />;
   return (
@@ -59,7 +61,7 @@ export default function ManagerFixedTaskCreatePage() {
       onSubmit={create.submit}
       onCancel={() => {
         clearFixedTaskCreateDraft(MANAGER_FIXED_TASKS_DRAFT_KEY);
-        navigate(listPath);
+        goBack();
       }}
       onError={showError}
       rememberKey={MANAGER_FIXED_TASKS_DRAFT_KEY}

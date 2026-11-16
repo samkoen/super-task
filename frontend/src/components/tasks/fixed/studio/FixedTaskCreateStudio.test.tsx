@@ -95,6 +95,22 @@ describe("FixedTaskCreateStudio", () => {
   });
 });
 
+describe("FixedTaskCreateStudio — retour Android (Échap)", () => {
+  it("leaves at once when nothing was typed", () => {
+    const { onCancel } = renderStudio();
+    fireEvent.keyDown(screen.getByTestId("fixed-task-studio"), { key: "Escape" });
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("asks before leaving when a draft exists", async () => {
+    const { onCancel } = renderStudio();
+    fireEvent.change(screen.getByLabelText(he.taskTitle), { target: { value: "טיוטה" } });
+    fireEvent.keyDown(screen.getByTestId("fixed-task-studio"), { key: "Escape" });
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: he.studioLeaveConfirm })).toBeTruthy();
+  });
+});
+
 describe("FixedTaskCreateStudio — פעם אחת", () => {
   function renderOnce(onSubmit = vi.fn().mockResolvedValue(undefined)) {
     render(

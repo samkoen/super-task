@@ -8,6 +8,7 @@ import FixedTaskBranchesTab from "../../components/tasks/fixed/FixedTaskBranches
 import FixedTaskBranchSheet from "../../components/tasks/fixed/FixedTaskBranchSheet";
 import FixedTaskEditStudio, { type EditTabId } from "../../components/tasks/fixed/studio/FixedTaskEditStudio";
 import { useFixedTaskDetail } from "../../hooks/useFixedTaskDetail";
+import { useGoBackOr } from "../../hooks/useGoBackOr";
 import { he } from "../../i18n/he";
 import { assigneesForBranch } from "../../utils/assigneeOptions";
 import { asText } from "../../utils/asList";
@@ -93,8 +94,8 @@ function DeleteHost({
 }
 
 function FixedTaskDetailView({ detail, group }: { detail: Detail; group: FixedTaskGroup }) {
-  const navigate = useNavigate();
   const listPath = useLocation().pathname.startsWith("/admin") ? "/admin/fixed-tasks" : "/manager/fixed-tasks";
+  const goBack = useGoBackOr(listPath);
   const [openBranch, setOpenBranch] = useState<FixedTaskBranch | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   return (
@@ -117,7 +118,7 @@ function FixedTaskDetailView({ detail, group }: { detail: Detail; group: FixedTa
         onDelete={() =>
           setDeleting({ templateId: group.template_ids[0], all: group.is_network, name: asText(group.title) })
         }
-        onBack={() => navigate(listPath)}
+        onBack={goBack}
         onError={detail.showError}
         onLinkCustomer={(name) => detail.linkCustomer(group.branches[0]?.branch_id ?? "", name)}
       />

@@ -263,7 +263,7 @@ export default function FixedTaskEditStudio(props: FixedTaskEditStudioProps) {
     ) : null;
 
   return (
-    <StudioScreen header={header} footer={footer}>
+    <StudioScreen header={header} footer={footer} onBack={back}>
       {tabs.length > 1 ? <StudioTabs tabs={tabs} active={activeTab} onChange={setTab} /> : null}
       {activeTab === "general" ? <GeneralBody props={props} draft={draft} /> : props.branchesView}
       {canEdit ? <MoreSheet props={props} draft={draft} open={moreOpen} onClose={() => setMoreOpen(false)} /> : null}

@@ -4,10 +4,13 @@ import { he } from "../../../../i18n/he";
 import { flowColor, flowScreenBackground, flowText } from "../../../../styles/flowTokens";
 import { STUDIO_MAX_WIDTH, studioPrimarySx, studioSecondarySx, studioSectionSx } from "./studioUi";
 
-/** Écran plein du studio (fond du FLOW 1 avec la lueur orangée), colonne de 393 px centrée. */
-export function StudioScreen({ header, children, footer }: { header: ReactNode; children: ReactNode; footer?: ReactNode }) {
+/**
+ * Écran plein du studio (fond du FLOW 1 avec la lueur orangée), colonne de 393 px centrée.
+ * `onBack` : même action que « חזרה » de l'en-tête (bouton retour Android, touche Échap).
+ */
+export function StudioScreen({ header, children, footer, onBack }: { header: ReactNode; children: ReactNode; footer?: ReactNode; onBack?: () => void }) {
   return (
-    <Dialog open fullScreen dir="rtl" disableEnforceFocus PaperProps={{ sx: { background: flowScreenBackground } }}>
+    <Dialog open fullScreen dir="rtl" disableEnforceFocus onClose={onBack} PaperProps={{ sx: { background: flowScreenBackground } }}>
       <Box data-testid="fixed-task-studio" sx={{ width: "100%", maxWidth: STUDIO_MAX_WIDTH, mx: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
         {header}
         <Box sx={{ px: "24px", pb: "24px", display: "flex", flexDirection: "column", gap: "20px", flex: 1 }}>{children}</Box>
