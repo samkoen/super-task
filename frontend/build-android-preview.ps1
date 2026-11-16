@@ -1,5 +1,5 @@
 # APK release branche sur l'API d'apercu.
-# Meme dossier que la prod, fichier app-preview.apk.
+# Meme dossier que la prod, fichier super-preview.apk.
 # From frontend:
 #   .\build-android-preview.ps1
 # From anywhere:
@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $PreviewApiUrl = "https://super-api-preview.onrender.com/api"
-$ApkFileName = "app-preview.apk"
+$ApkFileName = "super-preview.apk"
 
 function Assert-Success {
     param([string]$Step)
@@ -42,19 +42,18 @@ Write-Host "`n[2/3] npx cap sync android" -ForegroundColor Cyan
 npx cap sync android
 Assert-Success "npx cap sync android"
 
-Write-Host "`n[3/3] gradle assembleRelease" -ForegroundColor Cyan
+Write-Host "`n[3/3] gradle assemblePreview" -ForegroundColor Cyan
 Set-Location (Join-Path $PSScriptRoot "android")
-& .\gradlew.bat assembleRelease
-Assert-Success "gradlew assembleRelease"
+& .\gradlew.bat assemblePreview
+Assert-Success "gradlew assemblePreview"
 
-$apkDir = Join-Path $PSScriptRoot "android\app\build\outputs\apk\release"
-$built = Join-Path $apkDir "app-release.apk"
+$apkDir = Join-Path $PSScriptRoot "android\app\build\outputs\apk\preview"
+# build type preview + archivesName super → super-preview.apk, applicationId .preview
 $previewApk = Join-Path $apkDir $ApkFileName
-if (-not (Test-Path $built)) {
-    Write-Host "Echec : $built introuvable" -ForegroundColor Red
+if (-not (Test-Path $previewApk)) {
+    Write-Host "Echec : $previewApk introuvable" -ForegroundColor Red
     exit 1
 }
-Move-Item -Path $built -Destination $previewApk -Force
 
 Write-Host "`nOK - APK preview $($apkVersion.Name) :" -ForegroundColor Green
 Write-Host $previewApk -ForegroundColor Green
