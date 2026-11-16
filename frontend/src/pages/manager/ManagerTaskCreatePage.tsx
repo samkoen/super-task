@@ -10,6 +10,7 @@ import TaskGalleryPickerDialog from "../../components/tasks/TaskGalleryPickerDia
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../context/FeedbackContext";
+import { useGoBackOr } from "../../hooks/useGoBackOr";
 import { useStudioTaskCreate } from "../../hooks/useStudioTaskCreate";
 import { he } from "../../i18n/he";
 import { asList } from "../../utils/asList";
@@ -82,10 +83,17 @@ export default function ManagerTaskCreatePage() {
     clearFixedTaskCreateDraft(MANAGER_ONCE_TASK_DRAFT_KEY);
     navigate(listPath);
   }, [navigate, listPath]);
+  const goBack = useGoBackOr(listPath);
+  /** « חזרה » sans créer : l'écran d'origine (fiche oved, ou la page où l'on a touché « + »). */
+  const cancel = useCallback(() => {
+    clearFixedTaskCreateDraft(MANAGER_ONCE_TASK_DRAFT_KEY);
+    if (start.returnTo) navigate(start.returnTo);
+    else goBack();
+  }, [navigate, start.returnTo, goBack]);
   const create = useStudioTaskCreate(leave, start.galleryItem?.id);
 
   if (start.fromLibrary && !start.galleryItem) {
-    return <TaskGalleryPickerDialog open onClose={leave} onSelect={start.setGalleryItem} />;
+    return <TaskGalleryPickerDialog open onClose={cancel} onSelect={start.setGalleryItem} />;
   }
   if (people.loading || !start.initial) return <ListSkeleton variant="dashboard" />;
   return (
@@ -98,7 +106,7 @@ export default function ManagerTaskCreatePage() {
       currentUserId={user?.id}
       saving={create.saving}
       onSubmit={create.submit}
-      onCancel={leave}
+      onCancel={cancel}
       onError={showError}
       rememberKey={start.remembers ? MANAGER_ONCE_TASK_DRAFT_KEY : undefined}
       allowOnce

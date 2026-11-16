@@ -123,7 +123,15 @@ export default function FlowReview(props: Props) {
     capturedAt: props.capturedAt,
   });
   return (
-    <Dialog open={open} fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus>
+    <Dialog
+      open={open}
+      fullScreen
+      dir="rtl"
+      PaperProps={paperProps}
+      disableEnforceFocus
+      // Retour Android : ferme d'abord le découpage, sinon comme la flèche de l'en-tête (refaire la prise).
+      onClose={() => (trimming ? setTrimming(false) : onRetake())}
+    >
       <Box
         data-testid="flow-review"
         sx={{ width: "100%", maxWidth: 393, mx: "auto", flex: 1, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "30px", px: "24px", pt: withSystemTopInsetCss("38px"), pb: withSystemBottomInsetCss("30px"), overflowY: "auto" }}

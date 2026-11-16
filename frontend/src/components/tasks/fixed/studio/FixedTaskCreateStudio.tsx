@@ -207,7 +207,7 @@ export default function FixedTaskCreateStudio(props: FixedTaskCreateStudioProps)
   );
 
   return (
-    <StudioScreen header={header} footer={footer}>
+    <StudioScreen header={header} footer={footer} onBack={back}>
       <StepsSection form={form} patch={patch} disabled={props.saving} />
       <StudioSection title={he.studioDetailsTitle}>
         <TextField

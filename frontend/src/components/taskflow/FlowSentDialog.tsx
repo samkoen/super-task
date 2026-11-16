@@ -34,6 +34,10 @@ export default function FlowSentDialog({ open, count, onContinue }: Props) {
       open={open}
       dir="rtl"
       aria-labelledby="flow-sent-title"
+      // Retour Android (Échap) = « המשך » ; un tap à côté ne ferme pas la confirmation.
+      onClose={(_event, reason) => {
+        if (reason === "escapeKeyDown") onContinue();
+      }}
       slotProps={{ backdrop: { sx: { bgcolor: "rgba(21,25,35,0.48)" } } }}
       PaperProps={{ sx: paperSx, "data-testid": "flow-sent-dialog" } as object}
     >

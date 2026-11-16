@@ -106,9 +106,15 @@ function ReviewLayer({ flow, requirements, branch, branchCenter }: ReviewLayerPr
 /** Récap (10/10ב) puis, pour une ouverture de משמרת, popup « הסרטונים נשלחו » (11) une fois tout parti. */
 function SummaryLayer({ props, flow, requirements, onBack }: { props: TaskFlowScreenProps; flow: Flow; requirements: CompletionRequirement[]; onBack: (focus?: number | null) => void }) {
   const shiftOpening = Boolean(props.shiftOpening);
-  const sentPopup = shiftOpening && summaryPhase(flow.states, flow.sending) === "done" && !hasPendingUpload(flow.states);
+  const phase = summaryPhase(flow.states, flow.sending);
+  const sentPopup = shiftOpening && phase === "done" && !hasPendingUpload(flow.states);
+  // Retour Android : comme les boutons de l'écran (revenir aux cartes, ou continuer une fois envoyé).
+  const onClose = () => {
+    if (phase === "ready" || phase === "incomplete") onBack();
+    else if (phase === "done") props.onFinished();
+  };
   return (
-    <Dialog open fullScreen dir="rtl" PaperProps={paperProps}>
+    <Dialog open fullScreen dir="rtl" PaperProps={paperProps} onClose={onClose}>
       <FlowSummary
         shiftOpening={shiftOpening}
         requirements={requirements}
@@ -184,7 +190,7 @@ export default function TaskFlowScreen(props: TaskFlowScreenProps) {
 
   if (summary) return <SummaryLayer props={{ ...props, shiftOpening }} flow={flow} requirements={requirements} onBack={leaveSummary} />;
   return (
-    <Dialog open fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus>
+    <Dialog open fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus onClose={props.onClose}>
       <FlowBody props={props} flow={flow} requirements={requirements} focusIndex={focusIndex} onGuide={setGuideIndex} onSkip={setSkipIndex} onChat={() => setChatOpen(true)} onOpenSummary={onAllHandedOver} />
       <FlowToast toast={flow.toast} onClose={flow.closeToast} />
       <FlowGuideSheet req={guideIndex !== null ? requirements[guideIndex] : null} index={guideIndex ?? 0} onClose={() => setGuideIndex(null)} />
