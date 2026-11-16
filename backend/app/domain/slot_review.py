@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app.domain import task_status
 from app.domain.completion_media import attachment_is_filled
+from app.domain.slot_skip import has_skipped
 
 SLOT_APPROVED = task_status.REVIEW_APPROVED
 SLOT_REJECTED = task_status.REVIEW_REJECTED
@@ -81,8 +82,13 @@ def apply_decisions(
 
 
 def review_outcome(attachments: list[dict], required: list[int]) -> str:
-    """rejected dès qu'une case est X ; approved si toutes les cases requises sont V."""
+    """rejected dès qu'une case est X ; approved si toutes les cases requises sont V.
+
+    Si rien n'a été filmé mais que chaque case porte une raison, il n'y a aucun fichier à contrôler : approved.
+    """
     if not required:
+        if has_skipped(attachments):
+            return OUTCOME_APPROVED
         raise ValueError(_NOTHING_TO_REVIEW)
     statuses = [(review_of(item) or {}).get("status") for item in attachments]
     if SLOT_REJECTED in statuses:

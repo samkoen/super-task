@@ -1,4 +1,4 @@
-/** Traces siyum — visibles dans la console Chrome, pour croiser avec les logs Vercel. */
+/** Traces siyum — visibles dans la console Chrome, pour croiser avec les logs Render. */
 
 export function siyumTrace(step: string, detail?: Record<string, unknown>): void {
   if (detail) {

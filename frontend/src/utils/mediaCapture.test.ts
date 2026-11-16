@@ -5,6 +5,7 @@ import {
   capturePhotoFromVideo,
   classifyMediaError,
   compressPhotoForUpload,
+  encodePhotoJpeg,
   getUserMediaWithFallback,
   normalizePhotoOrientation,
   oppositeCameraFacing,
@@ -177,7 +178,7 @@ describe("mediaCapture", () => {
     expect(photoPreviewSize(800, 600)).toEqual({ width: 800, height: 600 });
   });
 
-  it("photoPreviewSize downscales so the long edge matches the Vercel-safe max", () => {
+  it("photoPreviewSize downscales so the long edge matches the upload max", () => {
     expect(photoPreviewSize(4000, 3000)).toEqual({ width: PHOTO_UPLOAD_MAX_EDGE, height: 960 });
   });
 
@@ -227,6 +228,39 @@ describe("mediaCapture", () => {
     expect(out.name).toBe("cam.jpg");
     expect(out.type).toBe("image/jpeg");
 
+    vi.unstubAllGlobals();
+  });
+
+  it("compressPhotoForUpload keeps a light PNG as PNG so transparency survives", async () => {
+    const file = new File(["art"], "fridge.png", { type: "image/png" });
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 1254, height: 1254, close: vi.fn() }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const types: string[] = [];
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb, type) => {
+      types.push(String(type));
+      cb(new Blob(["png"], { type: String(type) }));
+    });
+
+    const out = await compressPhotoForUpload(file);
+    expect(out.type).toBe("image/png");
+    expect(out.name).toBe("fridge.png");
+    expect(types).toEqual(["image/png"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("encodePhotoJpeg paints a white background first so transparent pixels never turn black", async () => {
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 100, height: 100, close: vi.fn() }));
+    const fillRect = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+      fillRect,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((cb) => cb(new Blob(["j"])));
+
+    await encodePhotoJpeg(new Blob(["x"], { type: "image/png" }));
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 100, 100);
     vi.unstubAllGlobals();
   });
 

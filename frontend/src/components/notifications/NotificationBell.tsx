@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Badge,
@@ -38,7 +38,13 @@ function formatWhen(iso: string) {
   }
 }
 
-export default function NotificationBell({ muteIncoming = false }: { muteIncoming?: boolean }) {
+type NotificationBellProps = {
+  muteIncoming?: boolean;
+  /** Remplace le bouton par défaut (écrans au design propre, ex. FLOW 1). */
+  renderTrigger?: (open: () => void, unreadCount: number) => ReactNode;
+};
+
+export default function NotificationBell({ muteIncoming = false, renderTrigger }: NotificationBellProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -111,11 +117,15 @@ export default function NotificationBell({ muteIncoming = false }: { muteIncomin
 
   return (
     <>
-      <IconButton color="inherit" aria-label={he.notificationsTitle} onClick={handleOpen} size="small">
-        <Badge badgeContent={unreadCount} color="error" max={99}>
-          <NotificationsNoneIcon />
-        </Badge>
-      </IconButton>
+      {renderTrigger ? (
+        renderTrigger(handleOpen, unreadCount)
+      ) : (
+        <IconButton color="inherit" aria-label={he.notificationsTitle} onClick={handleOpen} size="small">
+          <Badge badgeContent={unreadCount} color="error" max={99}>
+            <NotificationsNoneIcon />
+          </Badge>
+        </IconButton>
+      )}
 
       <Drawer anchor="left" open={open} onClose={closeAlerts} dir="rtl">
         <Box

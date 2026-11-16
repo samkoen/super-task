@@ -89,6 +89,16 @@ describe("GuidedCameraStage", () => {
     expect(shutter.disabled).toBe(true);
   });
 
+  it("shows the completed count in the header when progress is given", () => {
+    render(<GuidedCameraStage {...props({ guide: { title: "א", progress: { done: 1, total: 3 } } })} />);
+    expect(screen.getByTestId("guided-progress").textContent).toBe(he.flowStackCount(1, 3));
+  });
+
+  it("shows no progress pill without progress", () => {
+    render(<GuidedCameraStage {...props()} />);
+    expect(screen.queryByTestId("guided-progress")).toBeNull();
+  });
+
   it("does not allow closing while the camera is busy", () => {
     render(<GuidedCameraStage {...props({ closeDisabled: true })} />);
     expect((screen.getByRole("button", { name: he.cancel }) as HTMLButtonElement).disabled).toBe(true);

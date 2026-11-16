@@ -5,7 +5,22 @@ import { he } from "../../i18n/he";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 
 vi.mock("../media/MediaCaptureActions", () => ({
-  default: ({ photoLabel }: { photoLabel?: string }) => <button type="button">{photoLabel}</button>,
+  default: ({
+    photoLabel,
+    videoLabel,
+    onCapture,
+  }: {
+    photoLabel?: string;
+    videoLabel?: string;
+    onCapture: (file: File, kind: string) => void;
+  }) =>
+    videoLabel ? (
+      <button type="button" onClick={() => onCapture(new File(["v"], "rec.mp4", { type: "video/mp4" }), "video")}>
+        {videoLabel}
+      </button>
+    ) : (
+      <button type="button">{photoLabel}</button>
+    ),
 }));
 
 let resolvedSrc: string | null = null;
@@ -19,7 +34,11 @@ vi.mock("../../hooks/useResolvedMediaSrc", () => ({
   }),
 }));
 
-function renderCard(req: CompletionRequirement, onExample = vi.fn()) {
+function renderCard(
+  req: CompletionRequirement,
+  onExample = vi.fn(),
+  guide: { onGuideVideo?: ReturnType<typeof vi.fn>; onGuideVideoClear?: ReturnType<typeof vi.fn> } = {},
+) {
   render(
     <VisualRequirementCard
       req={req}
@@ -27,6 +46,8 @@ function renderCard(req: CompletionRequirement, onExample = vi.fn()) {
       onTitle={vi.fn()}
       onHint={vi.fn()}
       onExample={onExample}
+      onGuideVideo={guide.onGuideVideo ?? vi.fn()}
+      onGuideVideoClear={guide.onGuideVideoClear ?? vi.fn()}
       onSeconds={vi.fn()}
       onSecondsCommit={vi.fn()}
     />,
@@ -90,5 +111,49 @@ describe("VisualRequirementCard example buttons", () => {
   it("shows no example buttons for audio or message items", () => {
     renderCard({ kind: "audio" });
     expect(screen.queryByRole("button", { name: he.completionSlotExampleFromFile })).toBeNull();
+    expect(screen.queryByRole("button", { name: he.completionGuideVideoPick })).toBeNull();
+  });
+});
+
+describe("VisualRequirementCard guide video", () => {
+  const pickVideo = (file: File) =>
+    fireEvent.change(screen.getByTestId("guide-video-input"), { target: { files: [file] } });
+
+  it("lets the manager pick the « איך מצלמים » video", () => {
+    const onGuideVideo = vi.fn();
+    renderCard({ kind: "video", min_seconds: 10 }, vi.fn(), { onGuideVideo });
+    const file = new File(["x"], "how.mp4", { type: "video/mp4" });
+    pickVideo(file);
+    expect(onGuideVideo).toHaveBeenCalledWith("blob:example", file);
+  });
+
+  it("lets the manager film the guide video with the camera", () => {
+    const onGuideVideo = vi.fn();
+    renderCard({ kind: "photo" }, vi.fn(), { onGuideVideo });
+    fireEvent.click(screen.getByRole("button", { name: he.completionGuideVideoCapture }));
+    expect(onGuideVideo).toHaveBeenCalledWith("blob:example", expect.any(File));
+  });
+
+  it("offers neither pick nor capture for audio or message", () => {
+    renderCard({ kind: "message" });
+    expect(screen.queryByRole("button", { name: he.completionGuideVideoCapture })).toBeNull();
+  });
+
+  it("refuses a file that is not a video", () => {
+    const onGuideVideo = vi.fn();
+    renderCard({ kind: "photo" }, vi.fn(), { onGuideVideo });
+    pickVideo(new File(["x"], "shelf.jpg", { type: "image/jpeg" }));
+    expect(onGuideVideo).not.toHaveBeenCalled();
+    expect(screen.getByText(he.completionGuideVideoInvalid)).toBeTruthy();
+  });
+
+  it("previews the saved video and allows removing it", () => {
+    resolvedSrc = "/media/how.mp4";
+    const onGuideVideoClear = vi.fn();
+    renderCard({ kind: "video", guide_video_url: "/uploads/task_videos/how.mp4" }, vi.fn(), { onGuideVideoClear });
+    expect(screen.getByTestId("guide-video-preview")).toBeTruthy();
+    expect(screen.getByRole("button", { name: he.completionGuideVideoReplace })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: he.completionGuideVideoRemove }));
+    expect(onGuideVideoClear).toHaveBeenCalled();
   });
 });

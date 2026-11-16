@@ -657,6 +657,37 @@ async def complete_occurrence(
     return {"message": "המשימה עודכנה", "occurrence": item}
 
 
+@router.post("/occurrences/{occurrence_id}/slots/{slot_index}/submit")
+@handle_controller_errors
+async def submit_occurrence_slot(
+    occurrence_id: str,
+    slot_index: int,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    """Envoie une sous-tâche ; la dernière envoyée déclenche le contrôle menahel."""
+    actor = load_actor(request, UserRepository(db))
+    payload = data or {}
+    result = await service.submit_slot(
+        actor,
+        occurrence_id,
+        slot_index,
+        attachment=payload.get("attachment"),
+    )
+    item = result["occurrence"]
+    if result["finalized"]:
+        emit_after_complete(db, item)
+    return {
+        "message": "תת-המשימה נשלחה",
+        "occurrence": item,
+        "slot_index": result["slot_index"],
+        "task_submitted": result["task_submitted"],
+        "pending_slots": result["pending_slots"],
+    }
+
+
 @router.post("/occurrences/{occurrence_id}/approve")
 @handle_controller_errors
 def approve_occurrence(
@@ -810,6 +841,7 @@ async def post_task_message(
         audio_url=payload.get("audio_url"),
         file_url=payload.get("file_url"),
         file_name=payload.get("file_name"),
+        slot_index=payload.get("slot_index"),
     )
     _emit_task_event(db, result["event_type"], result["occurrence"])
     return {

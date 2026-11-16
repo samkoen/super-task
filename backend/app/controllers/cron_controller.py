@@ -1,4 +1,4 @@
-"""Jobs planifiés (Vercel Cron) — purge médias + inactivité employés."""
+"""Jobs planifiés — purge médias + inactivité employés."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -7,14 +7,13 @@ from sqlalchemy.orm import Session
 from app.core import config
 from app.dependencies import get_db
 from app.domain.notification_retention import notification_purge_cutoff
-from app.repositories.employee_break_repository import EmployeeBreakRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.task_completion_repository import TaskCompletionRepository
 from app.repositories.task_occurrence_repository import TaskOccurrenceRepository
 from app.repositories.user_repository import UserRepository
 from app.realtime.task_events import notify_task_change
 from app.services import blob_storage
-from app.services.employee_activity_service import EmployeeActivityService
+from app.services.employee_activity_service import bind_employee_activity
 from app.services.media_ready_service import MediaReadyService
 from app.services.media_retention_service import bind_media_retention
 from app.services.notification_service import NotificationService
@@ -25,7 +24,7 @@ router = APIRouter()
 def _assert_cron_authorized(authorization: str | None) -> None:
     secret = config.CRON_SECRET
     if not secret:
-        # Uniquement en local pur — jamais sur Vercel / production.
+        # Uniquement en local — jamais en production.
         if config.ENVIRONMENT == "development" and not config.IS_PRODUCTION:
             return
         raise HTTPException(status_code=503, detail="CRON_SECRET not configured")
@@ -65,7 +64,7 @@ def promote_pending_media(
     db: Session = Depends(get_db),
     authorization: str | None = Header(default=None),
 ):
-    """Déclenchement manuel — pas de cron Hobby (1×/jour max)."""
+    """Déclenchement manuel de la promotion des médias en attente."""
     _assert_cron_authorized(authorization)
     promoted, pending = _promote_and_notify(db)
     db.commit()
@@ -115,13 +114,7 @@ def scan_employee_inactivity(
     authorization: str | None = Header(default=None),
 ):
     _assert_cron_authorized(authorization)
-    activity = EmployeeActivityService(
-        UserRepository(db),
-        TaskOccurrenceRepository(db),
-        NotificationRepository(db),
-        EmployeeBreakRepository(db),
-    )
-    result = activity.run_inactivity_scan()
+    result = bind_employee_activity(db).run_inactivity_scan()
     pending = result.pop("pending", [])
     db.commit()
     NotificationService.push_task_event_sse(pending)

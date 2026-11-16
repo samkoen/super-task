@@ -204,6 +204,7 @@ class DashboardService:
                 "branch_id": actor.branch_id,
                 "branch_name": branch_name,
                 "branch_city": branch_city,
+                "branch_location": self._occurrences.get_branch_coordinates(actor.branch_id),
                 "preferred_language": language,
                 "avatar_url": user.avatar_url if user else None,
                 "excellence_slogan": user.excellence_slogan if user else None,

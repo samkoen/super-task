@@ -23,6 +23,7 @@ if _venv_python.is_file() and Path(sys.executable).resolve() != _venv_python.res
 
 import uvicorn
 
+from app.domain.dev_server import should_reload
 from app.main import create_app
 
 _interrupts = 0
@@ -39,12 +40,12 @@ def _handle_interrupt(signum, frame) -> None:
 def main() -> None:
     host = os.environ.get("UVICORN_HOST", "0.0.0.0")
     port = int(os.environ.get("UVICORN_PORT", os.environ.get("PORT", "5001")))
-    reload = os.environ.get("UVICORN_RELOAD", "0").lower() in ("1", "true", "yes")
+    # Rechargement auto en développement local ; UVICORN_RELOAD=0 pour le couper.
+    reload = should_reload(os.environ)
 
     if sys.platform == "win32" and reload:
-        print("AVERTISSEMENT: UVICORN_RELOAD=1 sous Windows peut laisser un processus")
-        print("orphelin après Ctrl+C. Préférez UVICORN_RELOAD=0 ou arrêtez avec:")
-        print("  Get-Process python | Stop-Process")
+        print("Rechargement auto actif (code modifié = API relancée). UVICORN_RELOAD=0 pour le couper.")
+        print("Si un processus reste après Ctrl+C : Get-Process python | Stop-Process")
 
     signal.signal(signal.SIGINT, _handle_interrupt)
     if hasattr(signal, "SIGTERM"):
@@ -61,6 +62,8 @@ def main() -> None:
             host=host,
             port=port,
             reload=True,
+            # Seulement le code : ni .venv, ni uploads, ni tests ne doivent relancer l'API.
+            reload_dirs=[str(_root / "app")],
             log_level=log_level,
             timeout_graceful_shutdown=3,
         )

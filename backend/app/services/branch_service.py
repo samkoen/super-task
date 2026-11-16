@@ -1,8 +1,12 @@
 from app.db import mappers as mp
 from app.domain import roles
+from app.domain.geo import normalize_coordinates
 from app.domain.scope import ActorContext, can_manage_branches
 from app.repositories.branch_repository import BranchRepository
 from app.repositories.network_repository import NetworkRepository
+
+KEEP: object = object()
+"""Valeur « ne pas toucher » pour les coordonnées d'une mise à jour partielle."""
 
 
 class BranchService:
@@ -30,8 +34,11 @@ class BranchService:
         address: str = "",
         city: str = "",
         postal_code: str = "",
+        latitude: object = None,
+        longitude: object = None,
     ) -> dict:
         self._assert_can_write(actor, network_id)
+        coordinates = normalize_coordinates(latitude, longitude)
         if not (name or "").strip():
             raise ValueError("נדרש שם סניף")
         if not self._network.find_by_id(network_id):
@@ -42,6 +49,7 @@ class BranchService:
             address=address,
             city=city,
             postal_code=postal_code,
+            coordinates=coordinates,
         )
         return self._to_api(branch)
 
@@ -55,7 +63,17 @@ class BranchService:
         city: str,
         postal_code: str,
         is_active: bool,
+        latitude: object = KEEP,
+        longitude: object = KEEP,
     ) -> dict:
+        set_coordinates = latitude is not KEEP or longitude is not KEEP
+        coordinates = (
+            normalize_coordinates(
+                None if latitude is KEEP else latitude, None if longitude is KEEP else longitude
+            )
+            if set_coordinates
+            else None
+        )
         existing = self._branch.find_by_id(id_)
         if not existing:
             raise ValueError("סניף לא נמצא")
@@ -67,6 +85,8 @@ class BranchService:
             city=city,
             postal_code=postal_code,
             is_active=is_active,
+            set_coordinates=set_coordinates,
+            coordinates=coordinates,
         )
         assert updated is not None
         return self._to_api(updated)

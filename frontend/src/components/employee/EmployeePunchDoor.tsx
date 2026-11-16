@@ -38,10 +38,8 @@ interface EmployeePunchDoorProps {
   photoUrl?: string | null;
   taskTitle?: string | null;
   remainingCount?: number;
-  /** Écran d'ouverture : date du jour et lieu (affichés une seule fois). */
-  dateLabel?: string;
-  meta?: string;
-  branchCity?: string | null;
+  /** Écran d'ouverture : nom du סניף pour le tag. */
+  branch?: string | null;
   onOpen: () => void;
 }
 
@@ -51,22 +49,11 @@ export default function EmployeePunchDoor({
   photoUrl,
   taskTitle,
   remainingCount = 0,
-  dateLabel,
-  meta,
-  branchCity,
+  branch,
   onOpen,
 }: EmployeePunchDoorProps) {
   if (kind === "start") {
-    return (
-      <EmployeeStartDoor
-        name={name}
-        photoUrl={photoUrl}
-        dateLabel={dateLabel}
-        meta={meta}
-        branchCity={branchCity}
-        onOpen={onOpen}
-      />
-    );
+    return <EmployeeStartDoor name={name} branch={branch} onOpen={onOpen} />;
   }
   return (
     <Box sx={endDoorSx}>

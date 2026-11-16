@@ -11,15 +11,12 @@ _PROJECT_DIR = _BACKEND_DIR.parent
 load_dotenv(_BACKEND_DIR / ".env")
 load_dotenv(_PROJECT_DIR / ".env")
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
-IS_SERVERLESS = IS_VERCEL or bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
-
 _DEFAULT_SECRET = "dev-secret-key-change-in-production"
 SECRET_KEY = os.environ.get("SECRET_KEY", _DEFAULT_SECRET)
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 APP_NAME = os.environ.get("APP_NAME", "סופר-מן")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
-IS_PRODUCTION = ENVIRONMENT == "production" or IS_VERCEL
+IS_PRODUCTION = ENVIRONMENT == "production"
 
 # Origines CORS (web + Capacitor). En local, regex pour IP LAN (téléphone → Vite).
 _CORS_DEFAULT = [
@@ -43,12 +40,12 @@ CORS_ALLOW_ORIGIN_REGEX = (
 )
 LOG_LEVEL = os.environ.get(
     "LOG_LEVEL",
-    "DEBUG" if ENVIRONMENT == "development" and not IS_VERCEL else "INFO",
+    "DEBUG" if ENVIRONMENT == "development" else "INFO",
 ).strip().upper()
 
 
 def resolve_cookie_secure(raw: str | None, *, is_production: bool) -> bool:
-    """Prod (Render/Vercel) : cookies Secure + SameSite=None pour l'APK https://localhost."""
+    """Prod (Render) : cookies Secure + SameSite=None pour l'APK https://localhost."""
     if raw is None:
         return is_production
     return raw.lower() in ("1", "true", "yes")
@@ -85,7 +82,7 @@ SYSTEM_BUG_INBOX_USER_IDS = os.environ.get("SYSTEM_BUG_INBOX_USER_IDS", "").stri
 
 
 def prepare_database_url(raw: str) -> str:
-    """Normalise l'URL PostgreSQL pour SQLAlchemy/psycopg2 (Neon, Vercel, etc.)."""
+    """Normalise l'URL PostgreSQL pour SQLAlchemy/psycopg2 (Neon, Render, etc.)."""
     url = raw.strip()
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
@@ -93,12 +90,10 @@ def prepare_database_url(raw: str) -> str:
 
 
 def uploads_dir() -> Path:
-    """Répertoire des fichiers uploadés — /tmp sur Vercel (FS éphémère)."""
+    """Répertoire des fichiers uploadés (disque local ; prod = R2)."""
     override = os.environ.get("UPLOADS_DIR", "").strip()
     if override:
         return Path(override)
-    if IS_VERCEL:
-        return Path("/tmp/super_uploads")
     return _BACKEND_DIR / "uploads"
 
 
@@ -113,8 +108,6 @@ _R2_ENDPOINT_RAW = os.environ.get("R2_ENDPOINT", "").strip().rstrip("/")
 R2_ENDPOINT = _R2_ENDPOINT_RAW or (
     f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else ""
 )
-# Token Blob Vercel ignoré (env / tests hérités).
-BLOB_READ_WRITE_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN", "").strip()
 MEDIA_RETENTION_HOURS = int(os.environ.get("MEDIA_RETENTION_HOURS", "24"))
 MEDIA_PHOTO_MAX_EDGE_PX = int(os.environ.get("MEDIA_PHOTO_MAX_EDGE_PX", "1280"))
 MEDIA_PHOTO_QUALITY = int(os.environ.get("MEDIA_PHOTO_QUALITY", "65"))
@@ -146,7 +139,7 @@ def assert_secure_runtime_config() -> None:
         return
     if SECRET_KEY == _DEFAULT_SECRET or len(SECRET_KEY) < 24:
         raise RuntimeError(
-            "SECRET_KEY must be set to a strong value in production/Vercel "
+            "SECRET_KEY must be set to a strong value in production "
             "(min 24 chars, not the default)."
         )
     if not object_storage_enabled():

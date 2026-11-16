@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Box, TextField, Typography } from "@mui/material";
 import MediaCaptureActions from "../media/MediaCaptureActions";
 import ExampleFileButton from "./ExampleFileButton";
+import GuideVideoField from "./GuideVideoField";
 import { he } from "../../i18n/he";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { mediaUrl } from "../../utils/mediaUrl";
@@ -18,6 +19,8 @@ export default function VisualRequirementCard({
   onTitle,
   onHint,
   onExample,
+  onGuideVideo,
+  onGuideVideoClear,
   onSeconds,
   onSecondsCommit,
 }: {
@@ -26,6 +29,8 @@ export default function VisualRequirementCard({
   onTitle: (title: string) => void;
   onHint: (hint: string) => void;
   onExample: (url: string, file: File | null) => void;
+  onGuideVideo: (url: string, file: File) => void;
+  onGuideVideoClear: () => void;
   onSeconds: (value: string) => void;
   onSecondsCommit: () => void;
 }) {
@@ -64,12 +69,20 @@ export default function VisualRequirementCard({
         />
       )}
       {req.kind !== "audio" && req.kind !== "message" && (
-        <ExamplePhotoField
-          title={req.title}
-          exampleSrc={exampleSrc}
-          disabled={disabled}
-          onExample={onExample}
-        />
+        <>
+          <GuideVideoField
+            url={req.guide_video_url}
+            disabled={disabled}
+            onPick={(file) => onGuideVideo(URL.createObjectURL(file), file)}
+            onClear={onGuideVideoClear}
+          />
+          <ExamplePhotoField
+            title={req.title}
+            exampleSrc={exampleSrc}
+            disabled={disabled}
+            onExample={onExample}
+          />
+        </>
       )}
     </>
   );

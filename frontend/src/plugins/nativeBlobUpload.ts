@@ -15,7 +15,7 @@ type NativeBlobUploadPlugin = {
 
 const NativeBlobUpload = registerPlugin<NativeBlobUploadPlugin>("NativeBlobUpload");
 
-/** PUT OkHttp vers l’URL présignée Cloudflare R2 (pas Vercel Blob). */
+/** PUT OkHttp vers l’URL présignée Cloudflare R2. */
 export function canUseNativeBlobUpload(): boolean {
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";

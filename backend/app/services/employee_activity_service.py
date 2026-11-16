@@ -220,3 +220,12 @@ class EmployeeActivityService:
             )
         )
         return bool(self._db.execute(stmt).scalar())
+
+
+def bind_employee_activity(db) -> EmployeeActivityService:
+    return EmployeeActivityService(
+        UserRepository(db),
+        TaskOccurrenceRepository(db),
+        NotificationRepository(db),
+        EmployeeBreakRepository(db),
+    )

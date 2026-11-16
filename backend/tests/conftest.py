@@ -10,6 +10,5 @@ for _key in (
     "R2_BUCKET",
     "R2_ACCOUNT_ID",
     "R2_ENDPOINT",
-    "BLOB_READ_WRITE_TOKEN",
 ):
     os.environ[_key] = ""

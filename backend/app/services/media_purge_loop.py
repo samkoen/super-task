@@ -1,4 +1,4 @@
-"""Ménage des médias sans cron Vercel : au réveil de l'API, puis chaque heure."""
+"""Ménage des médias : au réveil de l'API, puis chaque heure."""
 from __future__ import annotations
 
 import asyncio

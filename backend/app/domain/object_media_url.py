@@ -1,4 +1,4 @@
-"""URLs média : R2, Blob Vercel héritage, /uploads local."""
+"""URLs média : R2, anciennes URLs Blob ignorées, /uploads local."""
 from __future__ import annotations
 
 from dataclasses import dataclass

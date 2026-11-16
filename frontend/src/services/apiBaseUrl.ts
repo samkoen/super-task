@@ -16,7 +16,7 @@ export function resolveApiBaseUrl(
   const origin =
     options?.origin ?? (typeof window !== "undefined" ? window.location.origin : "");
 
-  // Navigateur local : toujours le backend local via proxy Vite (ignorer Vercel du .env).
+  // Navigateur local : toujours le backend local via proxy Vite (ignorer VITE_API_URL de prod).
   if (!isNative && isLocalDevOrigin(origin)) {
     return "/api";
   }

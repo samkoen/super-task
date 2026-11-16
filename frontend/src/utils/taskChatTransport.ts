@@ -19,12 +19,18 @@ export function asTaskChatPage(data: unknown): { messages: ChatMessageView[]; ha
 export function createTaskChatTransport(opts: {
   occurrenceId: string;
   onPosted?: (status: string, notice?: string) => void;
+  /** Étape choisie au moment de l'envoi (FLOW 1) ; null/absent = général. */
+  getSlotIndex?: () => number | null;
 }): ChatTransport {
   return {
     list: async (before) => asTaskChatPage(await taskService.listMessages(opts.occurrenceId, { before })),
-    send: async (payload) => postTaskChat(opts.occurrenceId, payload, opts.onPosted),
+    send: async (payload) => postTaskChat(opts.occurrenceId, withSlot(payload, opts.getSlotIndex?.()), opts.onPosted),
     upload: (file, kind) => uploadChatMedia(taskService, file, kind),
   };
+}
+
+export function withSlot(payload: ChatSendPayload, slotIndex: number | null | undefined): ChatSendPayload {
+  return typeof slotIndex === "number" ? { ...payload, slot_index: slotIndex } : payload;
 }
 
 async function postTaskChat(
