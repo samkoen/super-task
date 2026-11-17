@@ -129,6 +129,10 @@ function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): Slot
     status: entry.status === "failed" ? "failed" : "queued",
     capturedAt: entry.capturedAt,
     durationSeconds: entry.durationSeconds,
+    lightOk: entry.lightOk ?? null,
+    location: entry.location ?? null,
+    // La prise est encore sur l'appareil : elle reste visible (vignette, carte) en attendant l'envoi.
+    previewUrl: state.previewUrl ?? previewOf(entry),
     error: entry.lastError ?? null,
   };
 }

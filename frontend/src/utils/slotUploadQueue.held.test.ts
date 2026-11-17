@@ -136,3 +136,15 @@ describe("draft takes (filmed, not confirmed yet)", () => {
     expect(states[1].status).toBe("ready");
   });
 });
+
+describe("a take whose send failed or waits for the network", () => {
+  it("keeps its preview after a reload", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:kept");
+    const { queue } = makeQueue();
+    const waiting = await queue.enqueue(item(0));
+    const states = slotStatesFromCompletion([{ kind: "video" }], null as never, [{ ...waiting, status: "failed", lastError: "x" }]);
+    expect(states[0]).toMatchObject({ status: "failed", previewUrl: "blob:kept", error: "x" });
+    const queued = slotStatesFromCompletion([{ kind: "video" }], null as never, [waiting]);
+    expect(queued[0]).toMatchObject({ status: "queued", previewUrl: "blob:kept" });
+  });
+});

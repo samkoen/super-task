@@ -4,7 +4,7 @@ import type { CompletionRequirement } from "../utils/completionMedia";
 import type { CaptureLocation } from "../utils/geoCheck";
 import { getCurrentLocation } from "../utils/geoPosition";
 import type { TrimRange } from "../utils/flowTrim";
-import { getSlotUploadQueue } from "../utils/slotSender";
+import { getSlotUploadQueue, submitSlotStarting } from "../utils/slotSender";
 import { skipAttachment, type SkipDraft } from "../utils/slotSkip";
 import { trimVideo, type TrimResult } from "../utils/videoTrim";
 import { slotQueueId, type QueuedSlot, type SlotUploadQueue } from "../utils/slotUploadQueue";
@@ -309,7 +309,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
     async (index: number, text: string) => {
       setStates((prev) => prev.map((s, i) => (i === index ? { ...s, status: "uploading" } : s)));
       try {
-        const response = await taskService.submitSlot(occurrenceId, index, { kind: "message", text });
+        const response = await submitSlotStarting(occurrenceId, index, { kind: "message", text });
         setStates((prev) =>
           prev.map((s, i) => (i === index ? { ...s, status: "sent", text, sentAt: new Date().toISOString() } : s)),
         );
@@ -344,7 +344,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       try {
         const audioUrl = reason.audio ? (await taskService.uploadAudio(reason.audio)).url : reason.audioUrl ?? null;
         const attachment = skipAttachment(requirements[index].kind, reason, audioUrl);
-        const response = await taskService.submitSlot(occurrenceId, index, attachment);
+        const response = await submitSlotStarting(occurrenceId, index, attachment);
         setStates((prev) => markSkipSent(prev, index, audioUrl));
         callbacks.current.onSent?.(index, response);
       } catch (error) {

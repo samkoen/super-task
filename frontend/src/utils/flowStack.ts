@@ -19,9 +19,14 @@ export function canRevisit(state: SlotUiState | undefined): boolean {
   return state?.status === "ready" || (state?.status === "skipped" && !state.skip?.sent);
 }
 
-/** Prise confirmée sur l'appareil : la carte montre le média, plus « לא ניתן לצלם ». */
+/**
+ * Prise confirmée sur l'appareil, ou dont l'envoi a échoué : la carte montre le média (rien n'est perdu),
+ * plus « לא ניתן לצלם ».
+ */
 export function isKeptCapture(state: SlotUiState | undefined): boolean {
-  return Boolean(state && state.status === "ready" && state.kind !== "message");
+  if (!state || state.kind === "message") return false;
+  if (state.status === "ready") return true;
+  return state.status === "failed" && Boolean(state.previewUrl || state.url);
 }
 
 export function resolveActive(states: SlotUiState[], preferred: number | null): number | null {

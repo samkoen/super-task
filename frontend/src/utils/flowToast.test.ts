@@ -25,6 +25,10 @@ describe("flowToastContent", () => {
     expect(flowToastContent({ kind: "keptOffline", remaining: 0, mediaKind: "photo" }).title).toBe(he.flowToastSavedOnDevicePhoto);
   });
 
+  it("a failure says why when the server gave a reason", () => {
+    expect(flowToastContent({ kind: "failed", remaining: 0, reason: "המשימה כבר נסגרה" }).subtitle).toBe("המשימה כבר נסגרה");
+  });
+
   it("flags a failure", () => {
     expect(flowToastContent({ kind: "failed", remaining: 1 }).tone).toBe("error");
   });

@@ -8,7 +8,13 @@ import type { CompletionRequirement } from "./completionMedia";
  */
 export type FlowToastKind = "kept" | "keptOffline" | "failed";
 
-export type FlowToastState = { kind: FlowToastKind; remaining: number; mediaKind?: CompletionRequirement["kind"] };
+export type FlowToastState = {
+  kind: FlowToastKind;
+  remaining: number;
+  mediaKind?: CompletionRequirement["kind"];
+  /** Raison donnée par le serveur quand l'envoi est refusé. */
+  reason?: string;
+};
 
 export type FlowToastContent = { title: string; subtitle: string; tone: "success" | "pending" | "error" };
 
@@ -20,7 +26,7 @@ function savedOnDeviceText(kind: CompletionRequirement["kind"] | undefined): str
 }
 
 export function flowToastContent(toast: FlowToastState): FlowToastContent {
-  if (toast.kind === "failed") return { title: he.flowToastFailed, subtitle: "", tone: "error" };
+  if (toast.kind === "failed") return { title: he.flowToastFailed, subtitle: toast.reason?.trim() || "", tone: "error" };
   if (toast.kind === "keptOffline") return { title: savedOnDeviceText(toast.mediaKind), subtitle: "", tone: "pending" };
   if (toast.remaining <= 0) return { title: he.flowToastKept, subtitle: he.flowToastAllReady, tone: "success" };
   return { title: he.flowToastKept, subtitle: he.flowToastRemaining(toast.remaining), tone: "success" };

@@ -8,7 +8,10 @@ import { createMemorySlotStorage, createSlotUploadQueue } from "../../utils/slot
 const send = vi.fn();
 let queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: (e) => send(e), isOnline: () => true });
 
-vi.mock("../../utils/slotSender", () => ({ getSlotUploadQueue: () => queue }));
+vi.mock("../../utils/slotSender", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils/slotSender")>()),
+  getSlotUploadQueue: () => queue,
+}));
 vi.mock("../../services/taskService", () => ({ taskService: { submitSlot: vi.fn() } }));
 vi.mock("../notifications/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
 vi.mock("./FlowTaskChat", () => ({

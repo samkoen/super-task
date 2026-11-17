@@ -119,10 +119,11 @@ export function createDefaultSlotStorage(): SlotQueueStorage {
 /** Réseau coupé ou serveur indisponible : on garde le fichier et on retentera. */
 export function isRetryableSlotError(error: unknown): boolean {
   if (isFetchInterruptedError(error)) return true;
-  const row = error as { code?: string; message?: string; response?: { status?: number } } | null;
+  const row = error as { code?: string; message?: string; status?: number; response?: { status?: number } } | null;
   if (row?.message && isRequestTimeoutText(row.message)) return true;
   if (row?.code === "ERR_NETWORK" || row?.code === "ECONNABORTED") return true;
-  const status = row?.response?.status;
+  // L'intercepteur d'API rejette un `ApiError` qui porte le statut HTTP directement (500 sans réponse = réseau coupé).
+  const status = row?.response?.status ?? (typeof row?.status === "number" ? row.status : undefined);
   if (status === undefined) return typeof row === "object" && row !== null && "isAxiosError" in row;
   return status >= 500 || status === 408 || status === 429;
 }

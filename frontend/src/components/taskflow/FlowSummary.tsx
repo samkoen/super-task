@@ -96,6 +96,11 @@ function Row({ row, onFilmNow }: { row: SummaryRow; onFilmNow?: (index: number) 
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography sx={{ ...flowText.button, color: flowColor.neutral900, overflowWrap: "anywhere" }}>{row.title}</Typography>
         {row.skipped || row.notYet ? caption : null}
+        {row.errorText ? (
+          <Typography data-testid="flow-summary-error" sx={{ ...flowText.caption, color: flowColor.alphaNeutral900_66, overflowWrap: "anywhere" }}>
+            {row.errorText}
+          </Typography>
+        ) : null}
       </Box>
       {row.skipped || row.notYet ? null : caption}
       {row.canFilmNow && onFilmNow ? <FilmNowButton onClick={() => onFilmNow(row.index)} /> : null}

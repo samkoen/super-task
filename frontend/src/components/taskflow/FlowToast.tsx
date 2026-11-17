@@ -50,7 +50,7 @@ export default function FlowToast({ toast, onClose, durationMs = TOAST_MS }: Pro
         <Box sx={{ width: 28, height: 28, display: "grid", placeItems: "center", borderRadius: "50%", bgcolor: style.bg, flexShrink: 0 }}>
           <style.Icon sx={{ fontSize: 18, color: style.fg }} />
         </Box>
-        <Typography component="p" sx={{ ...flowText.button, whiteSpace: "nowrap" }}>
+        <Typography component="p" sx={{ ...flowText.button, maxWidth: "calc(100vw - 96px)", overflowWrap: "anywhere" }}>
           <span data-testid="flow-toast-title">{content?.title}</span>
           {content?.subtitle ? (
             <>

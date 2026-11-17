@@ -30,7 +30,7 @@ export function useTaskFlow(options: TaskFlowOptions) {
     ...uploadOptions,
     onSent: (_index, response) => onServerUpdate?.(response),
     onFailed: (_index, message) => {
-      setToast({ kind: "failed", remaining: 0 });
+      setToast({ kind: "failed", remaining: 0, reason: message });
       onError?.(message || he.flowToastFailed);
     },
   });
