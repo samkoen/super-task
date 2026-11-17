@@ -46,13 +46,13 @@ import EmployeeHomeHeader from "../../components/employee/EmployeeHomeHeader";
 import EmployeeAvatarCapture from "../../components/employee/EmployeeAvatarCapture";
 import EmployeePunchDoor from "../../components/employee/EmployeePunchDoor";
 import EmployeeFinishedTaskSections from "../../components/employee/EmployeeFinishedTaskSections";
-import EmployeeTimeline from "../../components/employee/EmployeeTimeline";
 import EmployeeManagerWaitingSection from "../../components/employee/EmployeeManagerWaitingSection";
-import EmployeeAllDone from "../../components/employee/EmployeeAllDone";
-import { pickNextTask } from "../../utils/employeeNextTask";
-import { orderTimelineTasks } from "../../utils/employeeTimeline";
+import TodayTasksScreen from "../../components/todaytasks/TodayTasksScreen";
 import { useEmployeePunchDoor } from "../../hooks/useEmployeePunchDoor";
 import { usePublishEmployeeStartDoor } from "../../hooks/useEmployeeStartDoorOpen";
+import { usePublishEmployeeTodayScreen } from "../../hooks/useEmployeeTodayScreen";
+import { flowText } from "../../styles/flowTokens";
+import { isTodayTaskDone } from "../../utils/todayPeriods";
 import { excludeAttendancePunch } from "../../utils/punchDoor";
 import type { EmployeeLanguage } from "../../domain/employeeLanguages";
 import { he } from "../../i18n/he";
@@ -97,37 +97,6 @@ function jobLabel(jobFunction: string | null | undefined): string {
   return labels[jobFunction] ?? jobFunction;
 }
 
-function EmployeeOpenWorkLists({
-  punchEnd,
-  onRequestEnd,
-  openCount,
-  workLists,
-  onOpen,
-}: {
-  punchEnd: EmployeeTaskCard | null | undefined;
-  onRequestEnd: () => void;
-  openCount: number;
-  workLists: { dynamic: EmployeeTaskCard[]; routine: EmployeeTaskCard[] };
-  onOpen: (task: EmployeeTaskCard) => void;
-}) {
-  const entries = orderTimelineTasks(workLists, pickNextTask(workLists));
-  return (
-    <>
-      {openCount === 0 ? <EmployeeAllDone /> : null}
-      <EmployeeTimeline entries={entries} onOpen={onOpen} />
-      {punchEnd ? (
-        <Button
-          size="small"
-          color="inherit"
-          onClick={onRequestEnd}
-          sx={{ mb: 2, alignSelf: "center", color: "text.secondary", fontWeight: 700 }}
-        >
-          {he.punchEndShift}
-        </Button>
-      ) : null}
-    </>
-  );
-}
 
 async function submitEmployeeCompletion(opts: {
   taskId: string;
@@ -246,6 +215,7 @@ function toEmployeeCard(task: TaskOccurrence): EmployeeTaskCard {
     is_work_start: task.is_work_start,
     is_work_end: task.is_work_end,
     start_url: task.start_url ?? null,
+    duration_minutes: task.duration_minutes ?? null,
     reference_photo_url: task.reference_photo_url ?? null,
     reference_video_url: task.reference_video_url ?? null,
     reference_audio_url: task.reference_audio_url ?? null,
@@ -725,11 +695,32 @@ export default function EmployeeTasksPage() {
     .filter(Boolean)
     .join(" · ");
   const startDoorOpen = Boolean(punch.showStart && punch.start);
+  const endDoorOpen = Boolean(punch.showEnd && punch.end);
   usePublishEmployeeStartDoor(startDoorOpen);
-  const showShiftHeader = !startDoorOpen && !(loading && !dashboard);
+  /** FLOW 2 · écran 01 : toutes les tâches du jour (faites ou non) rangées par moment de la journée. */
+  const showTodayScreen = !startDoorOpen && !endDoorOpen;
+  usePublishEmployeeTodayScreen(showTodayScreen);
+  const todayScreenTasks = useMemo(
+    () => {
+      const pool = collectUniqueTasks([
+        inProgressTasks,
+        awaitingResponseTasks,
+        urgentTasks,
+        todayTasks,
+        dashboard?.manager_waiting_tasks ?? [],
+        pendingReviewTasks,
+        completedTasks,
+      ]);
+      // Pointages ouverts : ils ont leur propre porte ; une fois envoyés, ils restent visibles (cochés).
+      const notPunch = new Set(excludeAttendancePunch(pool).map((task) => task.id));
+      return pool.filter((task) => notPunch.has(task.id) || isTodayTaskDone(task.status));
+    },
+    [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, dashboard?.manager_waiting_tasks, pendingReviewTasks, completedTasks],
+  );
+  const showShiftHeader = !startDoorOpen && !showTodayScreen && !(loading && !dashboard);
 
   return (
-    <Box sx={{ maxWidth: 760, mx: "auto", px: { xs: 1, sm: 2 } }}>
+    <Box sx={showTodayScreen ? undefined : { maxWidth: 760, mx: "auto", px: { xs: 1, sm: 2 } }}>
       {showShiftHeader ? (
         <EmployeeHomeHeader
           dateLabel={todayLabel}
@@ -759,11 +750,40 @@ export default function EmployeeTasksPage() {
         onCapture={handleAvatarCapture}
       />
 
-      {translatingTasks && (
+      {translatingTasks && !showTodayScreen && (
         <Alert severity="info" sx={{ mb: 2 }}>{he.taskTranslating}</Alert>
       )}
 
-      {loading ? (
+      {showTodayScreen ? (
+        <TodayTasksScreen
+          tasks={loading && !dashboard ? [] : todayScreenTasks}
+          loading={loading && !dashboard}
+          employeeName={headerName}
+          photoUrl={photoUrl}
+          onOpenTask={(task) => openWorkTask(task)}
+          onOpenTaskChat={(task) => openWorkTask(task, true)}
+          onOpenChats={() => navigate("/employee/chats")}
+          onOpenAccount={() => navigate("/employee/account")}
+          footer={
+            <>
+              {translatingTasks ? <Alert severity="info">{he.taskTranslating}</Alert> : null}
+              {punch.end ? (
+                <Button
+                  size="small"
+                  color="inherit"
+                  data-testid="today-end-shift"
+                  onClick={() => {
+                    if (punch.end) openDetail(punch.end);
+                  }}
+                  sx={{ ...flowText.button, alignSelf: "center", color: "text.secondary" }}
+                >
+                  {he.punchEndShift}
+                </Button>
+              ) : null}
+            </>
+          }
+        />
+      ) : loading ? (
         <ListSkeleton variant="table" rows={5} />
       ) : (
         <>
@@ -792,21 +812,7 @@ export default function EmployeeTasksPage() {
                 }}
               />
             </>
-          ) : (
-            <>
-              {managerWaiting}
-              <EmployeeOpenWorkLists
-                punchEnd={punch.end}
-                onRequestEnd={() => {
-                  if (punch.end) openDetail(punch.end);
-                }}
-                openCount={openCount}
-                workLists={workLists}
-                onOpen={openWorkTask}
-              />
-              {finishedSections}
-            </>
-          )}
+          ) : null}
         </>
       )}
 

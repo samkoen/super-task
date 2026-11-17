@@ -36,6 +36,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useEmployeeBreakMute } from "../../hooks/useEmployeeBreakMute";
 import { useEmployeeChatUnread } from "../../hooks/useEmployeeChatUnread";
 import { useEmployeeStartDoorOpen } from "../../hooks/useEmployeeStartDoorOpen";
+import { useEmployeeTodayScreen } from "../../hooks/useEmployeeTodayScreen";
 import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
 import { useNativeTaskChatAlerts } from "../../hooks/useNativeTaskChatAlerts";
@@ -124,6 +125,8 @@ function Layout() {
   const employeeAlertsOn = Boolean(user) && !loading && isEmployee;
   const breakMuted = useEmployeeBreakMute(employeeAlertsOn);
   const startDoorOpen = useEmployeeStartDoorOpen();
+  /** Écran 01 du FLOW 2 : il porte sa propre en-tête et sa propre barre du bas (Figma). */
+  const todayScreen = useEmployeeTodayScreen();
   const chatUnread = useEmployeeChatUnread(employeeAlertsOn, user?.role);
   useEmployeeNotificationSounds(employeeAlertsOn, breakMuted);
   useSlotAutoFlush(employeeAlertsOn);
@@ -327,6 +330,7 @@ function Layout() {
     return (
       <LivePullToRefresh>
       <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+        {!todayScreen && (
         <Box
           sx={{
             position: "sticky",
@@ -359,7 +363,8 @@ function Layout() {
             <EmployeeChromeMenu onLogout={handleLogout} chatUnread={chatUnread} />
           </Box>
         </Box>
-        {(user?.branches?.length ?? 0) >= 2 && (
+        )}
+        {!todayScreen && (user?.branches?.length ?? 0) >= 2 && (
           <Box
             sx={{
               px: { xs: 2, sm: 2.5 },
@@ -373,18 +378,22 @@ function Layout() {
         )}
         <Box
           component="main"
-          sx={{
-            px: { xs: 1.5, sm: 2.5 },
-            pt: { xs: 2, sm: 2.5 },
-            pb: startDoorOpen ? withSystemBottomInsetCss("24px") : employeeBottomContentPadCss(),
-            maxWidth: 960,
-            mx: "auto",
-          }}
+          sx={
+            todayScreen
+              ? { p: 0 }
+              : {
+                  px: { xs: 1.5, sm: 2.5 },
+                  pt: { xs: 2, sm: 2.5 },
+                  pb: startDoorOpen ? withSystemBottomInsetCss("24px") : employeeBottomContentPadCss(),
+                  maxWidth: 960,
+                  mx: "auto",
+                }
+          }
         >
           {shouldShowEmployeeBack(location.pathname, showBack) && <BackButton />}
           <OutletSuspense />
         </Box>
-        {!startDoorOpen && <EmployeeBottomNav />}
+        {!startDoorOpen && !todayScreen && <EmployeeBottomNav />}
         <ChatAlertBanner
           alert={chatAlerts.banner}
           onOpen={chatAlerts.open}

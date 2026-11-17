@@ -14,6 +14,8 @@ type Props = {
   /** Sans destination, l'icône reste affichée mais n'est pas cliquable. */
   onDocs?: () => void;
   onTeam?: () => void;
+  /** Distance au bas de l'écran : 18 px dans le FLOW 1, 31 px sur l'écran 01 du FLOW 2. */
+  bottomOffset?: number;
 };
 
 type TabProps = { label: string; testId: string; icon: string; onClick?: () => void };
@@ -55,7 +57,7 @@ function ActiveTab({ onClick }: { onClick: () => void }) {
  * Barre du bas du FLOW 1 (Figma « Bottom Nav », écrans 02 à 05 et 09) : pastille sombre
  * avec מסמכים · צוות · צ'אט · בית (actif), posée à 18 px du bas de l'écran.
  */
-export default function FlowBottomNav({ onHome, onChat, onDocs, onTeam }: Props) {
+export default function FlowBottomNav({ onHome, onChat, onDocs, onTeam, bottomOffset = 18 }: Props) {
   return (
     <Box
       component="nav"
@@ -65,7 +67,7 @@ export default function FlowBottomNav({ onHome, onChat, onDocs, onTeam }: Props)
         position: "fixed",
         left: 0,
         right: 0,
-        bottom: withSystemBottomInsetCss("18px"),
+        bottom: withSystemBottomInsetCss(`${bottomOffset}px`),
         display: "flex",
         justifyContent: "center",
         pointerEvents: "none",

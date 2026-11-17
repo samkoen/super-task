@@ -1281,6 +1281,18 @@ export const he = {
   flowNavTeam: "צוות",
   flowNavChat: "צ'אט",
   flowNavHome: "בית",
+  // FLOW 2 : écran 01 « המשימות להיום »
+  todayTasksTitle: "המשימות להיום",
+  todayPeriodTitles: { morning: "משימות בוקר", noon: "משימות צהריים", evening: "משימות ערב" },
+  todayPeriodCollapse: "קיפול הקבוצה",
+  todayPeriodExpand: "פתיחת הקבוצה",
+  todayTaskMore: "פעולות נוספות",
+  todayTaskOpen: "פתיחת המשימה",
+  todayTaskDone: "בוצעה",
+  todayTaskMinutes: (minutes: number) => `${minutes} דק׳`,
+  todayTasksEmpty: "אין משימות להיום",
+  todayTasksLoading: "טוען משימות…",
+  todayOpenAccount: "החשבון שלי",
   /** Coque menahel : pilule 4 onglets, rond « + », sheet « עוד ». */
   managerShellNavLabel: "ניווט ראשי",
   managerTabLabels: { tasks: "משימות", team: "צוות", chats: "שיחות", home: "בית" },

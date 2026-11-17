@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="3.2" height="12.8" viewBox="0 0 3.2 12.8" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="btn-more" clip-path="url(#clip0_0_220)">
+<circle id="dot" cx="1.6" cy="1.6" r="1.6" fill="#11151D"/>
+<circle id="dot_2" cx="1.6" cy="6.4" r="1.6" fill="#11151D"/>
+<circle id="dot_3" cx="1.6" cy="11.2" r="1.6" fill="#11151D"/>
+</g>
+<defs>
+<clipPath id="clip0_0_220">
+<rect width="3.2" height="12.8" fill="white"/>
+</clipPath>
+</defs>
+</svg>

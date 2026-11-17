@@ -4,6 +4,17 @@ import { MemoryRouter } from "react-router-dom";
 import EmployeeTasksPage from "./EmployeeTasksPage";
 import { he } from "../../i18n/he";
 import { dashboardService, type EmployeeDashboard, type EmployeeTaskCard } from "../../services/dashboardService";
+import { getEmployeeTodayScreen, setEmployeeTodayScreen } from "../../utils/employeeTodayScreenStore";
+import { within } from "@testing-library/react";
+
+/** Suite complète en parallèle : laisser au premier rendu le temps d'arriver. */
+const WAIT = { timeout: 5000 };
+
+/** Échéance du jour à l'heure locale (indépendant du fuseau de la machine de test). */
+function todayAt(hour: number, minute = 0): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute).toISOString();
+}
 
 vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
@@ -112,6 +123,116 @@ function renderPage() {
   );
 }
 
+describe("EmployeeTasksPage · FLOW 2 écran 01 (intégration dashboard → écran)", () => {
+  beforeEach(() => {
+    vi.mocked(dashboardService.getEmployee).mockReset();
+    setEmployeeTodayScreen(false);
+  });
+
+  it("shows the server duration under the title, and nothing when it is null", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        today_tasks: [
+          card({ id: "a", title: "בדיקת מלאי", due_at: todayAt(7, 30), duration_minutes: 15 }),
+          card({ id: "b", title: "סידור מדפים", due_at: todayAt(8), duration_minutes: null }),
+        ],
+      }),
+    );
+    renderPage();
+    const withDuration = (await screen.findByText("בדיקת מלאי", {}, WAIT)).closest("[data-testid='today-task-item']") as HTMLElement;
+    expect(within(withDuration).getByText(he.todayTaskMinutes(15))).toBeTruthy();
+    expect(within(withDuration).getByText("07:30")).toBeTruthy();
+    const without = screen.getByText("סידור מדפים").closest("[data-testid='today-task-item']") as HTMLElement;
+    expect(without.textContent).not.toContain("דק׳");
+  });
+
+  it("groups the dashboard tasks by moment of the day, done and open together", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        today_tasks: [
+          card({ id: "m", title: "משימת בוקר", due_at: todayAt(9) }),
+          card({ id: "e", title: "משימת ערב", due_at: todayAt(19) }),
+        ],
+        completed_tasks: [card({ id: "n", title: "משימת צהריים", due_at: todayAt(13), status: "completed" })],
+      }),
+    );
+    renderPage();
+    await screen.findByText("משימת בוקר", {}, WAIT);
+    expect(within(screen.getByTestId("today-period-tasks-morning")).getByText("משימת בוקר")).toBeTruthy();
+    expect(within(screen.getByTestId("today-period-tasks-noon")).getByText("משימת צהריים")).toBeTruthy();
+    expect(within(screen.getByTestId("today-period-tasks-evening")).getByText("משימת ערב")).toBeTruthy();
+    const order = Array.from(screen.getByTestId("today-periods").querySelectorAll("section")).map((s) => s.getAttribute("data-testid"));
+    expect(order).toEqual(["today-period-morning", "today-period-noon", "today-period-evening"]);
+  });
+
+  it("tells the Layout to hide its chrome while the screen is shown", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({ on_shift: true, today_tasks: [card({ id: "t", title: "מדף חלב" })] }),
+    );
+    const { unmount } = renderPage();
+    await screen.findByText("מדף חלב", {}, WAIT);
+    await waitFor(() => expect(getEmployeeTodayScreen()).toBe(true), WAIT);
+    unmount();
+    expect(getEmployeeTodayScreen()).toBe(false);
+  });
+
+  it("does not claim the screen while the start door is open", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({ today_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true })] }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("start-door", {}, WAIT)).toBeTruthy();
+    // Le signal est remis à false par un effet : il peut arriver juste après l'affichage de la porte.
+    await waitFor(() => expect(getEmployeeTodayScreen()).toBe(false), WAIT);
+    expect(screen.queryByTestId("today-tasks-screen")).toBeNull();
+  });
+
+  it("start-door day: during the first load nothing of the today screen is shown, then the door", async () => {
+    let resolve: (value: EmployeeDashboard) => void = () => undefined;
+    vi.mocked(dashboardService.getEmployee).mockReturnValue(
+      new Promise<EmployeeDashboard>((r) => {
+        resolve = r;
+      }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("today-tasks-loading", {}, WAIT)).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: he.todayTasksTitle })).toBeNull();
+    expect(screen.queryByTestId("flow-bottom-nav")).toBeNull();
+    resolve(dashboard({ today_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true })] }));
+    expect(await screen.findByTestId("start-door", {}, WAIT)).toBeTruthy();
+    expect(screen.queryByTestId("today-tasks-loading")).toBeNull();
+    expect(screen.queryByRole("heading", { name: he.todayTasksTitle })).toBeNull();
+    await waitFor(() => expect(getEmployeeTodayScreen()).toBe(false), WAIT);
+  });
+
+  it("normal day: the Layout chrome stays hidden from the first load to the loaded screen", async () => {
+    let resolve: (value: EmployeeDashboard) => void = () => undefined;
+    vi.mocked(dashboardService.getEmployee).mockReturnValue(
+      new Promise<EmployeeDashboard>((r) => {
+        resolve = r;
+      }),
+    );
+    renderPage();
+    await screen.findByTestId("today-tasks-loading", {}, WAIT);
+    await waitFor(() => expect(getEmployeeTodayScreen()).toBe(true), WAIT);
+    resolve(dashboard({ on_shift: true, today_tasks: [card({ id: "t", title: "מדף חלב" })] }));
+    expect(await screen.findByText("מדף חלב", {}, WAIT)).toBeTruthy();
+    expect(getEmployeeTodayScreen()).toBe(true);
+    expect(screen.getByTestId("flow-bottom-nav")).toBeTruthy();
+  });
+
+  it("opens the task flow from a row", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({ on_shift: true, today_tasks: [card({ id: "t", title: "מדף חלב", duration_minutes: 10 })] }),
+    );
+    renderPage();
+    fireEvent.click(await screen.findByText("מדף חלב", {}, WAIT));
+    expect(screen.getByText("detail:מדף חלב")).toBeTruthy();
+  });
+});
+
 describe("EmployeeTasksPage punch doors", () => {
   beforeEach(() => {
     vi.mocked(dashboardService.getEmployee).mockReset();
@@ -158,7 +279,7 @@ describe("EmployeeTasksPage punch doors", () => {
     await waitFor(() => expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy());
   });
 
-  it("keeps the list and lets the oved open the end door early", async () => {
+  it("shows the FLOW 2 today screen and lets the oved open the end door early", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
@@ -170,10 +291,10 @@ describe("EmployeeTasksPage punch doors", () => {
     );
     renderPage();
     expect(await screen.findByText("מדף חלב")).toBeTruthy();
-    expect(screen.getByTestId("employee-home-header")).toBeTruthy();
-    expect(screen.getByTestId("start-door-hero")).toBeTruthy();
-    expect(screen.getByTestId("employee-timeline")).toBeTruthy();
-    expect(screen.getByRole("button", { name: he.employeeBreakStart })).toBeTruthy();
+    expect(screen.getByTestId("today-tasks-screen")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: he.todayTasksTitle })).toBeTruthy();
+    expect(screen.queryByTestId("employee-home-header")).toBeNull();
+    expect(screen.queryByText("סיום משמרת", { selector: "[data-testid='today-task-title']" })).toBeNull();
     expect(screen.queryByText(he.punchClockOut)).toBeNull();
     expect(screen.queryByRole("button", { name: he.punchBackToTasks })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: he.punchEndShift }));
@@ -224,7 +345,7 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(await screen.findByText(he.punchClockOut)).toBeTruthy();
   });
 
-  it("counts a task waiting for menahel approval as done today", async () => {
+  it("shows a task waiting for menahel approval as done in its period", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
@@ -247,13 +368,12 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(
-      await screen.findByText(`${he.employeeProgressOf(1, 4)} ${he.employeeProgressDoneLabel}`),
-    ).toBeTruthy();
-    expect(screen.getByText("25%")).toBeTruthy();
+    const row = (await screen.findByText("מילוי מדף")).closest("[data-testid='today-task-item']");
+    expect(row?.getAttribute("data-state")).toBe("done");
+    expect(screen.getByText("מדף חלב").closest("[data-testid='today-task-item']")?.getAttribute("data-state")).toBe("pending");
   });
 
-  it("lets the oved open completed tasks without a bottom שיחה overlay", async () => {
+  it("lists completed tasks as done rows the oved can open", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
@@ -262,11 +382,10 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    const toggle = await screen.findByText(`${he.employeeShowCompleted} (1)`);
-    expect(screen.queryByRole("button", { name: he.directChatOpen })).toBeNull();
-    fireEvent.click(toggle);
-    expect(await screen.findByText("ניקוי רצפה")).toBeTruthy();
-    expect(screen.getByText(`${he.employeeHideCompleted} (1)`)).toBeTruthy();
+    const done = await screen.findByText("ניקוי רצפה");
+    expect(done.closest("[data-testid='today-task-item']")?.getAttribute("data-state")).toBe("done");
+    fireEvent.click(done);
+    expect(screen.getByText("detail:ניקוי רצפה")).toBeTruthy();
   });
 
   it("hides pending-review tasks while the start door is open", async () => {
@@ -299,7 +418,7 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(screen.queryByText("ניקוי רצפה")).toBeNull();
   });
 
-  it("shows a submitted clock-in in the finished list, not as a door", async () => {
+  it("shows a submitted clock-in as a done row, not as a door", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
@@ -310,14 +429,15 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(`${he.employeeShowCompleted} (2)`)).toBeTruthy();
+    const clockIn = await screen.findByText("פתיחת משמרת");
     expect(screen.queryByTestId("start-door")).toBeNull();
-    fireEvent.click(screen.getByText(`${he.employeeShowCompleted} (2)`));
-    fireEvent.click(screen.getByText("פתיחת משמרת"));
+    expect(clockIn.closest("[data-testid='today-task-item']")?.getAttribute("data-state")).toBe("done");
+    expect(screen.getByText("ניקוי רצפה")).toBeTruthy();
+    fireEvent.click(clockIn);
     expect(screen.getByText("detail:פתיחת משמרת")).toBeTruthy();
   });
 
-  it("keeps a manager-waiting task visible and opens its chat first", async () => {
+  it("keeps a manager-waiting task visible and opens its chat from the ⋮ menu", async () => {
     vi.mocked(dashboardService.getEmployee).mockResolvedValue(
       dashboard({
         on_shift: true,
@@ -333,11 +453,11 @@ describe("EmployeeTasksPage punch doors", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
-    expect(screen.getByText("תסתכל בתמונה")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: he.taskChatOpen }));
+    expect(await screen.findByText("ניקוי מדף")).toBeTruthy();
+    expect(screen.getAllByTestId("today-task-item")).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("today-task-more"));
+    fireEvent.click(await screen.findByTestId("today-task-menu-chat"));
     expect(screen.getByText("chat-first")).toBeTruthy();
-    expect(screen.getByText(`${he.employeeManagerWaiting} (1)`)).toBeTruthy();
   });
 
   it("hides manager waiting while the clock-in door is open", async () => {

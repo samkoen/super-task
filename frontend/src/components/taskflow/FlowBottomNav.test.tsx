@@ -22,6 +22,14 @@ describe("FlowBottomNav", () => {
     expect(onChat).toHaveBeenCalledTimes(1);
   });
 
+  it("sits 18 px from the bottom by default and accepts the FLOW 2 offset (31 px)", () => {
+    const { unmount } = render(<FlowBottomNav onHome={vi.fn()} onChat={vi.fn()} />);
+    expect(getComputedStyle(screen.getByTestId("flow-bottom-nav")).bottom).toContain("18px");
+    unmount();
+    render(<FlowBottomNav onHome={vi.fn()} onChat={vi.fn()} bottomOffset={31} />);
+    expect(getComputedStyle(screen.getByTestId("flow-bottom-nav")).bottom).toContain("31px");
+  });
+
   it("keeps docs and team visible but inert when they have no destination", () => {
     render(<FlowBottomNav onHome={vi.fn()} onChat={vi.fn()} />);
     expect((screen.getByTestId("flow-nav-docs") as HTMLButtonElement).disabled).toBe(true);
