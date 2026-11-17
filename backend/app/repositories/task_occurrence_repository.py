@@ -233,6 +233,7 @@ class TaskOccurrenceRepository:
         is_work_end: bool = False,
         start_url: str | None = None,
         network_group_id: str | None = None,
+        duration_minutes: int | None = None,
     ) -> TaskOccurrence:
         import uuid
 
@@ -254,6 +255,7 @@ class TaskOccurrenceRepository:
             is_work_start=bool(is_work_start),
             is_work_end=bool(is_work_end),
             start_url=(start_url or "").strip() or None,
+            duration_minutes=duration_minutes,
             network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             manager_user_id=mp.parse_uuid(manager_user_id) if manager_user_id else None,
             photo_required=photo_required,
@@ -400,6 +402,14 @@ class TaskOccurrenceRepository:
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 
+    def update_duration_minutes(self, id_: str, duration_minutes: int | None) -> TaskOccurrence | None:
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.duration_minutes = duration_minutes
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
     def update_work_flags(
         self, id_: str, *, is_work_start: bool, is_work_end: bool
     ) -> TaskOccurrence | None:
@@ -432,6 +442,8 @@ class TaskOccurrenceRepository:
         update_completion_requirements: bool = False,
         start_url: str | None = None,
         update_start_url: bool = False,
+        duration_minutes: int | None = None,
+        update_duration_minutes: bool = False,
     ) -> TaskOccurrence | None:
         row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
         if not row:
@@ -454,6 +466,8 @@ class TaskOccurrenceRepository:
             row.reference_audio_url = (reference_audio_url or "").strip() or None
         if update_start_url:
             row.start_url = (start_url or "").strip() or None
+        if update_duration_minutes:
+            row.duration_minutes = duration_minutes
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

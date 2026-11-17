@@ -868,6 +868,7 @@ class DashboardService:
             "is_work_start": task.is_work_start,
             "is_work_end": bool(getattr(task, "is_work_end", False)),
             "start_url": getattr(task, "start_url", None),
+            "duration_minutes": getattr(task, "duration_minutes", None),
             "reference_photo_url": task.reference_photo_url,
             "reference_video_url": task.reference_video_url,
             "reference_audio_url": task.reference_audio_url,

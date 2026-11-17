@@ -46,6 +46,7 @@ def merge_template_network_payload(existing, payload: dict, sibling) -> dict:
     _overlay_media_urls(merged, existing, sibling, payload)
     _overlay_ops(merged, existing, sibling, payload)
     _overlay_start_url(merged, existing, sibling, payload)
+    _overlay_duration(merged, existing, sibling, payload)
     _overlay_completion(merged, existing, sibling, payload)
     _overlay_photo_required(merged, existing, sibling, payload)
     return merged
@@ -59,6 +60,7 @@ def merge_occurrence_network_details(existing, details: dict, sibling) -> dict:
         merged["due_at"] = _as_due(sibling.due_at)
     _overlay_occurrence_media(merged, existing, sibling, details)
     _overlay_start_url(merged, existing, sibling, details)
+    _overlay_duration(merged, existing, sibling, details)
     _overlay_completion(merged, existing, sibling, details)
     _overlay_photo_required(merged, existing, sibling, details)
     return merged
@@ -100,6 +102,16 @@ def _overlay_start_url(merged, existing, sibling, incoming: dict) -> None:
     if _url(incoming.get("start_url")) == _url(getattr(existing, "start_url", None)):
         merged["start_url"] = sibling.start_url
         merged["update_start_url"] = False
+
+
+def _overlay_duration(merged, existing, sibling, incoming: dict) -> None:
+    """Durée (minutes) : chaque snif garde la sienne, sauf si elle a vraiment changé."""
+    keep_sibling = not incoming.get("update_duration_minutes") or incoming.get(
+        "duration_minutes"
+    ) == getattr(existing, "duration_minutes", None)
+    if keep_sibling:
+        merged["duration_minutes"] = getattr(sibling, "duration_minutes", None)
+        merged["update_duration_minutes"] = False
 
 
 def _overlay_occurrence_media(merged, existing, sibling, details: dict) -> None:

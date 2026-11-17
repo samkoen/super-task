@@ -300,6 +300,7 @@ def task_template_orm_to_domain(row: orm.TaskTemplate | None) -> TaskTemplate | 
         is_work_start=bool(getattr(row, "is_work_start", False)),
         is_work_end=bool(getattr(row, "is_work_end", False)),
         start_url=getattr(row, "start_url", None),
+        duration_minutes=getattr(row, "duration_minutes", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
         ),
@@ -371,6 +372,7 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         is_work_start=bool(getattr(row, "is_work_start", False)),
         is_work_end=bool(getattr(row, "is_work_end", False)),
         start_url=getattr(row, "start_url", None),
+        duration_minutes=getattr(row, "duration_minutes", None),
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
         ),

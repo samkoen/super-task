@@ -130,6 +130,7 @@ class TaskTemplateRepository:
         is_work_end: bool = False,
         start_url: str | None = None,
         network_group_id: str | None = None,
+        duration_minutes: int | None = None,
     ) -> TaskTemplate:
         import uuid
 
@@ -151,6 +152,7 @@ class TaskTemplateRepository:
             is_work_start=bool(is_work_start),
             is_work_end=bool(is_work_end),
             start_url=(start_url or "").strip() or None,
+            duration_minutes=duration_minutes,
             network_group_id=mp.parse_uuid(network_group_id) if network_group_id else None,
             photo_required=photo_required,
             reference_photo_url=(reference_photo_url or "").strip() or None,
@@ -194,6 +196,8 @@ class TaskTemplateRepository:
         is_work_end: bool | None = None,
         start_url: str | None = None,
         update_start_url: bool = False,
+        duration_minutes: int | None = None,
+        update_duration_minutes: bool = False,
     ) -> TaskTemplate | None:
         row = self._db.get(orm.TaskTemplate, mp.parse_uuid(id_))
         if not row:
@@ -219,6 +223,8 @@ class TaskTemplateRepository:
             row.is_work_end = bool(is_work_end)
         if update_start_url:
             row.start_url = (start_url or "").strip() or None
+        if update_duration_minutes:
+            row.duration_minutes = duration_minutes
         if reference_photo_url is not None:
             row.reference_photo_url = reference_photo_url.strip() or None
         if reference_video_url is not None:

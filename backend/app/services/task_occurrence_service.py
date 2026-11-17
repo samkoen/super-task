@@ -52,6 +52,7 @@ from app.domain.task_completion_submit import (
 from app.domain.task_translation_source import task_source_language
 from app.domain.scope import ActorContext
 from app.domain.start_url import normalize_start_url
+from app.domain.task_duration import normalize_duration_minutes
 from app.domain.task_chat_followup import parse_future_follow_up, status_after_chat_resolve
 from app.domain.task_kind import AD_HOC
 from app.domain.task_assignment import can_assign_user_to_branch
@@ -263,6 +264,7 @@ class TaskOccurrenceService:
         start_url: str | None = None,
         network_group_id: str | None = None,
         self_claim: bool = False,
+        duration_minutes: object | None = None,
     ) -> dict:
         self._assert_can_create_ad_hoc(
             actor, branch_id, assignee_user_id, self_claim=self_claim
@@ -307,6 +309,7 @@ class TaskOccurrenceService:
             source_gallery_item_id=gallery_id,
             start_url=normalize_start_url(start_url),
             network_group_id=network_group_id,
+            duration_minutes=normalize_duration_minutes(duration_minutes),
             **media_fields,
         )
         return self._to_api(occurrence, already_in_gallery=False)
@@ -399,6 +402,7 @@ class TaskOccurrenceService:
         source_gallery_item_id: str | None = None,
         start_url: str | None = None,
         branch_ids: list[str] | None = None,
+        duration_minutes: object | None = None,
     ) -> dict:
         """Duplique une מזדמנת (tous les snifim, ou une liste). 1er oved par snif."""
         if actor.role not in {roles.NETWORK_MANAGER, roles.ADMIN}:
@@ -427,6 +431,7 @@ class TaskOccurrenceService:
             source_gallery_item_id=source_gallery_item_id,
             start_url=start_url,
             network_group_id=group_id,
+            duration_minutes=normalize_duration_minutes(duration_minutes),
         )
         if not created:
             raise ValueError("לא נוצרו משימות — אין עובדים בסניפים")
@@ -1123,6 +1128,8 @@ class TaskOccurrenceService:
         start_url: str | None = None,
         update_start_url: bool = False,
         apply_to_network: bool = False,
+        duration_minutes: object | None = None,
+        update_duration_minutes: bool = False,
     ) -> dict:
         occurrence = self._require_editable_occurrence(actor, occurrence_id, title)
         parsed = datetime.fromisoformat(due_at)
@@ -1143,6 +1150,8 @@ class TaskOccurrenceService:
             reference_audio_url,
             start_url,
             update_start_url,
+            duration_minutes,
+            update_duration_minutes,
         )
         if apply_to_network and occurrence.task_kind == AD_HOC:
             return self._update_network_ad_hoc(actor, occurrence, details, assignee_user_id)
@@ -1174,6 +1183,7 @@ class TaskOccurrenceService:
         update_min_video_seconds, completion_requirements, update_completion_requirements,
         reference_photo_url, reference_video_url, reference_audio_url,
         start_url=None, update_start_url=False,
+        duration_minutes=None, update_duration_minutes=False,
     ) -> dict:
         media = TaskOccurrenceService._edit_media_fields(
             occurrence,
@@ -1202,6 +1212,10 @@ class TaskOccurrenceService:
             "update_reference_audio": reference_audio_url is not _UNSET,
             "start_url": normalize_start_url(start_url) if update_start_url else None,
             "update_start_url": update_start_url,
+            "duration_minutes": (
+                normalize_duration_minutes(duration_minutes) if update_duration_minutes else None
+            ),
+            "update_duration_minutes": update_duration_minutes,
         }
 
     @staticmethod
