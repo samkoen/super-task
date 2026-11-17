@@ -373,6 +373,7 @@ class DeliveryNoteService:
             photo_required=template.photo_required,
             min_video_seconds=getattr(template, "min_video_seconds", None),
             completion_requirements=getattr(template, "completion_requirements", None),
+            duration_minutes=getattr(template, "duration_minutes", None),
             created_by_id=template.created_by_id,
             ops_category=getattr(template, "ops_category", None),
         )
