@@ -50,6 +50,10 @@ type Filmed = {
   lightOk: boolean | null;
   /** GPS demandé à la capture ; attendu au plus quelques secondes avant l'envoi. */
   location: Promise<CaptureLocation | null>;
+  /** GPS une fois reçu : recopié dans la prise gardée sur disque. */
+  found?: CaptureLocation | null;
+  /** « אישור » donné : la copie disque devient `held`, on ne la réécrit plus en brouillon. */
+  confirmed?: boolean;
 };
 type FilmedFiles = Map<number, Filmed>;
 
@@ -85,6 +89,7 @@ function restoreDrafts(files: FilmedFiles, queued: QueuedSlot[]) {
       durationSeconds: entry.durationSeconds,
       lightOk: entry.lightOk ?? null,
       location: Promise.resolve(entry.location ?? null),
+      found: entry.location ?? null,
     });
   }
 }
@@ -174,8 +179,12 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       const kind = requirements[index]?.kind;
       if (!kind || !isMediaKind(kind)) return;
       const { file, capturedAt, durationSeconds, lightOk } = kept;
+      const id = slotQueueId(occurrenceId, index);
       void onDisk(index, () =>
-        queue.draft({ occurrenceId, slotIndex: index, kind, file, capturedAt, durationSeconds, lightOk, location: null }),
+        queue
+          .draft({ occurrenceId, slotIndex: index, kind, file, capturedAt, durationSeconds, lightOk, location: kept.found ?? null })
+          // Écriture impossible : l'ancienne prise de la case ne doit pas rester sur disque à sa place.
+          .catch(() => queue.dropHeld(id)),
       );
     },
     [queue, occurrenceId, requirements, onDisk],
@@ -205,7 +214,12 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         markFilmed(prev, index, { capturedAt, durationSeconds, lightOk, previewUrl: URL.createObjectURL(file) }),
       );
       void location.then((found) => {
-        if (files.current.get(index)?.location === location) setStates((prev) => withLocation(prev, index, found));
+        // Même prise (éventuellement coupée entre-temps) : le GPS rejoint la copie disque, puis l'écran.
+        const current = files.current.get(index);
+        if (current?.location !== location) return;
+        current.found = found;
+        if (!current.confirmed && found) saveDraft(index, current);
+        setStates((prev) => withLocation(prev, index, found));
       });
     },
     [setStates, locate, saveDraft],
@@ -256,11 +270,13 @@ export function useSlotUploads(options: SlotUploadsOptions) {
     async (index: number, kind: CompletionRequirement["kind"]) => {
       const kept = files.current.get(index);
       if (!kept || !isMediaKind(kind)) return;
-      const { location, ...media } = kept;
-      const found = await location;
+      const { file, capturedAt, durationSeconds, lightOk } = kept;
+      const found = await kept.location;
       // Refilmée pendant l'attente du GPS : la nouvelle prise est déjà sur disque, on ne l'écrase pas.
       if (files.current.get(index) !== kept) return;
-      await onDisk(index, () => queue.hold({ occurrenceId, slotIndex: index, kind, ...media, location: found }));
+      await onDisk(index, () =>
+        queue.hold({ occurrenceId, slotIndex: index, kind, file, capturedAt, durationSeconds, lightOk, location: found }),
+      );
     },
     [queue, occurrenceId, onDisk],
   );
@@ -274,6 +290,8 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       const cutting = trims.current.get(index);
       const job = (async () => {
         if (cutting) await cutting.catch(() => undefined);
+        const kept = files.current.get(index);
+        if (kept) kept.confirmed = true;
         setStates((prev) => markReady(prev, index, new Date().toISOString()));
         await holdOnDisk(index, requirements[index]?.kind ?? "message");
       })();
@@ -338,7 +356,11 @@ export function useSlotUploads(options: SlotUploadsOptions) {
     [occurrenceId, requirements, setStates, callbacks],
   );
 
-  /** Média confirmé → file d'envoi : depuis le disque, sinon (écriture disque échouée) depuis la mémoire. */
+  /**
+   * Média confirmé → file d'envoi. La prise en mémoire est celle que l'oved vient de valider : elle part
+   * en priorité (elle remplace toute copie disque plus ancienne). Après un rechargement, seule la copie
+   * disque existe : on la libère.
+   */
   const enqueueKept = useCallback(
     async (index: number, kind: CompletionRequirement["kind"]) => {
       if (!isMediaKind(kind)) return;
@@ -348,10 +370,13 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       holds.current.delete(index);
       const kept = files.current.get(index);
       files.current.delete(index);
-      if (await queue.release(slotQueueId(occurrenceId, index))) return;
-      if (!kept) return;
-      const { location, ...media } = kept;
-      await queue.enqueue({ occurrenceId, slotIndex: index, kind, ...media, location: await location });
+      if (!kept) {
+        await queue.release(slotQueueId(occurrenceId, index));
+        return;
+      }
+      const { file, capturedAt, durationSeconds, lightOk } = kept;
+      const location = await kept.location;
+      await queue.enqueue({ occurrenceId, slotIndex: index, kind, file, capturedAt, durationSeconds, lightOk, location });
     },
     [queue, occurrenceId],
   );

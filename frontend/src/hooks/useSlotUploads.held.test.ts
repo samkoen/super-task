@@ -174,4 +174,44 @@ describe("useSlotUploads: confirmed media survives a reload", () => {
     act(() => hook.result.current.discard(0));
     await waitFor(async () => expect(await storage.getAll()).toEqual([]));
   });
+
+  it("a new take replaces the confirmed one at send time, even when the disk refuses to store it", async () => {
+    const storage = createMemorySlotStorage();
+    const sentFiles: string[] = [];
+    const queue = createSlotUploadQueue({
+      storage,
+      send: async (entry) => {
+        sentFiles.push(entry.fileName);
+        return { task_submitted: false };
+      },
+      isOnline: () => true,
+    });
+    const hook = mount(queue);
+    act(() => hook.result.current.film(0, file("old.webm"), 9));
+    act(() => hook.result.current.keep(0));
+    await waitFor(async () => expect((await storage.getAll()).map((row) => row.status)).toEqual(["held"]));
+
+    vi.spyOn(queue, "draft").mockRejectedValue(new Error("quota"));
+    vi.spyOn(queue, "hold").mockRejectedValue(new Error("quota"));
+    act(() => hook.result.current.film(0, file("new.webm"), 8));
+    act(() => hook.result.current.keep(0));
+    await waitFor(async () => expect(await storage.getAll()).toEqual([]));
+    await act(async () => {
+      await hook.result.current.sendAll();
+    });
+    expect(sentFiles).toEqual(["new.webm"]);
+  });
+
+  it("the GPS found after filming is kept with the unconfirmed take and comes back after leaving the app", async () => {
+    const { queue, storage } = makeQueue();
+    const before = mount(queue);
+    act(() => before.result.current.film(0, file(), 7));
+    await waitFor(async () => expect((await storage.getAll())[0]?.location).toEqual({ lat: 32.1, lng: 34.8 }));
+    expect((await storage.getAll())[0].status).toBe("draft");
+    before.unmount();
+
+    const after = mount(queue);
+    await waitFor(() => expect(after.result.current.states[0].status).toBe("filmed"));
+    expect(after.result.current.states[0].location).toEqual({ lat: 32.1, lng: 34.8 });
+  });
 });
