@@ -47,6 +47,7 @@ type Filmed = {
   file: File;
   capturedAt: string;
   durationSeconds: number | null;
+  lightOk: boolean | null;
   /** GPS demandé à la capture ; attendu au plus quelques secondes avant l'envoi. */
   location: Promise<CaptureLocation | null>;
 };
@@ -73,12 +74,30 @@ async function withoutDelivered(
   return queued.filter((entry) => known[entry.slotIndex]?.status !== "sent");
 }
 
+/** Prise filmée avant une sortie de l'app : on reprend son fichier pour la confirmer, la couper ou l'envoyer. */
+function restoreDrafts(files: FilmedFiles, queued: QueuedSlot[]) {
+  for (const entry of queued) {
+    if (entry.status !== "draft" || files.has(entry.slotIndex)) continue;
+    const file = entry.file instanceof File ? entry.file : new File([entry.file], entry.fileName, { type: entry.mimeType });
+    files.set(entry.slotIndex, {
+      file,
+      capturedAt: entry.capturedAt,
+      durationSeconds: entry.durationSeconds,
+      lightOk: entry.lightOk ?? null,
+      location: Promise.resolve(entry.location ?? null),
+    });
+  }
+}
+
 /** Charge l'état au départ : ce que le serveur a déjà + ce qui attend sur l'appareil. */
 function useInitialStates(
   occurrenceId: string,
   requirements: CompletionRequirement[],
   completion: Completion,
   queue: SlotUploadQueue,
+  files: { current: FilmedFiles },
+  /** Cases déjà filmées ou annulées dans cette session : la lecture du disque ne les écrase pas. */
+  touched: { current: Set<number> },
 ) {
   const [states, setStates] = useState<SlotUiState[]>(() =>
     slotStatesFromCompletion(requirements, completion),
@@ -94,13 +113,16 @@ function useInitialStates(
       .catch(() => undefined)
       .then(() => queue.list(occurrenceId))
       .then((queued) => withoutDelivered(queue, picture(), queued))
-      .then((queued) => {
-        if (!cancelled) setStates((current) => mergeStoredSlots(current, picture(queued)));
+      .then((all) => {
+        if (cancelled) return;
+        const queued = all.filter((entry) => !touched.current.has(entry.slotIndex));
+        restoreDrafts(files.current, queued);
+        setStates((current) => mergeStoredSlots(current, picture(queued)));
       });
     return () => {
       cancelled = true;
     };
-  }, [occurrenceId, queue, latest]);
+  }, [occurrenceId, queue, latest, files, touched]);
   return [states, setStates] as const;
 }
 
@@ -114,25 +136,49 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const locate = options.locate ?? getCurrentLocation;
   const trimmer = options.trimmer ?? trimVideo;
   const queue = useMemo(() => options.queue ?? getSlotUploadQueue(), [options.queue]);
-  const [states, setStates] = useInitialStates(occurrenceId, requirements, completion, queue);
   const files = useRef<FilmedFiles>(new Map());
+  const touched = useRef(new Set<number>());
+  const [states, setStates] = useInitialStates(occurrenceId, requirements, completion, queue, files, touched);
   const callbacks = useLatest({ onSent, onSavedOnDevice, onFailed });
   const statesRef = useLatest(states);
   const sending = useRef(false);
   const [isSending, setSending] = useState(false);
-  /** Écritures disque en cours par case : l'envoi final et le re-tournage les attendent. */
+  /** Écritures disque par case, faites l'une après l'autre : l'envoi final les attend. */
   const holds = useRef(new Map<number, Promise<void>>());
+  /** Confirmation en cours (attend la découpe et le GPS) : l'envoi final l'attend. */
+  const confirming = useRef(new Map<number, Promise<void>>());
   /** Découpe en cours : une confirmation attend son résultat et garde le fichier coupé. */
   const trims = useRef(new Map<number, Promise<void>>());
 
-  /** La case est refilmée : le média confirmé précédent (sur disque) n'a plus d'objet. */
+  const onDisk = useCallback((index: number, write: () => Promise<unknown>) => {
+    touched.current.add(index);
+    const previous = holds.current.get(index) ?? Promise.resolve();
+    // Quota ou stockage indisponible : le fichier reste en mémoire et partira quand même à l'envoi.
+    const job = previous.then(write).then(
+      () => undefined,
+      () => undefined,
+    );
+    holds.current.set(index, job);
+    return job;
+  }, []);
+
+  /** La case est annulée : la prise gardée sur disque n'a plus d'objet. */
   const dropHeld = useCallback(
-    (index: number) => {
-      const writing = holds.current.get(index) ?? Promise.resolve();
-      holds.current.delete(index);
-      void writing.then(() => queue.dropHeld(slotQueueId(occurrenceId, index))).catch(() => undefined);
+    (index: number) => void onDisk(index, () => queue.dropHeld(slotQueueId(occurrenceId, index))),
+    [queue, occurrenceId, onDisk],
+  );
+
+  /** Prise filmée, pas encore confirmée : écrite sur disque tout de suite (une sortie de l'app ne la perd pas). */
+  const saveDraft = useCallback(
+    (index: number, kept: Filmed) => {
+      const kind = requirements[index]?.kind;
+      if (!kind || !isMediaKind(kind)) return;
+      const { file, capturedAt, durationSeconds, lightOk } = kept;
+      void onDisk(index, () =>
+        queue.draft({ occurrenceId, slotIndex: index, kind, file, capturedAt, durationSeconds, lightOk, location: null }),
+      );
     },
-    [queue, occurrenceId],
+    [queue, occurrenceId, requirements, onDisk],
   );
 
   useEffect(
@@ -150,10 +196,11 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const film = useCallback(
     (index: number, file: File, durationSeconds?: number | null, lightOk?: boolean | null) => {
       const capturedAt = new Date().toISOString();
-      dropHeld(index);
       const location = locate().catch(() => null);
-      const kept: Filmed = { file, capturedAt, durationSeconds: durationSeconds ?? null, location };
+      const kept: Filmed = { file, capturedAt, durationSeconds: durationSeconds ?? null, lightOk: lightOk ?? null, location };
       files.current.set(index, kept);
+      // Remplace sur disque la prise précédente de cette case (refilmée).
+      saveDraft(index, kept);
       setStates((prev) =>
         markFilmed(prev, index, { capturedAt, durationSeconds, lightOk, previewUrl: URL.createObjectURL(file) }),
       );
@@ -161,7 +208,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         if (files.current.get(index)?.location === location) setStates((prev) => withLocation(prev, index, found));
       });
     },
-    [setStates, locate, dropHeld],
+    [setStates, locate, saveDraft],
   );
 
   /** Découpe la vidéo en cours de revue ; ignoré si l'oved l'a refilmée entre-temps. */
@@ -172,12 +219,14 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       if (!kept || !preview) return;
       const result = await trimmer(preview, range);
       if (files.current.get(index) !== kept) return;
-      files.current.set(index, { ...kept, file: result.file as File, durationSeconds: result.durationSeconds });
+      const next: Filmed = { ...kept, file: result.file as File, durationSeconds: result.durationSeconds };
+      files.current.set(index, next);
+      saveDraft(index, next);
       setStates((prev) =>
         markTrimmed(prev, index, { durationSeconds: result.durationSeconds, previewUrl: URL.createObjectURL(result.file) }),
       );
     },
-    [setStates, trimmer, statesRef],
+    [setStates, trimmer, statesRef, saveDraft],
   );
 
   const trim = useCallback(
@@ -196,9 +245,10 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const discard = useCallback(
     (index: number) => {
       files.current.delete(index);
+      dropHeld(index);
       setStates((prev) => discardFilmed(prev, index));
     },
-    [setStates],
+    [setStates, dropHeld],
   );
 
   /** Écrit le média confirmé sur disque ; en cas d'échec il reste en mémoire et partira quand même à l'envoi. */
@@ -207,13 +257,12 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       const kept = files.current.get(index);
       if (!kept || !isMediaKind(kind)) return;
       const { location, ...media } = kept;
-      try {
-        await queue.hold({ occurrenceId, slotIndex: index, kind, ...media, location: await location });
-      } catch {
-        /* quota ou stockage indisponible : le fichier reste en mémoire */
-      }
+      const found = await location;
+      // Refilmée pendant l'attente du GPS : la nouvelle prise est déjà sur disque, on ne l'écrase pas.
+      if (files.current.get(index) !== kept) return;
+      await onDisk(index, () => queue.hold({ occurrenceId, slotIndex: index, kind, ...media, location: found }));
     },
-    [queue, occurrenceId],
+    [queue, occurrenceId, onDisk],
   );
 
   /**
@@ -228,7 +277,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         setStates((prev) => markReady(prev, index, new Date().toISOString()));
         await holdOnDisk(index, requirements[index]?.kind ?? "message");
       })();
-      holds.current.set(index, job);
+      confirming.current.set(index, job);
     },
     [setStates, holdOnDisk, requirements],
   );
@@ -293,6 +342,8 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const enqueueKept = useCallback(
     async (index: number, kind: CompletionRequirement["kind"]) => {
       if (!isMediaKind(kind)) return;
+      await confirming.current.get(index);
+      confirming.current.delete(index);
       await holds.current.get(index);
       holds.current.delete(index);
       const kept = files.current.get(index);

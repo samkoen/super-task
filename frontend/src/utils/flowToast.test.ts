@@ -19,6 +19,12 @@ describe("flowToastContent", () => {
     expect(flowToastContent({ kind: "kept", remaining: 0 }).subtitle).toBe(he.flowToastAllReady);
   });
 
+  it("09ב: without network the take is saved on the device", () => {
+    const c = flowToastContent({ kind: "keptOffline", remaining: 2, mediaKind: "video" });
+    expect(c).toEqual({ title: he.flowToastSavedOnDevice, subtitle: "", tone: "pending" });
+    expect(flowToastContent({ kind: "keptOffline", remaining: 0, mediaKind: "photo" }).title).toBe(he.flowToastSavedOnDevicePhoto);
+  });
+
   it("flags a failure", () => {
     expect(flowToastContent({ kind: "failed", remaining: 1 }).tone).toBe("error");
   });

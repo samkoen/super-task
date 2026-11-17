@@ -22,23 +22,27 @@ export type QueuedSlot = {
   capturedAt: string;
   /** GPS au moment du tournage ; absent si refusé ou indisponible. */
   location?: CaptureLocation | null;
+  /** Lumière mesurée au tournage (null : non mesurée). */
+  lightOk?: boolean | null;
   createdAt: number;
   attempts: number;
   /**
+   * `draft` : filmé mais pas encore confirmé (écran de revue 08) : gardé pour qu'une sortie de l'app
+   * ne fasse pas perdre la prise ; jamais envoyé.
    * `held` : confirmé par l'oved, gardé sur disque, mais pas encore envoyé (attend « אישור ושליחה ») :
    * le renvoi automatique l'ignore.
    * `failed` : erreur définitive (le serveur a refusé) — pas de renvoi automatique.
    * `acked` : le serveur a accepté le fichier, mais la copie locale n'a pas pu être effacée.
    * On ne la renvoie jamais.
    */
-  status: "pending" | "failed" | "held" | "acked";
+  status: "pending" | "failed" | "draft" | "held" | "acked";
   lastError?: string;
 };
 
 export type NewQueuedSlot = Pick<
   QueuedSlot,
   "occurrenceId" | "slotIndex" | "kind" | "file" | "durationSeconds" | "capturedAt"
-> & { fileName?: string; location?: CaptureLocation | null };
+> & { fileName?: string; location?: CaptureLocation | null; lightOk?: boolean | null };
 
 export type SlotQueueEvent =
   | { type: "queued"; entry: QueuedSlot }
@@ -125,6 +129,11 @@ export function isRetryableSlotError(error: unknown): boolean {
 
 export type SlotUploadQueue = ReturnType<typeof createSlotUploadQueue>;
 
+/** Gardé sur l'appareil sans être en file d'envoi (prise non confirmée ou confirmée avant le récap). */
+function isKeptLocally(entry: QueuedSlot): boolean {
+  return entry.status === "held" || entry.status === "draft";
+}
+
 /** Un média confirmé reste gardé 3 jours sans envoi, puis il est supprimé. */
 export const HELD_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -154,6 +163,7 @@ export function createSlotUploadQueue(options: {
       durationSeconds: item.durationSeconds,
       capturedAt: item.capturedAt,
       location: item.location ?? null,
+      lightOk: item.lightOk ?? null,
       createdAt: now(),
       attempts: 0,
       status,
@@ -174,6 +184,13 @@ export function createSlotUploadQueue(options: {
     return entry;
   };
 
+  /** Prise filmée, pas encore confirmée : gardée sur disque (une sortie de l'app ne la perd pas), jamais envoyée. */
+  const draft = async (item: NewQueuedSlot): Promise<QueuedSlot> => {
+    const entry = build(item, "draft");
+    await storage.put(entry);
+    return entry;
+  };
+
   /** « אישור ושליחה » : un média gardé passe en file d'envoi. Faux si rien n'était gardé pour cette case. */
   const release = async (id: string): Promise<boolean> => {
     const entry = (await storage.getAll()).find((row) => row.id === id && row.status === "held");
@@ -184,16 +201,16 @@ export function createSlotUploadQueue(options: {
     return true;
   };
 
-  /** La case est refilmée ou annulée : le média gardé n'a plus d'objet. Une entrée en envoi n'est jamais touchée. */
+  /** La case est refilmée ou annulée : le média gardé (ou la prise non confirmée) n'a plus d'objet. Une entrée en envoi n'est jamais touchée. */
   const dropHeld = async (id: string): Promise<void> => {
     const entry = (await storage.getAll()).find((row) => row.id === id);
-    if (entry?.status === "held") await storage.remove(id);
+    if (entry && isKeptLocally(entry)) await storage.remove(id);
   };
 
   /** Ménage : un média confirmé mais jamais envoyé ne reste pas indéfiniment sur l'appareil. */
   const pruneHeld = async (maxAgeMs: number = HELD_MAX_AGE_MS): Promise<void> => {
     const limit = now() - maxAgeMs;
-    const stale = (await storage.getAll()).filter((entry) => entry.status === "held" && entry.createdAt < limit);
+    const stale = (await storage.getAll()).filter((entry) => isKeptLocally(entry) && entry.createdAt < limit);
     await Promise.all(stale.map((entry) => storage.remove(entry.id)));
   };
 
@@ -282,7 +299,7 @@ export function createSlotUploadQueue(options: {
     };
   };
 
-  return { enqueue, hold, release, dropHeld, dropDelivered, pruneHeld, flush, list, retry, subscribe, remove: (id: string) => storage.remove(id) };
+  return { enqueue, draft, hold, release, dropHeld, dropDelivered, pruneHeld, flush, list, retry, subscribe, remove: (id: string) => storage.remove(id) };
 }
 
 export type AutoFlushEnv = {

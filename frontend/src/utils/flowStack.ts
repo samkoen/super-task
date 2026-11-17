@@ -14,9 +14,14 @@ export type StackLayout = {
  * `preferred` est la carte que l'oved a touchée en dernier : il choisit librement l'ordre.
  * Si cette carte est déjà remise, on passe à la suivante encore ouverte.
  */
-/** Une carte confirmée mais pas encore envoyée peut être rouverte pour être refaite. */
+/** Une carte confirmée mais pas encore envoyée peut être rouverte : revoir la prise, ou la refaire. */
 export function canRevisit(state: SlotUiState | undefined): boolean {
   return state?.status === "ready" || (state?.status === "skipped" && !state.skip?.sent);
+}
+
+/** Prise confirmée sur l'appareil : la carte montre le média, plus « לא ניתן לצלם ». */
+export function isKeptCapture(state: SlotUiState | undefined): boolean {
+  return Boolean(state && state.status === "ready" && state.kind !== "message");
 }
 
 export function resolveActive(states: SlotUiState[], preferred: number | null): number | null {
@@ -79,17 +84,39 @@ export function primaryActionLabel(kind: CompletionRequirement["kind"]): string 
   return he.flowActionVideo;
 }
 
+/** Bouton d'une prise déjà confirmée : refaire, la lecture se fait sur la carte. */
+export function cardActionLabel(kind: CompletionRequirement["kind"], state: SlotUiState | undefined): string {
+  if (!isKeptCapture(state)) return primaryActionLabel(kind);
+  return kind === "audio" ? he.flowActionRetakeAudio : he.flowReviewRetake;
+}
+
 /** Le lien « דוגמא לצילום נכון » est actif seulement si le menahel a donné une vidéo, une image ou une consigne. */
 export function hasGuide(req: CompletionRequirement): boolean {
   return Boolean(req.guide_video_url || req.example_url || (req.hint || "").trim());
 }
 
 /** Texte de l'onglet replié selon l'état d'envoi. */
-export function tabStatusText(state: SlotUiState): string {
+export function tabStatusText(state: SlotUiState, online = true): string {
   if (state.status === "skipped") return he.flowTabSkipped;
   if (state.status === "sent") return he.flowTabSent(formatClock(state.sentAt));
   if (state.status === "failed") return he.flowTabFailed;
   if (state.status === "uploading") return he.flowTabUploading;
-  if (state.status === "ready") return he.flowTabReady;
+  // 09ב : sans réseau, une prise confirmée attend sur l'appareil.
+  if (state.status === "ready") return online ? he.flowTabReady : he.flowTabWaiting;
   return he.flowTabWaiting;
+}
+
+/**
+ * Pastille de l'onglet : coche verte (envoyé, ou confirmé avec réseau : écran 09), nuage jaune
+ * (attend le réseau sur l'appareil : écran 09ב), ou alerte (non filmé, refusé).
+ */
+export type TabBadge = "done" | "waiting" | "skipped" | "failed" | "pending";
+
+export function tabBadge(state: SlotUiState, online = true): TabBadge {
+  if (state.status === "sent") return "done";
+  if (state.status === "ready") return online ? "done" : "waiting";
+  if (state.status === "queued") return "waiting";
+  if (state.status === "skipped") return "skipped";
+  if (state.status === "failed") return "failed";
+  return "pending";
 }

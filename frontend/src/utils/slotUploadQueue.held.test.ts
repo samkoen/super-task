@@ -110,3 +110,29 @@ describe("slotStatesFromCompletion with held media", () => {
     expect(states[0].status).toBe("queued");
   });
 });
+
+describe("draft takes (filmed, not confirmed yet)", () => {
+  it("are kept on disk, never sent, and dropped like a held take", async () => {
+    const send = vi.fn(async () => ({}));
+    const { queue, storage, clock } = makeQueue(send);
+    await queue.draft({ ...item(0), lightOk: false });
+    await queue.flush();
+    expect(send).not.toHaveBeenCalled();
+    expect(await queue.release(slotQueueId("occ-1", 0))).toBe(false);
+    expect((await storage.getAll())[0]).toMatchObject({ status: "draft", lightOk: false });
+    await queue.draft(item(1));
+    await queue.dropHeld(slotQueueId("occ-1", 1));
+    clock.value += HELD_MAX_AGE_MS + 1;
+    await queue.pruneHeld();
+    expect(await storage.getAll()).toEqual([]);
+  });
+
+  it("a video draft comes back on the review screen, a photo draft as confirmed", async () => {
+    const { queue } = makeQueue();
+    const video = await queue.draft({ ...item(0), lightOk: true });
+    const photo = await queue.draft({ ...item(1), kind: "photo" });
+    const states = slotStatesFromCompletion([{ kind: "video" }, { kind: "photo" }], null as never, [video, photo]);
+    expect(states[0]).toMatchObject({ status: "filmed", durationSeconds: 12, lightOk: true });
+    expect(states[1].status).toBe("ready");
+  });
+});

@@ -3,11 +3,14 @@ import { he } from "../i18n/he";
 import {
   formatClock,
   formatDueHour,
+  cardActionLabel,
   greetingFor,
   hasGuide,
+  isKeptCapture,
   primaryActionLabel,
   resolveActive,
   stackLayout,
+  tabBadge,
   stepNumber,
   tabStatusText,
 } from "./flowStack";
@@ -87,6 +90,28 @@ describe("libellés pilotés par la config du menahel", () => {
     expect(primaryActionLabel("photo")).toBe(he.flowActionPhoto);
     expect(primaryActionLabel("audio")).toBe(he.flowActionAudio);
     expect(primaryActionLabel("message")).toBe(he.flowActionMessage);
+  });
+
+  it("une prise confirmée se revoit : le bouton propose de la refaire, pas de la déclarer impossible", () => {
+    const kept: SlotUiState = { status: "ready", kind: "video", previewUrl: "blob:kept" };
+    expect(isKeptCapture(kept)).toBe(true);
+    expect(isKeptCapture({ status: "idle", kind: "video" })).toBe(false);
+    expect(isKeptCapture({ status: "ready", kind: "message", text: "שלום" })).toBe(false);
+    expect(isKeptCapture({ status: "skipped", kind: "video" })).toBe(false);
+    expect(cardActionLabel("video", kept)).toBe(he.flowReviewRetake);
+    expect(cardActionLabel("photo", { status: "ready", kind: "photo" })).toBe(he.flowReviewRetake);
+    expect(cardActionLabel("audio", { status: "ready", kind: "audio" })).toBe(he.flowActionRetakeAudio);
+    expect(cardActionLabel("video", { status: "idle", kind: "video" })).toBe(he.flowActionVideo);
+  });
+
+  it("09 / 09ב : une prise confirmée attend sur l'appareil quand il n'y a pas de réseau", () => {
+    const ready: SlotUiState = { status: "ready", kind: "video" };
+    expect(tabStatusText(ready)).toBe(he.flowTabReady);
+    expect(tabBadge(ready)).toBe("done");
+    expect(tabStatusText(ready, false)).toBe(he.flowTabWaiting);
+    expect(tabBadge(ready, false)).toBe("waiting");
+    expect(tabBadge({ status: "queued", kind: "video" })).toBe("waiting");
+    expect(tabBadge({ status: "sent", kind: "video" }, false)).toBe("done");
   });
 
   it("le lien d'exemple n'apparaît que si le menahel a donné une image ou une consigne", () => {

@@ -6,7 +6,7 @@ import type { MediaKind } from "../media/MediaCaptureActions";
 import { flowSize, flowToneForIndex } from "../../styles/flowTokens";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
-import { canRevisit, stackLayout } from "../../utils/flowStack";
+import { canRevisit, isKeptCapture, stackLayout } from "../../utils/flowStack";
 import { isHandedOver, type SlotUiState } from "../../utils/slotUploadState";
 
 export type TaskCardStackProps = {
@@ -22,6 +22,8 @@ export type TaskCardStackProps = {
   retake?: { index: number; nonce: number } | null;
   /** Carte à ouvrir en premier (« לצלם עכשיו » depuis le récap). */
   focusIndex?: number | null;
+  /** Réseau disponible : sinon les prises confirmées affichent « ממתין להעלאה » (écran 09ב). */
+  online?: boolean;
 };
 
 function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number }) {
@@ -39,7 +41,7 @@ function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number
       onCapture={(file, kind, seconds, lightOk) => props.onCapture(index, file, kind, seconds, lightOk)}
       onSendText={(text) => props.onSendText(index, text)}
       onOpenGuide={() => props.onOpenGuide(index)}
-      onSkip={props.onSkip ? () => props.onSkip?.(index) : undefined}
+      onSkip={props.onSkip && !isKeptCapture(states[index]) ? () => props.onSkip?.(index) : undefined}
     />
   );
 }
@@ -65,6 +67,7 @@ export default function TaskCardStack(props: TaskCardStackProps) {
           state={states[index]}
           variant={order === 0 ? "narrow" : "wide"}
           zIndex={order + 1}
+          online={props.online ?? true}
           onSelect={canRevisit(states[index]) ? () => setPreferred(index) : undefined}
         />
       ))}

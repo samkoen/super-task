@@ -80,13 +80,15 @@ describe("useSlotUploads: confirmed media survives a reload", () => {
     expect(await storage.getAll()).toEqual([]);
   });
 
-  it("filming the slot again deletes the confirmed take from disk", async () => {
+  it("filming the slot again replaces the confirmed take on disk with the new, unconfirmed one", async () => {
     const { queue, storage } = makeQueue();
     const hook = mount(queue);
     await confirm(hook, 0);
-    await waitFor(async () => expect(await storage.getAll()).toHaveLength(1));
+    await waitFor(async () => expect((await storage.getAll()).map((row) => row.status)).toEqual(["held"]));
     act(() => hook.result.current.film(0, file("again.webm"), 6));
-    await waitFor(async () => expect(await storage.getAll()).toEqual([]));
+    await waitFor(async () =>
+      expect((await storage.getAll()).map((row) => [row.status, row.fileName])).toEqual([["draft", "again.webm"]]),
+    );
     expect(hook.result.current.states[0].status).toBe("filmed");
   });
 
@@ -141,5 +143,35 @@ describe("useSlotUploads: confirmed media survives a reload", () => {
       await Promise.resolve();
     });
     expect(await storage.getAll()).toEqual([]);
+  });
+
+  it("a video filmed but not confirmed is still there after leaving the app", async () => {
+    const send = vi.fn(async () => ({ task_submitted: false }));
+    const { queue, storage } = makeQueue(send);
+    const before = mount(queue);
+    act(() => before.result.current.film(0, file("a.webm"), 7, true));
+    await waitFor(async () => expect((await storage.getAll()).map((row) => row.status)).toEqual(["draft"]));
+    before.unmount();
+
+    const after = mount(queue);
+    await waitFor(() => expect(after.result.current.states[0].status).toBe("filmed"));
+    expect(after.result.current.states[0]).toMatchObject({ durationSeconds: 7, lightOk: true, previewUrl: "blob:preview" });
+    act(() => after.result.current.keep(0));
+    await waitFor(async () => expect((await storage.getAll()).map((row) => row.status)).toEqual(["held"]));
+    expect(send).not.toHaveBeenCalled();
+    await act(async () => {
+      await after.result.current.sendAll();
+    });
+    expect(send).toHaveBeenCalledWith(slotQueueId("occ", 0));
+    expect(after.result.current.states[0].status).toBe("sent");
+  });
+
+  it("a discarded take is removed from disk", async () => {
+    const { queue, storage } = makeQueue();
+    const hook = mount(queue);
+    act(() => hook.result.current.film(0, file(), 7));
+    await waitFor(async () => expect(await storage.getAll()).toHaveLength(1));
+    act(() => hook.result.current.discard(0));
+    await waitFor(async () => expect(await storage.getAll()).toEqual([]));
   });
 });
