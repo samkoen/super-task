@@ -12,21 +12,19 @@ import type { DirectChatCard } from "../services/directChatService";
 import { buildPendingReviewQueue, buildQuestionsQueue } from "./dashboardCarousels";
 import { buildManagerSummary } from "./managerSummary";
 import { computeArrivedAt, memberTasks } from "./staffProgress";
+import { TODAY_PERIODS, periodForDue, type TodayPeriod } from "./todayPeriods";
 
 /**
  * Accueil menahel (maquette Figma « Menahel · בית (snif) ») : tout ce qui est calculé ici est pur,
  * à partir des données déjà renvoyées par `/dashboard/manager`.
  */
 
-export type DayPeriod = "morning" | "noon" | "evening";
-export const DAY_PERIODS: DayPeriod[] = ["morning", "noon", "evening"];
+export type DayPeriod = TodayPeriod;
+export const DAY_PERIODS: DayPeriod[] = TODAY_PERIODS;
 
-/** Moment de la journée d'une échéance (heure locale) : avant 12h, avant 17h, ensuite. */
+/** Moment de la journée d'une échéance : mêmes seuils que l'écran oved (12 h, 17 h). */
 export function periodOf(dueAt: string): DayPeriod {
-  const hour = new Date(dueAt).getHours();
-  if (hour < 12) return "morning";
-  if (hour < 17) return "noon";
-  return "evening";
+  return periodForDue(dueAt);
 }
 
 function uniqueQueueTasks(queues: TaskQueues | null | undefined): TimelineTask[] {

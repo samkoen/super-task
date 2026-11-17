@@ -1,6 +1,6 @@
 /**
- * FLOW 2 · écran 01 « המשימות להיום » : les tâches du jour rangées par moment de la journée
- * (Figma « Period Header » : בוקר / צהריים / ערב), mêmes seuils que la salutation (12 h, 18 h).
+ * Moments de la journée (Figma « Period Header » : בוקר / צהריים / ערב). Source unique des seuils
+ * (12 h, 17 h) pour tout l'app : écran oved, salutation, écrans menahel.
  */
 export type TodayPeriod = "morning" | "noon" | "evening";
 
@@ -27,14 +27,20 @@ function dueMs(task: PeriodTask): number {
   return Number.isNaN(ms) ? Number.MAX_SAFE_INTEGER : ms;
 }
 
+export const NOON_STARTS_AT = 12;
+export const EVENING_STARTS_AT = 17;
+
+export function periodForHour(hour: number): TodayPeriod {
+  if (hour < NOON_STARTS_AT) return "morning";
+  if (hour < EVENING_STARTS_AT) return "noon";
+  return "evening";
+}
+
 /** Heure illisible : la tâche reste visible, dans la première période. */
 export function periodForDue(dueAt: string): TodayPeriod {
   const date = new Date(dueAt);
   if (Number.isNaN(date.getTime())) return "morning";
-  const hour = date.getHours();
-  if (hour < 12) return "morning";
-  if (hour < 18) return "noon";
-  return "evening";
+  return periodForHour(date.getHours());
 }
 
 /** Périodes non vides, dans l'ordre de la journée ; tâches triées par heure dans chaque période. */

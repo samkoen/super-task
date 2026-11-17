@@ -5,15 +5,26 @@ import checkIcon from "../../assets/flow2/icon-check-small.svg";
 import { he } from "../../i18n/he";
 import { flowColor, flowRadius, flowSpace, flowText } from "../../styles/flowTokens";
 
+/**
+ * Marque discrète en plus de Done / Pending (écrans menahel) : « late » met la 2e ligne en rouge,
+ * « active » entoure la ligne d'orange (tâche en cours).
+ */
+export type TodayTaskTone = "late" | "active";
+
 type Props = {
   title: string;
-  /** Heure « 07:30 » de l'échéance. */
+  /** Heure « 07:30 » de l'échéance (précédée de la date si ce n'est pas le jour affiché). */
   time: string;
-  /** « 15 דק׳ » : affichée seulement si la tâche a une durée. */
-  duration?: string | null;
+  /** 2e ligne : « 15 דק׳ » côté oved, « דני · ממתין לאישור » côté menahel. Masquée si vide. */
+  subtitle?: string | null;
   done: boolean;
+  tone?: TodayTaskTone;
   onOpen: () => void;
-  onOpenChat: () => void;
+  /** Sans action secondaire, pas de ⋮ : toute la ligne ouvre la tâche. */
+  onOpenChat?: () => void;
+  testId?: string;
+  /** État métier exposé tel quel (ex. « review ») pour les tests et le débogage. */
+  dataState?: string;
 };
 
 function Divider() {
@@ -46,7 +57,7 @@ function Checkbox({ done }: { done: boolean }) {
 }
 
 /** ⋮ (btn-more) : ouvre le menu d'actions de la ligne sans ouvrir la tâche. */
-function MoreMenu({ onOpen, onOpenChat }: Pick<Props, "onOpen" | "onOpenChat">) {
+function MoreMenu({ onOpen, onOpenChat }: { onOpen: () => void; onOpenChat: () => void }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const pick = (action: () => void) => () => {
     setAnchor(null);
@@ -88,7 +99,9 @@ function MoreMenu({ onOpen, onOpenChat }: Pick<Props, "onOpen" | "onOpenChat">) 
  * Figma « Task Item » (écran 01 du FLOW 2) : case · heure · titre et durée · ⋮, de droite à gauche.
  * Done : fond orange 20 % et case verte ; Pending : fond neutral/100 à 52 %.
  */
-export default function TodayTaskItem({ title, time, duration, done, onOpen, onOpenChat }: Props) {
+export default function TodayTaskItem({ title, time, subtitle, done, tone, onOpen, onOpenChat, testId, dataState }: Props) {
+  const late = !done && tone === "late";
+  const active = !done && tone === "active";
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -100,8 +113,9 @@ export default function TodayTaskItem({ title, time, duration, done, onOpen, onO
       role="button"
       tabIndex={0}
       aria-label={done ? `${title} · ${he.todayTaskDone}` : title}
-      data-testid="today-task-item"
-      data-state={done ? "done" : "pending"}
+      data-testid={testId ?? "today-task-item"}
+      data-state={dataState ?? (done ? "done" : "pending")}
+      data-tone={late || active ? tone : undefined}
       onClick={onOpen}
       onKeyDown={onKeyDown}
       sx={{
@@ -115,6 +129,7 @@ export default function TodayTaskItem({ title, time, duration, done, onOpen, onO
         py: "10px",
         borderRadius: `${flowRadius.item}px`,
         bgcolor: done ? flowColor.alphaOrange500_20 : flowColor.alphaNeutral100_52,
+        boxShadow: active ? `inset 0 0 0 1px ${flowColor.orange500}` : "none",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
         "&:focus-visible": { outline: `2px solid ${flowColor.orange500}`, outlineOffset: 2 },
@@ -134,11 +149,16 @@ export default function TodayTaskItem({ title, time, duration, done, onOpen, onO
           >
             {title}
           </Typography>
-          {duration ? (
-            <Typography sx={{ ...flowText.caption, color: flowColor.textSecondary, whiteSpace: "nowrap" }}>{duration}</Typography>
+          {subtitle ? (
+            <Typography
+              data-testid="today-task-subtitle"
+              sx={{ ...flowText.caption, color: late ? flowColor.rec : flowColor.textSecondary, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+              {subtitle}
+            </Typography>
           ) : null}
         </Box>
-        <MoreMenu onOpen={onOpen} onOpenChat={onOpenChat} />
+        {onOpenChat ? <MoreMenu onOpen={onOpen} onOpenChat={onOpenChat} /> : null}
       </Box>
     </Box>
   );

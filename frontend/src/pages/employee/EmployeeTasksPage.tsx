@@ -764,6 +764,7 @@ export default function EmployeeTasksPage() {
           onOpenTaskChat={(task) => openWorkTask(task, true)}
           onOpenChats={() => navigate("/employee/chats")}
           onOpenAccount={() => navigate("/employee/account")}
+          onHome={user?.role === "branch_manager" ? () => navigate("/manager") : undefined}
           footer={
             <>
               {translatingTasks ? <Alert severity="info">{he.taskTranslating}</Alert> : null}

@@ -36,6 +36,11 @@ type Props<T extends TodayTask> = {
   onOpenTaskChat: (task: T) => void;
   onOpenChats: () => void;
   onOpenAccount: () => void;
+  /**
+   * Onglet « בית » de la barre du bas. Par défaut il remonte en haut de la liste ; un menahel snif
+   * (« המשימות שלי ») y retrouve son espace, l'écran n'ayant pas d'autre sortie.
+   */
+  onHome?: () => void;
   /** Contenu ajouté sous les groupes (ex. « סיום משמרת »). */
   footer?: ReactNode;
 };
@@ -136,7 +141,7 @@ function LoadingScreen() {
  * du jour par moment de la journée (בוקר / צהריים / ערב), chaque groupe se pliant avec son chevron.
  */
 export default function TodayTasksScreen<T extends TodayTask>(props: Props<T>) {
-  const { tasks, loading = false, employeeName, photoUrl, onOpenTask, onOpenTaskChat, onOpenChats, onOpenAccount, footer } = props;
+  const { tasks, loading = false, employeeName, photoUrl, onOpenTask, onOpenTaskChat, onOpenChats, onOpenAccount, onHome, footer } = props;
   const groups = groupTodayTasks(tasks);
   const toggles = usePeriodToggles();
   if (loading) return <LoadingScreen />;
@@ -185,7 +190,7 @@ export default function TodayTasksScreen<T extends TodayTask>(props: Props<T>) {
                     key={task.id}
                     title={task.title}
                     time={timelineTimeLabel(task.due_at)}
-                    duration={task.duration_minutes ? he.todayTaskMinutes(task.duration_minutes) : null}
+                    subtitle={task.duration_minutes ? he.todayTaskMinutes(task.duration_minutes) : null}
                     done={isTodayTaskDone(task.status)}
                     onOpen={() => onOpenTask(task)}
                     onOpenChat={() => onOpenTaskChat(task)}
@@ -197,7 +202,11 @@ export default function TodayTasksScreen<T extends TodayTask>(props: Props<T>) {
           </Box>
         </Box>
       </Box>
-      <FlowBottomNav bottomOffset={NAV_BOTTOM} onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} onChat={onOpenChats} />
+      <FlowBottomNav
+        bottomOffset={NAV_BOTTOM}
+        onHome={onHome ?? (() => window.scrollTo({ top: 0, behavior: "smooth" }))}
+        onChat={onOpenChats}
+      />
     </Box>
   );
 }

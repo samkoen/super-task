@@ -19,11 +19,34 @@ type Props = {
   period: TodayPeriod;
   open: boolean;
   onToggle: () => void;
+  /** Écrans menahel : pastille « fait/total » avant le chevron. */
+  counter?: { done: number; total: number };
   children: ReactNode;
 };
 
+function Counter({ period, done, total, dark }: { period: TodayPeriod; done: number; total: number; dark: boolean }) {
+  return (
+    <Typography
+      dir="ltr"
+      data-testid={`today-period-count-${period}`}
+      aria-label={he.todayPeriodCount(done, total)}
+      sx={{
+        ...flowText.caption,
+        flexShrink: 0,
+        px: "8px",
+        py: "2px",
+        borderRadius: `${flowRadius.full}px`,
+        bgcolor: dark ? flowColor.alphaNeutral0_19 : flowColor.alphaNeutral0_70,
+        color: dark ? flowColor.neutral0 : flowColor.neutral900,
+      }}
+    >
+      {`${done}/${total}`}
+    </Typography>
+  );
+}
+
 /** Figma « Period Header » (43) : icône, titre, puis le chevron qui plie la liste (à gauche). */
-function PeriodHeader({ period, open, onToggle }: Omit<Props, "children">) {
+function PeriodHeader({ period, open, onToggle, counter }: Omit<Props, "children">) {
   const style = PERIOD_STYLE[period];
   return (
     <ButtonBase
@@ -47,6 +70,7 @@ function PeriodHeader({ period, open, onToggle }: Omit<Props, "children">) {
       <Typography sx={{ ...flowText.button, flex: "1 0 0", minWidth: 0, textAlign: "right", color: style.text }}>
         {he.todayPeriodTitles[period]}
       </Typography>
+      {counter ? <Counter period={period} done={counter.done} total={counter.total} dark={period === "evening"} /> : null}
       <Box
         component="img"
         src={style.arrow}
@@ -65,7 +89,7 @@ function PeriodHeader({ period, open, onToggle }: Omit<Props, "children">) {
 }
 
 /** Groupe « period · בוקר / צהריים / ערב » : bandeau coloré (radius 28) et carte blanche (radius 24) des tâches. */
-export default function TodayPeriodSection({ period, open, onToggle, children }: Props) {
+export default function TodayPeriodSection({ period, open, onToggle, counter, children }: Props) {
   return (
     <Box
       component="section"
@@ -79,8 +103,8 @@ export default function TodayPeriodSection({ period, open, onToggle, children }:
         bgcolor: PERIOD_STYLE[period].bg,
       }}
     >
-      <PeriodHeader period={period} open={open} onToggle={onToggle} />
-      <Collapse in={open} timeout={200}>
+      <PeriodHeader period={period} open={open} onToggle={onToggle} counter={counter} />
+      <Collapse in={open} timeout={200} unmountOnExit>
         <Box
           data-testid={`today-period-tasks-${period}`}
           sx={{

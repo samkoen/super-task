@@ -1,4 +1,5 @@
 import { he } from "../i18n/he";
+import { periodForHour } from "./todayPeriods";
 import type { CompletionRequirement } from "./completionMedia";
 import { isHandedOver, nextOpenIndex, firstOpenIndex, type SlotUiState } from "./slotUploadState";
 
@@ -63,9 +64,10 @@ export function formatDueHour(iso: string | null | undefined): string {
 
 export function greetingFor(name: string | null | undefined, now: Date = new Date()): string {
   const who = (name || "").trim().split(/\s+/)[0] || "";
-  const hour = now.getHours();
-  if (hour < 12) return he.flowGreetingMorning(who);
-  if (hour < 18) return he.flowGreetingNoon(who);
+  // Mêmes seuils que les groupes de tâches : « ערב טוב » dès que commence « משימות ערב ».
+  const period = periodForHour(now.getHours());
+  if (period === "morning") return he.flowGreetingMorning(who);
+  if (period === "noon") return he.flowGreetingNoon(who);
   return he.flowGreetingEvening(who);
 }
 

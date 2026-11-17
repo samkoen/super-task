@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EmployeeTasksPage from "./EmployeeTasksPage";
 import { he } from "../../i18n/he";
 import { dashboardService, type EmployeeDashboard, type EmployeeTaskCard } from "../../services/dashboardService";
@@ -20,9 +20,11 @@ vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
 }));
 
+const mockAuth = vi.hoisted(() => ({ role: "employee" }));
+
 vi.mock("../../context/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: "e1", role: "employee", preferred_language: "he", full_name: "דני עובד" },
+    user: { id: "e1", role: mockAuth.role, preferred_language: "he", full_name: "דני עובד" },
     refresh: vi.fn(),
   }),
 }));
@@ -221,6 +223,40 @@ describe("EmployeeTasksPage · FLOW 2 écran 01 (intégration dashboard → écr
     expect(await screen.findByText("מדף חלב", {}, WAIT)).toBeTruthy();
     expect(getEmployeeTodayScreen()).toBe(true);
     expect(screen.getByTestId("flow-bottom-nav")).toBeTruthy();
+  });
+
+  it.each([
+    ["branch_manager", true],
+    ["employee", false],
+  ])("בית tab for %s: back to /manager = %s", async (role, goesToManager) => {
+    mockAuth.role = role;
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({ on_shift: true, today_tasks: [card({ id: "t", title: "מדף חלב" })] }),
+    );
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    try {
+      render(
+        <MemoryRouter initialEntries={["/employee"]}>
+          <Routes>
+            <Route path="/employee" element={<EmployeeTasksPage />} />
+            <Route path="/manager" element={<div>manager-home</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await screen.findByText("מדף חלב", {}, WAIT);
+      fireEvent.click(screen.getByTestId("flow-nav-home"));
+      if (goesToManager) {
+        expect(await screen.findByText("manager-home", {}, WAIT)).toBeTruthy();
+        expect(scrollTo).not.toHaveBeenCalled();
+      } else {
+        expect(screen.queryByText("manager-home")).toBeNull();
+        expect(scrollTo).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      mockAuth.role = "employee";
+      vi.unstubAllGlobals();
+    }
   });
 
   it("opens the task flow from a row", async () => {
