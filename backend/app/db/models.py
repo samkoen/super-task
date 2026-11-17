@@ -232,6 +232,8 @@ class TaskTemplate(Base):
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_work_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # Durée prévue en minutes (« 15 דק׳ » côté oved), copiée sur chaque occurrence.
+    duration_minutes: Mapped[int | None] = mapped_column(nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
     )
@@ -294,6 +296,7 @@ class TaskOccurrence(Base):
     is_work_start: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_work_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     start_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    duration_minutes: Mapped[int | None] = mapped_column(nullable=True)
     network_group_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, index=True
     )

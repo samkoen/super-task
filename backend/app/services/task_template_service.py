@@ -15,6 +15,7 @@ from app.domain.network_fixed_task import (
 from app.domain.completion_media import packed_media_fields, parse_requirements_input
 from app.domain.ops_category import normalize_ops_category
 from app.domain.start_url import normalize_start_url
+from app.domain.task_duration import normalize_duration_minutes
 from app.domain.delivery_note import opened_by_teuda, task_type_for_model
 from app.domain.task_kind import FIXED
 from app.domain.work_start import normalize_work_flags
@@ -99,6 +100,7 @@ class TaskTemplateService:
         network_group_id: str | None = None,
         opened_by_delivery_note: bool = False,
         delivery_note_task_type: str | None = None,
+        duration_minutes: object | None = None,
     ) -> dict:
         if not can_manage_tasks(actor):
             raise PermissionError("אין הרשאה ליצור משימות")
@@ -127,6 +129,7 @@ class TaskTemplateService:
         )
         work_start, work_end = normalize_work_flags(is_work_start, is_work_end)
         link = normalize_start_url(start_url)
+        duration = normalize_duration_minutes(duration_minutes)
         photo, video, audio = self._isolate_external_media(
             reference_photo_url, reference_video_url, reference_audio_url
         )
@@ -154,6 +157,7 @@ class TaskTemplateService:
             is_work_end=work_end,
             start_url=link,
             network_group_id=network_group_id,
+            duration_minutes=duration,
             **media_fields,
         )
         template = self._with_delivery_note(
@@ -189,6 +193,7 @@ class TaskTemplateService:
         opened_by_delivery_note: bool = False,
         delivery_note_task_type: str | None = None,
         branch_assignees: dict[str, str] | None = None,
+        duration_minutes: object | None = None,
     ) -> dict:
         """Duplique une tâche קבועה (tous les snifim, ou une liste).
 
@@ -201,6 +206,7 @@ class TaskTemplateService:
         )
         if not branches:
             raise ValueError("אין סניפים ברשת")
+        duration = normalize_duration_minutes(duration_minutes)
         group_id = str(uuid4())
         created: list[dict] = []
         skipped: list[dict] = []
@@ -228,6 +234,7 @@ class TaskTemplateService:
                 network_group_id=group_id,
                 opened_by_delivery_note=opened_by_delivery_note,
                 delivery_note_task_type=delivery_note_task_type,
+                duration_minutes=duration,
             )
             if item is None:
                 skipped.append(
@@ -291,6 +298,8 @@ class TaskTemplateService:
         is_work_end: bool | None = None,
         start_url: str | None = None,
         apply_to_network: bool = False,
+        duration_minutes: object | None = None,
+        update_duration_minutes: bool = False,
     ) -> dict:
         existing = self._require_editable_template(actor, template_id)
         payload = self._edit_payload(
@@ -312,6 +321,8 @@ class TaskTemplateService:
             is_work_start=is_work_start,
             is_work_end=is_work_end,
             start_url=start_url,
+            duration_minutes=duration_minutes,
+            update_duration_minutes=update_duration_minutes,
         )
         if apply_to_network:
             return self._update_network_group(
@@ -382,6 +393,9 @@ class TaskTemplateService:
             )
             self._occurrences.update_completion_requirements(occ.id, guides)
             self._occurrences.update_start_url(occ.id, getattr(template, "start_url", None))
+            self._occurrences.update_duration_minutes(
+                occ.id, getattr(template, "duration_minutes", None)
+            )
             self._occurrences.update_work_flags(
                 occ.id,
                 is_work_start=bool(getattr(template, "is_work_start", False)),
@@ -463,7 +477,8 @@ class TaskTemplateService:
                       reference_photo_url, reference_video_url, reference_audio_url,
                       ops_category, update_ops_category, min_video_seconds,
                       update_min_video_seconds, completion_requirements,
-                      update_completion_requirements, is_work_start, is_work_end, start_url) -> dict:
+                      update_completion_requirements, is_work_start, is_work_end, start_url,
+                      duration_minutes=None, update_duration_minutes=False) -> dict:
         start, end = normalize_work_flags(
             existing.is_work_start if is_work_start is None else bool(is_work_start),
             getattr(existing, "is_work_end", False) if is_work_end is None else bool(is_work_end),
@@ -487,6 +502,12 @@ class TaskTemplateService:
                 existing.start_url if start_url is None else normalize_start_url(start_url)
             ),
             "update_start_url": start_url is not None,
+            "duration_minutes": (
+                normalize_duration_minutes(duration_minutes)
+                if update_duration_minutes
+                else getattr(existing, "duration_minutes", None)
+            ),
+            "update_duration_minutes": update_duration_minutes,
         }
         payload.update(
             TaskTemplateService._edit_media_fields(

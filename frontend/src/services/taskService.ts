@@ -85,6 +85,8 @@ export interface TaskTemplate {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  /** Durée prévue en minutes (« 15 דק׳ » sur l'écran המשימות להיום). */
+  duration_minutes?: number | null;
   network_group_id?: string | null;
   is_network_task?: boolean;
   reference_photo_url?: string | null;
@@ -118,6 +120,7 @@ export interface UpdateTaskTemplatePayload {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  duration_minutes?: number | null;
   apply_to_network?: boolean;
 }
 
@@ -177,6 +180,7 @@ export interface TaskOccurrence {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  duration_minutes?: number | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;
@@ -228,6 +232,7 @@ export interface CreateTaskTemplatePayload {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  duration_minutes?: number | null;
   opened_by_delivery_note?: boolean;
   delivery_note_task_type?: string | null;
 }
@@ -248,6 +253,7 @@ export interface CreateAdHocPayload {
   apply_to_network?: boolean;
   branch_ids?: string[];
   start_url?: string | null;
+  duration_minutes?: number | null;
 }
 
 export interface SubmitSlotResponse {
@@ -546,6 +552,7 @@ export const taskService = {
       min_video_seconds?: number | null;
       completion_requirements?: CompletionRequirement[];
       start_url?: string | null;
+      duration_minutes?: number | null;
       reference_photo_url?: string | null;
       reference_video_url?: string | null;
       reference_audio_url?: string | null;

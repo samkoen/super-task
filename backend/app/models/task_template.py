@@ -30,6 +30,7 @@ class TaskTemplate:
     is_work_start: bool = False
     is_work_end: bool = False
     start_url: str | None = None
+    duration_minutes: int | None = None
     network_group_id: str | None = None
     opened_by_delivery_note: bool = False
     delivery_note_task_type: str | None = None
@@ -54,6 +55,7 @@ class TaskTemplate:
             "is_work_start": self.is_work_start,
             "is_work_end": self.is_work_end,
             "start_url": self.start_url,
+            "duration_minutes": self.duration_minutes,
             "network_group_id": self.network_group_id,
             "photo_required": self.photo_required,
             "reference_photo_url": self.reference_photo_url,

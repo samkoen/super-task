@@ -189,6 +189,8 @@ export interface EmployeeTaskCard {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  /** Durée prévue en minutes : « 15 דק׳ » sous le titre (FLOW 2 · écran 01). */
+  duration_minutes?: number | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
   reference_audio_url?: string | null;

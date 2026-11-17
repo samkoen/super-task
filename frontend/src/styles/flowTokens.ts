@@ -40,12 +40,19 @@ export const flowColor = {
   alphaGreen700_20: "rgba(46,133,77,0.2)",
   alphaGreen700_60: "rgba(46,133,77,0.6)",
   alphaNeutral0_70: "rgba(255,255,255,0.7)",
+  /** FLOW 2 (écran 01 « המשימות להיום ») : texte des Task Item et fonds des lignes. */
+  neutral1000: "#000000",
+  textPrimary: "#1a1a1a",
+  textSecondary: "rgba(26,26,26,0.6)",
+  alphaBlack800_44: "rgba(26,26,26,0.44)",
+  alphaNeutral100_52: "rgba(232,236,239,0.52)",
+  statusSuccessFg: "#2e854d",
 } as const;
 
 export const flowShadow = { floating: "0px 6px 18px rgba(13,20,48,0.25)" } as const;
 
-export const flowRadius = { xs: 6, sm: 12, md: 16, xl2: 28, full: 999 } as const;
-export const flowSpace = { s4: 4, s12: 12, s16: 16, s24: 24 } as const;
+export const flowRadius = { xs: 6, item: 8, sm: 12, md: 16, xl: 24, xl2: 28, full: 999 } as const;
+export const flowSpace = { s4: 4, s8: 8, s12: 12, s16: 16, s24: 24 } as const;
 
 /** Mesures du Figma (écran 393 × 852). */
 export const flowSize = {
@@ -80,6 +87,9 @@ export const flowText = {
   button: { fontFamily: FLOW_FONT, fontSize: 15, fontWeight: 600, lineHeight: "normal" },
   label: { fontFamily: FLOW_FONT, fontSize: 13, fontWeight: 500, lineHeight: "normal" },
   caption: { fontFamily: FLOW_FONT, fontSize: 12, fontWeight: 500, lineHeight: "normal" },
+  /** FLOW 2 : « Label/Task Title » et « Body/Small ». */
+  taskTitle: { fontFamily: FLOW_FONT, fontSize: 14, fontWeight: 600, lineHeight: "normal" },
+  bodySmall: { fontFamily: FLOW_FONT, fontSize: 13, fontWeight: 400, lineHeight: "normal" },
 } as const;
 
 export type FlowTone = "white" | "green" | "orange";

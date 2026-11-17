@@ -209,6 +209,14 @@ def test_two_models_open_two_occurrences_for_one_teuda():
     assert all(getattr(item, "reference_photo_url", None) is None for item in occurrences.created)
 
 
+def test_teuda_occurrence_copies_the_template_duration():
+    timed = _template("tpl-a")
+    timed.duration_minutes = 15
+    service, _, occurrences = _service([timed, _template("tpl-b", "אחר")])
+    service.ingest(_actor(), _document())
+    assert [item.duration_minutes for item in occurrences.created] == [15, None]
+
+
 def test_resync_keeps_the_mark_under_the_product():
     service, notes, _ = _service([_template("tpl-a")])
     service.ingest(_actor(), _document())

@@ -35,10 +35,12 @@ export function groupTasksByPeriod(tasks: TaskOccurrence[]): PeriodGroup[] {
   }).filter((group) => group.total > 0);
 }
 
-/** « דני · ממתין לאישור » ; « לא משויך » quand personne n'est désigné. */
+/** « דני · ממתין לאישור » (+ « · 15 דק׳ » si la durée est prévue) ; « לא משויך » quand personne n'est désigné. */
 export function taskRowSubtitle(task: TaskOccurrence): string {
   const who = task.assignee_name?.trim() || he.managerTasksUnassigned;
-  return `${who} · ${he.taskStatusLabels[task.status]}`;
+  const parts = [who, he.taskStatusLabels[task.status]];
+  if (task.duration_minutes) parts.push(he.todayTaskMinutes(task.duration_minutes));
+  return parts.join(" · ");
 }
 
 /** Heure de la ligne ; la date est ajoutée quand la tâche n'est pas du jour affiché (vue sur plusieurs jours). */
