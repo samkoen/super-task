@@ -19,7 +19,7 @@ import { flowMaskSx, flowShape } from "../../styles/flowShapes";
 import { guideFromRequirement } from "../../utils/captureGuide";
 import { MAX_MESSAGE_TEXT, type CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
-import { hasGuide, primaryActionLabel, stepNumber } from "../../utils/flowStack";
+import { cardActionLabel, hasGuide, isKeptCapture, stepNumber } from "../../utils/flowStack";
 import type { SlotUiState } from "../../utils/slotUploadState";
 
 export type FlowCardProps = {
@@ -84,6 +84,32 @@ function MessageField({ disabled, value, onChange }: { disabled?: boolean; value
       inputProps={{ maxLength: MAX_MESSAGE_TEXT, "aria-label": he.flowActionMessage }}
       sx={{ "& .MuiOutlinedInput-root": { fontFamily: flowText.body.fontFamily, fontSize: 15, borderRadius: `${flowRadius.md}px`, bgcolor: flowColor.neutral0 } }}
     />
+  );
+}
+
+/** Prise déjà confirmée : photo, vidéo ou audio que l'oved peut revoir avant l'envoi. */
+function CapturedPreview({ state }: { state: SlotUiState }) {
+  const raw = state.previewUrl || state.url || null;
+  const media = useResolvedMediaSrc(raw, false);
+  if (!media.src) {
+    return (
+      <Typography data-testid="flow-captured-missing" sx={{ ...flowText.body, color: flowColor.neutral900 }}>
+        {he.flowTabReady}
+      </Typography>
+    );
+  }
+  if (state.kind === "audio") {
+    return <Box component="audio" data-testid="flow-captured" src={media.src} controls sx={{ width: "100%" }} />;
+  }
+  if (state.kind === "photo") {
+    return (
+      <Box component="img" data-testid="flow-captured" src={media.src} alt="" onError={media.onError}
+        sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+    );
+  }
+  return (
+    <Box component="video" data-testid="flow-captured" src={media.src} controls playsInline preload="metadata"
+      sx={{ width: "100%", height: "100%", objectFit: "contain", bgcolor: "#000" }} />
   );
 }
 
@@ -179,7 +205,7 @@ function CardActions(props: FlowCardProps & { text: string }) {
         <CaptureButton
           req={req}
           index={index}
-          label={primaryActionLabel(req.kind)}
+          label={cardActionLabel(req.kind, props.state)}
           disabled={disabled}
           autoCaptureNonce={autoCaptureNonce}
           progress={props.progress}
@@ -289,6 +315,8 @@ export default function FlowCard(props: FlowCardProps) {
         <IllustrationArea tone={tone}>
           {req.kind === "message" ? (
             <MessageField disabled={props.disabled} value={text} onChange={setText} />
+          ) : isKeptCapture(props.state) ? (
+            <CapturedPreview state={props.state} />
           ) : (
             <ExampleImage req={req} />
           )}

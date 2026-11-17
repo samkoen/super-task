@@ -160,6 +160,7 @@ function FlowBody({ props, flow, requirements, focusIndex, onGuide, onSkip, onCh
           states={flow.states}
           retake={flow.retake}
           focusIndex={focusIndex}
+          online={flow.online}
           onCapture={flow.capture}
           onSendText={flow.saveText}
           onOpenGuide={onGuide}

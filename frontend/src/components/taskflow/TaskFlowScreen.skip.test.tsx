@@ -9,7 +9,10 @@ const { submitSlot, uploadAudio } = vi.hoisted(() => ({ submitSlot: vi.fn(), upl
 const send = vi.fn();
 let queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: (e) => send(e), isOnline: () => true });
 
-vi.mock("../../utils/slotSender", () => ({ getSlotUploadQueue: () => queue }));
+vi.mock("../../utils/slotSender", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils/slotSender")>()),
+  getSlotUploadQueue: () => queue,
+}));
 vi.mock("../../services/taskService", () => ({ taskService: { submitSlot, uploadAudio } }));
 vi.mock("../notifications/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
 vi.mock("./FlowTaskChat", () => ({ default: () => null }));

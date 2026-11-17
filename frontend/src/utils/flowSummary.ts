@@ -21,6 +21,8 @@ export type SummaryRow = {
   canFilmNow: boolean;
   /** Heure d'envoi (« 06:43 ») ; vide tant que rien n'est parti. */
   sentTime: string;
+  /** Envoi refusé : la raison donnée par le serveur (vide sinon). */
+  errorText: string;
 };
 
 /** Une ligne par carte : titre du menahel + statut réel (envoyé à 06:43, ou en attente de réseau). */
@@ -40,6 +42,7 @@ export function summaryRows(requirements: CompletionRequirement[], states: SlotU
       notYet,
       canFilmNow: notYet || (skipped && !state.skip?.sent),
       sentTime: state.status === "sent" ? formatClock(state.sentAt) : "",
+      errorText: state.status === "failed" ? (state.error ?? "").trim() : "",
     };
   });
 }

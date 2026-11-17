@@ -149,6 +149,10 @@ describe("isRetryableSlotError", () => {
     [{ response: { status: 403 } }, false],
     [new Error("boom"), false],
     ["Failed to fetch", true],
+    // ApiError de l'intercepteur : statut HTTP porté directement (réseau coupé → 500, serveur qui se réveille → 502).
+    [Object.assign(new Error("לא ניתן להתחבר לשרת"), { status: 500 }), true],
+    [Object.assign(new Error("Bad Gateway"), { status: 502 }), true],
+    [Object.assign(new Error("יש להתחיל את המשימה לפני הסיום"), { status: 400 }), false],
   ])("%j → %s", (error, expected) => {
     expect(isRetryableSlotError(error)).toBe(expected);
   });

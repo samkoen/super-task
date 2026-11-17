@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useOnlineStatus } from "./useOnlineStatus";
 import { useSlotUploads, type SlotUploadsOptions } from "./useSlotUploads";
 import type { MediaKind } from "../components/media/MediaCaptureActions";
 import { he } from "../i18n/he";
@@ -23,12 +24,13 @@ export function useTaskFlow(options: TaskFlowOptions) {
   const touched = useRef(false);
   const finished = useRef(false);
   const total = options.requirements.length;
+  const online = useOnlineStatus();
 
   const uploads = useSlotUploads({
     ...uploadOptions,
     onSent: (_index, response) => onServerUpdate?.(response),
     onFailed: (_index, message) => {
-      setToast({ kind: "failed", remaining: 0 });
+      setToast({ kind: "failed", remaining: 0, reason: message });
       onError?.(message || he.flowToastFailed);
     },
   });
@@ -45,23 +47,34 @@ export function useTaskFlow(options: TaskFlowOptions) {
     onAllHandedOver();
   }, [states, onAllHandedOver]);
 
+  /** Toast 09 (réseau là) ou 09ב (sans réseau : le média attend sur l'appareil). */
+  const toastKept = useCallback(
+    (index: number) =>
+      setToast({
+        kind: online ? "kept" : "keptOffline",
+        remaining: remainingAfter(states.map((s) => s.status), index),
+        mediaKind: options.requirements[index]?.kind,
+      }),
+    [online, states, options.requirements],
+  );
+
   /** La carte est confirmée : elle reste sur l'appareil, l'envoi se fera au récap. */
   const confirmSlot = useCallback(
     (index: number) => {
       touched.current = true;
       keep(index);
-      setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
+      toastKept(index);
     },
-    [keep, states],
+    [keep, toastKept],
   );
 
   const saveText = useCallback(
     (index: number, text: string) => {
       touched.current = true;
       keepText(index, text);
-      setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
+      toastKept(index);
     },
-    [keepText, states],
+    [keepText, toastKept],
   );
 
   /** « לא ניתן לצלם » : la raison est gardée, la carte compte comme remise (l'envoi se fera au récap). */
@@ -95,6 +108,7 @@ export function useTaskFlow(options: TaskFlowOptions) {
   const reviewIndex = states.findIndex((s) => s.status === "filmed" && s.kind === "video");
   return {
     states,
+    online,
     sending: uploads.sending,
     sendAll: uploads.sendAll,
     total,

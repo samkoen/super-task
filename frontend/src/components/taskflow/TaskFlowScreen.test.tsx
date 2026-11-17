@@ -8,7 +8,10 @@ import { createMemorySlotStorage, createSlotUploadQueue } from "../../utils/slot
 const send = vi.fn();
 let queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: (e) => send(e), isOnline: () => true });
 
-vi.mock("../../utils/slotSender", () => ({ getSlotUploadQueue: () => queue }));
+vi.mock("../../utils/slotSender", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils/slotSender")>()),
+  getSlotUploadQueue: () => queue,
+}));
 vi.mock("../../services/taskService", () => ({ taskService: { submitSlot: vi.fn() } }));
 vi.mock("../notifications/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
 vi.mock("./FlowTaskChat", () => ({
@@ -84,6 +87,21 @@ describe("TaskFlowScreen", () => {
     expect(screen.getByTestId("flow-tab-done").textContent).toContain(he.flowTabReady);
     expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1");
     expect(onFinished).not.toHaveBeenCalled();
+  });
+
+  it("09ב: without network the take is saved on the device and its tab waits for the upload", async () => {
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      renderScreen();
+      fireEvent.click(screen.getByTestId("flow-primary"));
+      await waitFor(() => expect(screen.getByTestId("flow-toast").getAttribute("data-tone")).toBe("pending"));
+      expect(screen.getByTestId("flow-toast-title").textContent).toBe(he.flowToastSavedOnDevicePhoto);
+      expect(screen.getByTestId("flow-tab-done").textContent).toContain(he.flowTabWaiting);
+      expect(screen.getByTestId("flow-tab-badge").getAttribute("data-badge")).toBe("waiting");
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      onLine.mockRestore();
+    }
   });
 
   it("sends everything only from the summary (אישור ושליחה), for an ordinary task too", async () => {

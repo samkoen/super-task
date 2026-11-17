@@ -90,6 +90,44 @@ describe("TaskCardStack", () => {
     expect((screen.getByTestId("flow-card")).getAttribute("data-index")).toBe("2");
   });
 
+  it("reopening a kept card shows the take and hides « לא ניתן לצלם »", () => {
+    const onSkip = vi.fn();
+    const ready: SlotUiState = { status: "ready", kind: "video", previewUrl: "blob:kept" };
+    renderStack(videos(2), [ready, idle()], { onSkip });
+    expect(screen.getByTestId("flow-skip").textContent).toContain(he.flowSkipButton);
+    fireEvent.click(screen.getByTestId("flow-tab-done"));
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("0");
+    expect(screen.queryByTestId("flow-skip")).toBeNull();
+    const video = screen.getByTestId("flow-captured");
+    expect(video.tagName).toBe("VIDEO");
+    expect(video.getAttribute("src")).toBe("blob:kept");
+    expect(screen.getByTestId("flow-primary").textContent).toBe(he.flowReviewRetake);
+  });
+
+  it("a card whose send failed still shows its take: nothing is lost", () => {
+    const failed: SlotUiState = { status: "failed", kind: "video", previewUrl: "blob:failed", error: "boom" };
+    renderStack(videos(1), [failed], { onSkip: vi.fn() });
+    expect(screen.getByTestId("flow-captured").getAttribute("src")).toBe("blob:failed");
+    expect(screen.queryByTestId("flow-skip")).toBeNull();
+    expect(screen.getByTestId("flow-primary").textContent).toBe(he.flowReviewRetake);
+  });
+
+  it("a kept card without a file still does not offer « לא ניתן לצלם »", () => {
+    renderStack(videos(1), [{ status: "ready", kind: "video" }], { onSkip: vi.fn() });
+    fireEvent.click(screen.getByTestId("flow-tab-done"));
+    expect(screen.queryByTestId("flow-skip")).toBeNull();
+    expect(screen.getByTestId("flow-captured-missing").textContent).toBe(he.flowTabReady);
+  });
+
+  it("reopening a kept photo shows the picture", () => {
+    const ready: SlotUiState = { status: "ready", kind: "photo", previewUrl: "blob:photo" };
+    renderStack([{ kind: "photo", title: "מדף" }, { kind: "photo", title: "קופה" }], [ready, idle("photo")], { onSkip: vi.fn() });
+    fireEvent.click(screen.getByTestId("flow-tab-done"));
+    const photo = screen.getByTestId("flow-captured");
+    expect(photo.tagName).toBe("IMG");
+    expect(photo.getAttribute("src")).toBe("blob:photo");
+  });
+
   it("folds a sent card above with its send time and a check badge", () => {
     renderStack(videos(3), [sent(), idle(), idle()]);
     const done = screen.getByTestId("flow-tab-done");

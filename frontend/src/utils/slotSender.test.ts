@@ -27,12 +27,31 @@ function deps(over: Partial<SlotSenderDeps> = {}): SlotSenderDeps {
     uploadFile: vi.fn(async () => ({ url: "/u/v.webm" })),
     uploadPoster: vi.fn(async () => ({ url: "/u/p.jpg" })),
     submit: vi.fn(async () => ({ task_submitted: false })) as never,
+    start: vi.fn(async () => ({})),
     makePoster: vi.fn(async () => new File(["p"], "poster.jpg")),
     ...over,
   };
 }
 
 describe("sendQueuedSlot", () => {
+  it("starts a task that was not started yet, then sends the slot again (the file is uploaded once)", async () => {
+    const submit = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("יש להתחיל את המשימה לפני הסיום"))
+      .mockResolvedValueOnce({ task_submitted: false });
+    const d = deps({ submit: submit as never });
+    await sendQueuedSlot(entry(), d);
+    expect(d.start).toHaveBeenCalledWith(entry().occurrenceId);
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(d.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start the task for any other refusal", async () => {
+    const d = deps({ submit: vi.fn(async () => Promise.reject(new Error("סוג המדיה אינו תואם"))) as never });
+    await expect(sendQueuedSlot(entry(), d)).rejects.toThrow("סוג המדיה");
+    expect(d.start).not.toHaveBeenCalled();
+  });
+
   it("téléverse le fichier puis déclare la sous-tâche avec durée, heure et vignette", async () => {
     const d = deps();
     await sendQueuedSlot(entry(), d);

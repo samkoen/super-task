@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Box, Snackbar, Typography } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import CloudOffRoundedIcon from "@mui/icons-material/CloudOffRounded";
+import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { flowColor, flowRadius, flowText } from "../../styles/flowTokens";
 import { flowToastContent, type FlowToastState } from "../../utils/flowToast";
@@ -13,11 +13,11 @@ type Props = { toast: FlowToastState | null; onClose: () => void; durationMs?: n
 
 const toneStyle = {
   success: { Icon: CheckRoundedIcon, bg: flowColor.green300, fg: flowColor.green700 },
-  pending: { Icon: CloudOffRoundedIcon, bg: flowColor.orange300, fg: flowColor.navy800 },
+  pending: { Icon: CloudOutlinedIcon, bg: flowColor.yellow300, fg: flowColor.navy800 },
   error: { Icon: ErrorOutlineRoundedIcon, bg: flowColor.neutral300, fg: flowColor.navy800 },
 } as const;
 
-/** Toast 09 « נשלח » ou 09b « נשמר במכשיר », en haut de l'écran sous l'en-tête. */
+/** Toast 09 « נשמר • נשארו עוד 2 משימות » (réseau là) ou 09ב « הסרטון נשמר במכשיר » (sans réseau), sur une ligne. */
 export default function FlowToast({ toast, onClose, durationMs = TOAST_MS }: Props) {
   useEffect(() => {
     if (!toast) return;
@@ -50,14 +50,15 @@ export default function FlowToast({ toast, onClose, durationMs = TOAST_MS }: Pro
         <Box sx={{ width: 28, height: 28, display: "grid", placeItems: "center", borderRadius: "50%", bgcolor: style.bg, flexShrink: 0 }}>
           <style.Icon sx={{ fontSize: 18, color: style.fg }} />
         </Box>
-        <Box>
-          <Typography data-testid="flow-toast-title" sx={flowText.button}>{content?.title}</Typography>
+        <Typography component="p" sx={{ ...flowText.button, maxWidth: "calc(100vw - 96px)", overflowWrap: "anywhere" }}>
+          <span data-testid="flow-toast-title">{content?.title}</span>
           {content?.subtitle ? (
-            <Typography data-testid="flow-toast-subtitle" sx={{ ...flowText.caption, color: flowColor.alphaNeutral0_80 }}>
-              {content.subtitle}
-            </Typography>
+            <>
+              {" • "}
+              <span data-testid="flow-toast-subtitle">{content.subtitle}</span>
+            </>
           ) : null}
-        </Box>
+        </Typography>
       </Box>
     </Snackbar>
   );

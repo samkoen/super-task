@@ -96,6 +96,21 @@ function previewOf(entry: QueuedSlot): string | null {
 function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): SlotUiState {
   // Déjà reçu par le serveur, ou copie locale qu'on ne renverra plus : la file ne réécrit pas l'état.
   if (!entry || state.status === "sent" || entry.status === "acked") return state;
+  if (entry.status === "draft") {
+    // Filmé puis l'app a été quittée avant « אישור » : la revue (08) se rouvre sur la même prise.
+    // Photo et audio n'ont pas d'écran de revue : leur prise compte comme confirmée.
+    return {
+      ...state,
+      status: entry.kind === "video" ? "filmed" : "ready",
+      capturedAt: entry.capturedAt,
+      durationSeconds: entry.durationSeconds,
+      lightOk: entry.lightOk ?? null,
+      location: entry.location ?? null,
+      previewUrl: previewOf(entry),
+      remark: null,
+      error: null,
+    };
+  }
   if (entry.status === "held") {
     // Confirmé avant un rechargement : la carte est « prête », il ne manque que l'envoi final.
     return {
@@ -103,6 +118,7 @@ function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): Slot
       status: "ready",
       capturedAt: entry.capturedAt,
       durationSeconds: entry.durationSeconds,
+      lightOk: entry.lightOk ?? null,
       location: entry.location ?? null,
       previewUrl: previewOf(entry),
       error: null,
@@ -113,6 +129,10 @@ function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): Slot
     status: entry.status === "failed" ? "failed" : "queued",
     capturedAt: entry.capturedAt,
     durationSeconds: entry.durationSeconds,
+    lightOk: entry.lightOk ?? null,
+    location: entry.location ?? null,
+    // La prise est encore sur l'appareil : elle reste visible (vignette, carte) en attendant l'envoi.
+    previewUrl: state.previewUrl ?? previewOf(entry),
     error: entry.lastError ?? null,
   };
 }

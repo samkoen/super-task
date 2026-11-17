@@ -1,5 +1,6 @@
 ﻿import { Box, ButtonBase, Typography } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import CloudOutlinedIcon from "@mui/icons-material/CloudOutlined";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
@@ -7,7 +8,7 @@ import dotsIcon from "../../assets/flow1/dots.svg";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { flowMaskSx, flowShape } from "../../styles/flowShapes";
 import { flowColor, flowRadius, flowSize, flowText, flowToneColor, type FlowTone } from "../../styles/flowTokens";
-import { stepNumber, tabStatusText } from "../../utils/flowStack";
+import { stepNumber, tabBadge, tabStatusText, type TabBadge } from "../../utils/flowStack";
 import type { SlotUiState } from "../../utils/slotUploadState";
 
 /**
@@ -65,31 +66,39 @@ function Thumbnail({ state }: { state: SlotUiState }) {
   );
 }
 
-function StatusBadge({ state }: { state: SlotUiState }) {
-  const sent = state.status === "sent";
-  const skipped = state.status === "skipped";
-  const Icon = sent ? CheckRoundedIcon : state.status === "failed" || skipped ? ErrorOutlineRoundedIcon : ScheduleRoundedIcon;
+const badgeStyle: Record<TabBadge, { Icon: typeof CheckRoundedIcon; bg: string; fg: string }> = {
+  done: { Icon: CheckRoundedIcon, bg: flowColor.green300, fg: flowColor.green700 },
+  waiting: { Icon: CloudOutlinedIcon, bg: flowColor.yellow300, fg: flowColor.navy800 },
+  skipped: { Icon: ErrorOutlineRoundedIcon, bg: flowColor.yellow300, fg: flowColor.navy800 },
+  failed: { Icon: ErrorOutlineRoundedIcon, bg: flowColor.neutral300, fg: flowColor.navy800 },
+  pending: { Icon: ScheduleRoundedIcon, bg: flowColor.neutral300, fg: flowColor.navy800 },
+};
+
+function StatusBadge({ state, online }: { state: SlotUiState; online: boolean }) {
+  const badge = tabBadge(state, online);
+  const { Icon, bg, fg } = badgeStyle[badge];
   return (
     <Box
       data-testid="flow-tab-badge"
       data-status={state.status}
+      data-badge={badge}
       sx={{
         width: 23.4,
         height: 23.4,
         flexShrink: 0,
         display: "grid",
         placeItems: "center",
-        bgcolor: sent ? flowColor.green300 : skipped ? flowColor.yellow300 : flowColor.neutral300,
+        bgcolor: bg,
         borderRadius: `${flowRadius.sm}px 11.7px 11.7px 11.7px`,
       }}
     >
-      <Icon sx={{ fontSize: 15, color: sent ? flowColor.green700 : flowColor.navy800 }} />
+      <Icon sx={{ fontSize: 15, color: fg }} />
     </Box>
   );
 }
 
 /** Onglet d'une carte déjà remise : vignette, « נשלח 06:43 » (ou « ממתין להעלאה »), coche. */
-export function FlowDoneTab({ index, state, variant, onSelect, zIndex }: Omit<TabProps, "title" | "tone">) {
+export function FlowDoneTab({ index, state, variant, onSelect, zIndex, online = true }: Omit<TabProps, "title" | "tone"> & { online?: boolean }) {
   return (
     <ButtonBase
       data-testid="flow-tab-done"
@@ -117,10 +126,10 @@ export function FlowDoneTab({ index, state, variant, onSelect, zIndex }: Omit<Ta
       <Box sx={{ display: "flex", alignItems: "center", gap: "23px", minWidth: 0 }}>
         <Thumbnail state={state} />
         <Typography sx={{ ...flowText.caption, color: flowColor.navy800, whiteSpace: "nowrap" }}>
-          {tabStatusText(state)}
+          {tabStatusText(state, online)}
         </Typography>
       </Box>
-      <StatusBadge state={state} />
+      <StatusBadge state={state} online={online} />
     </ButtonBase>
   );
 }

@@ -1,5 +1,6 @@
 import { taskService, type SubmitSlotResponse } from "../services/taskService";
 import type { CompletionAttachment } from "./completionMedia";
+import { isCompleteBlockedUntilStart } from "./employeeDoTask";
 import { posterFileFromVideoSrc } from "./videoPosterFile";
 import {
   createDefaultSlotStorage,
@@ -12,6 +13,8 @@ export type SlotSenderDeps = {
   uploadFile: (kind: QueuedSlot["kind"], file: File) => Promise<{ url: string }>;
   uploadPoster: (file: File) => Promise<{ url: string }>;
   submit: typeof taskService.submitSlot;
+  /** Démarre la tâche (« in_progress ») quand le serveur refuse un envoi sur une tâche pas encore commencée. */
+  start: (occurrenceId: string) => Promise<unknown>;
   makePoster: (file: File) => Promise<File | null>;
 };
 
@@ -24,6 +27,7 @@ const defaultDeps: SlotSenderDeps = {
         : taskService.uploadAudio(file),
   uploadPoster: (file) => taskService.uploadPhoto(file),
   submit: taskService.submitSlot,
+  start: taskService.start,
   makePoster: async (file) => {
     const src = URL.createObjectURL(file);
     try {
@@ -61,6 +65,26 @@ export function attachmentFromUpload(entry: QueuedSlot, url: string, posterUrl?:
   };
 }
 
+/**
+ * Déclare une sous-tâche au serveur. Le FLOW s'ouvre aussi sur une tâche pas encore commencée
+ * (« pending », « overdue ») : le serveur refuse alors l'envoi (« יש להתחיל את המשימה ») ;
+ * on démarre la tâche puis on renvoie une fois.
+ */
+export async function submitSlotStarting(
+  occurrenceId: string,
+  slotIndex: number,
+  attachment: CompletionAttachment,
+  deps: Pick<SlotSenderDeps, "submit" | "start"> = defaultDeps,
+): Promise<SubmitSlotResponse> {
+  try {
+    return await deps.submit(occurrenceId, slotIndex, attachment);
+  } catch (error) {
+    if (!isCompleteBlockedUntilStart(error)) throw error;
+    await deps.start(occurrenceId);
+    return deps.submit(occurrenceId, slotIndex, attachment);
+  }
+}
+
 /** Téléverse le fichier gardé sur l'appareil, puis déclare la sous-tâche au serveur. */
 export async function sendQueuedSlot(
   entry: QueuedSlot,
@@ -69,7 +93,7 @@ export async function sendQueuedSlot(
   const file = asFile(entry);
   const { url } = await deps.uploadFile(entry.kind, file);
   const posterUrl = entry.kind === "video" ? await uploadPosterQuietly(file, deps) : undefined;
-  return deps.submit(entry.occurrenceId, entry.slotIndex, attachmentFromUpload(entry, url, posterUrl));
+  return submitSlotStarting(entry.occurrenceId, entry.slotIndex, attachmentFromUpload(entry, url, posterUrl), deps);
 }
 
 let shared: SlotUploadQueue | null = null;
