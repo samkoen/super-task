@@ -12,7 +12,7 @@ from app.domain.completion_media import (
     attachment_is_filled,
     normalize_attachments,
 )
-from app.domain.slot_review import SLOT_REJECTED, review_of, same_content
+from app.domain.slot_review import SLOT_REJECTED, review_of, same_content, with_previous_review
 from app.domain.slot_skip import is_skipped, same_skip
 
 _UNKNOWN_SLOT = "תת-משימה לא קיימת"
@@ -55,7 +55,7 @@ def merge_slot(
     current = [dict(item) for item in stored or []]
     for position in range(len(current), len(requirements)):
         current.append(empty_slot(requirements[position]["kind"]))
-    current[index] = attachment
+    current[index] = with_previous_review(current[index], attachment)
     return current
 
 

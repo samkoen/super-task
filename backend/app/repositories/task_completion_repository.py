@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -145,6 +147,8 @@ class TaskCompletionRepository:
         row.manager_reviewed_at = None
         row.rejection_note = None
         row.quality_rating = None
+        # Renvoi après un refus : « נשלח 09:12 » côté menahel, pas l'heure du premier envoi.
+        row.completed_at = datetime.now(timezone.utc)
         if media_ready is not None:
             row.media_ready = media_ready
         self._db.flush()

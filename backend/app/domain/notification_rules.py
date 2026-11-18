@@ -95,3 +95,15 @@ def recipients_for_task_event(
         return recipients
 
     return recipients
+
+
+REOPEN_NOTE_MAX = 300
+
+
+def reopen_notification_message(base: str, task_title: str | None, note: str | None) -> str:
+    """« המנהל פתח מחדש את המשימה: X » suivi de ce qu'il faut corriger, pour que l'oved le lise sans ouvrir la tâche."""
+    detail = f": {task_title}" if task_title else ""
+    text = (note or "").strip()
+    if len(text) > REOPEN_NOTE_MAX:
+        text = text[: REOPEN_NOTE_MAX - 1].rstrip() + "…"
+    return f"{base}{detail}\n{text}" if text else f"{base}{detail}"

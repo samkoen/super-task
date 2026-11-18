@@ -79,6 +79,12 @@ describe("wizardContext", () => {
     expect(network(touched).selectedIds).toEqual(["b2"]);
   });
 
+  it("selects no branch for a one-time task until the manager picks one", () => {
+    const once = network(ready({ taskKind: "ad_hoc" }));
+    expect(once.selectedIds).toEqual([]);
+    expect(firstBlockedStep(ready({ taskKind: "ad_hoc", dueAt: "2026-11-18T09:00" }), once)).toBe("where");
+  });
+
   it("uses only the own branch for a branch manager", () => {
     const ctx = wizardContext(ready(), {
       branches: [],

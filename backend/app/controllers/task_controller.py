@@ -124,6 +124,7 @@ def _emit_task_event(
     item: dict,
     *,
     occurrence_id: str | None | object = _UNSET,
+    reopen_note: str | None = None,
 ) -> None:
     """Commit DB changes before SSE so refetching clients see fresh data."""
     # Après hard-delete (ביטול), ne pas lier la notif à l'occurrence disparue (FK).
@@ -136,6 +137,7 @@ def _emit_task_event(
         occurrence_id=linked_occurrence_id,
         task_title=item.get("title"),
         created_by_user_id=item.get("created_by_id"),
+        reopen_note=reopen_note,
     )
     db.commit()
     _notify_occurrence(event_type, item)
@@ -727,7 +729,7 @@ async def reopen_occurrence(
     note = ((data or {}).get("rejection_note") or "").strip() or "נא לתקן לפי ההודעה"
     item = service.reopen_occurrence(actor, occurrence_id, rejection_note=note)
     chat = await messages.post_message(actor, occurrence_id, body=note)
-    _emit_task_event(db, "task_reopened", chat.get("occurrence") or item)
+    _emit_task_event(db, "task_reopened", chat.get("occurrence") or item, reopen_note=note)
     return {
         "message": "הודעה נשלחה והמשימה נפתחה מחדש",
         "occurrence": chat["occurrence"],
@@ -760,7 +762,7 @@ async def review_occurrence_slots(
         _emit_task_event(db, "task_approved", item)
         return {"message": "המשימה אושרה ונסגרה", "outcome": outcome, "occurrence": item}
     chat = await messages.post_message(actor, occurrence_id, body=summary)
-    _emit_task_event(db, "task_reopened", chat.get("occurrence") or item)
+    _emit_task_event(db, "task_reopened", chat.get("occurrence") or item, reopen_note=summary)
     return {
         "message": "המשימה נפתחה מחדש לעובד",
         "outcome": outcome,
@@ -784,7 +786,7 @@ async def reopen_closed_occurrence(
     if note:
         chat = await messages.post_message(actor, occurrence_id, body=note)
         item = chat.get("occurrence") or item
-    _emit_task_event(db, "task_reopened", item)
+    _emit_task_event(db, "task_reopened", item, reopen_note=note)
     return {"message": "המשימה נפתחה מחדש לעובד", "occurrence": item}
 
 

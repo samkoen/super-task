@@ -60,3 +60,12 @@ def test_sounds_employee_vs_manager():
     assert notification_sound_for("direct_message", recipient_is_employee=False) == SOUND_NONE
     assert notification_sound_for("task_message_manager", recipient_is_employee=True) == SOUND_TASK_END
     assert notification_sound_for("task_message_employee", recipient_is_employee=False) == SOUND_NONE
+
+
+def test_reopen_message_tells_the_oved_what_to_fix():
+    from app.domain.notification_rules import REOPEN_NOTE_MAX, reopen_notification_message
+
+    assert reopen_notification_message("נפתח", "מדף", "להזיז את הקרטון") == "נפתח: מדף\nלהזיז את הקרטון"
+    assert reopen_notification_message("נפתח", "מדף", "  ") == "נפתח: מדף"
+    long = reopen_notification_message("נפתח", None, "א" * 500)
+    assert len(long.split("\n")[1]) == REOPEN_NOTE_MAX

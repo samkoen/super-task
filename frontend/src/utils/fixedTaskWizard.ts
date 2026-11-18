@@ -131,6 +131,14 @@ export function rowsWithoutEmployee(rows: BranchAssigneeRow[]): string[] {
   return rows.filter((r) => r.candidates.length === 0).map((r) => r.branchName);
 }
 
+/**
+ * Rien de choisi encore : une tâche fixe vise tout le réseau (cas habituel), mais une tâche ponctuelle
+ * ne part dans aucun snif tant que le menahel n'en coche pas un (sinon 12 magasins la recevaient par mégarde).
+ */
+function untouchedBranchIds(form: Pick<WizardForm, "taskKind">, allBranchIds: string[]): string[] {
+  return form.taskKind === "ad_hoc" ? [] : allBranchIds;
+}
+
 export function wizardContext(
   form: WizardForm,
   input: {
@@ -144,7 +152,7 @@ export function wizardContext(
   const selectedIds = input.canPickBranch
     ? form.branchesTouched
       ? form.selectedBranchIds.filter((id) => allBranchIds.includes(id))
-      : allBranchIds
+      : untouchedBranchIds(form, allBranchIds)
     : [input.defaultBranchId];
   const rows = input.canPickBranch
     ? buildAssigneeRows(input.branches, selectedIds, input.employees, form.branchChoices)

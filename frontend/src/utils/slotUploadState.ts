@@ -40,6 +40,8 @@ export type SlotUiState = {
   text?: string | null;
   /** Remarque du menahel quand il a refusé cette sous-tâche. */
   remark?: string | null;
+  /** Image figée de la prise refusée, avec les ronds et flèches du menahel. */
+  remarkImageUrl?: string | null;
   error?: string | null;
   /** Renseigné quand `status` vaut « skipped ». */
   skip?: SlotSkipState | null;
@@ -68,7 +70,7 @@ function stateFromAttachment(
     sentAt: item?.captured_at ?? null,
   };
   if (fill.review?.status === "rejected") {
-    return { ...base, status: "idle", remark: fill.review.remark || "", sentAt: null };
+    return { ...base, status: "idle", remark: fill.review.remark || "", remarkImageUrl: fill.review.annotated_url || null, sentAt: null };
   }
   return base;
 }
@@ -108,6 +110,7 @@ function withQueueEntry(state: SlotUiState, entry: QueuedSlot | undefined): Slot
       location: entry.location ?? null,
       previewUrl: previewOf(entry),
       remark: null,
+      remarkImageUrl: null,
       error: null,
     };
   }
@@ -182,6 +185,7 @@ export function markFilmed(
     lightOk: media.lightOk ?? null,
     previewUrl: media.previewUrl ?? null,
     remark: null,
+    remarkImageUrl: null,
     error: null,
     skip: null,
   });
@@ -204,6 +208,7 @@ export function markSkipped(
     location: null,
     previewUrl: null,
     remark: null,
+    remarkImageUrl: null,
     error: null,
   });
 }
@@ -257,6 +262,7 @@ export function markReady(states: SlotUiState[], index: number, nowIso: string, 
     capturedAt: current.capturedAt ?? nowIso,
     ...(text !== undefined ? { text } : {}),
     remark: null,
+    remarkImageUrl: null,
     error: null,
   });
 }
@@ -282,7 +288,7 @@ export function applyQueueEvent(
   if (event.type === "failed") {
     return patch(states, index, { status: "failed", error: event.entry.lastError ?? null });
   }
-  return patch(states, index, { status: "sent", sentAt: nowIso(), error: null, remark: null });
+  return patch(states, index, { status: "sent", sentAt: nowIso(), error: null, remark: null, remarkImageUrl: null });
 }
 
 /** Remise au serveur faite ou en cours : l'oved n'a plus rien à filmer pour cette case. */

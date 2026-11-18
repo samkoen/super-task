@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, ButtonBase, CircularProgress, TextField, Typography } from "@mui/material";
 import FormDialog from "../../ui/FormDialog";
 import PhotoAnnotationCanvas, { type PhotoAnnotationCanvasHandle } from "../../media/PhotoAnnotationCanvas";
 import { ReviewableVideo } from "../MarkVideoFrameButton";
 import { useResolvedMediaSrc } from "../../../hooks/useResolvedMediaSrc";
 import { he } from "../../../i18n/he";
-import { employeeFieldSx, employeePrimaryButtonSx } from "../../../styles/employeeUi";
-import { dialogSecondaryActionSx } from "../../../styles/dialogUi";
+import { employeeFieldSx } from "../../../styles/employeeUi";
+import { flowColor, flowText } from "../../../styles/flowTokens";
+import { studioPrimarySx } from "../fixed/studio/studioUi";
 import type { CompletionKind } from "../../../utils/completionMedia";
 import { REMARK_MAX, rejectedDraft, type SlotDraft } from "../../../utils/slotReview";
 
@@ -64,14 +65,15 @@ export default function SlotRemarkDialog({ open, title, kind, mediaUrl, initial,
       onClose={onClose}
       busy={busy}
       actions={
-        <>
-          <Button onClick={onClose} disabled={busy} sx={dialogSecondaryActionSx}>
+        <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: "4px" }}>
+          {/* Même bouton noir que « אישור » / « שליחה לתיקון » de la revue. */}
+          <ButtonBase data-testid="slot-remark-save" onClick={() => void save()} disabled={busy} sx={studioPrimarySx}>
+            {busy ? <CircularProgress size={24} sx={{ color: flowColor.neutral0 }} /> : he.slotRemarkSave}
+          </ButtonBase>
+          <ButtonBase onClick={onClose} disabled={busy} sx={{ ...flowText.button, height: 44, color: flowColor.neutral900 }}>
             {he.cancel}
-          </Button>
-          <Button variant="contained" onClick={() => void save()} disabled={busy} sx={employeePrimaryButtonSx}>
-            {busy ? <CircularProgress size={24} color="inherit" /> : he.slotRemarkSave}
-          </Button>
-        </>
+          </ButtonBase>
+        </Box>
       }
     >
       <Typography fontWeight={800} sx={{ fontSize: "1.1rem" }}>
@@ -89,7 +91,7 @@ export default function SlotRemarkDialog({ open, title, kind, mediaUrl, initial,
         <PhotoAnnotationCanvas
           ref={canvasRef}
           image={imageSource}
-          hint={kind === "photo" ? he.slotRemarkHintPhoto : undefined}
+          hint={kind === "photo" ? he.slotRemarkHintPhoto : he.slotRemarkHintDraw}
         />
       ) : null}
       <TextField
@@ -106,6 +108,11 @@ export default function SlotRemarkDialog({ open, title, kind, mediaUrl, initial,
       {error ? <Alert severity="error">{error}</Alert> : null}
     </FormDialog>
   );
+}
+
+/** Écran peu haut : la vidéo laisse la place aux outils et au bouton du bas. */
+function remarkVideoMaxHeight(): number {
+  return Math.round(Math.max(180, Math.min(window.innerHeight * 0.4, 320)));
 }
 
 async function exportAnnotated(
@@ -144,7 +151,7 @@ function VideoFramePicker({
       <Typography variant="body2" color="text.secondary" mb={1}>
         {he.slotRemarkHintVideo}
       </Typography>
-      <ReviewableVideo src={resolved.src} onMarkFrame={onFrame} maxHeight={320} />
+      <ReviewableVideo src={resolved.src} onMarkFrame={onFrame} maxHeight={remarkVideoMaxHeight()} />
     </Box>
   );
 }

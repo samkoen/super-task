@@ -58,6 +58,11 @@ describe("reviewSubtitle", () => {
     expect(reviewSubtitle(task({ department_name: "ירקות" }))).toBe("דני · ירקות · נשלח 06:47");
   });
 
+  it("says « נשלח שוב » when a take answers a refusal", () => {
+    const completion = { ...task().completion, completion_attachments: [{ kind: "video", url: "/a.webm", previous_review: { remark: "x" } }] };
+    expect(reviewSubtitle(task({ completion } as never))).toBe("דני · נשלח שוב 06:47");
+  });
+
   it("drops unknown parts", () => {
     expect(reviewSubtitle(task({ assignee_name: null, completion: null }))).toBe("");
   });

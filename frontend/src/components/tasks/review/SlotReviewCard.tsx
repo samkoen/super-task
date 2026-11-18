@@ -52,6 +52,7 @@ export default function SlotReviewCard(props: Props) {
         verdict={draft?.status}
         previouslyApproved={previouslyApproved}
       />
+      <PreviousAsk item={item} onEnlarge={(src) => onEnlarge(src, "photo")} />
       <SlotMedia attachment={item.attachment} title={item.title} videoPending={videoPending} onEnlarge={onEnlarge} />
       <VerdictButtons
         verdict={draft?.status}
@@ -63,6 +64,17 @@ export default function SlotReviewCard(props: Props) {
       {draft?.status === "rejected" ? (
         <RejectedRemark draft={draft} disabled={disabled} onEdit={onReject} onEnlarge={(src) => onEnlarge(src, "photo")} />
       ) : null}
+    </Box>
+  );
+}
+
+/** Renvoi après un refus : ce que le menahel avait demandé, pour vérifier que c'est corrigé. */
+function PreviousAsk({ item, onEnlarge }: { item: ReviewItem; onEnlarge: (src: string) => void }) {
+  const previous = item.attachment.previous_review;
+  if (!previous) return null;
+  return (
+    <Box data-testid="slot-previous-ask">
+      <SlotRemarkView label={he.slotReviewPreviousAsk} remark={previous.remark} imageUrl={previous.annotated_url} onEnlarge={onEnlarge} />
     </Box>
   );
 }

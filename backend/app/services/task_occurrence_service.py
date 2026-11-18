@@ -33,6 +33,7 @@ from app.domain.slot_review import (
     normalize_decisions,
     rejection_summary,
     required_indices,
+    reject_for_reopen,
     review_outcome,
     strip_reviews,
 )
@@ -997,12 +998,14 @@ class TaskOccurrenceService:
         cleared = self._completions.clear_approved_review(occurrence_id, rejection_note=note)
         assert cleared is not None
         if cleared.completion_attachments:
-            cleared = (
-                self._completions.update_attachments(
-                    occurrence_id, strip_reviews(cleared.completion_attachments)
-                )
-                or cleared
+            _, reqs = self._media_requirements(occurrence)
+            redo = reject_for_reopen(
+                strip_reviews(cleared.completion_attachments),
+                requirement_count=len(reqs),
+                remark=note,
+                reviewed_at=datetime.now(TZ).isoformat(),
             )
+            cleared = self._completions.update_attachments(occurrence_id, redo) or cleared
         updated = self._occurrences.reopen_after_review(occurrence_id)
         assert updated is not None
         self._media_retention.cancel_purge(occurrence_id)

@@ -31,7 +31,9 @@ export function queuePosition(queue: ReviewQueueEntry[], currentId: string, deci
 /** « דני · מחסן · נשלח 06:47 » : seulement les morceaux connus. */
 export function reviewSubtitle(task: TaskOccurrence): string {
   const time = formatClockTime(task.completion?.completed_at);
-  const parts = [task.assignee_name?.trim(), task.department_name?.trim(), time ? he.managerReviewSentAt(time) : ""];
+  const resent = (task.completion?.completion_attachments ?? []).some((item) => item.previous_review);
+  const sent = time ? (resent ? he.managerReviewResentAt(time) : he.managerReviewSentAt(time)) : "";
+  const parts = [task.assignee_name?.trim(), task.department_name?.trim(), sent];
   return parts.filter(Boolean).join(" · ");
 }
 

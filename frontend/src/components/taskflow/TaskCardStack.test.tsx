@@ -221,4 +221,11 @@ describe("TaskCardStack", () => {
     expect(screen.queryByTestId("flow-retry")).toBeNull();
     expect(screen.getByTestId("flow-guide").textContent).toBe(he.flowExampleLink);
   });
+
+  it("shows the manager's drawing under the remark and enlarges it on tap", async () => {
+    const refused: SlotUiState = { status: "idle", kind: "video", remark: "קרוב יותר", remarkImageUrl: "/uploads/marked.jpg" };
+    renderStack(videos(1), [refused]);
+    fireEvent.click(await screen.findByTestId("flow-card-remark-image"));
+    expect(await screen.findByTestId("flow-card-remark-image-close")).toBeTruthy();
+  });
 });

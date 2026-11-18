@@ -126,3 +126,12 @@ def test_slot_already_sent_detects_same_file_for_same_slot():
 def test_slot_already_sent_is_false_for_rejected_slot_with_same_file():
     stored = [{"kind": "photo", "url": "/uploads/a.jpg", "review": {"status": "rejected"}}]
     assert not slot_already_sent(stored, 0, {"kind": "photo", "url": "/uploads/a.jpg"})
+
+
+def test_merge_slot_keeps_the_refusal_the_new_take_answers():
+    from app.domain.slot_submit import merge_slot
+
+    stored = [{"kind": "photo", "url": "/uploads/old.jpg", "review": {"status": "rejected", "remark": "חסר"}}]
+    merged = merge_slot(stored, [{"kind": "photo"}], 0, {"kind": "photo", "url": "/uploads/new.jpg"})
+    assert merged[0]["previous_review"] == {"remark": "חסר"}
+    assert "review" not in merged[0]

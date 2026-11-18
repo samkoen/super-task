@@ -210,3 +210,25 @@ def test_strip_reviews_removes_only_review_key():
     reviewed = apply_decisions(_photos(1), {0: {"status": "approved"}}, reviewed_at=NOW)
     assert strip_reviews(reviewed) == _photos(1)
     assert strip_reviews(None) == []
+
+
+def test_previous_review_follows_the_take_that_replaces_a_refused_one():
+    from app.domain.slot_review import with_previous_review
+
+    refused = {"kind": "video", "url": "/uploads/a.webm", "review": {"status": "rejected", "remark": "קרוב יותר", "annotated_url": "/uploads/m.jpg", "reviewed_at": "t1"}}
+    new = with_previous_review(refused, {"kind": "video", "url": "/uploads/b.webm"})
+    assert new["previous_review"] == {"remark": "קרוב יותר", "annotated_url": "/uploads/m.jpg", "reviewed_at": "t1"}
+    same = with_previous_review(new, {"kind": "video", "url": "/uploads/b.webm"})
+    assert same["previous_review"]["remark"] == "קרוב יותר"
+    approved = {"kind": "video", "url": "/uploads/a.webm", "review": {"status": "approved"}}
+    assert "previous_review" not in with_previous_review(approved, {"kind": "video", "url": "/uploads/c.webm"})
+
+
+def test_reject_for_reopen_marks_every_required_slot_with_the_note():
+    from app.domain.slot_review import reject_for_reopen
+
+    items = [{"kind": "video", "url": "/uploads/a.webm"}, {"kind": "video", "skipped": {"reason_code": "no_stock"}}, {"kind": "photo", "url": "/uploads/extra.jpg"}]
+    out = reject_for_reopen(items, requirement_count=2, remark=" לצלם שוב ", reviewed_at="t")
+    assert [o.get("review", {}).get("status") for o in out] == ["rejected", "rejected", None]
+    assert out[0]["review"]["remark"] == "לצלם שוב"
+    assert "remark" not in reject_for_reopen(items, requirement_count=2, remark=None, reviewed_at="t")[0]["review"]

@@ -6,6 +6,10 @@ import { directChatService } from "../../services/directChatService";
 import { taskService } from "../../services/taskService";
 import { taskChatListTitle } from "../../utils/employeeTaskChats";
 
+vi.mock("react-router-dom", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router-dom")>()),
+  useNavigate: () => vi.fn(),
+}));
 vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
 }));

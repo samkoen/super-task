@@ -131,12 +131,46 @@ def carry_over_reviews(
 
 
 def _carried(prior: dict | None, item: dict, index: int, requirement_count: int) -> dict:
+    item = with_previous_review(prior, item)
     review = review_of(prior)
     if review is None or not same_content(prior, item):
         return item
     if review["status"] == SLOT_APPROVED or _optional_index(index, requirement_count):
         return {**item, "review": review}
     return item
+
+
+def with_previous_review(prior: dict | None, item: dict) -> dict:
+    """Garde sur la nouvelle prise le refus qu'elle corrige (remarque, image annotée).
+
+    Le menahel revoit ainsi ce qu'il avait demandé ; le même fichier renvoyé garde l'historique déjà posé.
+    """
+    if not prior:
+        return item
+    if same_content(prior, item):
+        kept = prior.get("previous_review")
+        return {**item, "previous_review": kept} if isinstance(kept, dict) else item
+    review = review_of(prior)
+    if review is None or review["status"] != SLOT_REJECTED:
+        return item
+    fields = {k: review[k] for k in ("remark", "annotated_url", "reviewed_at") if review.get(k)}
+    return {**item, "previous_review": fields}
+
+
+def reject_for_reopen(
+    attachments: list[dict], *, requirement_count: int, remark: str | None, reviewed_at: str
+) -> list[dict]:
+    """« פתח מחדש » sur une tâche fermée : chaque sous-tâche exigée est à refaire, avec la remarque.
+
+    Sans cela, toutes les cases restent « rendues » et l'oved ne peut plus rien renvoyer.
+    """
+    review: dict = {"status": SLOT_REJECTED, "reviewed_at": reviewed_at}
+    if (remark or "").strip():
+        review["remark"] = remark.strip()[:MAX_REMARK]
+    return [
+        {**item, "review": dict(review)} if index < requirement_count else dict(item)
+        for index, item in enumerate(attachments)
+    ]
 
 
 def _optional_index(index: int, requirement_count: int) -> bool:

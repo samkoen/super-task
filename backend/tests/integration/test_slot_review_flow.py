@@ -258,7 +258,17 @@ def test_oved_cannot_review_slots(client_mgr, client_emp, world_seed, jpeg_bytes
     assert response.status_code in {401, 403}, response.text
 
 
-def test_reopen_closed_clears_slot_reviews(client_mgr, client_emp, world_seed, jpeg_bytes):
+def _send_slot(client_emp, occ_id: str, index: int, url: str):
+    return client_emp.post(
+        f"/api/tasks/occurrences/{occ_id}/slots/{index}/submit",
+        json={"attachment": {"kind": "photo", "url": url}},
+    )
+
+
+def test_reopen_closed_asks_every_slot_again_so_the_oved_can_resend(
+    client_mgr, client_emp, world_seed, jpeg_bytes, mock_i18n
+):
+    """« פתח מחדש » après acceptation : chaque sous-tâche est à refaire, sinon l'oved reste bloqué."""
     occ_id, _ = _pending_review(client_mgr, client_emp, world_seed, jpeg_bytes)
     _review(
         client_mgr,
@@ -266,10 +276,51 @@ def test_reopen_closed_clears_slot_reviews(client_mgr, client_emp, world_seed, j
         [{"index": 0, "status": "approved"}, {"index": 1, "status": "approved"}],
         quality_rating=5,
     )
-    reopened = client_mgr.post(f"/api/tasks/occurrences/{occ_id}/reopen-closed")
+    reopened = client_mgr.post(
+        f"/api/tasks/occurrences/{occ_id}/reopen-closed", json={"rejection_note": "חסר המדף העליון"}
+    )
     assert reopened.status_code == 200, reopened.text
-    attachments = reopened.json()["occurrence"]["completion"]["completion_attachments"]
-    assert all("review" not in item for item in attachments)
+    task = client_mgr.get(f"/api/tasks/occurrences/{occ_id}").json()
+    assert task["status"] == "in_progress"
+    attachments = task["completion"]["completion_attachments"]
+    assert [a["review"]["status"] for a in attachments] == ["rejected", "rejected"]
+    assert attachments[0]["review"]["remark"] == "חסר המדף העליון"
+
+    first = _send_slot(client_emp, occ_id, 0, _upload(client_emp, jpeg_bytes, "c.jpg"))
+    assert first.status_code == 200, first.text
+    assert first.json()["pending_slots"] == [1]
+    last = _send_slot(client_emp, occ_id, 1, _upload(client_emp, jpeg_bytes, "d.jpg"))
+    assert last.status_code == 200, last.text
+    assert last.json()["occurrence"]["status"] == "pending_review"
+
+
+def test_refilmed_slot_keeps_the_refusal_it_answers(
+    client_mgr, client_emp, world_seed, jpeg_bytes, mock_i18n
+):
+    """Le menahel revoit sa remarque et son dessin sur la nouvelle prise ; l'heure d'envoi est celle du renvoi."""
+    occ_id, urls = _pending_review(client_mgr, client_emp, world_seed, jpeg_bytes)
+    first_sent = client_mgr.get(f"/api/tasks/occurrences/{occ_id}").json()["completion"]["completed_at"]
+    annotated = _upload(client_mgr, jpeg_bytes, "marked.jpg")
+    _review(
+        client_mgr,
+        occ_id,
+        [
+            {"index": 0, "status": "approved"},
+            {"index": 1, "status": "rejected", "remark": "להזיז את הקרטון", "annotated_url": annotated},
+        ],
+    )
+    notes = client_emp.get("/api/notifications").json()
+    items = notes["items"]
+    assert any("להזיז את הקרטון" in (n.get("message") or "") for n in items)
+
+    resent = _send_slot(client_emp, occ_id, 1, _upload(client_emp, jpeg_bytes, "e.jpg"))
+    assert resent.status_code == 200, resent.text
+    completion = client_mgr.get(f"/api/tasks/occurrences/{occ_id}").json()["completion"]
+    previous = completion["completion_attachments"][1]["previous_review"]
+    assert previous["remark"] == "להזיז את הקרטון"
+    assert previous["annotated_url"] == annotated
+    assert "previous_review" not in completion["completion_attachments"][0]
+    assert completion["completed_at"] >= first_sent
 
 
 def _find_card(dashboard: dict, occ_id: str) -> dict:

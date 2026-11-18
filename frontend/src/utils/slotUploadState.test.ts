@@ -101,6 +101,15 @@ describe("slotUploadState", () => {
     expect(first).toMatchObject({ status: "idle", remark: "trop sombre", sentAt: null });
   });
 
+  it("une sous-tâche refusée garde l'image annotée du menahel pour l'oved", () => {
+    const completion = {
+      completion_attachments: [
+        { kind: "video" as const, url: "/u/1.webm", review: { status: "rejected" as const, remark: "x", annotated_url: "/uploads/m.jpg" } },
+      ],
+    };
+    expect(slotStatesFromCompletion(reqs(1), completion)[0].remarkImageUrl).toBe("/uploads/m.jpg");
+  });
+
   it("une copie locale ne recouvre pas une case déjà reçue, et une copie acquittée ne repart pas", () => {
     const sent = {
       completion_attachments: [{ kind: "video" as const, url: "/u/1.webm", captured_at: "t" }],

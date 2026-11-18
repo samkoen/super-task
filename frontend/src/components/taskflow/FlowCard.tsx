@@ -23,6 +23,7 @@ import { MAX_MESSAGE_TEXT, type CompletionRequirement } from "../../utils/comple
 import { slotDisplayTitle } from "../../utils/completionSlotView";
 import { cardActionLabel, hasGuide, isKeptCapture, stepNumber } from "../../utils/flowStack";
 import type { SlotUiState } from "../../utils/slotUploadState";
+import FlowRemarkImage from "./FlowRemarkImage";
 
 export type FlowCardProps = {
   req: CompletionRequirement;
@@ -297,6 +298,7 @@ function CardHeader({ props }: { props: FlowCardProps }) {
           {remark ? `${he.flowCardManagerRemark}: ${remark}` : state.error || ""}
         </Typography>
       ) : null}
+      {state.remarkImageUrl ? <FlowRemarkImage url={state.remarkImageUrl} /> : null}
     </>
   );
 }

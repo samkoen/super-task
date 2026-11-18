@@ -42,7 +42,8 @@ type DrawState =
 function readDisplayBounds(container: HTMLElement | null): { maxWidth: number; maxHeight: number } {
   const width = container?.clientWidth ?? 0;
   const maxWidth = Math.max(280, width > 0 ? width : Math.min(window.innerWidth - 48, 640));
-  const maxHeight = Math.max(240, Math.min(window.innerHeight * 0.5, 520));
+  // Sur un écran peu haut, l'image doit tenir avec ses outils au-dessus d'un bouton collé en bas.
+  const maxHeight = Math.max(180, Math.min(window.innerHeight * 0.42, 520));
   return { maxWidth, maxHeight };
 }
 

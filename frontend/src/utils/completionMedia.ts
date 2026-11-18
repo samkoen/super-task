@@ -45,6 +45,8 @@ export type CompletionAttachment = {
   location?: { lat: number; lng: number; accuracy?: number };
   poster_url?: string;
   review?: SlotReview;
+  /** Refus que cette nouvelle prise corrige (remarque et image du menahel au tour d'avant). */
+  previous_review?: Pick<SlotReview, "remark" | "annotated_url" | "reviewed_at">;
 };
 
 export const MAX_COMPLETION_REQUIREMENTS = 10;

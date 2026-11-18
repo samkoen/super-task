@@ -19,8 +19,8 @@ vi.mock("../chat/DirectChatThread", () => ({ default: ({ conversationId }: { con
 vi.mock("../review/ManagerReviewScreen", () => ({
   default: ({ request }: { request: { startId: string } | null }) => (request ? <div data-testid="review-screen">{request.startId}</div> : null),
 }));
-vi.mock("../tasks/TaskCompletionReviewDialog", () => ({ default: ({ task }: { task: { id: string } | null }) => (task ? <div data-testid="summary-dialog">{task.id}</div> : null) }));
-vi.mock("../tasks/TaskOccurrenceEditDialog", () => ({ default: ({ occurrenceId }: { occurrenceId: string | null }) => (occurrenceId ? <div data-testid="edit-dialog">{occurrenceId}</div> : null) }));
+vi.mock("../review/ManagerTaskSummaryScreen", () => ({ default: ({ taskId }: { taskId: string | null }) => (taskId ? <div data-testid="summary-dialog">{taskId}</div> : null) }));
+vi.mock("../tasks/today/ManagerTaskEditScreen", () => ({ default: ({ occurrenceId }: { occurrenceId: string | null }) => (occurrenceId ? <div data-testid="edit-dialog">{occurrenceId}</div> : null) }));
 
 const at = (hour: number) => new Date(2026, 10, 16, hour).toISOString();
 const occ = (id: string, hour: number, status: TaskOccurrence["status"], assignee = "u1") =>

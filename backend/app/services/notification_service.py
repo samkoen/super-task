@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from app.domain import roles
 from app.domain.break_notify import muted_employee_sound
-from app.domain.notification_rules import SOUND_NONE, notification_sound_for, recipients_for_task_event
+from app.domain.notification_rules import (
+    SOUND_NONE,
+    notification_sound_for,
+    recipients_for_task_event,
+    reopen_notification_message,
+)
 from app.realtime.sse_hub import sse_hub
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.user_repository import UserRepository
@@ -55,6 +60,7 @@ class NotificationService:
         created_by_user_id: str | None = None,
         message_override: str | None = None,
         force_sound: bool = False,
+        reopen_note: str | None = None,
     ) -> list[tuple[str, str, str, str]]:
         """Persist notifications; caller must commit before push_task_event_sse.
 
@@ -63,6 +69,8 @@ class NotificationService:
         title, base_message = _TASK_LABELS.get(event_type, ("עדכון משימה", "עדכון במשימות"))
         if message_override:
             message = message_override
+        elif event_type == "task_reopened" and reopen_note:
+            message = reopen_notification_message(base_message, task_title, reopen_note)
         else:
             detail = f": {task_title}" if task_title else ""
             message = f"{base_message}{detail}"
