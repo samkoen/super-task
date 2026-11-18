@@ -87,6 +87,7 @@ import { siyumTrace } from "../../utils/siyumTrace";
 import { scheduleConfirmCompletionMedia } from "../../utils/confirmCompletionMedia";
 import { mediaService } from "../../services/mediaService";
 import { usePendingUploads } from "../../hooks/usePendingUploads";
+import { useReloadWhenUploadsLand } from "../../hooks/useReloadWhenUploadsLand";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -594,6 +595,8 @@ export default function EmployeeTasksPage() {
     [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, pendingReviewTasks, completedTasks],
   );
   const pendingUploads = usePendingUploads();
+  // Vidéos parties après la fermeture du flux : on relit le statut serveur, sinon l'écran de כניסה revient.
+  useReloadWhenUploadsLand(pendingUploads.taskIds, () => void load(true));
   const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask), pendingUploads.taskIds);
   const openWorkTask = useCallback(
     (task: EmployeeTaskCard, focusChat = false) => {

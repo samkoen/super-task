@@ -5,7 +5,7 @@ import EmployeeTasksPage from "./EmployeeTasksPage";
 import { he } from "../../i18n/he";
 import { dashboardService, type EmployeeDashboard, type EmployeeTaskCard } from "../../services/dashboardService";
 import { getEmployeeTodayScreen, setEmployeeTodayScreen } from "../../utils/employeeTodayScreenStore";
-import { within } from "@testing-library/react";
+import { act, within } from "@testing-library/react";
 
 /** Suite complète en parallèle : laisser au premier rendu le temps d'arriver. */
 const WAIT = { timeout: 5000 };
@@ -17,10 +17,33 @@ function todayAt(hour: number, minute = 0): string {
 }
 
 /** File d'envoi du téléphone : tâches finies sans קליטה dont les vidéos attendent. */
-const pendingUploadIds = vi.hoisted(() => ({ current: new Set<string>() }));
-vi.mock("../../hooks/usePendingUploads", () => ({
-  usePendingUploads: () => ({ taskIds: pendingUploadIds.current, taskCount: pendingUploadIds.current.size }),
-}));
+const pendingUploadIds = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    current: new Set<string>(),
+    /** Simule la file qui se vide (ou se remplit) pendant que la page est affichée. */
+    set(ids: string[]) {
+      this.current = new Set(ids);
+      listeners.forEach((l) => l());
+    },
+    subscribe(l: () => void) {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  };
+});
+vi.mock("../../hooks/usePendingUploads", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    usePendingUploads: () => {
+      const taskIds = useSyncExternalStore(
+        (l) => pendingUploadIds.subscribe(l),
+        () => pendingUploadIds.current,
+      );
+      return { taskIds, taskCount: taskIds.size };
+    },
+  };
+});
 
 vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
@@ -547,6 +570,27 @@ describe("EmployeeTasksPage · ouverture de משמרת envoyée sans קליטה"
     const opening = screen.getByText("פתיחת משמרת").closest("[data-testid='today-task-item']");
     expect(opening?.getAttribute("data-state")).toBe("awaiting-upload");
     expect(within(opening as HTMLElement).getByText(he.todayAwaitingUpload)).toBeTruthy();
+  });
+
+  it("with קליטה: back on the recap before the videos left, the door stays shut once they land", async () => {
+    pendingUploadIds.current = new Set(["s"]);
+    const opening = { id: "s", title: "פתיחת משמרת", is_work_start: true, due_at: todayAt(8) };
+    const work = card({ id: "t", title: "מדף חלב", due_at: todayAt(9) });
+    vi.mocked(dashboardService.getEmployee)
+      // Flux fermé tout de suite : le serveur n'a pas encore le dernier fichier.
+      .mockResolvedValueOnce(dashboard({ on_shift: true, in_progress_tasks: [card({ ...opening, status: "in_progress" })], today_tasks: [work] }))
+      // Dernier fichier reçu : la tâche est partie en contrôle.
+      .mockResolvedValue(dashboard({ on_shift: true, pending_review_tasks: [card({ ...opening, status: "pending_review" })], today_tasks: [work] }));
+    renderPage();
+    await screen.findByText("מדף חלב", {}, WAIT);
+    const calls = vi.mocked(dashboardService.getEmployee).mock.calls.length;
+    act(() => pendingUploadIds.set([]));
+    await waitFor(() => expect(vi.mocked(dashboardService.getEmployee).mock.calls.length).toBeGreaterThan(calls));
+    await waitFor(() => {
+      const row = screen.getByText("פתיחת משמרת").closest("[data-testid='today-task-item']");
+      expect(row?.getAttribute("data-state")).not.toBe("awaiting-upload");
+    });
+    expect(screen.queryByTestId("start-door")).toBeNull();
   });
 
   it("still shows the start door when nothing waits on the phone (videos lost: film again)", async () => {
