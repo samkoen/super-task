@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EmployeeTasksPage from "./EmployeeTasksPage";
@@ -15,6 +15,12 @@ function todayAt(hour: number, minute = 0): string {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute).toISOString();
 }
+
+/** File d'envoi du téléphone : tâches finies sans קליטה dont les vidéos attendent. */
+const pendingUploadIds = vi.hoisted(() => ({ current: new Set<string>() }));
+vi.mock("../../hooks/usePendingUploads", () => ({
+  usePendingUploads: () => ({ taskIds: pendingUploadIds.current, taskCount: pendingUploadIds.current.size }),
+}));
 
 vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
@@ -516,5 +522,40 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(await screen.findByTestId("start-door")).toBeTruthy();
     expect(screen.queryByText(`${he.employeeManagerWaiting} (1)`)).toBeNull();
     expect(screen.queryByText("ניקוי מדף")).toBeNull();
+  });
+});
+
+describe("EmployeeTasksPage · ouverture de משמרת envoyée sans קליטה", () => {
+  beforeEach(() => {
+    vi.mocked(dashboardService.getEmployee).mockReset();
+    pendingUploadIds.current = new Set();
+  });
+
+  it("goes to the today screen instead of the start door, the opening checked « ממתין לקליטה »", async () => {
+    pendingUploadIds.current = new Set(["s"]);
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        // Le serveur n'a pas encore les vidéos : la tâche est toujours en cours chez lui.
+        in_progress_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true, status: "in_progress", due_at: todayAt(8) })],
+        today_tasks: [card({ id: "t", title: "מדף חלב", due_at: todayAt(9) })],
+      }),
+    );
+    renderPage();
+    await screen.findByText("מדף חלב", {}, WAIT);
+    expect(screen.queryByTestId("start-door")).toBeNull();
+    const opening = screen.getByText("פתיחת משמרת").closest("[data-testid='today-task-item']");
+    expect(opening?.getAttribute("data-state")).toBe("awaiting-upload");
+    expect(within(opening as HTMLElement).getByText(he.todayAwaitingUpload)).toBeTruthy();
+  });
+
+  it("still shows the start door when nothing waits on the phone (videos lost: film again)", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        in_progress_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true, status: "in_progress" })],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("start-door", {}, WAIT)).toBeTruthy();
   });
 });

@@ -3,6 +3,7 @@ import {
   excludeAttendancePunch,
   findOpenPunchTask,
   hasOpenWorkTasks,
+  isOpenForEmployee,
   isPunchDue,
   shouldShowEndDoor,
 } from "./punchDoor";
@@ -71,5 +72,15 @@ describe("punchDoor", () => {
     expect(
       shouldShowEndDoor({ startOpen: true, end, inTask: false, hasOpenWork: false }),
     ).toBe(false);
+  });
+
+  it("treats a task whose files wait on the phone as done for the oved", () => {
+    const waiting = new Set(["s", "t"]);
+    expect(isOpenForEmployee(punch("s"), waiting)).toBe(false);
+    expect(isOpenForEmployee(punch("x"), waiting)).toBe(true);
+    expect(isOpenForEmployee(punch("x", { status: "pending_review" }), waiting)).toBe(false);
+    expect(findOpenPunchTask([punch("s", { is_work_start: true, status: "in_progress" })], "start", waiting)).toBeNull();
+    expect(hasOpenWorkTasks([punch("t", { status: "in_progress" })], waiting)).toBe(false);
+    expect(hasOpenWorkTasks([punch("t", { status: "in_progress" })])).toBe(true);
   });
 });
