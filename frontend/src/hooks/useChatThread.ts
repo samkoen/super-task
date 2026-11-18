@@ -107,9 +107,22 @@ function useChatSend(args: {
     });
   }, [afterSend, runBusy, transportRef]);
 
+  /** Comme `sendMedia`, mais dit si le média est parti : l'appelant garde son fichier en cas d'échec. */
+  const sendMediaChecked = useCallback(async (file: File, kind: ChatMediaKind): Promise<boolean> => {
+    let sent = false;
+    await runBusy(async () => {
+      const payload = await transportRef.current.upload(file, kind);
+      rememberChatMediaPreview(payload, file);
+      await afterSend(await transportRef.current.send(payload));
+      sent = true;
+    });
+    return sent;
+  }, [afterSend, runBusy, transportRef]);
+
   return {
     sendText,
     sendMedia,
+    sendMediaChecked,
     annotateReply: useChatPhotoAnnotateReply((file, caption) => sendMedia(file, "photo", caption)),
   };
 }

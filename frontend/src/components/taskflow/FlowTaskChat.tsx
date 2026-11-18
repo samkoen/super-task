@@ -102,7 +102,7 @@ function ChatScreen(props: ScreenProps) {
           sending={thread.sending}
           error={thread.error}
           onSend={() => void thread.sendText()}
-          onSendMedia={thread.sendMedia}
+          onSendMedia={thread.sendMediaChecked}
         />
       ) : null}
     </Box>

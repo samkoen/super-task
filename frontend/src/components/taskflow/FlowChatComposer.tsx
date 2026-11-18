@@ -24,7 +24,8 @@ type Props = {
   sending: boolean;
   error?: string;
   onSend: () => void;
-  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<void>;
+  /** Résout `false` si l'envoi a échoué (le vocal est alors gardé pour un nouvel essai). */
+  onSendMedia: (file: File, kind: ChatMediaKind) => void | Promise<boolean | void>;
 };
 
 /** Hauteurs des barres de l'onde (décoratives, comme dans le Figma). */
@@ -198,11 +199,11 @@ export default function FlowChatComposer(props: Props) {
   const [photoOpen, setPhotoOpen] = useState(false);
   const voice = useChatVoice();
   const canSend = Boolean(props.body.trim()) && !props.sending;
+  // Le vocal reste affiché pendant l'envoi : il n'est effacé qu'une fois l'envoi confirmé.
   const sendVoice = async () => {
     if (!voice.file) return;
-    const file = voice.file;
-    voice.cancel();
-    await props.onSendMedia(file, "audio");
+    const sent = await props.onSendMedia(voice.file, "audio");
+    if (sent !== false) voice.cancel();
   };
   const error = props.error || (voice.error ? he.flowSkipRecordFailed : "");
   return (
@@ -235,7 +236,7 @@ export default function FlowChatComposer(props: Props) {
         open={photoOpen}
         uploading={props.sending}
         onClose={() => setPhotoOpen(false)}
-        onSend={(file, kind = "photo") => props.onSendMedia(file, kind)}
+        onSend={async (file, kind = "photo") => { await props.onSendMedia(file, kind); }}
       />
     </Box>
   );
