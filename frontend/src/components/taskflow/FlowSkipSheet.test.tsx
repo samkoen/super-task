@@ -81,8 +81,16 @@ describe("FlowSkipSheet (screen 05ב)", () => {
     expect((screen.getByTestId("flow-skip-confirm") as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId("flow-skip-explanation").getAttribute("data-required")).toBe("true");
     expect(screen.getByPlaceholderText(he.flowSkipTextPlaceholderOther)).toBeTruthy();
+    expect(screen.getByTestId("flow-skip-other-needs-details").textContent).toBe(he.flowSkipOtherNeedsDetails);
     fireEvent.change(screen.getByTestId("flow-skip-text"), { target: { value: "משהו" } });
     expect((screen.getByTestId("flow-skip-confirm") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId("flow-skip-other-needs-details")).toBeNull();
+  });
+
+  it("does not show the « אחר » warning for a preset reason", () => {
+    renderSheet();
+    fireEvent.click(screen.getByTestId("flow-skip-reason-area_blocked"));
+    expect(screen.queryByTestId("flow-skip-other-needs-details")).toBeNull();
   });
 
   it("starts recording from the mic button", async () => {

@@ -1,11 +1,11 @@
-﻿import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EmployeeTasksPage from "./EmployeeTasksPage";
 import { he } from "../../i18n/he";
 import { dashboardService, type EmployeeDashboard, type EmployeeTaskCard } from "../../services/dashboardService";
 import { getEmployeeTodayScreen, setEmployeeTodayScreen } from "../../utils/employeeTodayScreenStore";
-import { within } from "@testing-library/react";
+import { act, within } from "@testing-library/react";
 
 /** Suite complète en parallèle : laisser au premier rendu le temps d'arriver. */
 const WAIT = { timeout: 5000 };
@@ -15,6 +15,35 @@ function todayAt(hour: number, minute = 0): string {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute).toISOString();
 }
+
+/** File d'envoi du téléphone : tâches finies sans קליטה dont les vidéos attendent. */
+const pendingUploadIds = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    current: new Set<string>(),
+    /** Simule la file qui se vide (ou se remplit) pendant que la page est affichée. */
+    set(ids: string[]) {
+      this.current = new Set(ids);
+      listeners.forEach((l) => l());
+    },
+    subscribe(l: () => void) {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  };
+});
+vi.mock("../../hooks/usePendingUploads", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    usePendingUploads: () => {
+      const taskIds = useSyncExternalStore(
+        (l) => pendingUploadIds.subscribe(l),
+        () => pendingUploadIds.current,
+      );
+      return { taskIds, taskCount: taskIds.size };
+    },
+  };
+});
 
 vi.mock("../../context/FeedbackContext", () => ({
   useFeedback: () => ({ showError: vi.fn(), showSuccess: vi.fn() }),
@@ -516,5 +545,69 @@ describe("EmployeeTasksPage punch doors", () => {
     expect(await screen.findByTestId("start-door")).toBeTruthy();
     expect(screen.queryByText(`${he.employeeManagerWaiting} (1)`)).toBeNull();
     expect(screen.queryByText("ניקוי מדף")).toBeNull();
+  });
+});
+
+describe("EmployeeTasksPage · ouverture de משמרת envoyée sans קליטה", () => {
+  beforeEach(() => {
+    vi.mocked(dashboardService.getEmployee).mockReset();
+    pendingUploadIds.current = new Set();
+  });
+
+  it("goes to the today screen instead of the start door, the opening checked « ממתין לקליטה »", async () => {
+    pendingUploadIds.current = new Set(["s"]);
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        on_shift: true,
+        // Le serveur n'a pas encore les vidéos : la tâche est toujours en cours chez lui.
+        in_progress_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true, status: "in_progress", due_at: todayAt(8) })],
+        today_tasks: [card({ id: "t", title: "מדף חלב", due_at: todayAt(9) })],
+      }),
+    );
+    renderPage();
+    await screen.findByText("מדף חלב", {}, WAIT);
+    expect(screen.queryByTestId("start-door")).toBeNull();
+    const opening = screen.getByText("פתיחת משמרת").closest("[data-testid='today-task-item']");
+    expect(opening?.getAttribute("data-state")).toBe("awaiting-upload");
+    expect(within(opening as HTMLElement).getByText(he.todayAwaitingUpload)).toBeTruthy();
+  });
+
+  it("with קליטה: back on the recap before the videos left, the door stays shut once they land", async () => {
+    pendingUploadIds.current = new Set(["s"]);
+    const opening = { id: "s", title: "פתיחת משמרת", is_work_start: true, due_at: todayAt(8) };
+    const work = card({ id: "t", title: "מדף חלב", due_at: todayAt(9) });
+    // Dernier fichier reçu : la tâche est partie en contrôle. La réponse est retenue pour voir l'entre-deux.
+    let answer!: () => void;
+    const reloaded = new Promise<EmployeeDashboard>((resolve) => {
+      answer = () => resolve(dashboard({ on_shift: true, pending_review_tasks: [card({ ...opening, status: "pending_review" })], today_tasks: [work] }));
+    });
+    vi.mocked(dashboardService.getEmployee)
+      // Flux fermé tout de suite : le serveur n'a pas encore le dernier fichier.
+      .mockResolvedValueOnce(dashboard({ on_shift: true, in_progress_tasks: [card({ ...opening, status: "in_progress" })], today_tasks: [work] }))
+      .mockReturnValue(reloaded);
+    renderPage();
+    await screen.findByText("מדף חלב", {}, WAIT);
+    const calls = vi.mocked(dashboardService.getEmployee).mock.calls.length;
+    act(() => pendingUploadIds.set([]));
+    await waitFor(() => expect(vi.mocked(dashboardService.getEmployee).mock.calls.length).toBeGreaterThan(calls));
+    // Rechargement en cours : la file est vide, le tableau de bord dit encore « בתהליך », la porte reste fermée.
+    expect(screen.queryByTestId("start-door")).toBeNull();
+    expect(screen.getByText("מדף חלב")).toBeTruthy();
+    await act(async () => answer());
+    await waitFor(() => {
+      const row = screen.getByText("פתיחת משמרת").closest("[data-testid='today-task-item']");
+      expect(row?.getAttribute("data-state")).not.toBe("awaiting-upload");
+    });
+    expect(screen.queryByTestId("start-door")).toBeNull();
+  });
+
+  it("still shows the start door when nothing waits on the phone (videos lost: film again)", async () => {
+    vi.mocked(dashboardService.getEmployee).mockResolvedValue(
+      dashboard({
+        in_progress_tasks: [card({ id: "s", title: "פתיחת משמרת", is_work_start: true, status: "in_progress" })],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("start-door", {}, WAIT)).toBeTruthy();
   });
 });

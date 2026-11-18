@@ -328,6 +328,9 @@ function SheetBody({ req, index, onClose, onConfirm }: Props & { req: Completion
   const [draft, setDraft] = useState<SkipDraft>(emptySkipDraft);
   const voice = useSkipVoice();
   const valid = isSkipDraftValid({ ...draft, audio: voice.file }) && !(draft.reasonCode === "other" && voice.recorder.recording);
+  // « אחר » sans texte ni vocal : on dit tout de suite pourquoi « דיווח והמשך » reste gris.
+  const otherNeedsDetails =
+    draft.reasonCode === "other" && !draft.reasonText.trim() && !voice.file && !voice.recorder.recording;
 
   const confirm = async () => {
     const audio = await voice.finish();
@@ -338,6 +341,11 @@ function SheetBody({ req, index, onClose, onConfirm }: Props & { req: Completion
     <>
       <SheetHeader title={he.flowSkipSheetTitle} subtitle={he.flowSkipSheetSubtitle(slotDisplayTitle(req, index))} onClose={onClose} />
       <ReasonChips value={draft.reasonCode} onChange={(reasonCode) => setDraft((d) => ({ ...d, reasonCode }))} />
+      {otherNeedsDetails ? (
+        <Typography role="alert" data-testid="flow-skip-other-needs-details" sx={{ ...flowText.label, fontWeight: 700, color: flowColor.ink, textAlign: "right" }}>
+          {he.flowSkipOtherNeedsDetails}
+        </Typography>
+      ) : null}
       <ExplanationBox text={draft.reasonText} onText={(reasonText) => setDraft((d) => ({ ...d, reasonText }))} voice={voice} required={draft.reasonCode === "other"} />
       <ButtonBase
         data-testid="flow-skip-confirm"

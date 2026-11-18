@@ -87,6 +87,7 @@ import { siyumTrace } from "../../utils/siyumTrace";
 import { scheduleConfirmCompletionMedia } from "../../utils/confirmCompletionMedia";
 import { mediaService } from "../../services/mediaService";
 import { usePendingUploads } from "../../hooks/usePendingUploads";
+import { useReloadWhenUploadsLand } from "../../hooks/useReloadWhenUploadsLand";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -593,7 +594,11 @@ export default function EmployeeTasksPage() {
       ]),
     [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, pendingReviewTasks, completedTasks],
   );
-  const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask));
+  const pendingUploads = usePendingUploads();
+  // Vidéos parties après la fermeture du flux : on relit le statut serveur, sinon l'écran de כניסה revient.
+  // Les tâches qui viennent de partir restent « en attente » jusqu'à la fin du rechargement (pas de clignotement).
+  const awaitingUploadIds = useReloadWhenUploadsLand(pendingUploads.taskIds, () => load(true));
+  const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask), awaitingUploadIds);
   const openWorkTask = useCallback(
     (task: EmployeeTaskCard, focusChat = false) => {
       const redirected = Boolean(punch.start && task.id !== punch.start.id);
@@ -673,7 +678,6 @@ export default function EmployeeTasksPage() {
   const headerBranch = dashboard?.employee?.branch_name;
   const headerJob = dashboard?.employee?.job_function;
   const onShift = dashboard?.on_shift;
-  const pendingUploads = usePendingUploads();
   const photoUrl = dashboard?.employee?.avatar_url ?? user?.avatar_url;
   const finishedSections = (
     <EmployeeFinishedTaskSections
@@ -717,9 +721,12 @@ export default function EmployeeTasksPage() {
       ]);
       // Pointages ouverts : ils ont leur propre porte ; une fois envoyés, ils restent visibles (cochés).
       const notPunch = new Set(excludeAttendancePunch(pool).map((task) => task.id));
-      return pool.filter((task) => notPunch.has(task.id) || isTodayTaskDone(task.status));
+      // Une ouverture de משמרת finie sans קליטה reste visible, cochée « ממתין לקליטה ».
+      return pool.filter(
+        (task) => notPunch.has(task.id) || isTodayTaskDone(task.status) || awaitingUploadIds.has(task.id),
+      );
     },
-    [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, dashboard?.manager_waiting_tasks, pendingReviewTasks, completedTasks],
+    [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, dashboard?.manager_waiting_tasks, pendingReviewTasks, completedTasks, awaitingUploadIds],
   );
   const showShiftHeader = !startDoorOpen && !showTodayScreen && !(loading && !dashboard);
 
@@ -762,7 +769,7 @@ export default function EmployeeTasksPage() {
         <TodayTasksScreen
           tasks={loading && !dashboard ? [] : todayScreenTasks}
           loading={loading && !dashboard}
-          awaitingUploadIds={pendingUploads.taskIds}
+          awaitingUploadIds={awaitingUploadIds}
           employeeName={headerName}
           photoUrl={photoUrl}
           onOpenTask={(task) => openWorkTask(task)}
