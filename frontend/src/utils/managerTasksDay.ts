@@ -2,12 +2,17 @@
 import { he } from "../i18n/he";
 import type { TaskOccurrence } from "../services/taskService";
 import { formatHebrewDayNoYear, shiftDay, todayIso } from "./dateView";
+import { formatClockTime } from "./flowReview";
 import { DAY_PERIODS, periodOf, type DayPeriod } from "./managerHome";
 
 export type TaskRowState = "done" | "review" | "active" | "late" | "todo";
 
-/** Une preuve envoyée compte comme faite pour l'oved (elle attend seulement le menahel). */
-export function taskRowState(task: Pick<TaskOccurrence, "status">): TaskRowState {
+/**
+ * Une preuve envoyée compte comme faite pour l'oved (elle attend seulement le menahel).
+ * Même chose pour une tâche finie sans קליטה : l'oved a fini, seuls les fichiers manquent encore.
+ */
+export function taskRowState(task: Pick<TaskOccurrence, "status" | "awaiting_upload_at">): TaskRowState {
+  if (awaitsUpload(task)) return "review";
   switch (task.status) {
     case "completed": return "done";
     case "pending_review": return "review";
@@ -35,10 +40,22 @@ export function groupTasksByPeriod(tasks: TaskOccurrence[]): PeriodGroup[] {
   }).filter((group) => group.total > 0);
 }
 
+/** Oved sans קליטה : « ממתין להעלאה · 10:42 » (heure de fin sur son téléphone) tant que les fichiers ne sont pas arrivés. */
+function awaitsUpload(task: Pick<TaskOccurrence, "status" | "awaiting_upload_at">): boolean {
+  return Boolean(task.awaiting_upload_at) && !["pending_review", "completed", "cancelled"].includes(task.status);
+}
+
+export function awaitingUploadLabel(task: Pick<TaskOccurrence, "status" | "awaiting_upload_at">): string | null {
+  if (!awaitsUpload(task) || !task.awaiting_upload_at) return null;
+  const time = formatClockTime(task.awaiting_upload_at);
+  return time ? he.managerTaskAwaitingUpload(time) : null;
+}
+
 /** « דני · ממתין לאישור » (+ « · 15 דק׳ » si la durée est prévue) ; « לא משויך » quand personne n'est désigné. */
 export function taskRowSubtitle(task: TaskOccurrence): string {
   const who = task.assignee_name?.trim() || he.managerTasksUnassigned;
-  const parts = [who, he.taskStatusLabels[task.status]];
+  const waiting = awaitingUploadLabel(task);
+  const parts = [who, waiting ?? he.taskStatusLabels[task.status]];
   if (task.duration_minutes) parts.push(he.todayTaskMinutes(task.duration_minutes));
   return parts.join(" · ");
 }

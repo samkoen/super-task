@@ -1,6 +1,14 @@
 import { useEffect } from "react";
+import { taskService } from "../services/taskService";
+import { flushFinishSignals } from "../utils/finishSignals";
 import { getSlotUploadQueue } from "../utils/slotSender";
-import { startSlotAutoFlush } from "../utils/slotUploadQueue";
+import { startSlotAutoFlush, type SlotUploadQueue } from "../utils/slotUploadQueue";
+
+/** Le petit signal « tâche finie » part avant les vidéos : le menahel le voit dès qu'un peu de réseau revient. */
+export async function sendFinishSignalsThenFiles(queue: Pick<SlotUploadQueue, "flush">): Promise<void> {
+  await flushFinishSignals((marker) => taskService.finishedOffline(marker.occurrenceId, marker.finishedAt));
+  await queue.flush();
+}
 
 /**
  * Renvoie les vidéos gardées sur l'appareil au retour du réseau (app ouverte).
@@ -9,6 +17,7 @@ import { startSlotAutoFlush } from "../utils/slotUploadQueue";
 export function useSlotAutoFlush(enabled: boolean, queueFactory = getSlotUploadQueue): void {
   useEffect(() => {
     if (!enabled) return;
-    return startSlotAutoFlush(queueFactory());
+    const queue = queueFactory();
+    return startSlotAutoFlush({ flush: () => sendFinishSignalsThenFiles(queue) });
   }, [enabled, queueFactory]);
 }

@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 import app.db.models as orm
@@ -13,6 +13,27 @@ from app.models.user import User
 class UserRepository:
     def __init__(self, db: Session):
         self._db = db
+
+    def touch_last_seen(self, id_: str, *, now: datetime, min_gap) -> None:
+        """Dernière requête de l'utilisateur ; une seule écriture par intervalle `min_gap`."""
+        stale = now - min_gap
+        self._db.execute(
+            update(orm.User)
+            .where(orm.User.id == mp.parse_uuid(id_))
+            .where(or_(orm.User.last_seen_at.is_(None), orm.User.last_seen_at < stale))
+            .values(last_seen_at=now)
+            .execution_options(synchronize_session=False)
+        )
+
+    def last_seen_map(self, ids: list[str]) -> dict[str, str]:
+        """`{user_id: ISO}` pour les utilisateurs déjà vus."""
+        uuids = [mp.parse_uuid(i) for i in ids if i]
+        if not uuids:
+            return {}
+        rows = self._db.execute(
+            select(orm.User.id, orm.User.last_seen_at).where(orm.User.id.in_(uuids))
+        ).all()
+        return {str(uid): seen.isoformat() for uid, seen in rows if seen is not None}
 
     def find_by_id(self, id_: str) -> Optional[User]:
         try:

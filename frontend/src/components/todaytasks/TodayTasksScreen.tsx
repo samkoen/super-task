@@ -43,6 +43,8 @@ type Props<T extends TodayTask> = {
   onHome?: () => void;
   /** Contenu ajouté sous les groupes (ex. « סיום משמרת »). */
   footer?: ReactNode;
+  /** Tâches finies sur ce téléphone dont les vidéos attendent la קליטה : cochées, avec « יישלח כשתחזור הקליטה ». */
+  awaitingUploadIds?: ReadonlySet<string>;
 };
 
 /** Mesures Figma : la barre du bas est à 31 px du bas, 120 px libres sous le dernier groupe. */
@@ -140,8 +142,13 @@ function LoadingScreen() {
  * FLOW 2 · écran 01 « המשימות להיום » (Figma 436:1265) : salutation, titre et cloche, puis les tâches
  * du jour par moment de la journée (בוקר / צהריים / ערב), chaque groupe se pliant avec son chevron.
  */
+function taskSubtitle(task: TodayTask, awaitingUploadIds?: ReadonlySet<string>): string | null {
+  if (awaitingUploadIds?.has(task.id) && !isTodayTaskDone(task.status)) return he.todayAwaitingUpload;
+  return task.duration_minutes ? he.todayTaskMinutes(task.duration_minutes) : null;
+}
+
 export default function TodayTasksScreen<T extends TodayTask>(props: Props<T>) {
-  const { tasks, loading = false, employeeName, photoUrl, onOpenTask, onOpenTaskChat, onOpenChats, onOpenAccount, onHome, footer } = props;
+  const { tasks, loading = false, employeeName, photoUrl, onOpenTask, onOpenTaskChat, onOpenChats, onOpenAccount, onHome, footer, awaitingUploadIds } = props;
   const groups = groupTodayTasks(tasks);
   const toggles = usePeriodToggles();
   if (loading) return <LoadingScreen />;
@@ -190,8 +197,9 @@ export default function TodayTasksScreen<T extends TodayTask>(props: Props<T>) {
                     key={task.id}
                     title={task.title}
                     time={timelineTimeLabel(task.due_at)}
-                    subtitle={task.duration_minutes ? he.todayTaskMinutes(task.duration_minutes) : null}
-                    done={isTodayTaskDone(task.status)}
+                    subtitle={taskSubtitle(task, awaitingUploadIds)}
+                    done={isTodayTaskDone(task.status) || Boolean(awaitingUploadIds?.has(task.id))}
+                    dataState={awaitingUploadIds?.has(task.id) ? "awaiting-upload" : undefined}
                     onOpen={() => onOpenTask(task)}
                     onOpenChat={() => onOpenTaskChat(task)}
                   />

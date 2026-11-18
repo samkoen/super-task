@@ -1453,6 +1453,20 @@ export const he = {
   flowToastFailed: "השליחה נכשלה",
   flowToastSkipReported: "הדיווח נשלח למנהלת",
   flowToastSavedOnDevice: "הסרטון נשמר במכשיר",
+  // ---------------------------------------------------------------- Oved sans קליטה
+  todayAwaitingUpload: "ממתין לקליטה",
+  uploadBannerOffline: (count: number) =>
+    count === 1 ? "אין קליטה · משימה אחת ממתינה לשליחה" : `אין קליטה · ${count} משימות ממתינות לשליחה`,
+  uploadBannerSending: (count: number) => (count === 1 ? "שולח משימה אחת…" : `שולח ${count} משימות…`),
+  uploadBannerHint: "הסרטונים שמורים בטלפון ויישלחו לבד",
+  uploadAllSent: "כל הסרטונים נשלחו",
+  logoutPendingTitle: "יש סרטונים שעוד לא נשלחו",
+  logoutPendingBody: (count: number) =>
+    `${count === 1 ? "משימה אחת ממתינה" : `${count} משימות ממתינות`} לשליחה. הם יישלחו לבד כשתחזור הקליטה, רק אם תישארו מחוברים.`,
+  logoutPendingStay: "להישאר מחובר",
+  logoutPendingAnyway: "להתנתק בכל זאת",
+  managerTaskAwaitingUpload: (time: string) => `ממתין להעלאה · ${time}`,
+  managerTeamOfflineSince: (time: string) => `לא מחובר מאז ${time}`,
   flowToastSavedOnDevicePhoto: "התמונה נשמרה במכשיר",
   flowToastSavedOnDeviceAudio: "ההקלטה נשמרה במכשיר",
   flowToastSavedOnDeviceMessage: "ההודעה נשמרה במכשיר",

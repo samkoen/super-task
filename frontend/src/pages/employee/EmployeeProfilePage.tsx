@@ -17,6 +17,7 @@ import {
 } from "./EmployeeProfileSections";
 import AppUpdateCard from "../../components/appUpdate/AppUpdateCard";
 import AgrolineConnectionCard from "../../components/tasks/AgrolineConnectionCard";
+import { useLogoutGuard } from "../../components/employee/useLogoutGuard";
 
 const EMPTY_PASSWORD: PasswordFormValue = {
   current_password: "",
@@ -74,6 +75,7 @@ function useAvatarActions(refresh: () => Promise<unknown> | void) {
 
 export default function EmployeeProfilePage() {
   const { user, refresh, logout } = useAuth();
+  const logoutGuard = useLogoutGuard(() => void logout());
   const { showSuccess, showError } = useFeedback();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EmployeeProfileForm>(EMPTY_FORM);
@@ -160,11 +162,12 @@ export default function EmployeeProfilePage() {
         variant="outlined"
         color="error"
         startIcon={<LogoutRoundedIcon />}
-        onClick={() => void logout()}
+        onClick={logoutGuard.requestLogout}
         sx={{ minHeight: EMPLOYEE_TOUCH_MIN, borderRadius: "16px", fontWeight: 800, fontSize: "1.05rem" }}
       >
         {he.logout}
       </Button>
+      {logoutGuard.dialog}
       <EmployeeAvatarCapture
         open={avatar.open}
         uploading={avatar.uploading}

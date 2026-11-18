@@ -180,6 +180,8 @@ export interface TaskOccurrence {
   is_work_start?: boolean;
   is_work_end?: boolean;
   start_url?: string | null;
+  /** Oved sans קליטה : fini sur le téléphone à cette heure, fichiers pas encore reçus. */
+  awaiting_upload_at?: string | null;
   duration_minutes?: number | null;
   reference_photo_url?: string | null;
   reference_video_url?: string | null;
@@ -429,6 +431,15 @@ export const taskService = {
       `/tasks/occurrences/${occurrenceId}/complete`,
       payload,
       { timeout: 120_000 },
+    );
+    return response.data;
+  },
+
+  /** Petit signal sans fichier : l'oved a fini sans קליטה, ses vidéos suivront. */
+  finishedOffline: async (occurrenceId: string, finishedAt: string) => {
+    const response = await api.post<{ occurrence: TaskOccurrence }>(
+      `/tasks/occurrences/${occurrenceId}/finished-offline`,
+      { finished_at: finishedAt },
     );
     return response.data;
   },

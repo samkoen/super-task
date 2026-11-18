@@ -97,6 +97,7 @@ def build_timeline_item(
         "completion_status": completion.status if completion else None,
         "not_completed_reason": completion.not_completed_reason if completion else None,
         "media_ready": True if completion is None else bool(getattr(completion, "media_ready", True)),
+        "awaiting_upload_at": getattr(task, "awaiting_upload_at", None),
     }
 
 

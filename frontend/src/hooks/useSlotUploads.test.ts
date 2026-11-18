@@ -2,9 +2,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompletionRequirement } from "../utils/completionMedia";
 import { createMemorySlotStorage, createSlotUploadQueue } from "../utils/slotUploadQueue";
+import { readFinishMarkers } from "../utils/finishSignals";
 
 const { submitSlot } = vi.hoisted(() => ({ submitSlot: vi.fn() }));
-vi.mock("../services/taskService", () => ({ taskService: { submitSlot } }));
+vi.mock("../services/taskService", () => ({ taskService: { submitSlot, finishedOffline: vi.fn().mockRejectedValue(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" })) } }));
 
 import { useSlotUploads } from "./useSlotUploads";
 
@@ -33,6 +34,7 @@ const file = () => new File(["abc"], "v.webm", { type: "video/webm" });
 
 describe("useSlotUploads", () => {
   beforeEach(() => {
+    localStorage.clear();
     submitSlot.mockReset();
     URL.createObjectURL = vi.fn(() => "blob:preview");
   });
@@ -75,6 +77,8 @@ describe("useSlotUploads", () => {
     expect(hook.result.current.states[0].status).toBe("queued");
     expect(onSavedOnDevice).toHaveBeenCalledWith(0);
     expect(onSent).not.toHaveBeenCalled();
+    // La fin de la tâche est gardée : elle partira avant les vidéos dès qu'un peu de réseau revient.
+    expect(readFinishMarkers().map((marker) => marker.occurrenceId)).toEqual(["occ"]);
   });
 
   it("network back: the queue sends the file and the card becomes sent", async () => {

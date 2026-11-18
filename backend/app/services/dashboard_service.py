@@ -610,6 +610,17 @@ class DashboardService:
             grouped.setdefault(user_id, []).append((category, rating))
         return {uid: aggregate_quality_ratings(items) for uid, items in grouped.items()}
 
+    def _last_seen(self, ids: list[str]) -> dict[str, str]:
+        """Dernière connexion de chaque oved (« לא מחובר מאז » côté menahel)."""
+        finder = getattr(self._users, "last_seen_map", None)
+        if finder is None:
+            return {}
+        try:
+            found = finder(ids)
+        except Exception:  # noqa: BLE001 — information de confort, jamais bloquante
+            return {}
+        return found if isinstance(found, dict) else {}
+
     def _team_timelines(
         self,
         employees: list[User],
@@ -633,6 +644,7 @@ class DashboardService:
             overdue_by_assignee.setdefault(task.assignee_user_id, []).append(task)
 
         qualities = self._quality_summaries([emp.id for emp in employees])
+        last_seen = self._last_seen([emp.id for emp in employees])
         team = []
         for emp in employees:
             emp_tasks = by_assignee.get(emp.id, [])
@@ -682,6 +694,7 @@ class DashboardService:
                 "timeline": timeline,
                 "overdue_backlog": backlog,
                 "quality_rating": qualities.get(emp.id, empty_quality_summary()),
+                "last_seen_at": last_seen.get(emp.id),
             })
         team.sort(key=lambda m: (not m["is_active"], m["full_name"]))
         return team
@@ -789,6 +802,7 @@ class DashboardService:
                 by_assignee.setdefault(task.assignee_user_id, []).append(task)
 
         qualities = self._quality_summaries([emp.id for emp in employees])
+        last_seen = self._last_seen([emp.id for emp in employees])
         team = []
         for emp in employees:
             emp_tasks = by_assignee.get(emp.id, [])
@@ -809,6 +823,7 @@ class DashboardService:
                 "completed_today": completed_today,
                 "open_tasks": sum(1 for t in emp_tasks if t.status in task_status.ACTIVE),
                 "quality_rating": qualities.get(emp.id, empty_quality_summary()),
+                "last_seen_at": last_seen.get(emp.id),
             })
         team.sort(key=lambda m: (not m["is_active"], m["full_name"]))
         return team

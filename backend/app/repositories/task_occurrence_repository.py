@@ -18,6 +18,7 @@ from app.domain.employee_task_carry_over import (
 )
 from app.domain.fixed_task_expiry import EXPIRE_STATUSES
 from app.domain.task_kind import AD_HOC, FIXED
+from app.domain.offline_upload import keeps_awaiting_upload
 from app.models.task_occurrence import TaskOccurrence
 
 _TZ = ZoneInfo("Asia/Jerusalem")
@@ -278,6 +279,8 @@ class TaskOccurrenceRepository:
         if not row:
             return None
         row.status = status
+        if not keeps_awaiting_upload(status):
+            row.awaiting_upload_at = None
         if status == task_status.AWAITING_RESPONSE:
             row.chat_follow_up_at = None
             row.chat_resolved_at = None
@@ -318,6 +321,15 @@ class TaskOccurrenceRepository:
         row.started_by_id = mp.parse_uuid(started_by_id)
         row.started_at = started_at
         row.manager_next_at = None
+        self._db.flush()
+        return mp.task_occurrence_orm_to_domain(row)
+
+    def mark_awaiting_upload(self, id_: str, *, finished_at: datetime) -> TaskOccurrence | None:
+        """L'oved a fini sans קליטה : les fichiers suivront (effacé quand la preuve arrive)."""
+        row = self._db.get(orm.TaskOccurrence, mp.parse_uuid(id_))
+        if not row:
+            return None
+        row.awaiting_upload_at = finished_at
         self._db.flush()
         return mp.task_occurrence_orm_to_domain(row)
 

@@ -93,10 +93,10 @@ describe("EmployeeProfilePage", () => {
     expect(screen.getByText("avatar-capture-open")).toBeTruthy();
   });
 
-  it("logs out from the page", () => {
+  it("logs out from the page (no video waiting on the phone)", async () => {
     render(<EmployeeProfilePage />);
     fireEvent.click(screen.getByRole("button", { name: he.logout }));
-    expect(logout).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
 
   it("shows a spinner while the user is loading", () => {

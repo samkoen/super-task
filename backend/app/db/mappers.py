@@ -376,6 +376,9 @@ def task_occurrence_orm_to_domain(row: orm.TaskOccurrence | None) -> TaskOccurre
         network_group_id=(
             str(row.network_group_id) if getattr(row, "network_group_id", None) else None
         ),
+        awaiting_upload_at=(
+            parse_datetime_iso(row.awaiting_upload_at) if getattr(row, "awaiting_upload_at", None) else None
+        ),
     )
 
 

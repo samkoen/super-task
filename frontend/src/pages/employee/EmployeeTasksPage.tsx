@@ -11,7 +11,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { apiErrorMessage } from "../../utils/apiErrorMessage";
+import { apiErrorMessage, isOfflineError } from "../../utils/apiErrorMessage";
 import { useFeedback } from "../../context/FeedbackContext";
 import ListSkeleton from "../../components/ui/ListSkeleton";
 import {
@@ -86,6 +86,7 @@ import { waitUntilPendingVideosReady } from "../../utils/videoSlotReady";
 import { siyumTrace } from "../../utils/siyumTrace";
 import { scheduleConfirmCompletionMedia } from "../../utils/confirmCompletionMedia";
 import { mediaService } from "../../services/mediaService";
+import { usePendingUploads } from "../../hooks/usePendingUploads";
 import {
   employeeCompletePayload,
   shouldPromptIncomplete,
@@ -308,7 +309,8 @@ export default function EmployeeTasksPage() {
       ];
       void translatePendingTasks(lang, allTasks);
     } catch (e) {
-      showError(apiErrorMessage(e, he.errorGeneric));
+      // Sans קליטה on garde la liste déjà affichée : le bandeau « אין קליטה » le dit déjà.
+      if (!isOfflineError(e)) showError(apiErrorMessage(e, he.errorGeneric));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -346,7 +348,8 @@ export default function EmployeeTasksPage() {
         setLinkedStartReady(true);
         return true;
       } catch (e) {
-        showError(apiErrorMessage(e, he.errorGeneric));
+        // Sans קליטה, la tâche démarrera sur le serveur à l'envoi de la première sous-tâche.
+        if (!isOfflineError(e)) showError(apiErrorMessage(e, he.errorGeneric));
         setDashboard((prev) => revertStartedOnDashboard(prev, task));
         setDetailTask((prev) => (prev?.id === task.id ? task : prev));
         setLinkedStartReady(false);
@@ -670,6 +673,7 @@ export default function EmployeeTasksPage() {
   const headerBranch = dashboard?.employee?.branch_name;
   const headerJob = dashboard?.employee?.job_function;
   const onShift = dashboard?.on_shift;
+  const pendingUploads = usePendingUploads();
   const photoUrl = dashboard?.employee?.avatar_url ?? user?.avatar_url;
   const finishedSections = (
     <EmployeeFinishedTaskSections
@@ -758,6 +762,7 @@ export default function EmployeeTasksPage() {
         <TodayTasksScreen
           tasks={loading && !dashboard ? [] : todayScreenTasks}
           loading={loading && !dashboard}
+          awaitingUploadIds={pendingUploads.taskIds}
           employeeName={headerName}
           photoUrl={photoUrl}
           onOpenTask={(task) => openWorkTask(task)}

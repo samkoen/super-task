@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BranchSummary, ManagerMyWork, TeamMember, TimelineTask } from "../services/dashboardService";
 import type { DirectChatCard } from "../services/directChatService";
+import { he } from "../i18n/he";
 import {
   buildManagerInbox,
   buildNetworkOverview,
@@ -78,6 +79,25 @@ describe("buildManagerInbox", () => {
 
   it("is empty when nothing waits for the manager", () => {
     expect(buildManagerInbox(null, [])).toEqual([]);
+  });
+});
+
+describe("offline oved in « הצוות עכשיו »", () => {
+  const now = new Date(2026, 10, 16, 11, 0).getTime();
+  const seen = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString();
+
+  it("says since when a working oved has not been online", () => {
+    const [entry] = buildTeamNow([member("1", "דני", { status: "in_progress", current_task_title: "מדף", last_seen_at: seen(20) })], now);
+    expect(entry.detail).toBe(he.managerTeamOfflineSince("10:40"));
+  });
+
+  it("stays quiet when he was online recently, has nothing left, or has not arrived", () => {
+    const recent = buildTeamNow([member("1", "דני", { status: "in_progress", current_task_title: "מדף", last_seen_at: seen(5) })], now);
+    expect(recent[0].detail).toBe("מדף");
+    const done = buildTeamNow([member("2", "רונית", { completed_today: 3, last_seen_at: seen(60) })], now);
+    expect(done[0].detail).toBeNull();
+    const away = buildTeamNow([member("3", "מאיה", { last_seen_at: seen(60) })], now);
+    expect(away[0].detail).toBeNull();
   });
 });
 

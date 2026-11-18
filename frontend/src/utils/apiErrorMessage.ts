@@ -32,6 +32,18 @@ const HTML_DOCUMENT = /<!doctype\s+html|<html[\s>]|<\/html>/i;
 const HTML_TOO_LARGE = /request entity too large|payload too large|function_payload_too_large|\b413\b/i;
 
 /** Page HTML brute (erreur d'hébergeur), pas un message à montrer. */
+/**
+ * Pas de קליטה : le téléphone est hors ligne, ou la requête n'a jamais atteint le serveur.
+ * L'oved voit déjà le bandeau « אין קליטה » : pas de toast d'erreur en plus.
+ */
+export function isOfflineError(error: unknown, online: boolean = typeof navigator === "undefined" || navigator.onLine !== false): boolean {
+  if (!online) return true;
+  if (isFetchInterruptedError(error)) return true;
+  const row = error as { code?: string; isAxiosError?: boolean; response?: unknown; status?: number } | null;
+  if (row?.code === "ERR_NETWORK") return true;
+  return Boolean(row?.isAxiosError) && !row?.response && row?.status === undefined;
+}
+
 export function isHtmlErrorDocument(text: string): boolean {
   return HTML_DOCUMENT.test(text);
 }
