@@ -3,14 +3,13 @@ import type { TaskOccurrence } from "../../../services/taskService";
 import type { ManagerTaskActions } from "../../../hooks/useManagerTaskActions";
 import { he } from "../../../i18n/he";
 import ManagerReviewScreen from "../../review/ManagerReviewScreen";
+import ManagerTaskSummaryScreen from "../../review/ManagerTaskSummaryScreen";
 import ConfirmDeleteDialog from "../../ui/ConfirmDeleteDialog";
-import TaskCompletionReviewDialog from "../TaskCompletionReviewDialog";
-import TaskOccurrenceEditDialog from "../TaskOccurrenceEditDialog";
-import ManagerTaskEditFooter from "./ManagerTaskEditFooter";
+import ManagerTaskEditScreen from "./ManagerTaskEditScreen";
 
 type Props = {
   actions: ManagerTaskActions;
-  /** Liste affichée : la fiche reprend la dernière version d'une tâche (marque « הבאה » à jour). */
+  /** Liste affichée : l'écran reprend la dernière version d'une tâche (marque « הבאה » à jour). */
   tasks: TaskOccurrence[];
   employees?: User[];
   canManage: boolean;
@@ -18,25 +17,21 @@ type Props = {
   onChanged: (message?: string) => void;
 };
 
-/** Les fenêtres ouvertes depuis une ligne de tâche : revue plein écran, résumé, fiche, confirmation. */
+/** Les écrans ouverts depuis une ligne de tâche : revue, résumé d'une tâche fermée, édition, confirmation. */
 export default function ManagerTaskDialogs({ actions, tasks, employees, canManage, onChanged }: Props) {
   const { del } = actions;
   return (
     <>
       <ManagerReviewScreen request={actions.reviewRequest} onClose={actions.closeReview} onDone={(message) => onChanged(message)} />
-      <TaskCompletionReviewDialog task={actions.summaryTask} onClose={actions.closeSummary} onDone={(message) => onChanged(message)} />
-      <TaskOccurrenceEditDialog
+      <ManagerTaskSummaryScreen taskId={actions.summaryTask?.id ?? null} onClose={actions.closeSummary} onDone={(message) => onChanged(message)} />
+      <ManagerTaskEditScreen
         occurrenceId={actions.editId}
         employees={employees}
+        listTask={tasks.find((o) => o.id === actions.editId)}
         onClose={actions.closeEdit}
-        onSaved={() => onChanged()}
-        footer={canManage ? (task) => (
-          <ManagerTaskEditFooter
-            task={tasks.find((o) => o.id === task.id) ?? task}
-            onSetManagerNext={(t, enabled) => void actions.setManagerNext(t, enabled)}
-            onDelete={actions.askDelete}
-          />
-        ) : undefined}
+        onSaved={(message) => onChanged(message)}
+        onSetManagerNext={canManage ? (t, enabled) => void actions.setManagerNext(t, enabled) : undefined}
+        onDelete={canManage ? actions.askDelete : undefined}
       />
       <ConfirmDeleteDialog
         open={Boolean(del.deleting)}

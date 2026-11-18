@@ -80,7 +80,6 @@ export default function StudioPreview({ open, onClose, title, dueTime, requireme
           employeeName={employeeName || he.studioPreviewEmployee}
           photoUrl={photoUrl}
           onBack={onClose}
-          onOpenChat={noop}
         />
         <Box sx={{ px: "24px" }}>
           {requirements.length ? (
@@ -91,6 +90,7 @@ export default function StudioPreview({ open, onClose, title, dueTime, requireme
               onCapture={noop}
               onSendText={noop}
               onOpenGuide={setGuideIndex}
+              onChat={noop}
             />
           ) : (
             <Typography sx={{ ...flowText.body, color: flowColor.alphaNeutral900_60, textAlign: "center", mt: 4 }}>

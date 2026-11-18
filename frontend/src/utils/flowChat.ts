@@ -1,18 +1,7 @@
 import { he } from "../i18n/he";
 import type { CompletionRequirement } from "./completionMedia";
 import { slotDisplayTitle } from "./completionSlotView";
-import { isHandedOver, type SlotUploadStatus } from "./slotUploadState";
-
-export type TopicChoice = { index: number; label: string; done: boolean };
-
-/** Pastilles « על איזה סרטון מדברים ? » : une par sous-tâche du menahel ; `done` quand la carte est remise (ou non filmée). */
-export function topicChoices(requirements: CompletionRequirement[], statuses: SlotUploadStatus[]): TopicChoice[] {
-  return requirements.map((req, index) => ({
-    index,
-    label: slotDisplayTitle(req, index),
-    done: isHandedOver(statuses[index] ?? "idle"),
-  }));
-}
+import type { ChatMessageView } from "./chatMessageView";
 
 /** Tag d'une bulle (titre du sous-tâche) ; null = message général ou sous-tâche disparue. */
 export function stepTagLabel(requirements: CompletionRequirement[], index: number | null | undefined): string | null {
@@ -24,4 +13,9 @@ export function stepTagLabel(requirements: CompletionRequirement[], index: numbe
 export function composerPlaceholder(requirements: CompletionRequirement[], selected: number | null): string {
   const title = stepTagLabel(requirements, selected);
   return title ? he.flowChatPlaceholderTopic(title) : he.flowChatPlaceholder;
+}
+
+/** Fil d'une sous-tâche : ses messages et les messages généraux de la tâche (sans sous-tâche). */
+export function slotThreadMessages<T extends Pick<ChatMessageView, "slot_index">>(messages: T[], slotIndex: number): T[] {
+  return messages.filter((msg) => typeof msg.slot_index !== "number" || msg.slot_index === slotIndex);
 }

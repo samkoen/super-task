@@ -23,6 +23,8 @@ export const flowColor = {
   line: "#d9e3f2",
   alphaNeutral900_66: "rgba(17,21,29,0.66)",
   alphaNeutral900_60: "rgba(17,21,29,0.60)",
+  /** Bouton plein désactivé (« דיווח והמשך » sans raison, écran 05ד). */
+  alphaNeutral900_35: "rgba(17,21,29,0.35)",
   alphaNeutral1000_53: "rgba(0,0,0,0.53)",
   alphaNeutral1000_10: "rgba(0,0,0,0.1)",
   alphaNavy800_18: "rgba(18,33,63,0.18)",

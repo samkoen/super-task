@@ -15,9 +15,9 @@ vi.mock("../../utils/slotSender", async (importOriginal) => ({
 vi.mock("../../services/taskService", () => ({ taskService: { submitSlot: vi.fn() } }));
 vi.mock("../notifications/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
 vi.mock("./FlowTaskChat", () => ({
-  default: ({ open, occurrenceId, statuses, onClose }: { open: boolean; occurrenceId: string; statuses: string[]; onClose: () => void }) =>
-    open ? (
-      <div data-testid="task-chat" data-occurrence={occurrenceId} data-statuses={statuses.join(",")}>
+  default: ({ slotIndex, occurrenceId, onClose }: { slotIndex: number | null; occurrenceId: string; onClose: () => void }) =>
+    slotIndex !== null ? (
+      <div data-testid="task-chat" data-occurrence={occurrenceId} data-slot={slotIndex}>
         <button type="button" data-testid="task-chat-close" onClick={onClose} />
       </div>
     ) : null,
@@ -226,18 +226,19 @@ describe("TaskFlowScreen", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("has no chat icon on the subtask cards", () => {
+  it("has no chat icon in the header anymore (mail du designer, 18.11)", () => {
     renderScreen();
-    expect(screen.queryByTestId("flow-card-chat")).toBeNull();
+    expect(screen.queryByTestId("task-flow-chats")).toBeNull();
   });
 
-  it("opens this task's chat (not the general chat list) from the top icon, and closes it back to the flow", () => {
+  it("opens the active sub-task's chat (not the general chat list) from the card menu, and closes it back to the flow", () => {
     const { onOpenChats } = renderScreen();
     expect(screen.queryByTestId("task-chat")).toBeNull();
-    fireEvent.click(screen.getByTestId("task-flow-chats"));
+    fireEvent.click(screen.getByTestId("flow-card-menu"));
+    fireEvent.click(screen.getByTestId("flow-card-menu-chat"));
     const chat = screen.getByTestId("task-chat");
     expect(chat.getAttribute("data-occurrence")).toBe("occ1");
-    expect(chat.getAttribute("data-statuses")).toBe("idle,idle");
+    expect(chat.getAttribute("data-slot")).toBe("0");
     expect(onOpenChats).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("task-chat-close"));
     expect(screen.queryByTestId("task-chat")).toBeNull();

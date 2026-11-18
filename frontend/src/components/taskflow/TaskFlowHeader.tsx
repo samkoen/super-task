@@ -4,7 +4,6 @@ import NotificationBell from "../notifications/NotificationBell";
 import summaryButton from "../../assets/flow1/btn-summary.svg";
 import arrowLeftIcon from "../../assets/flow1/icon-arrow-left.svg";
 import bellIcon from "../../assets/flow1/icon-bell.svg";
-import messageIcon from "../../assets/flow1/icon-message-circle.svg";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { he } from "../../i18n/he";
 import { flowColor, flowSize, flowText } from "../../styles/flowTokens";
@@ -17,8 +16,6 @@ type Props = {
   employeeName?: string | null;
   photoUrl?: string | null;
   onBack: () => void;
-  /** Icône du haut : ouvre le chat de cette tâche (pas la liste générale). */
-  onOpenChat: () => void;
   /** Icône « סיכום » (presse-papiers, écran 03 du Figma) : ouvre le récap (10) à tout moment. */
   onOpenSummary?: () => void;
 };
@@ -106,13 +103,12 @@ function SummaryButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function Toolbar({ onBack, onOpenChat, onOpenSummary }: Pick<Props, "onBack" | "onOpenChat" | "onOpenSummary">) {
+function Toolbar({ onBack, onOpenSummary }: Pick<Props, "onBack" | "onOpenSummary">) {
   return (
     <Box sx={{ direction: "ltr", display: "flex", alignItems: "center", justifyContent: "space-between", pt: "16px", pb: "12px" }}>
       <RoundButton label={he.flowBack} testId="task-flow-back" icon={arrowLeftIcon} iconSize={22} onClick={onBack} />
       <Box sx={{ display: "flex", gap: "12px" }}>
         {onOpenSummary ? <SummaryButton onClick={onOpenSummary} /> : null}
-        <RoundButton label={he.flowOpenTaskChat} testId="task-flow-chats" icon={messageIcon} iconSize={19} onClick={onOpenChat} />
         <NotificationBell
           renderTrigger={(open, unread) => (
             <RoundButton label={he.notificationsTitle} testId="task-flow-bell" icon={bellIcon} iconSize={22} onClick={open}>
@@ -127,9 +123,10 @@ function Toolbar({ onBack, onOpenChat, onOpenSummary }: Pick<Props, "onBack" | "
 
 /**
  * En-tête du FLOW 1 (Figma « Home Header » + « toolbar ») : avatar et salutation, titre de la tâche
- * avec « בשעה 6:30 », puis retour à gauche ; סיכום, chat et cloche à droite.
+ * avec « בשעה 6:30 », puis retour à gauche ; סיכום et cloche à droite. Le chat se trouve dans le menu
+ * « ••• » de chaque carte et dans la caméra (mail du designer, 18.11).
  */
-export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, onBack, onOpenChat, onOpenSummary }: Props) {
+export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, onBack, onOpenSummary }: Props) {
   return (
     <Box
       component="header"
@@ -140,7 +137,7 @@ export default function TaskFlowHeader({ title, dueAt, employeeName, photoUrl, o
         <Greeting name={employeeName} photoUrl={photoUrl} />
         <TitleBlock title={title} due={formatDueHour(dueAt)} />
       </Box>
-      <Toolbar onBack={onBack} onOpenChat={onOpenChat} onOpenSummary={onOpenSummary} />
+      <Toolbar onBack={onBack} onOpenSummary={onOpenSummary} />
     </Box>
   );
 }

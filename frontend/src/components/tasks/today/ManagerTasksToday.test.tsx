@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import type { TaskOccurrence } from "../../../services/taskService";
 import { he } from "../../../i18n/he";
 import { groupTasksByPeriod } from "../../../utils/managerTasksDay";
-import ManagerTaskEditFooter from "./ManagerTaskEditFooter";
 import ManagerTasksDayBoard from "./ManagerTasksDayBoard";
 import ManagerTasksFilters from "./ManagerTasksFilters";
 
@@ -128,23 +127,5 @@ describe("ManagerTasksFilters", () => {
     fireEvent.click(screen.getByRole("button", { name: he.managerTasksNextDay }));
     expect(props.onPrevDay).toHaveBeenCalledTimes(1);
     expect(props.onNextDay).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("ManagerTaskEditFooter", () => {
-  it("offers the next-task mark and the deletion on an open task", () => {
-    const onSetManagerNext = vi.fn();
-    const onDelete = vi.fn();
-    const open = task("a", 9, "pending");
-    render(<ManagerTaskEditFooter task={open} onSetManagerNext={onSetManagerNext} onDelete={onDelete} />);
-    fireEvent.click(screen.getByRole("checkbox"));
-    expect(onSetManagerNext).toHaveBeenCalledWith(open, true);
-    fireEvent.click(screen.getByTestId("task-edit-delete"));
-    expect(onDelete).toHaveBeenCalledWith(open);
-  });
-
-  it("shows nothing on a closed task", () => {
-    const { container } = render(<ManagerTaskEditFooter task={task("a", 9, "completed")} onSetManagerNext={vi.fn()} onDelete={vi.fn()} />);
-    expect(container.textContent).toBe("");
   });
 });

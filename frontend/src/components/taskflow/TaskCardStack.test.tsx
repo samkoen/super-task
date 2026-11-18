@@ -93,10 +93,14 @@ describe("TaskCardStack", () => {
   it("reopening a kept card shows the take and hides « לא ניתן לצלם »", () => {
     const onSkip = vi.fn();
     const ready: SlotUiState = { status: "ready", kind: "video", previewUrl: "blob:kept" };
-    renderStack(videos(2), [ready, idle()], { onSkip });
+    renderStack(videos(2), [ready, idle()], { onSkip, onChat: vi.fn() });
+    fireEvent.click(screen.getByTestId("flow-card-menu"));
     expect(screen.getByTestId("flow-skip").textContent).toContain(he.flowSkipButton);
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
     fireEvent.click(screen.getByTestId("flow-tab-done"));
     expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("0");
+    fireEvent.click(screen.getByTestId("flow-card-menu"));
+    expect(screen.getByTestId("flow-card-menu-chat")).toBeTruthy();
     expect(screen.queryByTestId("flow-skip")).toBeNull();
     const video = screen.getByTestId("flow-captured");
     expect(video.tagName).toBe("VIDEO");
@@ -106,8 +110,9 @@ describe("TaskCardStack", () => {
 
   it("a card whose send failed still shows its take: nothing is lost", () => {
     const failed: SlotUiState = { status: "failed", kind: "video", previewUrl: "blob:failed", error: "boom" };
-    renderStack(videos(1), [failed], { onSkip: vi.fn() });
+    renderStack(videos(1), [failed], { onSkip: vi.fn(), onChat: vi.fn() });
     expect(screen.getByTestId("flow-captured").getAttribute("src")).toBe("blob:failed");
+    fireEvent.click(screen.getByTestId("flow-card-menu"));
     expect(screen.queryByTestId("flow-skip")).toBeNull();
     expect(screen.getByTestId("flow-primary").textContent).toBe(he.flowReviewRetake);
   });
@@ -179,9 +184,16 @@ describe("TaskCardStack", () => {
     expect((screen.getByTestId("flow-guide") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("has no chat icon on the subtask card (the chat lives in the page header)", () => {
-    renderStack(videos(2), [idle(), idle()]);
-    expect(screen.queryByTestId("flow-card-chat")).toBeNull();
+  it("opens the chat of the active sub-task from the « ••• » menu (screen 05ג)", () => {
+    const onChat = vi.fn();
+    const onSkip = vi.fn();
+    renderStack(videos(2), [idle(), idle()], { onChat, onSkip });
+    expect(screen.queryByTestId("flow-skip")).toBeNull();
+    fireEvent.click(screen.getByTestId("flow-card-menu"));
+    expect(screen.getByTestId("flow-card-menu-chat").textContent).toContain(he.flowCardMenuChat);
+    fireEvent.click(screen.getByTestId("flow-card-menu-chat"));
+    expect(onChat).toHaveBeenCalledWith(0);
+    expect(onSkip).not.toHaveBeenCalled();
   });
 
   it("uses the example image as illustration, with a neutral fallback", () => {

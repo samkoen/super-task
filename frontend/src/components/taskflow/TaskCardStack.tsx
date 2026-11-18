@@ -16,8 +16,10 @@ export type TaskCardStackProps = {
   onCapture: (index: number, file: File, kind: MediaKind, durationSeconds?: number, lightOk?: boolean | null) => void;
   onSendText: (index: number, text: string) => void;
   onOpenGuide: (index: number) => void;
-  /** « לא ניתן לצלם » sur la carte active (ouvre la feuille de raison). */
+  /** Menu « ••• » › « לא ניתן לצלם » sur la carte active (ouvre la feuille de raison). */
   onSkip?: (index: number) => void;
+  /** Chat de la sous-tâche `index` (menu « ••• » de la carte, icône de la caméra). */
+  onChat?: (index: number) => void;
   /** Demande de refilmer la carte `index` : incrémenter `nonce` rouvre la caméra. */
   retake?: { index: number; nonce: number } | null;
   /** Carte à ouvrir en premier (« לצלם עכשיו » depuis le récap). */
@@ -42,6 +44,7 @@ function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number
       onSendText={(text) => props.onSendText(index, text)}
       onOpenGuide={() => props.onOpenGuide(index)}
       onSkip={props.onSkip && !isKeptCapture(states[index]) ? () => props.onSkip?.(index) : undefined}
+      onChat={props.onChat ? () => props.onChat?.(index) : undefined}
     />
   );
 }

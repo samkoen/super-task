@@ -19,7 +19,7 @@ vi.mock("../../hooks/useResolvedMediaSrc", () => ({
 
 function setup(unread = 0, extra: Partial<Parameters<typeof TaskFlowHeader>[0]> = {}) {
   vi.mocked(notificationService.list).mockResolvedValue({ items: [], unread_count: unread });
-  const handlers = { onBack: vi.fn(), onOpenChat: vi.fn() };
+  const handlers = { onBack: vi.fn() };
   render(
     <TaskFlowHeader
       title="פתיחת משמרת"
@@ -49,17 +49,14 @@ describe("TaskFlowHeader", () => {
     expect(screen.getByTestId("task-flow-avatar").textContent).toBe("א");
   });
 
-  it("puts back on the left, then the task chat and bell, as round buttons", () => {
+  it("puts back on the left, then the bell, as round buttons, with no chat icon", () => {
     const handlers = setup();
     const back = screen.getByTestId("task-flow-back");
-    const chats = screen.getByTestId("task-flow-chats");
     const bell = screen.getByTestId("task-flow-bell");
-    expect(back.compareDocumentPosition(chats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(chats.compareDocumentPosition(bell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(back.compareDocumentPosition(bell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId("task-flow-chats")).toBeNull();
     fireEvent.click(back);
-    fireEvent.click(chats);
     expect(handlers.onBack).toHaveBeenCalledTimes(1);
-    expect(handlers.onOpenChat).toHaveBeenCalledTimes(1);
   });
 
   it("shows the orange dot on the bell only when notifications are unread", async () => {
@@ -72,13 +69,13 @@ describe("TaskFlowHeader", () => {
     await waitFor(() => expect(notificationService.list).toHaveBeenCalled());
     expect(screen.queryByTestId("task-flow-bell-dot")).toBeNull();
   });
-  it("shows the « סיכום » icon between back and chat and opens the summary", () => {
+  it("shows the « סיכום » icon between back and bell and opens the summary", () => {
     const onOpenSummary = vi.fn();
     setup(0, { onOpenSummary });
     const summary = screen.getByRole("button", { name: he.flowOpenSummary });
     fireEvent.click(summary);
     expect(onOpenSummary).toHaveBeenCalledTimes(1);
-    const order = [screen.getByTestId("task-flow-back"), summary, screen.getByTestId("task-flow-chats")];
+    const order = [screen.getByTestId("task-flow-back"), summary, screen.getByTestId("task-flow-bell")];
     expect(order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Alert, Box, CircularProgress, Dialog } from "@mui/material";
 import FlowPageHeader from "../taskflow/FlowPageHeader";
 import { ApiError } from "../../services/api";
@@ -18,7 +18,8 @@ type Props = {
   onDone: (message?: string) => void;
 };
 
-function useReviewTask(id: string | null) {
+/** Version fraîche de la tâche (preuve, sous-tâches, note) : la ligne de la liste ne suffit pas. */
+export function useReviewTask(id: string | null) {
   const [task, setTask] = useState<TaskOccurrence | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -62,17 +63,35 @@ export default function ManagerReviewScreen({ request, onClose, onDone }: Props)
   const { task, error } = useReviewTask(currentId);
   const decided = (message?: string) => { onDone(message); advance(); };
   return (
-    <Dialog open={Boolean(request)} onClose={onClose} fullScreen dir="rtl" PaperProps={{ sx: { background: flowScreenBackground } }} disableEnforceFocus>
-      <Box data-testid="manager-review-screen" sx={{ width: "100%", maxWidth: 440, mx: "auto", px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("20px"), pb: withSystemBottomInsetCss("32px"), display: "flex", flexDirection: "column", gap: "16px" }}>
-        {task && position ? (
-          <ManagerReviewBody key={task.id} task={task} position={position} onBack={onClose} onDecided={decided} onStatusChanged={(_status, notice) => decided(notice)} />
-        ) : (
-          <>
-            <FlowPageHeader title={he.managerReviewTitle} titleColor={flowColor.neutral900} onBack={onClose} />
-            {error ? <Alert severity="error">{error}</Alert> : <CircularProgress sx={{ alignSelf: "center", color: flowColor.navy800 }} />}
-          </>
-        )}
+    <ReviewScreenShell open={Boolean(request)} onClose={onClose} testId="manager-review-screen">
+      {task && position ? (
+        <ManagerReviewBody key={task.id} task={task} position={position} onBack={onClose} onDecided={decided} onStatusChanged={(_status, notice) => decided(notice)} />
+      ) : (
+        <ReviewLoading title={he.managerReviewTitle} error={error} onBack={onClose} />
+      )}
+    </ReviewScreenShell>
+  );
+}
+
+type ShellProps = { open: boolean; onClose: () => void; testId: string; children: ReactNode };
+
+/** Plein écran du FLOW (fond, colonne de 440 px, marges système) partagé par la revue et le résumé. */
+export function ReviewScreenShell({ open, onClose, testId, children }: ShellProps) {
+  return (
+    <Dialog open={open} onClose={onClose} fullScreen dir="rtl" PaperProps={{ sx: { background: flowScreenBackground } }} disableEnforceFocus>
+      <Box data-testid={testId} sx={{ width: "100%", maxWidth: 440, mx: "auto", px: `${flowSize.contentPaddingX}px`, pt: withSystemTopInsetCss("20px"), pb: withSystemBottomInsetCss("32px"), display: "flex", flexDirection: "column", gap: "16px" }}>
+        {children}
       </Box>
     </Dialog>
+  );
+}
+
+/** En-tête seul pendant le chargement (ou l'erreur) de la tâche. */
+export function ReviewLoading({ title, error, onBack }: { title: string; error: string; onBack: () => void }) {
+  return (
+    <>
+      <FlowPageHeader title={title} titleColor={flowColor.neutral900} onBack={onBack} />
+      {error ? <Alert severity="error">{error}</Alert> : <CircularProgress sx={{ alignSelf: "center", color: flowColor.navy800 }} />}
+    </>
   );
 }

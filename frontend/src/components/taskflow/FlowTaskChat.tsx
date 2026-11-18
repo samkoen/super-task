@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Box, CircularProgress, Dialog, Typography } from "@mui/material";
 import FlowChatComposer from "./FlowChatComposer";
 import { FlowChatHeader } from "./FlowChatHeader";
 import FlowChatMessages from "./FlowChatMessages";
-import FlowChatTopics from "./FlowChatTopics";
 import { useAuth } from "../../context/AuthContext";
 import { useChatThread } from "../../hooks/useChatThread";
 import { useTaskChatLiveSync } from "../../hooks/useTaskChatLiveSync";
@@ -11,31 +10,30 @@ import { he } from "../../i18n/he";
 import { flowColor } from "../../styles/flowTokens";
 import type { TaskStatus } from "../../services/taskService";
 import type { CompletionRequirement } from "../../utils/completionMedia";
-import { composerPlaceholder, stepTagLabel, topicChoices } from "../../utils/flowChat";
+import { composerPlaceholder, slotThreadMessages, stepTagLabel } from "../../utils/flowChat";
 import { canComposeTaskChat } from "../../utils/taskChatCompose";
 import { createTaskChatTransport } from "../../utils/taskChatTransport";
-import type { SlotUploadStatus } from "../../utils/slotUploadState";
 
 type Props = {
-  open: boolean;
+  /** Sous-tâche dont on ouvre le chat ; null = fermé. */
+  slotIndex: number | null;
   occurrenceId: string;
+  /** Titre de la tâche (« פתיחת משמרת ») : début du sous-titre. */
   title: string;
   status?: TaskStatus;
   managerName?: string | null;
   requirements: CompletionRequirement[];
-  /** Statut de chaque carte : coche verte sur les sujets déjà remis. */
-  statuses: SlotUploadStatus[];
   onClose: () => void;
   onOccurrenceUpdated?: () => void;
   /** Pause du poll de secours du fil (tests) ; défaut : poll normal. */
   pollMs?: number | false;
 };
 
-type ScreenProps = Omit<Props, "open">;
+type ScreenProps = Omit<Props, "slotIndex"> & { slotIndex: number };
 
-function useTaskThread(props: ScreenProps, selected: number | null) {
-  const slotRef = useRef<number | null>(selected);
-  slotRef.current = selected;
+function useTaskThread(props: ScreenProps) {
+  const slotRef = useRef<number | null>(props.slotIndex);
+  slotRef.current = props.slotIndex;
   const onUpdated = useRef(props.onOccurrenceUpdated);
   onUpdated.current = props.onOccurrenceUpdated;
   const transport = useMemo(
@@ -62,7 +60,8 @@ function Feed({ props, thread, myId }: { props: ScreenProps; thread: ReturnType<
       </Box>
     );
   }
-  if (!thread.messages.length) {
+  const messages = slotThreadMessages(thread.messages, props.slotIndex);
+  if (!messages.length) {
     return (
       <Typography data-testid="flow-chat-empty" sx={{ textAlign: "center", color: flowColor.alphaNavy800_60, py: 4, px: 2 }}>
         {he.taskChatEmpty}
@@ -71,9 +70,9 @@ function Feed({ props, thread, myId }: { props: ScreenProps; thread: ReturnType<
   }
   return (
     <FlowChatMessages
-      messages={thread.messages}
+      messages={messages}
       myId={myId}
-      stepTagFor={(index) => stepTagLabel(props.requirements, index)}
+      stepTagFor={() => null}
       hasMore={thread.hasMore}
       loadingOlder={thread.loadingOlder}
       onLoadOlder={() => void thread.loadOlder()}
@@ -84,27 +83,26 @@ function Feed({ props, thread, myId }: { props: ScreenProps; thread: ReturnType<
 
 function ChatScreen(props: ScreenProps) {
   const { user } = useAuth();
-  const [selected, setSelected] = useState<number | null>(null);
-  const thread = useTaskThread(props, selected);
+  const thread = useTaskThread(props);
+  const slotTitle = stepTagLabel(props.requirements, props.slotIndex) ?? "";
   const canCompose = props.status ? canComposeTaskChat(props.status, true) : true;
   return (
     <Box data-testid="flow-task-chat" dir="rtl" sx={{ width: "100%", maxWidth: 393, height: "100dvh", mx: "auto", display: "flex", flexDirection: "column", bgcolor: flowColor.neutral100 }}>
       <Box sx={{ flexShrink: 0 }}>
-        <FlowChatHeader title={props.title} managerName={props.managerName} onBack={props.onClose} />
+        <FlowChatHeader title={slotTitle} taskTitle={props.title} managerName={props.managerName} onBack={props.onClose} />
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", pt: "16px" }}>
-        {canCompose ? <FlowChatTopics choices={topicChoices(props.requirements, props.statuses)} selected={selected} onSelect={setSelected} /> : null}
         <Feed props={props} thread={thread} myId={user?.id} />
       </Box>
       {canCompose ? (
         <FlowChatComposer
-          placeholder={composerPlaceholder(props.requirements, selected)}
+          placeholder={composerPlaceholder(props.requirements, props.slotIndex)}
           body={thread.body}
           onBodyChange={thread.setBody}
           sending={thread.sending}
           error={thread.error}
           onSend={() => void thread.sendText()}
-          onSendMedia={thread.sendMedia}
+          onSendMedia={thread.sendMediaChecked}
         />
       ) : null}
     </Box>
@@ -114,13 +112,14 @@ function ChatScreen(props: ScreenProps) {
 const paperProps = { sx: { bgcolor: flowColor.neutral100 } };
 
 /**
- * Chat de la tâche (Figma écran 12), ouvert par l'icône de chat du haut de l'écran de tâche :
- * fil de la tâche et choix du sujet (sous-tâche) visé par chaque message.
+ * Chat d'une sous-tâche (Figma écrans 12ב → 12ב4), ouvert depuis le menu « ••• » de la carte ou depuis
+ * la caméra. Chaque message part avec `slot_index` ; le fil montre les messages de cette sous-tâche
+ * et les messages généraux de la tâche (sans sous-tâche).
  */
-export default function FlowTaskChat({ open, ...rest }: Props) {
+export default function FlowTaskChat({ slotIndex, ...rest }: Props) {
   return (
-    <Dialog fullScreen open={open} onClose={rest.onClose} dir="rtl" PaperProps={paperProps}>
-      <ChatScreen {...rest} />
+    <Dialog fullScreen open={slotIndex !== null} onClose={rest.onClose} dir="rtl" PaperProps={paperProps}>
+      {slotIndex !== null ? <ChatScreen {...rest} slotIndex={slotIndex} /> : null}
     </Dialog>
   );
 }

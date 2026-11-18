@@ -54,7 +54,7 @@ function Evidence({ task, review, onMarkPhoto }: { task: TaskOccurrence; review:
   );
 }
 
-function OvedReport({ task }: { task: TaskOccurrence }) {
+export function OvedReport({ task }: { task: TaskOccurrence }) {
   const completion = task.completion;
   if (!completion) return null;
   const notDone = completion.status === "not_completed";

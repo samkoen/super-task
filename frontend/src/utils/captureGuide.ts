@@ -10,6 +10,8 @@ export type CaptureGuide = {
   progress?: { done: number; total: number };
   /** Bouton « ? » de la caméra : rouvre la fiche « איך מצלמים » (absent = bouton grisé). */
   onHelp?: () => void;
+  /** Icône de chat à côté du retour (écran 06) : chat de cette sous-tâche (absent = masquée). */
+  onChat?: () => void;
 };
 
 export function guideFromRequirement(req: CompletionRequirement, index: number): CaptureGuide {

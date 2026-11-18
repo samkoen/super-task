@@ -152,7 +152,7 @@ export default function FlowVideoCamera(props: Props) {
       data-testid="flow-video-camera"
       sx={{ width: "100%", maxWidth: 393, mx: "auto", flex: 1, minHeight: 0, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "30px", px: "24px", pt: withSystemTopInsetCss("38px"), pb: withSystemBottomInsetCss("21px") }}
     >
-      <FlowPageHeader title={guide.title} progress={guide.progress} onBack={onClose} backDisabled={recording || handingOver} />
+      <FlowPageHeader title={guide.title} progress={guide.progress} onBack={onClose} backDisabled={recording || handingOver} onChat={guide.onChat} chatDisabled={recording || handingOver} />
       <Viewport recorder={recorder} guide={guide} minSeconds={minSeconds} handingOver={handingOver} />
     </Box>
   );

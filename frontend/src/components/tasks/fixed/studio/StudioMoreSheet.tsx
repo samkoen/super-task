@@ -28,8 +28,11 @@ export type StudioMoreSheetProps = {
   onError?: (message: string) => void;
   advanced: TaskAdvancedValue;
   onAdvancedChange: (patch: Partial<TaskAdvancedValue>) => void;
-  delivery: { enabled: boolean; taskType: string };
-  onDeliveryChange: (patch: { enabled?: boolean; taskType?: string }) => void;
+  /** Absent (tâche du jour) : pas de bloc « תעודת משלוח ». */
+  delivery?: { enabled: boolean; taskType: string };
+  onDeliveryChange?: (patch: { enabled?: boolean; taskType?: string }) => void;
+  /** « ad_hoc » : seulement le lien de départ (pas de catégorie ni début/fin de journée). */
+  advancedKind?: "fixed" | "ad_hoc";
   /** Actions propres à l'édition (rattacher un client Agroline). */
   deliveryExtra?: ReactNode;
   /** Édition seulement : interrupteur « פעילה ». */
@@ -69,19 +72,21 @@ export default function StudioMoreSheet(props: StudioMoreSheetProps) {
           onError={props.onError}
         />
       </Block>
-      <Block title={he.deliveryNoteSectionTitle}>
-        <DeliveryNoteTemplateFields
-          enabled={props.delivery.enabled}
-          onEnabledChange={(enabled) => props.onDeliveryChange({ enabled })}
-          taskType={props.delivery.taskType}
-          onTaskTypeChange={(taskType) => props.onDeliveryChange({ taskType })}
-          disabled={disabled}
-        >
-          {props.deliveryExtra}
-        </DeliveryNoteTemplateFields>
-      </Block>
+      {props.delivery ? (
+        <Block title={he.deliveryNoteSectionTitle}>
+          <DeliveryNoteTemplateFields
+            enabled={props.delivery.enabled}
+            onEnabledChange={(enabled) => props.onDeliveryChange?.({ enabled })}
+            taskType={props.delivery.taskType}
+            onTaskTypeChange={(taskType) => props.onDeliveryChange?.({ taskType })}
+            disabled={disabled}
+          >
+            {props.deliveryExtra}
+          </DeliveryNoteTemplateFields>
+        </Block>
+      ) : null}
       <TaskAdvancedFields
-        taskKind="fixed"
+        taskKind={props.advancedKind ?? "fixed"}
         value={props.advanced}
         onChange={props.onAdvancedChange}
         open

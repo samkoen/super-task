@@ -1,16 +1,16 @@
 import type { TeamMember, TimelineTask } from "../../../services/dashboardService";
-import type { TaskOccurrence } from "../../../services/taskService";
 import { he } from "../../../i18n/he";
 import { rosterEntry } from "../../../utils/managerTeam";
 import TaskChatDialog from "../../tasks/TaskChatDialog";
-import TaskCompletionReviewDialog from "../../tasks/TaskCompletionReviewDialog";
-import TaskOccurrenceEditDialog from "../../tasks/TaskOccurrenceEditDialog";
+import ManagerTaskSummaryScreen from "../../review/ManagerTaskSummaryScreen";
+import ManagerTaskEditScreen from "../../tasks/today/ManagerTaskEditScreen";
 import DirectChatScreen from "../../chat/DirectChatScreen";
 import ManagerEmployeeSheet from "../../team/ManagerEmployeeSheet";
 
 export type ManagerHomeDialogsState = {
   chatTask: TimelineTask | null;
-  reviewTarget: TaskOccurrence | null;
+  /** Tâche fermée ouverte depuis le tableau d'analyse : son résumé. */
+  summaryTaskId: string | null;
   editOccurrenceId: string | null;
   member: TeamMember | null;
   directChat: { id: string; title: string } | null;
@@ -26,12 +26,12 @@ type Props = {
   onDirectSent: () => void;
 };
 
-/** Fenêtres ouvertes depuis l'accueil : chat de tâche, revue de preuve, édition, fiche d'un oved, chat direct. */
+/** Fenêtres ouvertes depuis l'accueil : chat de tâche, résumé d'une tâche fermée, édition, fiche d'un oved, chat direct. */
 export default function ManagerHomeDialogs({ state, branchId, onPatch, onCloseDirectChat, onDone, onDirectSent }: Props) {
-  const { chatTask, reviewTarget, editOccurrenceId, member, directChat } = state;
+  const { chatTask, summaryTaskId, editOccurrenceId, member, directChat } = state;
   const close = {
     onCloseChatTask: () => onPatch({ chatTask: null }),
-    onCloseReview: () => onPatch({ reviewTarget: null }),
+    onCloseSummary: () => onPatch({ summaryTaskId: null }),
     onCloseEdit: () => onPatch({ editOccurrenceId: null }),
     onCloseMember: () => onPatch({ member: null }),
     onCloseDirectChat,
@@ -48,8 +48,8 @@ export default function ManagerHomeDialogs({ state, branchId, onPatch, onCloseDi
         chatResolvedAt={chatTask?.chat_resolved_at}
         onClose={() => { close.onCloseChatTask(); onDone(); }}
       />
-      <TaskCompletionReviewDialog task={reviewTarget} onClose={close.onCloseReview} onDone={(message) => onDone(message)} />
-      <TaskOccurrenceEditDialog occurrenceId={editOccurrenceId} onClose={close.onCloseEdit} onSaved={(message) => onDone(message)} />
+      <ManagerTaskSummaryScreen taskId={summaryTaskId} onClose={close.onCloseSummary} onDone={(message) => onDone(message)} />
+      <ManagerTaskEditScreen occurrenceId={editOccurrenceId} onClose={close.onCloseEdit} onSaved={(message) => onDone(message)} />
       <ManagerEmployeeSheet entry={member ? rosterEntry(null, member, branchId) : null} onClose={close.onCloseMember} onChanged={() => onDone()} />
       <DirectChatScreen chat={directChat} onClose={close.onCloseDirectChat} onSent={onDirectSent} />
     </>
