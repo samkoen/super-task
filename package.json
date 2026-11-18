@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "test:android": "npm --prefix frontend run test:android",
-    "test:android:device": "npm --prefix frontend run test:android:device"
+    "test:android:device": "npm --prefix frontend run test:android:device",
+    "test:e2e": "npm --prefix e2e test"
   }
 }

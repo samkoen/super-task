@@ -1,0 +1,19 @@
+# Postgres jetable pour les tests e2e (CI, ou poste sans Postgres local).
+#   docker compose -f e2e/docker-compose.e2e.yml up -d
+#   E2E_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5433/super_e2e npm --prefix e2e test
+services:
+  postgres-e2e:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
