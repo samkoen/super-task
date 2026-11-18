@@ -143,21 +143,25 @@ function PrimaryButton({ label, onClick, disabled }: { label: string; onClick?: 
       data-testid="flow-primary"
       onClick={onClick}
       disabled={disabled}
-      sx={{ ...smallButtonSx, minWidth: 136, bgcolor: flowColor.neutral900, color: flowColor.neutral0, "&.Mui-disabled": { opacity: 0.5 } }}
+      // 136 px du Figma ; sur un écran plus étroit, c'est ce bouton qui cède la place au lien.
+      sx={{ ...smallButtonSx, width: 136, minWidth: 0, flexShrink: 1, whiteSpace: "nowrap", bgcolor: flowColor.neutral900, color: flowColor.neutral0, "&.Mui-disabled": { opacity: 0.5 } }}
     >
       {label}
     </ButtonBase>
   );
 }
 
-/** Lien « דוגמא לצילום נכון » : toujours présent, grisé tant que le menahel n'a rien défini. */
+/**
+ * Lien « דוגמא לצילום נכון » : toujours présent, grisé tant que le menahel n'a rien défini.
+ * Toujours sur une ligne (Figma 03 : whitespace-nowrap) ; sans fond, il n'a pas besoin de marge latérale.
+ */
 function ExampleLink({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
   return (
     <ButtonBase
       data-testid="flow-guide"
       disabled={!enabled}
       onClick={onClick}
-      sx={{ ...smallButtonSx, color: flowColor.neutral900, "&.Mui-disabled": { opacity: 0.35 } }}
+      sx={{ ...smallButtonSx, px: "4px", flexShrink: 0, whiteSpace: "nowrap", color: flowColor.neutral900, "&.Mui-disabled": { opacity: 0.35 } }}
     >
       {he.flowExampleLink}
     </ButtonBase>

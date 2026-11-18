@@ -72,6 +72,14 @@ describe("TaskCardStack", () => {
     expect(getComputedStyle(screen.getByTestId("flow-illustration")).objectFit).toBe("contain");
   });
 
+  it("keeps « דוגמא לצילום נכון » on one line, like Figma screen 03", () => {
+    renderStack(videos(1), [idle()]);
+    const guide = screen.getByTestId("flow-guide");
+    expect(guide.textContent).toBe(he.flowExampleLink);
+    expect(getComputedStyle(guide).whiteSpace).toBe("nowrap");
+    expect(getComputedStyle(guide).flexShrink).toBe("0");
+  });
+
   it("handles any number of cards: a single card has no tab below", () => {
     renderStack(videos(1), [idle()]);
     expect(screen.getByTestId("flow-card")).toBeTruthy();
