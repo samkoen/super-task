@@ -668,7 +668,13 @@ class TaskOccurrenceService:
         )
         return packed
 
+    @staticmethod
+    def _arrival_still_open(existing) -> bool:
+        """L'arrivée suit les films gardés jusqu'au 1er envoi au menahel ; après un refus, elle ne bouge plus."""
+        return existing is None or getattr(existing, "manager_review_status", None) is None
+
     def _stamp_work_start_arrival(self, occurrence, attachments) -> None:
+        """פתיחת משמרת : arrivée = 1re prise photo/vidéo parmi les médias envoyés (cases non filmées exclues)."""
         if not getattr(occurrence, "is_work_start", False):
             return
         when = arrival_at_from_visual(attachments, now=datetime.now(TZ))
@@ -716,7 +722,7 @@ class TaskOccurrenceService:
             media["attachments"] = self._carry_slot_reviews(occurrence, existing, media["attachments"])
         employee_submission = as_assignee
         needs_review = employee_submission_needs_review(employee_submission)
-        if employee_submission and not existing:
+        if employee_submission and self._arrival_still_open(existing):
             self._stamp_work_start_arrival(occurrence, media["attachments"])
 
         if existing and task_status.employee_may_submit(occurrence.status):
@@ -845,12 +851,12 @@ class TaskOccurrenceService:
 
     def _save_slot_draft(self, actor, occurrence, existing, merged: list[dict], as_assignee: bool):
         """Enregistre la sous-tâche sans clore la tâche (la tâche reste en cours)."""
+        if as_assignee and self._arrival_still_open(existing):
+            self._stamp_work_start_arrival(occurrence, merged)
         if existing:
             updated = self._completions.update_attachments(occurrence.id, merged)
             assert updated is not None
             return updated
-        if as_assignee:
-            self._stamp_work_start_arrival(occurrence, merged)
         packed = self._pack_attachments(merged)
         return self._completions.create(
             occurrence_id=occurrence.id,

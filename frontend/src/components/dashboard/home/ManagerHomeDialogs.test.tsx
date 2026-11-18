@@ -4,8 +4,8 @@ import type { TeamMember } from "../../../services/dashboardService";
 import ManagerHomeDialogs, { type ManagerHomeDialogsState } from "./ManagerHomeDialogs";
 
 vi.mock("../../tasks/TaskChatDialog", () => ({ default: () => null }));
-vi.mock("../../tasks/TaskCompletionReviewDialog", () => ({ default: () => null }));
-vi.mock("../../tasks/TaskOccurrenceEditDialog", () => ({ default: () => null }));
+vi.mock("../../review/ManagerTaskSummaryScreen", () => ({ default: () => null }));
+vi.mock("../../tasks/today/ManagerTaskEditScreen", () => ({ default: () => null }));
 vi.mock("../../chat/DirectChatThread", () => ({ default: () => <div data-testid="direct-thread" /> }));
 vi.mock("../../team/ManagerEmployeeSheet", () => ({
   default: ({ entry, onClose, onAccount }: { entry: { id: string; branchId: string; state: string } | null; onClose: () => void; onAccount?: unknown }) =>
@@ -17,7 +17,7 @@ vi.mock("../../team/ManagerEmployeeSheet", () => ({
     ) : null,
 }));
 
-const none: ManagerHomeDialogsState = { chatTask: null, reviewTarget: null, editOccurrenceId: null, member: null, directChat: null };
+const none: ManagerHomeDialogsState = { chatTask: null, summaryTaskId: null, editOccurrenceId: null, member: null, directChat: null };
 const member = { user_id: "u1", full_name: "שמואל", status: "in_progress", completed_today: 0, total_today: 1, timeline: [], overdue_backlog: [] } as unknown as TeamMember;
 
 describe("ManagerHomeDialogs", () => {

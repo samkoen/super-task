@@ -42,24 +42,25 @@ import {
 } from "../../utils/managerHome";
 import { reviewQueueFromInbox } from "../../utils/managerReview";
 
-const NO_DIALOG: ManagerHomeDialogsState = { chatTask: null, reviewTarget: null, editOccurrenceId: null, member: null, directChat: null };
+const NO_DIALOG: ManagerHomeDialogsState = { chatTask: null, summaryTaskId: null, editOccurrenceId: null, member: null, directChat: null };
 
 /** Aucun snif choisi = vue réseau, y compris pour le menahel qui gère tous les oveds (décision du 16.11). */
 function isNetworkOverview(data: ManagerDashboard): boolean {
   return !data.branch;
 }
 
-/** Ouvre une tâche du tableau : la revue si une preuve attend, sinon l'édition. */
-function useOpenTask(setDialogs: (patch: Partial<ManagerHomeDialogsState>) => void, onError: (m: string) => void) {
+/** Ouvre une tâche du tableau : la revue si une preuve attend, le résumé si elle est fermée, sinon l'édition. */
+function useOpenTask(setDialogs: (patch: Partial<ManagerHomeDialogsState>) => void, openReview: (taskId: string) => void, onError: (m: string) => void) {
   return useCallback(async (taskId: string) => {
     try {
       const occurrence = await taskService.getOccurrence(taskId);
-      if (dashboardTaskUsesReview(occurrence.status)) setDialogs({ reviewTarget: occurrence });
+      if (occurrence.status === "pending_review") openReview(taskId);
+      else if (dashboardTaskUsesReview(occurrence.status)) setDialogs({ summaryTaskId: taskId });
       else setDialogs({ editOccurrenceId: taskId });
     } catch (e) {
       onError(e instanceof ApiError ? e.message : he.errorGeneric);
     }
-  }, [setDialogs, onError]);
+  }, [setDialogs, openReview, onError]);
 }
 
 /** « לבדיקה » ouvre la revue plein écran sur toute la file des preuves du périmètre. */
@@ -80,10 +81,10 @@ function AnalysisPanel({ data, stages, onOpenTask }: { data: ManagerDashboard; s
 }
 
 /** Fenêtres de l'accueil (un seul état) et ouverture d'une tâche du tableau d'analyse. */
-function useHomeDialogs(onError: (m: string) => void) {
+function useHomeDialogs(openReview: (taskId: string) => void, onError: (m: string) => void) {
   const [dialogs, setDialogsState] = useState<ManagerHomeDialogsState>(NO_DIALOG);
   const setDialogs = useCallback((patch: Partial<ManagerHomeDialogsState>) => setDialogsState((d) => ({ ...d, ...patch })), []);
-  return { dialogs, setDialogs, openTask: useOpenTask(setDialogs, onError) };
+  return { dialogs, setDialogs, openTask: useOpenTask(setDialogs, openReview, onError) };
 }
 
 /** « לטיפולך » : un message ouvre le chat direct, une question son chat de tâche, une preuve la revue. */
@@ -106,10 +107,10 @@ export default function ManagerDashboardPage() {
   const navigate = useNavigate();
   const home = useManagerHomeData();
   const inbox = useManagerInboxChats();
-  const { dialogs, setDialogs, openTask } = useHomeDialogs(showError);
-  const [analysisOpen, setAnalysisOpen] = useState(false);
   const { data, load } = home;
   const review = useReviewLauncher(data);
+  const { dialogs, setDialogs, openTask } = useHomeDialogs(review.open, showError);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const openInboxItem = useInboxOpener(data, inbox, setDialogs, review.open);
   useTaskChangeListener(useCallback(() => { void load(true); void inbox.reload(); }, [load, inbox.reload]));
   const network = Boolean(data && isNetworkOverview(data));

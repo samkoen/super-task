@@ -142,3 +142,63 @@ def test_work_start_resubmit_after_reopen_keeps_first_arrival():
         )
     )
     occurrence_repo.set_started_at.assert_not_called()
+
+
+def _draft(attachments) -> TaskCompletion:
+    """Sous-tâches déjà reçues, tâche pas encore envoyée au menahel."""
+    draft = _completion()
+    draft.manager_review_status = None
+    draft.completion_attachments = attachments
+    return draft
+
+
+def _photo(url: str, at: str) -> dict:
+    return {"kind": "photo", "url": url, "captured_at": f"2026-01-01T{at}:00+02:00"}
+
+
+def _three_photo_slots():
+    occurrence = _occurrence(completion_requirements=[{"kind": "photo"}, {"kind": "photo"}, {"kind": "photo"}])
+    occurrence_repo, completion_repo = _repos(occurrence)
+    completion_repo.update_attachments.side_effect = lambda _id, merged: _draft(merged)
+    return occurrence_repo, completion_repo
+
+
+def _submit(occurrence_repo, completion_repo, index: int, attachment: dict):
+    return asyncio.run(
+        _service(occurrence_repo, completion_repo).submit_slot(_employee(), "occ-1", index, attachment=attachment)
+    )
+
+
+def _stamped(occurrence_repo) -> datetime:
+    return occurrence_repo.set_started_at.call_args.kwargs["started_at"]
+
+
+def test_arrival_uses_earliest_film_among_all_sent_slots():
+    occurrence_repo, completion_repo = _three_photo_slots()
+    completion_repo.find_by_occurrence.return_value = _draft([_photo("/uploads/a.jpg", "08:20")])
+    _submit(occurrence_repo, completion_repo, 1, _photo("/uploads/b.jpg", "08:05"))
+    assert _stamped(occurrence_repo) == datetime.fromisoformat("2026-01-01T08:05:00+02:00")
+
+
+def test_arrival_waits_for_a_real_film_when_first_slot_is_skipped():
+    occurrence_repo, completion_repo = _three_photo_slots()
+    skipped = {"kind": "photo", "skipped": {"reason_code": "no_stock"}}
+    completion_repo.find_by_occurrence.return_value = _draft([skipped])
+    _submit(occurrence_repo, completion_repo, 1, _photo("/uploads/b.jpg", "08:10"))
+    assert _stamped(occurrence_repo) == datetime.fromisoformat("2026-01-01T08:10:00+02:00")
+
+
+def test_arrival_ignores_a_take_replaced_before_sending():
+    occurrence_repo, completion_repo = _three_photo_slots()
+    completion_repo.find_by_occurrence.return_value = _draft([_photo("/uploads/old.jpg", "08:00")])
+    _submit(occurrence_repo, completion_repo, 0, _photo("/uploads/new.jpg", "08:25"))
+    assert _stamped(occurrence_repo) == datetime.fromisoformat("2026-01-01T08:25:00+02:00")
+
+
+def test_arrival_does_not_move_on_a_slot_resent_after_a_refusal():
+    occurrence_repo, completion_repo = _three_photo_slots()
+    rejected = _draft([_photo("/uploads/a.jpg", "08:00")])
+    rejected.manager_review_status = task_status.REVIEW_REJECTED
+    completion_repo.find_by_occurrence.return_value = rejected
+    _submit(occurrence_repo, completion_repo, 0, _photo("/uploads/again.jpg", "11:00"))
+    occurrence_repo.set_started_at.assert_not_called()

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { TaskOccurrence } from "../../services/taskService";
 import { taskService } from "../../services/taskService";
@@ -25,12 +24,26 @@ vi.mock("../../components/review/ManagerReviewScreen", () => ({
   default: ({ request }: { request: { startId: string; queue: { id: string }[] } | null }) =>
     request ? <div data-testid="review-screen">{`${request.startId}:${request.queue.map((q) => q.id).join(",")}`}</div> : null,
 }));
-vi.mock("../../components/tasks/TaskCompletionReviewDialog", () => ({
-  default: ({ task }: { task: TaskOccurrence | null }) => (task ? <div data-testid="summary-dialog">{task.id}</div> : null),
+vi.mock("../../components/review/ManagerTaskSummaryScreen", () => ({
+  default: ({ taskId }: { taskId: string | null }) => (taskId ? <div data-testid="summary-dialog">{taskId}</div> : null),
 }));
-vi.mock("../../components/tasks/TaskOccurrenceEditDialog", () => ({
-  default: ({ occurrenceId, footer }: { occurrenceId: string | null; footer?: (t: TaskOccurrence) => ReactNode }) =>
-    occurrenceId ? <div data-testid="edit-dialog">{footer?.({ id: occurrenceId } as TaskOccurrence)}</div> : null,
+type EditMockProps = {
+  occurrenceId: string | null;
+  listTask?: TaskOccurrence;
+  onSetManagerNext?: (t: TaskOccurrence, enabled: boolean) => void;
+  onDelete?: (t: TaskOccurrence) => void;
+};
+vi.mock("../../components/tasks/today/ManagerTaskEditScreen", () => ({
+  default: ({ occurrenceId, listTask, onSetManagerNext, onDelete }: EditMockProps) => {
+    if (!occurrenceId) return null;
+    const row = listTask ?? ({ id: occurrenceId } as TaskOccurrence);
+    return (
+      <div data-testid="edit-dialog">
+        <input type="checkbox" checked={Boolean(row.is_manager_next)} onChange={(e) => onSetManagerNext?.(row, e.target.checked)} />
+        <button data-testid="task-edit-delete" onClick={() => onDelete?.(row)} />
+      </div>
+    );
+  },
 }));
 
 const at = (hour: number) => new Date(2026, 10, 16, hour).toISOString();

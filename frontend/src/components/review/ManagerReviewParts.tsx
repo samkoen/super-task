@@ -28,18 +28,21 @@ export function ReviewCard({ title, children, testId }: { title?: string; childr
   );
 }
 
-type HeaderProps = { title: string; subtitle: string; index: number; total: number; onBack: () => void; onChat: () => void };
+type HeaderProps = { title: string; subtitle: string; index?: number; total?: number; onBack: () => void; onChat: () => void; status?: string };
 
-/** Figma : titre + retour, « דני · מחסן · נשלח 06:47 », puis compteur « 2 מתוך 5 » et bouton rond de chat. */
-export function ReviewHeader({ title, subtitle, index, total, onBack, onChat }: HeaderProps) {
+/** Figma : titre + retour, « דני · מחסן · נשלח 06:47 », puis compteur « 2 מתוך 5 » (ou l'état de la tâche) et bouton rond de chat. */
+export function ReviewHeader({ title, subtitle, index, total, onBack, onChat, status }: HeaderProps) {
+  const pill = index != null && total != null ? he.managerReviewQueue(index, total) : status;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <FlowPageHeader title={title} titleColor={flowColor.neutral900} onBack={onBack} />
       {subtitle ? <Typography data-testid="review-subtitle" sx={{ ...flowText.body, color: flowColor.alphaNeutral900_60, mt: "-8px" }}>{subtitle}</Typography> : null}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Typography data-testid="review-queue" sx={{ ...flowText.label, px: "12px", py: "6px", borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral0, color: flowColor.neutral900 }}>
-          {he.managerReviewQueue(index, total)}
-        </Typography>
+        {pill ? (
+          <Typography data-testid="review-queue" sx={{ ...flowText.label, px: "12px", py: "6px", borderRadius: `${flowRadius.full}px`, bgcolor: flowColor.neutral0, color: flowColor.neutral900 }}>
+            {pill}
+          </Typography>
+        ) : <Box />}
         <ButtonBase aria-label={he.managerReviewOpenChat} onClick={onChat} sx={{ width: 56, height: 56, borderRadius: "50%" }}>
           <Box component="img" src={chatIcon} alt="" sx={{ width: 56, height: 56, display: "block" }} />
         </ButtonBase>
@@ -75,10 +78,10 @@ export function ReviewActions({ primaryLabel, saving, primaryDisabled, onPrimary
   );
 }
 
-type ReturnSheetProps = { open: boolean; saving: boolean; marksCount: number; onClose: () => void; onSend: (note: string) => void };
+type ReturnSheetProps = { open: boolean; saving: boolean; marksCount: number; onClose: () => void; onSend: (note: string) => void; sendLabel?: string };
 
 /** Feuille « מה צריך לתקן? » : remarque libre, envoyée avec les photos annotées. */
-export function ReviewReturnSheet({ open, saving, marksCount, onClose, onSend }: ReturnSheetProps) {
+export function ReviewReturnSheet({ open, saving, marksCount, onClose, onSend, sendLabel = he.managerReviewReturnSend }: ReturnSheetProps) {
   const [note, setNote] = useState("");
   useEffect(() => { if (open) setNote(""); }, [open]);
   return (
@@ -95,7 +98,7 @@ export function ReviewReturnSheet({ open, saving, marksCount, onClose, onSend }:
       </Box>
       {marksCount > 0 ? <Typography sx={{ ...flowText.body, color: flowColor.navy800 }}>{he.reviewMarkedPhotoCount(marksCount)}</Typography> : null}
       <ButtonBase data-testid="review-return-send" disabled={saving} onClick={() => onSend(note)} sx={studioPrimarySx}>
-        {saving ? <CircularProgress size={22} sx={{ color: flowColor.neutral0 }} /> : he.managerReviewReturnSend}
+        {saving ? <CircularProgress size={22} sx={{ color: flowColor.neutral0 }} /> : sendLabel}
       </ButtonBase>
     </StudioSheet>
   );
