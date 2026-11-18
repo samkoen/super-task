@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, ButtonBase, Drawer, InputBase, Typography } from "@mui/material";
+import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import closeIcon from "../../assets/flow1/icon-x.svg";
 import micIcon from "../../assets/flow1/icon-mic.svg";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
@@ -28,14 +30,22 @@ function audioFile(blob: Blob): File {
 /** Enregistrement de l'explication vocale : un seul fichier gardé, envoyé au serveur avec le récap. */
 function useSkipVoice() {
   const recorder = useAudioRecorder();
-  const { reset, recording, stopAndWait, start } = recorder;
+  const { reset, recording, stopAndWait, start, elapsedSeconds } = recorder;
   const [file, setFile] = useState<File | null>(null);
+  /** Durée mesurée pendant l'enregistrement : un webm de MediaRecorder n'annonce souvent pas sa durée. */
+  const [seconds, setSeconds] = useState(0);
   useEffect(() => () => reset(), [reset]);
 
+  const keep = (blob: Blob | null) => {
+    if (!blob) return null;
+    const next = audioFile(blob);
+    setSeconds(elapsedSeconds);
+    setFile(next);
+    return next;
+  };
   const toggle = async () => {
     if (recording) {
-      const blob = await stopAndWait();
-      if (blob) setFile(audioFile(blob));
+      keep(await stopAndWait());
       return;
     }
     setFile(null);
@@ -44,15 +54,17 @@ function useSkipVoice() {
   /** Appelé au clic sur « דיווח והמשך » : un enregistrement encore ouvert est arrêté et gardé. */
   const finish = async (): Promise<File | null> => {
     if (!recording) return file;
-    const blob = await stopAndWait();
-    return blob ? audioFile(blob) : file;
+    return keep(await stopAndWait()) ?? file;
   };
   const remove = () => {
     setFile(null);
+    setSeconds(0);
     reset();
   };
-  return { recorder, file, toggle, finish, remove };
+  return { recorder, file, seconds, toggle, finish, remove };
 }
+
+type Voice = ReturnType<typeof useSkipVoice>;
 
 function ReasonChips({ value, onChange }: { value: SkipReasonCode | null; onChange: (code: SkipReasonCode) => void }) {
   return (
@@ -83,48 +95,162 @@ function ReasonChips({ value, onChange }: { value: SkipReasonCode | null; onChan
   );
 }
 
-function AudioPreview({ file }: { file: File }) {
-  const url = useMemo(() => (typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : ""), [file]);
-  useEffect(() => () => (url ? URL.revokeObjectURL(url) : undefined), [url]);
-  if (!url) return null;
-  return <Box component="audio" controls src={url} data-testid="flow-skip-audio" sx={{ width: "100%", height: 36 }} />;
+/** « 0:07 » : minutes sans zéro, secondes sur deux chiffres (Figma 05ה2/05ה3). */
+function formatVoiceClock(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(Number.isFinite(totalSeconds) ? totalSeconds : 0));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-type Voice = ReturnType<typeof useSkipVoice>;
+/** Hauteurs des 17 barres de l'onde dessinée dans le Figma. */
+const WAVE_BARS = [8, 14, 20, 12, 18, 10, 16, 22, 12, 8, 14, 18, 10, 6, 12, 16, 8];
+const WAVE_GREY = "#b2b8bf";
 
-function VoiceStatus({ voice }: { voice: Voice }) {
-  const { recorder, file } = voice;
-  if (recorder.recording) {
-    return <Typography data-testid="flow-skip-recording" sx={{ ...flowText.label, color: flowColor.neutral900 }}>{he.flowSkipRecording(recorder.elapsedSeconds)}</Typography>;
-  }
-  if (recorder.error) {
-    return <Typography role="alert" data-testid="flow-skip-record-error" sx={{ ...flowText.label, color: flowColor.neutral900 }}>{he.flowSkipRecordFailed}</Typography>;
-  }
-  if (file) {
-    return (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
-        <Typography data-testid="flow-skip-recorded" sx={{ ...flowText.label, color: flowColor.green700 }}>{he.flowSkipRecorded}</Typography>
-        <AudioPreview file={file} />
+const waveKeyframes = {
+  "@keyframes flowSkipWave": {
+    "0%, 100%": { transform: "scaleY(0.35)" },
+    "50%": { transform: "scaleY(1)" },
+  },
+};
+
+/** Onde « vivante » pendant l'enregistrement : chaque barre respire avec un léger décalage. */
+function LiveWave() {
+  return (
+    <Box aria-hidden data-testid="flow-skip-live-wave" sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "3px", overflow: "hidden", ...waveKeyframes }}>
+      {WAVE_BARS.map((height, i) => (
+        <Box
+          key={i}
+          sx={{
+            width: 3,
+            height,
+            flexShrink: 0,
+            borderRadius: `${flowRadius.full}px`,
+            bgcolor: flowColor.alphaNeutral900_60,
+            animation: `flowSkipWave ${0.9 + (i % 4) * 0.15}s ease-in-out ${(i % 5) * 0.12}s infinite`,
+            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+          }}
+        />
+      ))}
+    </Box>
+  );
+}
+
+/** Onde de réécoute : la partie déjà jouée en foncé, depuis la droite (lecture RTL du Figma 05ה3). */
+function PlaybackWave({ progress }: { progress: number }) {
+  const count = WAVE_BARS.length;
+  return (
+    <Box aria-hidden sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "3px", overflow: "hidden" }}>
+      {WAVE_BARS.map((height, i) => {
+        const played = progress > 0 && (count - i) / count <= progress;
+        return <Box key={i} sx={{ width: 3, height, flexShrink: 0, borderRadius: `${flowRadius.full}px`, bgcolor: played ? flowColor.neutral900 : WAVE_GREY, transition: "background-color 120ms linear" }} />;
+      })}
+    </Box>
+  );
+}
+
+function DeleteVoice({ voice }: { voice: Voice }) {
+  return (
+    <ButtonBase data-testid="flow-skip-audio-delete" aria-label={he.flowSkipRecordDelete} onClick={voice.remove} sx={{ width: 28, height: 28, flexShrink: 0, borderRadius: "50%" }}>
+      <Box component="img" src={closeIcon} alt="" sx={{ width: 20, height: 20, opacity: 0.6 }} />
+    </ButtonBase>
+  );
+}
+
+/** Rangée commune des deux états (05ה2/05ה3), lue de gauche à droite comme dans le Figma. */
+const VOICE_ROW_SX = { display: "flex", alignItems: "center", gap: "8px", minHeight: 44, pl: "4px", pr: "12px", py: "4px", borderRadius: `${flowRadius.full}px` } as const;
+
+/** 05ה2 : bouton stop rouge, onde vivante, chrono avec point rouge, X pour jeter. */
+function RecordingRow({ voice }: { voice: Voice }) {
+  return (
+    <Box dir="ltr" data-testid="flow-skip-recording" sx={VOICE_ROW_SX}>
+      <ButtonBase
+        data-testid="flow-skip-stop"
+        aria-label={he.flowSkipRecordStop}
+        onClick={() => void voice.toggle()}
+        sx={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", bgcolor: flowColor.rec }}
+      >
+        <Box sx={{ width: 12, height: 12, borderRadius: "3px", bgcolor: flowColor.neutral0 }} />
+      </ButtonBase>
+      <LiveWave />
+      <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        <Typography data-testid="flow-skip-timer" sx={{ ...flowText.body, fontWeight: 500, color: flowColor.neutral900 }}>
+          {formatVoiceClock(voice.recorder.elapsedSeconds)}
+        </Typography>
+        <Box aria-hidden sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: flowColor.rec }} />
       </Box>
-    );
-  }
-  return null;
+      <DeleteVoice voice={voice} />
+    </Box>
+  );
+}
+
+function useAudioPlayback(file: File, fallbackSeconds: number) {
+  const url = useMemo(() => (typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : ""), [file]);
+  useEffect(() => () => (url ? URL.revokeObjectURL(url) : undefined), [url]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(fallbackSeconds);
+  const readDuration = () => {
+    const d = audioRef.current?.duration;
+    if (d && Number.isFinite(d)) setDuration(d);
+  };
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) void audio.play()?.catch(() => setPlaying(false));
+    else audio.pause();
+  };
+  const events = {
+    onPlay: () => setPlaying(true),
+    onPause: () => setPlaying(false),
+    onEnded: () => {
+      setPlaying(false);
+      setCurrent(0);
+    },
+    onTimeUpdate: () => setCurrent(audioRef.current?.currentTime ?? 0),
+    onLoadedMetadata: readDuration,
+    onDurationChange: readDuration,
+  };
+  return { url, audioRef, playing, current, duration, toggle, events };
+}
+
+/** 05ה3 : onde de réécoute, « 0:05 / 0:14 », lecture/pause noir, X pour jeter. */
+function PlaybackRow({ voice, file }: { voice: Voice; file: File }) {
+  const player = useAudioPlayback(file, voice.seconds);
+  const progress = player.duration > 0 ? Math.min(1, player.current / player.duration) : 0;
+  const Icon = player.playing ? PauseRoundedIcon : PlayArrowRoundedIcon;
+  return (
+    <Box dir="ltr" data-testid="flow-skip-recorded" aria-label={he.flowSkipRecorded} sx={VOICE_ROW_SX}>
+      {player.url ? <Box component="audio" ref={player.audioRef} src={player.url} preload="metadata" data-testid="flow-skip-audio" sx={{ display: "none" }} {...player.events} /> : null}
+      <PlaybackWave progress={progress} />
+      <Typography data-testid="flow-skip-timer" sx={{ ...flowText.body, fontWeight: 500, color: flowColor.neutral900, flexShrink: 0 }}>
+        {`${formatVoiceClock(player.current)} / ${formatVoiceClock(player.duration)}`}
+      </Typography>
+      <ButtonBase
+        data-testid="flow-skip-play"
+        aria-label={player.playing ? he.flowSkipPause : he.flowSkipPlay}
+        aria-pressed={player.playing}
+        onClick={player.toggle}
+        sx={{ width: 32, height: 32, flexShrink: 0, borderRadius: "50%", bgcolor: flowColor.neutral900, color: flowColor.neutral0 }}
+      >
+        <Icon sx={{ fontSize: 18 }} />
+      </ButtonBase>
+      <DeleteVoice voice={voice} />
+    </Box>
+  );
 }
 
 /** Figma 05ד : « הקלטה קולית » puis le micro rond noir, en bas à gauche du champ. */
 function MicButton({ voice }: { voice: Voice }) {
-  const recording = voice.recorder.recording;
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
       <Typography aria-hidden sx={{ ...flowText.label, color: flowColor.alphaNeutral900_66 }}>
-        {recording ? he.flowSkipRecordStop : he.flowSkipRecord}
+        {he.flowSkipRecord}
       </Typography>
       <ButtonBase
         data-testid="flow-skip-mic"
-        aria-label={recording ? he.flowSkipRecordStop : he.flowSkipRecord}
-        aria-pressed={recording}
+        aria-label={he.flowSkipRecord}
         onClick={() => void voice.toggle()}
-        sx={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", bgcolor: recording ? flowColor.rec : flowColor.neutral900 }}
+        sx={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", bgcolor: flowColor.neutral900 }}
       >
         <Box component="img" src={micIcon} alt="" sx={{ width: 18, height: 18, display: "block" }} />
       </ButtonBase>
@@ -132,18 +258,38 @@ function MicButton({ voice }: { voice: Voice }) {
   );
 }
 
+/** Micro au repos, enregistreur (05ה2), ou réécoute avant l'envoi (05ה3). */
+function VoiceControls({ voice }: { voice: Voice }) {
+  if (voice.recorder.recording) return <RecordingRow voice={voice} />;
+  if (voice.file) return <PlaybackRow voice={voice} file={voice.file} />;
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <MicButton voice={voice} />
+      {voice.recorder.error ? (
+        <Typography role="alert" data-testid="flow-skip-record-error" sx={{ ...flowText.label, color: flowColor.neutral900 }}>{he.flowSkipRecordFailed}</Typography>
+      ) : null}
+    </Box>
+  );
+}
+
+function explanationPlaceholder(voice: Voice, required: boolean): string {
+  if (voice.file && !voice.recorder.recording) return he.flowSkipTextPlaceholderVoice;
+  return required ? he.flowSkipTextPlaceholderOther : he.flowSkipTextPlaceholder;
+}
+
 /** Champ gris (05ד) ; « אחר » (05ה) : bord foncé et pirus obligatoire annoncé dans le placeholder. */
 function ExplanationBox({ text, onText, voice, required }: { text: string; onText: (value: string) => void; voice: Voice; required: boolean }) {
-  const placeholder = required ? he.flowSkipTextPlaceholderOther : he.flowSkipTextPlaceholder;
+  const placeholder = explanationPlaceholder(voice, required);
+  const hasVoice = Boolean(voice.file) || voice.recorder.recording;
   return (
     <Box
       data-testid="flow-skip-explanation"
       data-required={required ? "true" : "false"}
-      sx={{ p: "14px 16px 12px", gap: "8px", display: "flex", flexDirection: "column", borderRadius: `${flowRadius.md}px`, bgcolor: flowColor.neutral100, border: `1.5px solid ${required ? flowColor.neutral900 : "transparent"}` }}
+      sx={{ p: "12px 16px", gap: "8px", display: "flex", flexDirection: "column", borderRadius: `${flowRadius.md}px`, bgcolor: flowColor.neutral100, border: `1.5px solid ${required ? flowColor.neutral900 : "transparent"}` }}
     >
       <InputBase
         multiline
-        minRows={2}
+        minRows={hasVoice ? 1 : 2}
         maxRows={4}
         value={text}
         onChange={(event) => onText(event.target.value)}
@@ -151,15 +297,7 @@ function ExplanationBox({ text, onText, voice, required }: { text: string; onTex
         inputProps={{ "data-testid": "flow-skip-text", maxLength: SKIP_TEXT_MAX, "aria-label": placeholder }}
         sx={{ ...flowText.body, color: flowColor.neutral900, "& textarea::placeholder": { color: flowColor.alphaNeutral900_60, opacity: 1 } }}
       />
-      <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <MicButton voice={voice} />
-        <VoiceStatus voice={voice} />
-        {voice.file && !voice.recorder.recording ? (
-          <ButtonBase data-testid="flow-skip-audio-delete" onClick={voice.remove} sx={{ ...flowText.label, px: "8px", height: 32, color: flowColor.alphaNeutral900_66 }}>
-            {he.flowSkipRecordDelete}
-          </ButtonBase>
-        ) : null}
-      </Box>
+      <VoiceControls voice={voice} />
     </Box>
   );
 }

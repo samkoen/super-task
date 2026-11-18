@@ -72,6 +72,14 @@ describe("TaskCardStack", () => {
     expect(getComputedStyle(screen.getByTestId("flow-illustration")).objectFit).toBe("contain");
   });
 
+  it("keeps « דוגמא לצילום נכון » on one line, like Figma screen 03", () => {
+    renderStack(videos(1), [idle()]);
+    const guide = screen.getByTestId("flow-guide");
+    expect(guide.textContent).toBe(he.flowExampleLink);
+    expect(getComputedStyle(guide).whiteSpace).toBe("nowrap");
+    expect(getComputedStyle(guide).flexShrink).toBe("0");
+  });
+
   it("handles any number of cards: a single card has no tab below", () => {
     renderStack(videos(1), [idle()]);
     expect(screen.getByTestId("flow-card")).toBeTruthy();
@@ -88,6 +96,17 @@ describe("TaskCardStack", () => {
     fireEvent.click(screen.getAllByTestId("flow-tab-next")[1]);
     expect((screen.getByTestId("flow-card")).textContent).toContain("וידאו 3");
     expect((screen.getByTestId("flow-card")).getAttribute("data-index")).toBe("2");
+  });
+
+  it("moves on by itself to the next open card once the chosen card is handed over", () => {
+    const handlers = { onCapture: vi.fn(), onSendText: vi.fn(), onOpenGuide: vi.fn() };
+    const reqs = videos(3);
+    const { rerender } = render(<TaskCardStack requirements={reqs} states={[idle(), idle(), idle()]} {...handlers} />);
+    fireEvent.click(screen.getAllByTestId("flow-tab-next")[0]);
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1");
+    rerender(<TaskCardStack requirements={reqs} states={[idle(), { status: "ready", kind: "video", previewUrl: "blob:x" }, idle()]} {...handlers} />);
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("2");
+    expect(screen.getByTestId("flow-tab-done").getAttribute("data-index")).toBe("1");
   });
 
   it("reopening a kept card shows the take and hides « לא ניתן לצלם »", () => {

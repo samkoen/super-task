@@ -39,7 +39,11 @@ export function resolveActive(states: SlotUiState[], preferred: number | null): 
 }
 
 export function stackLayout(states: SlotUiState[], preferred: number | null): StackLayout {
-  const active = resolveActive(states, preferred);
+  return layoutAround(states, resolveActive(states, preferred));
+}
+
+/** Pile autour d'une carte active imposée (carte qu'on garde à l'écran le temps de l'animation de remise). */
+export function layoutAround(states: SlotUiState[], active: number | null): StackLayout {
   const above: number[] = [];
   const below: number[] = [];
   states.forEach((state, index) => {
