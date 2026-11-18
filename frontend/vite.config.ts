@@ -1,7 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const apiTarget = "http://127.0.0.1:5001";
+// Les tests e2e lancent une API à part (autre port) : VITE_API_PROXY_TARGET.
+const apiTarget = process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:5001";
 
 const sseProxy = {
   target: apiTarget,
