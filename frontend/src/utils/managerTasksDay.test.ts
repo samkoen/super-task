@@ -46,6 +46,14 @@ describe("row texts", () => {
     expect(taskRowSubtitle(task("a", 7, "pending", { assignee_name: null }))).toBe(`${he.managerTasksUnassigned} · ${he.taskStatusLabels.pending}`);
   });
 
+  it("says a task finished without reception is waiting for its files, until they arrive", () => {
+    const waiting = task("a", 7, "in_progress", { awaiting_upload_at: new Date(2026, 10, 16, 10, 42).toISOString() });
+    expect(taskRowSubtitle(waiting)).toBe(`דני · ${he.managerTaskAwaitingUpload("10:42")}`);
+    expect(taskRowSubtitle({ ...waiting, status: "pending_review" })).toBe(`דני · ${he.taskStatusLabels.pending_review}`);
+    expect(taskRowState(waiting)).toBe("review");
+    expect(taskRowState({ ...waiting, status: "completed" })).toBe("done");
+  });
+
   it("adds the date only for another day", () => {
     expect(taskRowTime(at(6, 30), "2026-11-16")).toBe("06:30");
     expect(taskRowTime(at(6, 30, 14), "2026-11-16")).toBe("14.11 06:30");

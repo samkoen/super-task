@@ -11,7 +11,9 @@ import type {
 import type { DirectChatCard } from "../services/directChatService";
 import { buildPendingReviewQueue, buildQuestionsQueue } from "./dashboardCarousels";
 import { buildManagerSummary } from "./managerSummary";
+import { he } from "../i18n/he";
 import { computeArrivedAt, memberTasks } from "./staffProgress";
+import { formatClockTime } from "./flowReview";
 import { TODAY_PERIODS, periodForDue, type TodayPeriod } from "./todayPeriods";
 
 /**
@@ -156,6 +158,17 @@ export interface TeamNowEntry {
 
 const STATE_ORDER: TeamNowState[] = ["idle", "working", "notArrived", "done"];
 
+/** Plus de 15 minutes sans requête de son téléphone alors qu'il a encore du travail : sans doute sans קליטה. */
+export const OFFLINE_AFTER_MS = 15 * 60 * 1000;
+
+export function offlineSince(member: TeamMember, state: TeamNowState, nowMs = Date.now()): string | null {
+  if (!member.last_seen_at || state === "done" || state === "notArrived" || member.open_tasks <= 0) return null;
+  const seen = new Date(member.last_seen_at).getTime();
+  if (Number.isNaN(seen) || nowMs - seen < OFFLINE_AFTER_MS) return null;
+  const time = formatClockTime(member.last_seen_at);
+  return time ? he.managerTeamOfflineSince(time) : null;
+}
+
 export function teamNowState(member: TeamMember): TeamNowState {
   if (member.total_today > 0 && member.completed_today >= member.total_today) return "done";
   if (member.status === "in_progress") return "working";
@@ -167,7 +180,7 @@ export function teamNowState(member: TeamMember): TeamNowState {
  * Bande « הצוות עכשיו » : ceux qui n'ont rien en cours passent en tête, puis ceux qui travaillent.
  * Tous les oveds du snif y sont : `is_active` du backend veut dire « a travaillé aujourd'hui ».
  */
-export function buildTeamNow(team: TeamMember[] | null | undefined): TeamNowEntry[] {
+export function buildTeamNow(team: TeamMember[] | null | undefined, nowMs = Date.now()): TeamNowEntry[] {
   return (team ?? [])
     .map((member) => {
       const state = teamNowState(member);
@@ -176,7 +189,7 @@ export function buildTeamNow(team: TeamMember[] | null | undefined): TeamNowEntr
         name: member.full_name,
         initial: member.full_name.trim().charAt(0),
         state,
-        detail: state === "working" ? member.current_task_title : null,
+        detail: offlineSince(member, state, nowMs) ?? (state === "working" ? member.current_task_title : null),
         member,
       };
     })

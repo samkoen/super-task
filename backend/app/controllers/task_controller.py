@@ -696,6 +696,25 @@ async def submit_occurrence_slot(
     }
 
 
+@router.post("/occurrences/{occurrence_id}/finished-offline")
+@handle_controller_errors
+def finished_offline(
+    occurrence_id: str,
+    request: Request,
+    data: dict[str, Any] | None = Body(default=None),
+    service: TaskOccurrenceService = Depends(get_occurrence_service),
+    db: Session = Depends(get_db),
+):
+    """Petit signal sans fichier : l'oved a fini, ses vidéos partiront au retour de la קליטה."""
+    actor = load_actor(request, UserRepository(db))
+    item = service.mark_finished_offline(
+        actor, occurrence_id, finished_at=(data or {}).get("finished_at")
+    )
+    db.commit()
+    _notify_occurrence("task_updated", item)
+    return {"occurrence": item}
+
+
 @router.post("/occurrences/{occurrence_id}/approve")
 @handle_controller_errors
 def approve_occurrence(

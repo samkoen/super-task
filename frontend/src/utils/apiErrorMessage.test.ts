@@ -5,6 +5,7 @@ import {
   humanizeApiError,
   isFetchInterruptedError,
   isHtmlErrorDocument,
+  isOfflineError,
 } from "./apiErrorMessage";
 
 describe("apiErrorMessage", () => {
@@ -82,5 +83,18 @@ describe("apiErrorMessage", () => {
     expect(apiErrorMessage(new Error("יש להתחיל את המשימה לפני הסיום"), he.errorGeneric)).toBe(
       "יש להתחיל את המשימה לפני הסיום",
     );
+  });
+});
+
+describe("isOfflineError", () => {
+  it("is offline when the phone says so or the request never reached the server", () => {
+    expect(isOfflineError(new Error("x"), false)).toBe(true);
+    expect(isOfflineError({ code: "ERR_NETWORK" }, true)).toBe(true);
+    expect(isOfflineError({ isAxiosError: true }, true)).toBe(true);
+  });
+
+  it("is a real error when the server answered", () => {
+    expect(isOfflineError({ isAxiosError: true, response: { status: 500 } }, true)).toBe(false);
+    expect(isOfflineError({ status: 403, message: "אין הרשאה" }, true)).toBe(false);
   });
 });

@@ -56,6 +56,14 @@ describe("TodayTasksScreen", () => {
     expect(within(screen.getByTestId("today-period-tasks-evening")).getByText("סגירת קופה")).toBeTruthy();
   });
 
+  it("ticks a task finished without reception and says it will be sent", () => {
+    renderScreen({ awaitingUploadIds: new Set(["m2"]) });
+    const morning = within(screen.getByTestId("today-period-tasks-morning")).getAllByTestId("today-task-item");
+    expect(morning[1].getAttribute("data-state")).toBe("awaiting-upload");
+    expect(within(morning[1]).getByTestId("today-task-checkbox").getAttribute("data-done")).toBe("true");
+    expect(within(morning[1]).getByText(he.todayAwaitingUpload)).toBeTruthy();
+  });
+
   it("opens the task on row click, and the chat from the ⋮ menu without opening the task", () => {
     const props = renderScreen();
     const [first] = screen.getAllByTestId("today-task-item");

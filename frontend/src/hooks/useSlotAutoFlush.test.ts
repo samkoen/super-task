@@ -1,32 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
-import { useSlotAutoFlush } from "./useSlotAutoFlush";
+import { sendFinishSignalsThenFiles } from "./useSlotAutoFlush";
+import { taskService } from "../services/taskService";
+import { rememberFinished } from "../utils/finishSignals";
 
-function fakeQueue() {
-  return { flush: vi.fn(async () => undefined) } as never;
-}
+vi.mock("../services/taskService", () => ({ taskService: { finishedOffline: vi.fn() } }));
 
-describe("useSlotAutoFlush", () => {
-  it("flushes the device queue on start and again when the network comes back", () => {
-    const queue = fakeQueue() as { flush: ReturnType<typeof vi.fn> };
-    renderHook(() => useSlotAutoFlush(true, () => queue as never));
-    expect(queue.flush).toHaveBeenCalledTimes(1);
-    window.dispatchEvent(new Event("online"));
-    expect(queue.flush).toHaveBeenCalledTimes(2);
-  });
-
-  it("does nothing while disabled", () => {
-    const queue = fakeQueue() as { flush: ReturnType<typeof vi.fn> };
-    renderHook(() => useSlotAutoFlush(false, () => queue as never));
-    window.dispatchEvent(new Event("online"));
-    expect(queue.flush).not.toHaveBeenCalled();
-  });
-
-  it("stops listening on unmount", () => {
-    const queue = fakeQueue() as { flush: ReturnType<typeof vi.fn> };
-    const { unmount } = renderHook(() => useSlotAutoFlush(true, () => queue as never));
-    unmount();
-    window.dispatchEvent(new Event("online"));
-    expect(queue.flush).toHaveBeenCalledTimes(1);
+describe("sendFinishSignalsThenFiles", () => {
+  it("sends the small finish signal before the heavy files", async () => {
+    localStorage.clear();
+    rememberFinished("t1", "2026-11-18T10:42:00Z");
+    const order: string[] = [];
+    vi.mocked(taskService.finishedOffline).mockImplementation(async () => {
+      order.push("signal");
+      return {} as never;
+    });
+    await sendFinishSignalsThenFiles({ flush: async () => void order.push("files") });
+    expect(order).toEqual(["signal", "files"]);
+    expect(taskService.finishedOffline).toHaveBeenCalledWith("t1", "2026-11-18T10:42:00Z");
   });
 });

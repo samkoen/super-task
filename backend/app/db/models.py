@@ -54,6 +54,8 @@ class User(Base):
     excellence_slogan: Mapped[str | None] = mapped_column(String(120), nullable=True)
     on_break_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idle_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Dernière requête de l'oved (au plus une écriture toutes les 2 minutes).
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     inactivity_notified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -313,6 +315,8 @@ class TaskOccurrence(Base):
         index=True,
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Oved sans קליטה : fini sur le téléphone, fichiers pas encore reçus (heure de fin vue par l'appareil).
+    awaiting_upload_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_by_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
     )

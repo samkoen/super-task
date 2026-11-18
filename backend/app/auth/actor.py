@@ -1,9 +1,13 @@
 """Chargement du contexte acteur depuis la session + DB (source de vérité)."""
 
+import logging
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, Request, status
 
 from app.auth.session_roles import MANAGER_ROLES, require_user_id, session_user_role
 from app.domain import roles
+from app.domain.offline_upload import LAST_SEEN_MIN_GAP
 from app.domain.scope import ActorContext
 from app.domain.task_scope import visible_branch_ids_for_tasks
 from app.domain.user_membership import resolve_active_branch_id
@@ -12,6 +16,8 @@ from app.repositories.branch_repository import BranchRepository
 from app.repositories.user_branch_membership_repository import UserBranchMembershipRepository
 from app.repositories.user_repository import UserRepository
 
+logger = logging.getLogger(__name__)
+
 SESSION_ACTIVE_BRANCH_KEY = "active_branch_id"
 SESSION_PREVIEW_AS_KEY = "preview_as_user_id"
 
@@ -19,7 +25,18 @@ SESSION_PREVIEW_AS_KEY = "preview_as_user_id"
 def load_real_actor(request: Request, user_repo: UserRepository) -> ActorContext:
     """Acteur réellement connecté (ignore le mode צפייה כעובד)."""
     user = _session_user(request, user_repo)
+    _touch_last_seen(user, user_repo)
     return _actor_for_user(request, user_repo, user, sync_session_role=True)
+
+
+def _touch_last_seen(user, user_repo: UserRepository) -> None:
+    """« לא מחובר מאז » côté menahel : chaque requête de l'oved prouve qu'il a du réseau."""
+    if user.role != roles.EMPLOYEE:
+        return
+    try:
+        user_repo.touch_last_seen(user.id, now=datetime.now(timezone.utc), min_gap=LAST_SEEN_MIN_GAP)
+    except Exception:  # noqa: BLE001 — l'horodatage ne doit jamais bloquer la requête
+        logger.warning("last_seen update failed for %s", user.id, exc_info=True)
 
 
 def load_actor(request: Request, user_repo: UserRepository) -> ActorContext:

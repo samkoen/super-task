@@ -8,6 +8,7 @@ import { getSlotUploadQueue, submitSlotStarting } from "../utils/slotSender";
 import { skipAttachment, type SkipDraft } from "../utils/slotSkip";
 import { trimVideo, type TrimResult } from "../utils/videoTrim";
 import { slotQueueId, type QueuedSlot, type SlotUploadQueue } from "../utils/slotUploadQueue";
+import { flushFinishSignals, rememberFinished } from "../utils/finishSignals";
 import {
   applyQueueEvent,
   clearSkip,
@@ -399,7 +400,12 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       }
       await queue.flush();
       const waiting = (await queue.list(occurrenceId)).find((entry) => entry.status === "pending");
-      if (waiting) callbacks.current.onSavedOnDevice?.(waiting.slotIndex);
+      if (waiting) {
+        // Pas de קליטה : la tâche est finie pour l'oved ; le menahel le saura dès qu'un peu de réseau revient.
+        rememberFinished(occurrenceId);
+        void flushFinishSignals((marker) => taskService.finishedOffline(marker.occurrenceId, marker.finishedAt));
+        callbacks.current.onSavedOnDevice?.(waiting.slotIndex);
+      }
     } finally {
       sending.current = false;
       setSending(false);

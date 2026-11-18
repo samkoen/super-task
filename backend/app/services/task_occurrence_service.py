@@ -37,6 +37,7 @@ from app.domain.slot_review import (
     review_outcome,
     strip_reviews,
 )
+from app.domain.offline_upload import accepts_finish_signal, finished_at_from_client, needs_start
 from app.domain.slot_submit import (
     merge_slot,
     normalize_slot_attachment,
@@ -512,6 +513,30 @@ class TaskOccurrenceService:
             raise ValueError("ניתן להתחיל רק משימה במצב ממתין או באיחור")
         updated = self._occurrences.start(
             occurrence_id, started_by_id=actor.user_id, started_at=datetime.now(TZ)
+        )
+        assert updated is not None
+        return self._to_api(updated)
+
+    def mark_finished_offline(self, actor: ActorContext, occurrence_id: str, *, finished_at: object) -> dict:
+        """L'oved a fini sans קליטה : le menahel voit « בוצע · ממתין להעלאה » avant que les fichiers arrivent.
+
+        Idempotent : une tâche déjà envoyée ou fermée est renvoyée telle quelle.
+        """
+        occurrence = self._occurrences.find_by_id(occurrence_id)
+        if not occurrence:
+            raise ValueError("משימה לא נמצאה")
+        if not can_start_assigned_work(
+            actor, assignee_user_id=occurrence.assignee_user_id, branch_id=occurrence.branch_id
+        ):
+            raise PermissionError("אין הרשאה לבצע משימה זו")
+        if not accepts_finish_signal(occurrence.status):
+            return self._to_api(occurrence)
+        now = datetime.now(TZ)
+        if needs_start(occurrence.status):
+            occurrence = self._occurrences.start(occurrence_id, started_by_id=actor.user_id, started_at=now)
+            assert occurrence is not None
+        updated = self._occurrences.mark_awaiting_upload(
+            occurrence_id, finished_at=finished_at_from_client(finished_at, now)
         )
         assert updated is not None
         return self._to_api(updated)

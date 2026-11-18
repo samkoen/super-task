@@ -41,6 +41,8 @@ import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { useEmployeeNotificationSounds } from "../../hooks/useEmployeeNotificationSounds";
 import { useNativeTaskChatAlerts } from "../../hooks/useNativeTaskChatAlerts";
 import { useSlotAutoFlush } from "../../hooks/useSlotAutoFlush";
+import EmployeeUploadBanner from "../employee/EmployeeUploadBanner";
+import { useLogoutGuard } from "../employee/useLogoutGuard";
 import { useTaskEventSource } from "../../hooks/useTaskEventSource";
 import { he } from "../../i18n/he";
 import { SIDEBAR_WIDTH } from "../../constants/layout";
@@ -166,9 +168,11 @@ function Layout() {
     ]);
   }, [user]);
 
+  const logoutGuard = useLogoutGuard(() => void logout());
   const handleLogout = () => {
     closeMainNav();
-    void logout();
+    if (isEmployee) logoutGuard.requestLogout();
+    else void logout();
   };
 
   const handleNavigation = (path: string) => {
@@ -330,6 +334,8 @@ function Layout() {
     return (
       <LivePullToRefresh>
       <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+        <EmployeeUploadBanner />
+        {logoutGuard.dialog}
         {!todayScreen && (
         <Box
           sx={{

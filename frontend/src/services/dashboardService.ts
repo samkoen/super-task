@@ -60,6 +60,8 @@ export interface TimelineTask {
   completed_at: string | null;
   duration_minutes: number | null;
   elapsed_minutes: number | null;
+  /** Oved sans קליטה : fini à cette heure sur le téléphone, fichiers pas encore reçus. */
+  awaiting_upload_at?: string | null;
   department_name: string | null;
   assignee_name: string | null;
   task_kind: TaskKind;
@@ -92,6 +94,8 @@ export interface TeamMember {
   timeline: TimelineTask[];
   overdue_backlog: TimelineTask[];
   quality_rating?: QualityRatingSummary;
+  /** Dernière requête reçue de son téléphone (« לא מחובר מאז »). */
+  last_seen_at?: string | null;
 }
 
 export interface TaskQueues {
