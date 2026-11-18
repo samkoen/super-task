@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTopModalPortalHost } from "../../hooks/useTopModalPortalHost";
 import { createPortal } from "react-dom";
 import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
 import { IconButton } from "@mui/material";
@@ -19,7 +20,6 @@ import { withSystemBottomInsetCss } from "../../utils/systemInsets";
 import { employeeBottomNavFabBottomCss } from "../../utils/employeeBottomNav";
 import { pushRouteTrail, readRouteTrail } from "../../utils/routeTrail";
 import { captureViewportPng } from "../../utils/systemBugCapture";
-import { pickSystemBugPortalHost } from "../../utils/systemBugPortal";
 import { systemBugAppVersion, systemBugPreviewLabel } from "../../utils/systemBugMeta";
 import SystemBugDialog from "./SystemBugDialog";
 
@@ -82,27 +82,13 @@ function SystemBugTrigger({
   );
 }
 
-function useSystemBugPortalHost() {
-  const [host, setHost] = useState<HTMLElement | null>(() =>
-    typeof document !== "undefined" ? document.body : null,
-  );
-  useEffect(() => {
-    const sync = () => setHost(pickSystemBugPortalHost(document.body));
-    sync();
-    const obs = new MutationObserver(sync);
-    obs.observe(document.body, { childList: true });
-    return () => obs.disconnect();
-  }, []);
-  return host;
-}
-
 export default function SystemBugLauncher() {
   const location = useLocation();
   const { user } = useAuth();
   const { showSuccess, showError } = useFeedback();
   const [open, setOpen] = useState(false);
   const [screenshot, setScreenshot] = useState<Blob | null>(null);
-  const host = useSystemBugPortalHost();
+  const host = useTopModalPortalHost();
   const startDoorOpen = useEmployeeStartDoorOpen();
 
   useEffect(() => {

@@ -63,6 +63,7 @@ import EmployeeBottomNav from "./EmployeeBottomNav";
 import EmployeeChromeMenu from "./EmployeeChromeMenu";
 import ViewAsPicker from "./ViewAsPicker";
 import SystemBugLauncher from "../systemBug/SystemBugLauncher";
+import ViewAsExitFab from "./ViewAsExitFab";
 import AppUpdateGuard from "../appUpdate/AppUpdateGuard";
 import { canViewSystemBugInbox, SYSTEM_BUG_INBOX_PATH } from "../../utils/systemBugInbox";
 import { shouldShowManagerChrome } from "../../utils/managerBottomNav";
@@ -407,6 +408,7 @@ function Layout() {
         />
         <AppUpdateGuard />
         <SystemBugLauncher />
+        <ViewAsExitFab />
       </Box>
       </LivePullToRefresh>
     );
@@ -422,6 +424,7 @@ function Layout() {
             <ChatAlertBanner alert={chatAlerts.banner} onOpen={chatAlerts.open} onClose={chatAlerts.dismiss} />
             <AppUpdateGuard />
             <SystemBugLauncher />
+            <ViewAsExitFab />
           </>
         }
       >
@@ -515,6 +518,7 @@ function Layout() {
       />
       <AppUpdateGuard />
       <SystemBugLauncher />
+      <ViewAsExitFab />
     </Box>
   );
 }
