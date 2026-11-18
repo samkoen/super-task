@@ -204,7 +204,7 @@ function SheetBody({ req, index, onClose, onConfirm }: Props & { req: Completion
       <SheetHeader title={he.flowSkipSheetTitle} subtitle={he.flowSkipSheetSubtitle(slotDisplayTitle(req, index))} onClose={onClose} />
       <ReasonChips value={draft.reasonCode} onChange={(reasonCode) => setDraft((d) => ({ ...d, reasonCode }))} />
       {otherNeedsDetails ? (
-        <Typography role="alert" data-testid="flow-skip-other-needs-details" sx={{ ...flowText.label, fontWeight: 700, color: flowColor.rec, textAlign: "right" }}>
+        <Typography role="alert" data-testid="flow-skip-other-needs-details" sx={{ ...flowText.label, fontWeight: 700, color: flowColor.ink, textAlign: "right" }}>
           {he.flowSkipOtherNeedsDetails}
         </Typography>
       ) : null}
