@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import FlowCard from "./FlowCard";
 import { FlowDoneTab, FlowNextTab } from "./FlowTab";
@@ -6,8 +6,9 @@ import type { MediaKind } from "../media/MediaCaptureActions";
 import { flowSize, flowToneForIndex } from "../../styles/flowTokens";
 import type { CompletionRequirement } from "../../utils/completionMedia";
 import { slotDisplayTitle } from "../../utils/completionSlotView";
-import { canRevisit, isKeptCapture, stackLayout } from "../../utils/flowStack";
-import { isHandedOver, type SlotUiState } from "../../utils/slotUploadState";
+import { canRevisit, isKeptCapture, layoutAround, stackLayout } from "../../utils/flowStack";
+import { isHandedOver, nextOpenIndex, type SlotUiState } from "../../utils/slotUploadState";
+import { animateExit, animateSettle, snapshotStack, stackMotionEnabled, type ExitKind, type StackSnapshot } from "./stackMotion";
 
 export type TaskCardStackProps = {
   requirements: CompletionRequirement[];
@@ -49,17 +50,85 @@ function ActiveCard({ props, index }: { props: TaskCardStackProps; index: number
   );
 }
 
+type Pending = { before: StackSnapshot; previousActive: number | null };
+
+/**
+ * Carte active choisie par l'oved, animations comprises. Quand la carte active vient d'être remise
+ * (confirmée, envoyée, « לא ניתן לצלם »), elle reste un instant à l'écran puis s'envole et la sous-tâche
+ * suivante prend sa place toute seule : l'oved n'a rien à toucher.
+ */
+function useStackNavigation(states: SlotUiState[], focusIndex: number | null | undefined) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [preferred, setPreferred] = useState<number | null>(focusIndex ?? null);
+  /** Carte remise gardée à l'écran le temps de l'animation. */
+  const [hold, setHold] = useState<number | null>(null);
+  const [seen, setSeen] = useState<{ states: SlotUiState[]; active: number | null }>(() => ({ states, active: stackLayout(states, preferred).active }));
+  const pending = useRef<Pending | null>(null);
+  const busy = useRef(false);
+
+  // État dérivé pendant le rendu : repère la carte active qui vient de passer « remise ».
+  if (seen.states !== states) {
+    const shown = seen.active;
+    const justDone = shown !== null && hold === null && states[shown] && seen.states[shown]
+      && !isHandedOver(seen.states[shown].status) && isHandedOver(states[shown].status);
+    setSeen({ states, active: shown });
+    if (justDone) {
+      const next = nextOpenIndex(states, shown);
+      if (stackMotionEnabled() && next !== null) setHold(shown);
+      else if (next !== null) setPreferred(next);
+    }
+  }
+
+  const layout = hold !== null ? layoutAround(states, hold) : stackLayout(states, preferred);
+  if (seen.states === states && seen.active !== layout.active) setSeen({ states, active: layout.active });
+
+  const go = useCallback(async (next: number | null, kind: ExitKind) => {
+    if (busy.current) return;
+    busy.current = true;
+    await animateExit(containerRef.current, kind);
+    pending.current = { before: snapshotStack(containerRef.current), previousActive: layout.active };
+    setHold(null);
+    if (next !== null) setPreferred(next);
+    busy.current = false;
+  }, [layout.active]);
+
+  useLayoutEffect(() => {
+    const job = pending.current;
+    pending.current = null;
+    if (job) animateSettle(containerRef.current, job.before, job.previousActive);
+  }, [layout.active]);
+
+  // Carte remise : laisser le temps à la revue plein écran de se fermer, puis passer à la suivante.
+  useEffect(() => {
+    if (hold === null) return;
+    const timer = window.setTimeout(() => void go(nextOpenIndex(states, hold), "done"), 420);
+    return () => window.clearTimeout(timer);
+  }, [hold, states, go]);
+
+  const select = useCallback((index: number) => {
+    if (index === layout.active) return;
+    if (!stackMotionEnabled()) {
+      setHold(null);
+      setPreferred(index);
+      return;
+    }
+    void go(index, "swipe");
+  }, [go, layout.active]);
+
+  return { containerRef, layout, select };
+}
+
 /**
  * Pile de cartes du FLOW 1 : les cartes remises « minces » au-dessus, la carte active en grand,
  * les cartes à faire repliées en dessous. L'oved touche l'onglet de son choix : ordre libre.
  */
 export default function TaskCardStack(props: TaskCardStackProps) {
   const { requirements, states } = props;
-  const [preferred, setPreferred] = useState<number | null>(props.focusIndex ?? null);
-  const layout = stackLayout(states, preferred);
+  const { containerRef, layout, select } = useStackNavigation(states, props.focusIndex);
   if (!requirements.length) return null;
   return (
     <Box
+      ref={containerRef}
       data-testid="task-card-stack"
       sx={{ width: "100%", maxWidth: flowSize.cardWidth, mx: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}
     >
@@ -71,7 +140,7 @@ export default function TaskCardStack(props: TaskCardStackProps) {
           variant={order === 0 ? "narrow" : "wide"}
           zIndex={order + 1}
           online={props.online ?? true}
-          onSelect={canRevisit(states[index]) ? () => setPreferred(index) : undefined}
+          onSelect={canRevisit(states[index]) ? () => select(index) : undefined}
         />
       ))}
       {layout.active !== null ? <ActiveCard props={props} index={layout.active} /> : null}
@@ -83,7 +152,7 @@ export default function TaskCardStack(props: TaskCardStackProps) {
           tone={flowToneForIndex(index)}
           variant={order === layout.below.length - 1 ? "narrow" : "wide"}
           zIndex={9 - order}
-          onSelect={() => setPreferred(index)}
+          onSelect={() => select(index)}
         />
       ))}
     </Box>

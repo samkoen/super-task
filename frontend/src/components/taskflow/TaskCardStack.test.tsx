@@ -90,6 +90,17 @@ describe("TaskCardStack", () => {
     expect((screen.getByTestId("flow-card")).getAttribute("data-index")).toBe("2");
   });
 
+  it("moves on by itself to the next open card once the chosen card is handed over", () => {
+    const handlers = { onCapture: vi.fn(), onSendText: vi.fn(), onOpenGuide: vi.fn() };
+    const reqs = videos(3);
+    const { rerender } = render(<TaskCardStack requirements={reqs} states={[idle(), idle(), idle()]} {...handlers} />);
+    fireEvent.click(screen.getAllByTestId("flow-tab-next")[0]);
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1");
+    rerender(<TaskCardStack requirements={reqs} states={[idle(), { status: "ready", kind: "video", previewUrl: "blob:x" }, idle()]} {...handlers} />);
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("2");
+    expect(screen.getByTestId("flow-tab-done").getAttribute("data-index")).toBe("1");
+  });
+
   it("reopening a kept card shows the take and hides « לא ניתן לצלם »", () => {
     const onSkip = vi.fn();
     const ready: SlotUiState = { status: "ready", kind: "video", previewUrl: "blob:kept" };
