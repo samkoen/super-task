@@ -100,11 +100,12 @@ describe("FlowSkipSheet (screen 05ב)", () => {
     rerender(<FlowSkipSheet req={req} index={2} onClose={vi.fn()} onConfirm={onConfirm} />);
     expect(screen.getByTestId("flow-skip-recording")).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getByTestId("flow-skip-mic"));
+      fireEvent.click(screen.getByTestId("flow-skip-stop"));
     });
     recorder.recording = false;
     rerender(<FlowSkipSheet req={req} index={2} onClose={vi.fn()} onConfirm={onConfirm} />);
-    expect(screen.getByTestId("flow-skip-recorded").textContent).toBe(he.flowSkipRecorded);
+    expect(screen.getByTestId("flow-skip-recorded")).toBeTruthy();
+    expect(screen.getByPlaceholderText(he.flowSkipTextPlaceholderVoice)).toBeTruthy();
     fireEvent.click(screen.getByTestId("flow-skip-confirm"));
     await waitFor(() => expect(onConfirm).toHaveBeenCalled());
     const draft = onConfirm.mock.calls[0][1];
@@ -118,13 +119,48 @@ describe("FlowSkipSheet (screen 05ב)", () => {
     recorder.recording = true;
     rerender(<FlowSkipSheet req={req} index={2} onClose={vi.fn()} onConfirm={onConfirm} />);
     await act(async () => {
-      fireEvent.click(screen.getByTestId("flow-skip-mic"));
+      fireEvent.click(screen.getByTestId("flow-skip-stop"));
     });
     recorder.recording = false;
     rerender(<FlowSkipSheet req={req} index={2} onClose={vi.fn()} onConfirm={onConfirm} />);
     fireEvent.click(screen.getByTestId("flow-skip-audio-delete"));
     expect(screen.queryByTestId("flow-skip-recorded")).toBeNull();
     expect(recorder.reset).toHaveBeenCalled();
+  });
+
+  it("shows the Figma 05ה2 recorder: red stop, live wave and a 0:07 clock", () => {
+    recorder.recording = true;
+    recorder.elapsedSeconds = 7;
+    renderSheet();
+    expect(screen.getByTestId("flow-skip-live-wave")).toBeTruthy();
+    expect(screen.getByTestId("flow-skip-timer").textContent).toBe("0:07");
+    expect(screen.queryByTestId("flow-skip-mic")).toBeNull();
+  });
+
+  it("throws away a recording in progress with the X", () => {
+    recorder.recording = true;
+    renderSheet();
+    fireEvent.click(screen.getByTestId("flow-skip-audio-delete"));
+    expect(recorder.reset).toHaveBeenCalled();
+  });
+
+  it("replays the recording before sending (05ה3): « 0:00 / 0:14 » and a play button", async () => {
+    const { rerender, onConfirm } = renderSheet();
+    recorder.recording = true;
+    recorder.elapsedSeconds = 14;
+    rerender(<FlowSkipSheet req={req} index={2} onClose={vi.fn()} onConfirm={onConfirm} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("flow-skip-stop"));
+    });
+    recorder.recording = false;
+    rerender(<FlowSkipSheet req={req} index={2} onClose={vi.fn()} onConfirm={onConfirm} />);
+    expect(screen.getByTestId("flow-skip-timer").textContent).toBe("0:00 / 0:14");
+    const audio = screen.getByTestId("flow-skip-audio") as HTMLAudioElement;
+    const play = vi.spyOn(audio, "play").mockResolvedValue(undefined);
+    fireEvent.click(screen.getByTestId("flow-skip-play"));
+    expect(play).toHaveBeenCalled();
+    fireEvent.play(audio);
+    expect(screen.getByTestId("flow-skip-play").getAttribute("aria-label")).toBe(he.flowSkipPause);
   });
 
   it("tells the worker when the device cannot record", () => {
