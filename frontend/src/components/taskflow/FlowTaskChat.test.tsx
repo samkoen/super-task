@@ -1,6 +1,6 @@
 import { CacheProvider } from "@emotion/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FlowTaskChat from "./FlowTaskChat";
 import { emotionCache } from "../../emotion/caches";
 import { he } from "../../i18n/he";
@@ -42,13 +42,12 @@ function renderChat(extra: Partial<Parameters<typeof FlowTaskChat>[0]> = {}) {
   render(
     <CacheProvider value={emotionCache}>
       <FlowTaskChat
-        open
+        slotIndex={1}
         occurrenceId="o1"
-        title="בדיקת מלאי במחלקה"
+        title="פתיחת משמרת"
         status="in_progress"
         managerName="רונית"
         requirements={reqs}
-        statuses={["sent", "idle"]}
         pollMs={false}
         onClose={onClose}
         {...extra}
@@ -63,91 +62,57 @@ beforeEach(() => {
   vi.mocked(taskService.postMessage).mockReset().mockResolvedValue({ occurrence: { status: "awaiting_response" } } as never);
 });
 
-describe("FlowTaskChat (Figma 12)", () => {
-  it("shows the task title and the manager, without any progress bar", async () => {
+describe("FlowTaskChat (Figma 12ב, chat d'une sous-tâche)", () => {
+  it("names the sub-task in the title and the task and manager in the subtitle", async () => {
     renderChat();
-    expect(screen.getByTestId("flow-chat-title").textContent).toBe(he.flowChatHeaderTitle("בדיקת מלאי במחלקה"));
-    expect(screen.getByTestId("flow-chat-subtitle").textContent).toBe(he.flowChatHeaderSub("רונית"));
-    expect(screen.queryByTestId("flow-chat-context")).toBeNull();
-    expect(screen.queryByTestId("flow-chat-bars")).toBeNull();
+    expect(screen.getByTestId("flow-chat-title").textContent).toBe(he.flowChatHeaderTitle("ספירת מדפים"));
+    expect(screen.getByTestId("flow-chat-subtitle").textContent).toBe(he.flowChatHeaderSub("רונית", "פתיחת משמרת"));
+    expect(he.flowChatHeaderSub("רונית", "פתיחת משמרת")).toBe("פתיחת משמרת • רונית, מנהלת משמרת");
     await screen.findByTestId("flow-chat-empty");
   });
 
-  it("renders manager bubbles apart from mine, with the step tag when a message targets a step", async () => {
+  it("is closed when no sub-task is chosen", () => {
+    renderChat({ slotIndex: null });
+    expect(screen.queryByTestId("flow-task-chat")).toBeNull();
+  });
+
+  it("shows this sub-task's messages and the general ones, not the other sub-tasks', without step tags", async () => {
     vi.mocked(taskService.listMessages).mockResolvedValue({
       has_more: false,
       messages: [
         message({ id: "m1", body: "בוקר טוב אבי" }),
         message({ id: "m2", sender_user_id: "emp-1", sender_role: "employee", body: "לסמן כחוסר?", slot_index: 1 }),
+        message({ id: "m3", body: "על המעבר", slot_index: 0 }),
       ],
     } as never);
     renderChat();
     const bubbles = await screen.findAllByTestId("flow-chat-bubble");
     expect(bubbles.map((b) => b.getAttribute("data-mine"))).toEqual(["false", "true"]);
-    expect(within(bubbles[0]).queryByTestId("flow-chat-step-tag")).toBeNull();
-    expect(within(bubbles[1]).getByTestId("flow-chat-step-tag").textContent).toBe("ספירת מדפים");
+    expect(screen.queryByText("על המעבר")).toBeNull();
+    expect(screen.queryByTestId("flow-chat-step-tag")).toBeNull();
     expect(screen.getByTestId("flow-chat-day")).toBeTruthy();
   });
 
-  it("asks which video is discussed and offers one pill per sub-task, none selected by default", async () => {
+  it("has no topic pills: every message goes to this sub-task", async () => {
     renderChat();
     await screen.findByTestId("flow-chat-empty");
-    expect(screen.getByText(he.flowChatWhichTopic)).toBeTruthy();
-    const pills = screen.getAllByTestId("flow-chat-choice");
-    expect(pills.map((c) => c.textContent)).toEqual(["מעבר בין המדפים", "ספירת מדפים"]);
-    expect(pills.map((c) => c.getAttribute("aria-pressed"))).toEqual(["false", "false"]);
-  });
-
-  it("shows a green check on the pills of sub-tasks already handed over", async () => {
-    renderChat();
-    await screen.findByTestId("flow-chat-empty");
-    const pills = screen.getAllByTestId("flow-chat-choice");
-    expect(within(pills[0]).queryByTestId("flow-chat-choice-done")).toBeTruthy();
-    expect(within(pills[1]).queryByTestId("flow-chat-choice-done")).toBeNull();
-  });
-
-  it("names the selected video in the placeholder and sends the message to that step", async () => {
-    renderChat();
-    await screen.findByTestId("flow-chat-empty");
-    fireEvent.click(screen.getAllByTestId("flow-chat-choice")[1]);
+    expect(screen.queryByTestId("flow-chat-choice")).toBeNull();
     expect(screen.getByPlaceholderText(he.flowChatPlaceholderTopic("ספירת מדפים"))).toBeTruthy();
     fireEvent.change(screen.getByTestId("flow-chat-input"), { target: { value: "אין טונה" } });
     fireEvent.click(screen.getByTestId("flow-chat-send"));
     await waitFor(() => expect(taskService.postMessage).toHaveBeenCalledWith("o1", { body: "אין טונה", slot_index: 1 }));
   });
 
-  it("tapping the selected pill again turns the message back into a general one", async () => {
+  it("shows the mic while the field is empty and the send button once something is typed", async () => {
     renderChat();
     await screen.findByTestId("flow-chat-empty");
-    const pill = () => screen.getAllByTestId("flow-chat-choice")[1];
-    fireEvent.click(pill());
-    fireEvent.click(pill());
-    expect(pill().getAttribute("aria-pressed")).toBe("false");
-    fireEvent.change(screen.getByTestId("flow-chat-input"), { target: { value: "שאלה" } });
-    fireEvent.click(screen.getByTestId("flow-chat-send"));
-    await waitFor(() => expect(taskService.postMessage).toHaveBeenCalledWith("o1", { body: "שאלה" }));
-  });
-
-  it("sends a general message without any step", async () => {
-    renderChat();
-    await screen.findByTestId("flow-chat-empty");
-    fireEvent.change(screen.getByTestId("flow-chat-input"), { target: { value: "שאלה כללית" } });
-    fireEvent.click(screen.getByTestId("flow-chat-send"));
-    await waitFor(() => expect(taskService.postMessage).toHaveBeenCalledWith("o1", { body: "שאלה כללית" }));
-  });
-
-  it("does not send an empty message", async () => {
-    renderChat();
-    await screen.findByTestId("flow-chat-empty");
-    expect((screen.getByTestId("flow-chat-send") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("flow-chat-mic")).toBeTruthy();
+    expect(screen.queryByTestId("flow-chat-send")).toBeNull();
     fireEvent.keyDown(screen.getByTestId("flow-chat-input"), { key: "Enter" });
     expect(taskService.postMessage).not.toHaveBeenCalled();
-  });
-
-  it("hides the topic pills when the task has no step", async () => {
-    renderChat({ requirements: [], statuses: [] });
-    await screen.findByTestId("flow-chat-empty");
-    expect(screen.queryByTestId("flow-chat-picker")).toBeNull();
+    fireEvent.change(screen.getByTestId("flow-chat-input"), { target: { value: "שאלה" } });
+    expect(screen.queryByTestId("flow-chat-mic")).toBeNull();
+    expect(screen.getByTestId("flow-chat-send")).toBeTruthy();
   });
 
   it("keeps the thread readable but not writable once the task is closed", async () => {

@@ -7,6 +7,7 @@ import type { SubmitSlotResponse } from "../services/taskService";
 import { remainingAfter, type FlowToastState } from "../utils/flowToast";
 import { readyForSummary } from "../utils/flowSummary";
 import type { SkipDraft } from "../utils/slotSkip";
+import { slotDisplayTitle } from "../utils/completionSlotView";
 
 export type TaskFlowOptions = Omit<SlotUploadsOptions, "onSent" | "onSavedOnDevice" | "onFailed"> & {
   /** Toutes les cartes sont confirmées : place au récap (10), qui fait l'envoi au serveur. */
@@ -82,9 +83,14 @@ export function useTaskFlow(options: TaskFlowOptions) {
     (index: number, draft: SkipDraft) => {
       touched.current = true;
       skip(index, draft);
-      setToast({ kind: "kept", remaining: remainingAfter(states.map((s) => s.status), index) });
+      const req = options.requirements[index];
+      setToast({
+        kind: "skipReported",
+        remaining: remainingAfter(states.map((s) => s.status), index),
+        slotTitle: req ? slotDisplayTitle(req, index) : undefined,
+      });
     },
-    [skip, states],
+    [skip, states, options.requirements],
   );
 
   const capture = useCallback(

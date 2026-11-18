@@ -111,38 +111,48 @@ function VoiceStatus({ voice }: { voice: Voice }) {
   return null;
 }
 
+/** Figma 05ד : « הקלטה קולית » puis le micro rond noir, en bas à gauche du champ. */
 function MicButton({ voice }: { voice: Voice }) {
   const recording = voice.recorder.recording;
   return (
-    <ButtonBase
-      data-testid="flow-skip-mic"
-      aria-label={recording ? he.flowSkipRecordStop : he.flowSkipRecord}
-      aria-pressed={recording}
-      onClick={() => void voice.toggle()}
-      sx={{ width: 44, height: 44, flexShrink: 0, borderRadius: "50%", bgcolor: recording ? flowColor.orange500 : flowColor.neutral900 }}
-    >
-      <Box component="img" src={micIcon} alt="" sx={{ width: 18, height: 18, display: "block" }} />
-    </ButtonBase>
+    <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+      <Typography aria-hidden sx={{ ...flowText.label, color: flowColor.alphaNeutral900_66 }}>
+        {recording ? he.flowSkipRecordStop : he.flowSkipRecord}
+      </Typography>
+      <ButtonBase
+        data-testid="flow-skip-mic"
+        aria-label={recording ? he.flowSkipRecordStop : he.flowSkipRecord}
+        aria-pressed={recording}
+        onClick={() => void voice.toggle()}
+        sx={{ width: 36, height: 36, flexShrink: 0, borderRadius: "50%", bgcolor: recording ? flowColor.rec : flowColor.neutral900 }}
+      >
+        <Box component="img" src={micIcon} alt="" sx={{ width: 18, height: 18, display: "block" }} />
+      </ButtonBase>
+    </Box>
   );
 }
 
-function ExplanationBox({ text, onText, voice }: { text: string; onText: (value: string) => void; voice: Voice }) {
+/** Champ gris (05ד) ; « אחר » (05ה) : bord foncé et pirus obligatoire annoncé dans le placeholder. */
+function ExplanationBox({ text, onText, voice, required }: { text: string; onText: (value: string) => void; voice: Voice; required: boolean }) {
+  const placeholder = required ? he.flowSkipTextPlaceholderOther : he.flowSkipTextPlaceholder;
   return (
-    <Box sx={{ p: "12px", gap: "8px", display: "flex", flexDirection: "column", borderRadius: `${flowRadius.md}px`, border: `1px solid ${flowColor.line}` }}>
-      <Box sx={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-        <InputBase
-          multiline
-          minRows={2}
-          maxRows={4}
-          value={text}
-          onChange={(event) => onText(event.target.value)}
-          placeholder={he.flowSkipTextPlaceholder}
-          inputProps={{ "data-testid": "flow-skip-text", maxLength: SKIP_TEXT_MAX, "aria-label": he.flowSkipTextPlaceholder }}
-          sx={{ flex: 1, ...flowText.body, color: flowColor.neutral900 }}
-        />
-        <MicButton voice={voice} />
-      </Box>
+    <Box
+      data-testid="flow-skip-explanation"
+      data-required={required ? "true" : "false"}
+      sx={{ p: "14px 16px 12px", gap: "8px", display: "flex", flexDirection: "column", borderRadius: `${flowRadius.md}px`, bgcolor: flowColor.neutral100, border: `1.5px solid ${required ? flowColor.neutral900 : "transparent"}` }}
+    >
+      <InputBase
+        multiline
+        minRows={2}
+        maxRows={4}
+        value={text}
+        onChange={(event) => onText(event.target.value)}
+        placeholder={placeholder}
+        inputProps={{ "data-testid": "flow-skip-text", maxLength: SKIP_TEXT_MAX, "aria-label": placeholder }}
+        sx={{ ...flowText.body, color: flowColor.neutral900, "& textarea::placeholder": { color: flowColor.alphaNeutral900_60, opacity: 1 } }}
+      />
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <MicButton voice={voice} />
         <VoiceStatus voice={voice} />
         {voice.file && !voice.recorder.recording ? (
           <ButtonBase data-testid="flow-skip-audio-delete" onClick={voice.remove} sx={{ ...flowText.label, px: "8px", height: 32, color: flowColor.alphaNeutral900_66 }}>
@@ -180,7 +190,6 @@ function SheetBody({ req, index, onClose, onConfirm }: Props & { req: Completion
   const [draft, setDraft] = useState<SkipDraft>(emptySkipDraft);
   const voice = useSkipVoice();
   const valid = isSkipDraftValid({ ...draft, audio: voice.file }) && !(draft.reasonCode === "other" && voice.recorder.recording);
-  const needsDetails = draft.reasonCode === "other" && !valid;
 
   const confirm = async () => {
     const audio = await voice.finish();
@@ -191,21 +200,16 @@ function SheetBody({ req, index, onClose, onConfirm }: Props & { req: Completion
     <>
       <SheetHeader title={he.flowSkipSheetTitle} subtitle={he.flowSkipSheetSubtitle(slotDisplayTitle(req, index))} onClose={onClose} />
       <ReasonChips value={draft.reasonCode} onChange={(reasonCode) => setDraft((d) => ({ ...d, reasonCode }))} />
-      <ExplanationBox text={draft.reasonText} onText={(reasonText) => setDraft((d) => ({ ...d, reasonText }))} voice={voice} />
-      {needsDetails ? (
-        <Typography data-testid="flow-skip-other-hint" sx={{ ...flowText.caption, color: flowColor.alphaNeutral900_66 }}>
-          {he.flowSkipOtherNeedsDetails}
-        </Typography>
-      ) : null}
+      <ExplanationBox text={draft.reasonText} onText={(reasonText) => setDraft((d) => ({ ...d, reasonText }))} voice={voice} required={draft.reasonCode === "other"} />
       <ButtonBase
         data-testid="flow-skip-confirm"
         disabled={!valid}
         onClick={() => void confirm()}
-        sx={{ ...BUTTON_SX, bgcolor: flowColor.neutral900, color: flowColor.neutral0, "&.Mui-disabled": { opacity: 0.4, color: flowColor.neutral0 } }}
+        sx={{ ...BUTTON_SX, bgcolor: flowColor.neutral900, color: flowColor.neutral0, "&.Mui-disabled": { bgcolor: flowColor.alphaNeutral900_35, color: flowColor.neutral0 } }}
       >
         {he.flowSkipConfirm}
       </ButtonBase>
-      <ButtonBase data-testid="flow-skip-later" onClick={onClose} sx={{ ...BUTTON_SX, height: 48, color: flowColor.neutral900 }}>
+      <ButtonBase data-testid="flow-skip-later" onClick={onClose} sx={{ ...BUTTON_SX, height: 40, fontSize: 15, fontWeight: 600, color: flowColor.neutral900 }}>
         {he.flowSkipLater}
       </ButtonBase>
     </>

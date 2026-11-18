@@ -38,8 +38,13 @@ function renderScreen(extra: Partial<TaskFlowScreenProps> = {}) {
   return handlers;
 }
 
+async function openSkip() {
+  fireEvent.click(screen.getByTestId("flow-card-menu"));
+  fireEvent.click(await screen.findByTestId("flow-skip"));
+}
+
 async function skipFirstCard(code = "area_blocked") {
-  fireEvent.click(screen.getByTestId("flow-skip"));
+  await openSkip();
   fireEvent.click(await screen.findByTestId(`flow-skip-reason-${code}`));
   fireEvent.click(screen.getByTestId("flow-skip-confirm"));
   await waitFor(() => expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("1"));
@@ -56,7 +61,7 @@ beforeEach(() => {
 describe("TaskFlowScreen: « לא ניתן לצלם »", () => {
   it("opens the sheet from the card and « אצלם אחר כך » leaves the card untouched", async () => {
     renderScreen();
-    fireEvent.click(screen.getByTestId("flow-skip"));
+    await openSkip();
     expect(await screen.findByTestId("flow-skip-heading")).toBeTruthy();
     fireEvent.click(screen.getByTestId("flow-skip-later"));
     await waitFor(() => expect(screen.queryByTestId("flow-skip-heading")).toBeNull());

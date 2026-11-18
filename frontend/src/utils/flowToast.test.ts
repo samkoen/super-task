@@ -47,3 +47,13 @@ describe("remainingAfter", () => {
     expect(remainingAfter(["failed", "filmed", "idle"], 2)).toBe(2);
   });
 });
+
+describe("flowToastContent: « לא ניתן לצלם » (screen 05ז)", () => {
+  it("says the report went to the manager and names the sub-task", () => {
+    expect(flowToastContent({ kind: "skipReported", remaining: 0, slotTitle: "סרטון בסטה" })).toEqual({
+      title: he.flowToastSkipReported,
+      subtitle: "סרטון בסטה",
+      tone: "success",
+    });
+  });
+});

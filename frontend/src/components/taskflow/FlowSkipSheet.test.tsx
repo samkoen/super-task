@@ -79,10 +79,10 @@ describe("FlowSkipSheet (screen 05ב)", () => {
     renderSheet();
     fireEvent.click(screen.getByTestId("flow-skip-reason-other"));
     expect((screen.getByTestId("flow-skip-confirm") as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId("flow-skip-other-hint").textContent).toBe(he.flowSkipOtherNeedsDetails);
+    expect(screen.getByTestId("flow-skip-explanation").getAttribute("data-required")).toBe("true");
+    expect(screen.getByPlaceholderText(he.flowSkipTextPlaceholderOther)).toBeTruthy();
     fireEvent.change(screen.getByTestId("flow-skip-text"), { target: { value: "משהו" } });
     expect((screen.getByTestId("flow-skip-confirm") as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.queryByTestId("flow-skip-other-hint")).toBeNull();
   });
 
   it("starts recording from the mic button", async () => {

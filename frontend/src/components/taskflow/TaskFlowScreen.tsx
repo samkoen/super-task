@@ -129,6 +129,8 @@ function SummaryLayer({ props, flow, requirements, onBack }: { props: TaskFlowSc
         }}
       />
       <FlowSentDialog open={sentPopup} count={sentVideoCount(flow.states)} onContinue={props.onFinished} />
+      {/* Écran 05ז : après « דיווח והמשך » sur la dernière carte, le toast reste visible sur le récap. */}
+      <FlowToast toast={flow.toast?.kind === "skipReported" ? flow.toast : null} onClose={flow.closeToast} />
     </Dialog>
   );
 }
@@ -140,7 +142,7 @@ function FlowBody({ props, flow, requirements, focusIndex, onGuide, onSkip, onCh
   focusIndex: number | null;
   onGuide: (index: number) => void;
   onSkip: (index: number) => void;
-  onChat: () => void;
+  onChat: (index: number) => void;
   onOpenSummary: () => void;
 }) {
   return (
@@ -151,7 +153,6 @@ function FlowBody({ props, flow, requirements, focusIndex, onGuide, onSkip, onCh
         employeeName={props.employeeName}
         photoUrl={props.photoUrl}
         onBack={props.onClose}
-        onOpenChat={onChat}
         onOpenSummary={onOpenSummary}
       />
       <Box sx={{ px: "24px" }}>
@@ -165,6 +166,7 @@ function FlowBody({ props, flow, requirements, focusIndex, onGuide, onSkip, onCh
           onSendText={flow.saveText}
           onOpenGuide={onGuide}
           onSkip={onSkip}
+          onChat={onChat}
         />
       </Box>
       <FlowBottomNav onHome={props.onClose} onChat={props.onOpenChats} />
@@ -187,12 +189,13 @@ export default function TaskFlowScreen(props: TaskFlowScreenProps) {
   });
   const [guideIndex, setGuideIndex] = useState<number | null>(null);
   const [skipIndex, setSkipIndex] = useState<number | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
+  /** Sous-tâche dont le chat est ouvert (écran 12ב). */
+  const [chatSlot, setChatSlot] = useState<number | null>(null);
 
   if (summary) return <SummaryLayer props={{ ...props, shiftOpening }} flow={flow} requirements={requirements} onBack={leaveSummary} />;
   return (
     <Dialog open fullScreen dir="rtl" PaperProps={paperProps} disableEnforceFocus onClose={props.onClose}>
-      <FlowBody props={props} flow={flow} requirements={requirements} focusIndex={focusIndex} onGuide={setGuideIndex} onSkip={setSkipIndex} onChat={() => setChatOpen(true)} onOpenSummary={onAllHandedOver} />
+      <FlowBody props={props} flow={flow} requirements={requirements} focusIndex={focusIndex} onGuide={setGuideIndex} onSkip={setSkipIndex} onChat={setChatSlot} onOpenSummary={onAllHandedOver} />
       <FlowToast toast={flow.toast} onClose={flow.closeToast} />
       <FlowGuideSheet req={guideIndex !== null ? requirements[guideIndex] : null} index={guideIndex ?? 0} onClose={() => setGuideIndex(null)} />
       <FlowSkipSheet
@@ -206,14 +209,13 @@ export default function TaskFlowScreen(props: TaskFlowScreenProps) {
       />
       <ReviewLayer flow={flow} requirements={requirements} branch={props.branch} branchCenter={props.branchCenter} />
       <FlowTaskChat
-        open={chatOpen}
+        slotIndex={chatSlot}
         occurrenceId={task.id}
         title={task.title}
         status={task.status}
         managerName={task.manager_name}
         requirements={requirements}
-        statuses={flow.states.map((state) => state.status)}
-        onClose={() => setChatOpen(false)}
+        onClose={() => setChatSlot(null)}
         onOccurrenceUpdated={props.onChatUpdated}
       />
     </Dialog>

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Box, ButtonBase, TextField, Typography } from "@mui/material";
+import { Box, ButtonBase, Divider, Menu, MenuItem, TextField, Typography } from "@mui/material";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import MicNoneRoundedIcon from "@mui/icons-material/MicNoneRounded";
+import dotsIcon from "../../assets/flow1/dots.svg";
 import flagIcon from "../../assets/flow1/icon-flag.svg";
+import messageIcon from "../../assets/flow1/icon-message-circle.svg";
 import MediaCaptureActions, { type MediaKind } from "../media/MediaCaptureActions";
 import { useResolvedMediaSrc } from "../../hooks/useResolvedMediaSrc";
 import { he } from "../../i18n/he";
@@ -33,8 +35,10 @@ export type FlowCardProps = {
   onCapture: (file: File, kind: MediaKind, durationSeconds?: number, lightOk?: boolean | null) => void;
   onSendText: (text: string) => void;
   onOpenGuide: () => void;
-  /** « לא ניתן לצלם » : ouvre la feuille de raison (écran 05ב). Absent = bouton masqué. */
+  /** Menu « ••• » › « לא ניתן לצלם » : ouvre la feuille de raison (écran 05ד). Absent = entrée masquée. */
   onSkip?: () => void;
+  /** Menu « ••• » › « צ׳אט », et icône de chat de la caméra : chat de cette sous-tâche (écran 12ב). */
+  onChat?: () => void;
   /** Change à chaque « צילום מחדש » : rouvre la caméra pour cette carte. */
   autoCaptureNonce?: number;
 };
@@ -159,7 +163,7 @@ function ExampleLink({ enabled, onClick }: { enabled: boolean; onClick: () => vo
   );
 }
 
-function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress, onHelp, onCapture }: {
+function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress, onHelp, onChat, onCapture }: {
   req: CompletionRequirement;
   index: number;
   label: string;
@@ -168,6 +172,8 @@ function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress
   autoCaptureNonce?: number;
   /** Ouvre la fiche « איך מצלמים » depuis le « ? » de la caméra. */
   onHelp?: () => void;
+  /** Icône de chat dans l'en-tête de la caméra (écran 06). */
+  onChat?: () => void;
   onCapture: FlowCardProps["onCapture"];
 }) {
   const openRef = useRef<(() => void) | null>(null);
@@ -184,7 +190,7 @@ function CaptureButton({ req, index, label, disabled, autoCaptureNonce, progress
       disabled={disabled}
       allowedKinds={[kind]}
       minVideoSeconds={kind === "video" ? req.min_seconds ?? null : null}
-      guide={{ ...guideFromRequirement(req, index), progress, ...(onHelp ? { onHelp } : {}) }}
+      guide={{ ...guideFromRequirement(req, index), progress, ...(onHelp ? { onHelp } : {}), ...(onChat ? { onChat } : {}) }}
       deferVideoReview
       onCapture={(file, captured, meta) => onCapture(file, captured, meta?.durationSeconds, meta?.lightOk)}
       trigger={(open, ui) => {
@@ -210,6 +216,7 @@ function CardActions(props: FlowCardProps & { text: string }) {
           autoCaptureNonce={autoCaptureNonce}
           progress={props.progress}
           onHelp={hasGuide(req) ? props.onOpenGuide : undefined}
+          onChat={props.onChat}
           onCapture={props.onCapture}
         />
       )}
@@ -218,47 +225,63 @@ function CardActions(props: FlowCardProps & { text: string }) {
   );
 }
 
-/** Écran 05א : « לא ניתן לצלם » en haut à gauche de la carte (pastille sombre + drapeau). */
-function SkipButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+const menuIconSx = { width: 20, height: 20, display: "block", filter: "brightness(0)" } as const;
+
+function MenuEntry({ testId, icon, label, onClick }: { testId: string; icon: string; label: string; onClick: () => void }) {
   return (
-    <ButtonBase
-      data-testid="flow-skip"
-      onClick={onClick}
-      disabled={disabled}
-      sx={{
-        // Zone de toucher ≥ 44 px, pastille visible de 28 px.
-        minHeight: 44,
-        m: "-8px 0",
-        "&.Mui-disabled": { opacity: 0.5 },
-      }}
-    >
-      <Box
-        sx={{
-          height: 28,
-          px: "10px",
-          gap: "4px",
-          display: "flex",
-          alignItems: "center",
-          borderRadius: `${flowRadius.full}px`,
-          bgcolor: flowColor.neutral900,
-          color: flowColor.neutral0,
-          ...flowText.label,
-        }}
+    <MenuItem data-testid={testId} onClick={onClick} sx={{ minHeight: 48, gap: "8px", px: "16px", ...flowText.button, color: flowColor.neutral900 }}>
+      <Box component="img" src={icon} alt="" sx={menuIconSx} />
+      {label}
+    </MenuItem>
+  );
+}
+
+/** Écran 05ג : bouton « ••• » en haut à gauche de la carte, menu « צ׳אט » / « לא ניתן לצלם ». */
+function CardMenu({ onChat, onSkip, disabled }: { onChat?: () => void; onSkip?: () => void; disabled?: boolean }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const pick = (action?: () => void) => () => {
+    setAnchor(null);
+    action?.();
+  };
+  return (
+    <>
+      <ButtonBase
+        data-testid="flow-card-menu"
+        aria-label={he.flowCardMenu}
+        aria-haspopup="menu"
+        aria-expanded={anchor ? "true" : undefined}
+        disabled={disabled}
+        onClick={(event) => setAnchor(event.currentTarget)}
+        // Zone de toucher ≥ 44 px autour des trois points.
+        sx={{ minWidth: 44, minHeight: 44, m: "-12px -12px", borderRadius: "50%", "&.Mui-disabled": { opacity: 0.5 } }}
       >
-        {he.flowSkipButton}
-        <Box component="img" src={flagIcon} alt="" sx={{ width: 16, height: 16, display: "block" }} />
-      </Box>
-    </ButtonBase>
+        <Box component="img" src={dotsIcon} alt="" sx={{ width: 19, height: 5, display: "block" }} />
+      </ButtonBase>
+      <Menu
+        anchorEl={anchor}
+        open={Boolean(anchor)}
+        onClose={() => setAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{ paper: { dir: "rtl", sx: { minWidth: 180, borderRadius: `${flowRadius.md}px`, boxShadow: "0 8px 24px rgba(17,21,29,0.16)" } } }}
+        MenuListProps={{ sx: { py: 0 } }}
+      >
+        {onChat ? <MenuEntry testId="flow-card-menu-chat" icon={messageIcon} label={he.flowCardMenuChat} onClick={pick(onChat)} /> : null}
+        {onChat && onSkip ? <Divider sx={{ my: "0 !important", mx: "12px" }} /> : null}
+        {onSkip ? <MenuEntry testId="flow-skip" icon={flagIcon} label={he.flowSkipButton} onClick={pick(onSkip)} /> : null}
+      </Menu>
+    </>
   );
 }
 
 function CardHeader({ props }: { props: FlowCardProps }) {
   const { req, index, state } = props;
   const remark = state.remark?.trim();
+  const hasMenu = Boolean(props.onSkip || props.onChat);
   return (
     <>
-      <Box sx={{ display: "flex", direction: "ltr", alignItems: "center", justifyContent: props.onSkip ? "space-between" : "flex-end" }}>
-        {props.onSkip ? <SkipButton disabled={props.disabled} onClick={props.onSkip} /> : null}
+      <Box sx={{ display: "flex", direction: "ltr", alignItems: "center", justifyContent: hasMenu ? "space-between" : "flex-end" }}>
+        {hasMenu ? <CardMenu onChat={props.onChat} onSkip={props.onSkip} disabled={props.disabled} /> : null}
         <Typography sx={{ ...flowText.label, color: flowColor.alphaNeutral900_66 }}>{stepNumber(index)}</Typography>
       </Box>
       <Typography component="h2" sx={{ ...flowText.h2, mt: "16px", color: flowColor.neutral900, textAlign: "right", overflowWrap: "anywhere" }}>
