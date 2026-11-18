@@ -576,16 +576,24 @@ describe("EmployeeTasksPage · ouverture de משמרת envoyée sans קליטה"
     pendingUploadIds.current = new Set(["s"]);
     const opening = { id: "s", title: "פתיחת משמרת", is_work_start: true, due_at: todayAt(8) };
     const work = card({ id: "t", title: "מדף חלב", due_at: todayAt(9) });
+    // Dernier fichier reçu : la tâche est partie en contrôle. La réponse est retenue pour voir l'entre-deux.
+    let answer!: () => void;
+    const reloaded = new Promise<EmployeeDashboard>((resolve) => {
+      answer = () => resolve(dashboard({ on_shift: true, pending_review_tasks: [card({ ...opening, status: "pending_review" })], today_tasks: [work] }));
+    });
     vi.mocked(dashboardService.getEmployee)
       // Flux fermé tout de suite : le serveur n'a pas encore le dernier fichier.
       .mockResolvedValueOnce(dashboard({ on_shift: true, in_progress_tasks: [card({ ...opening, status: "in_progress" })], today_tasks: [work] }))
-      // Dernier fichier reçu : la tâche est partie en contrôle.
-      .mockResolvedValue(dashboard({ on_shift: true, pending_review_tasks: [card({ ...opening, status: "pending_review" })], today_tasks: [work] }));
+      .mockReturnValue(reloaded);
     renderPage();
     await screen.findByText("מדף חלב", {}, WAIT);
     const calls = vi.mocked(dashboardService.getEmployee).mock.calls.length;
     act(() => pendingUploadIds.set([]));
     await waitFor(() => expect(vi.mocked(dashboardService.getEmployee).mock.calls.length).toBeGreaterThan(calls));
+    // Rechargement en cours : la file est vide, le tableau de bord dit encore « בתהליך », la porte reste fermée.
+    expect(screen.queryByTestId("start-door")).toBeNull();
+    expect(screen.getByText("מדף חלב")).toBeTruthy();
+    await act(async () => answer());
     await waitFor(() => {
       const row = screen.getByText("פתיחת משמרת").closest("[data-testid='today-task-item']");
       expect(row?.getAttribute("data-state")).not.toBe("awaiting-upload");

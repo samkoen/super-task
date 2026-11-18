@@ -596,8 +596,9 @@ export default function EmployeeTasksPage() {
   );
   const pendingUploads = usePendingUploads();
   // Vidéos parties après la fermeture du flux : on relit le statut serveur, sinon l'écran de כניסה revient.
-  useReloadWhenUploadsLand(pendingUploads.taskIds, () => void load(true));
-  const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask), pendingUploads.taskIds);
+  // Les tâches qui viennent de partir restent « en attente » jusqu'à la fin du rechargement (pas de clignotement).
+  const awaitingUploadIds = useReloadWhenUploadsLand(pendingUploads.taskIds, () => load(true));
+  const punch = useEmployeePunchDoor(punchPool, Boolean(detailTask), awaitingUploadIds);
   const openWorkTask = useCallback(
     (task: EmployeeTaskCard, focusChat = false) => {
       const redirected = Boolean(punch.start && task.id !== punch.start.id);
@@ -722,10 +723,10 @@ export default function EmployeeTasksPage() {
       const notPunch = new Set(excludeAttendancePunch(pool).map((task) => task.id));
       // Une ouverture de משמרת finie sans קליטה reste visible, cochée « ממתין לקליטה ».
       return pool.filter(
-        (task) => notPunch.has(task.id) || isTodayTaskDone(task.status) || pendingUploads.taskIds.has(task.id),
+        (task) => notPunch.has(task.id) || isTodayTaskDone(task.status) || awaitingUploadIds.has(task.id),
       );
     },
-    [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, dashboard?.manager_waiting_tasks, pendingReviewTasks, completedTasks, pendingUploads.taskIds],
+    [inProgressTasks, awaitingResponseTasks, urgentTasks, todayTasks, dashboard?.manager_waiting_tasks, pendingReviewTasks, completedTasks, awaitingUploadIds],
   );
   const showShiftHeader = !startDoorOpen && !showTodayScreen && !(loading && !dashboard);
 
@@ -768,7 +769,7 @@ export default function EmployeeTasksPage() {
         <TodayTasksScreen
           tasks={loading && !dashboard ? [] : todayScreenTasks}
           loading={loading && !dashboard}
-          awaitingUploadIds={pendingUploads.taskIds}
+          awaitingUploadIds={awaitingUploadIds}
           employeeName={headerName}
           photoUrl={photoUrl}
           onOpenTask={(task) => openWorkTask(task)}
