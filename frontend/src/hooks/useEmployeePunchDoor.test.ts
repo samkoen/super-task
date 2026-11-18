@@ -37,4 +37,15 @@ describe("useEmployeePunchDoor", () => {
     const { result } = renderHook(() => useEmployeePunchDoor([end], false));
     expect(result.current.showEnd).toBe(true);
   });
+
+  it("does not bring the start door back once clock-in is finished offline and waiting to upload", () => {
+    const { result } = renderHook(() => useEmployeePunchDoor([start, end, shelf], false, new Set(["s"])));
+    expect(result.current.showStart).toBe(false);
+    expect(result.current.start).toBeNull();
+  });
+
+  it("counts a work task waiting to upload as done for the exit screen", () => {
+    const { result } = renderHook(() => useEmployeePunchDoor([end, shelf], false, new Set(["t"])));
+    expect(result.current.showEnd).toBe(true);
+  });
 });
