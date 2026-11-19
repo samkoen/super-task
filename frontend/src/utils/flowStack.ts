@@ -33,7 +33,14 @@ export function resolveActive(states: SlotUiState[], preferred: number | null): 
   if (!states.length) return null;
   if (canRevisit(states[preferred ?? -1])) return preferred;
   if (preferred !== null && states[preferred] && !isHandedOver(states[preferred].status)) return preferred;
-  if (preferred !== null && states[preferred]) return nextOpenIndex(states, preferred);
+  const open = preferred !== null && states[preferred] ? nextOpenIndex(states, preferred) : firstOpen(states);
+  // Tout est remis (ex. retour du récap) : une carte reste ouverte, la première qu'on peut encore revoir.
+  if (open !== null) return open;
+  const revisit = states.findIndex((state) => canRevisit(state));
+  return revisit < 0 ? null : revisit;
+}
+
+function firstOpen(states: SlotUiState[]): number | null {
   const first = firstOpenIndex(states);
   return isHandedOver(states[first].status) ? null : first;
 }

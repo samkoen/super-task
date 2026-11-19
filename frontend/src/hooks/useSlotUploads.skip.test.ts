@@ -2,6 +2,8 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompletionRequirement } from "../utils/completionMedia";
 import { createMemorySlotStorage, createSlotUploadQueue } from "../utils/slotUploadQueue";
+import { createKeptStore, createMemoryKeptStore } from "../utils/slotKeptStore";
+import { slowRows } from "../utils/slotKeptStore.slowRows";
 
 const { submitSlot, uploadAudio } = vi.hoisted(() => ({ submitSlot: vi.fn(), uploadAudio: vi.fn() }));
 vi.mock("../services/taskService", () => ({ taskService: { submitSlot, uploadAudio } }));
@@ -101,5 +103,103 @@ describe("useSlotUploads: « לא ניתן לצלם »", () => {
       await hook.result.current.sendAll();
     });
     expect(submitSlot).not.toHaveBeenCalled();
+  });
+});
+
+describe("useSlotUploads: « לא ניתן לצלם » survives leaving and reopening the task", () => {
+  function open(queue: ReturnType<typeof createSlotUploadQueue>, keptStore: ReturnType<typeof createMemoryKeptStore>) {
+    return renderHook(() =>
+      useSlotUploads({ occurrenceId: "occ", requirements, completion: null as never, queue, keptStore, locate: async () => null }),
+    );
+  }
+
+  it("brings back the reason (and its voice note) of a card next to a filmed one", async () => {
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
+    const queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: async () => ({}), isOnline: () => true });
+    const keptStore = createMemoryKeptStore();
+    const first = open(queue, keptStore);
+    const audio = new File(["v"], "voice.webm", { type: "audio/webm" });
+    act(() => first.result.current.film(0, new File(["x"], "a.mp4", { type: "video/mp4" }), 6));
+    act(() => first.result.current.keep(0));
+    act(() => first.result.current.skip(1, { reasonCode: "other", reasonText: "הדלת נעולה", audio }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    first.unmount();
+
+    const again = open(queue, keptStore);
+    await vi.waitFor(() => expect(again.result.current.states[1].status).toBe("skipped"));
+    expect(again.result.current.states[0].status).toBe("ready");
+    expect(again.result.current.states[1].skip).toMatchObject({ reasonCode: "other", reasonText: "הדלת נעולה", sent: false });
+    expect(again.result.current.states[1].skip?.audio?.name).toBe("voice.webm");
+    vi.unstubAllGlobals();
+  });
+
+  it("a reason withdrawn right before leaving does not come back, even with a slow device storage", async () => {
+    const queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: async () => ({}), isOnline: () => true });
+    const keptStore = createKeptStore(slowRows());
+    const first = open(queue, keptStore as ReturnType<typeof createMemoryKeptStore>);
+    act(() => first.result.current.skip(1, { reasonCode: "no_stock", reasonText: "", audio: null }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    act(() => first.result.current.unskip(1));
+    first.unmount();
+
+    const again = open(queue, keptStore as ReturnType<typeof createMemoryKeptStore>);
+    await act(async () => {
+      await keptStore.list("occ");
+    });
+    expect(again.result.current.states[1].status).toBe("idle");
+  });
+
+  it("forgets the reason once it was withdrawn, or once the server has it", async () => {
+    const queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: async () => ({}), isOnline: () => true });
+    const keptStore = createMemoryKeptStore();
+    const first = open(queue, keptStore);
+    act(() => first.result.current.skip(0, { reasonCode: "no_stock", reasonText: "", audio: null }));
+    act(() => first.result.current.skip(1, { reasonCode: "no_stock", reasonText: "", audio: null }));
+    act(() => first.result.current.unskip(0));
+    await act(async () => {
+      await first.result.current.sendAll();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(await keptStore.list("occ")).toEqual([]);
+  });
+});
+
+describe("useSlotUploads: a confirmed written note survives leaving and reopening the task", () => {
+  const withNote: CompletionRequirement[] = [
+    { kind: "video", min_seconds: 5, title: "a" },
+    { kind: "message", title: "b" } as CompletionRequirement,
+  ];
+  function open(queue: ReturnType<typeof createSlotUploadQueue>, keptStore: ReturnType<typeof createMemoryKeptStore>) {
+    return renderHook(() =>
+      useSlotUploads({ occurrenceId: "occ", requirements: withNote, completion: null as never, queue, keptStore, locate: async () => null }),
+    );
+  }
+
+  it("brings back the note, sends it at the end, then forgets it", async () => {
+    const queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: async () => ({}), isOnline: () => true });
+    const keptStore = createMemoryKeptStore();
+    const first = open(queue, keptStore);
+    act(() => first.result.current.keepText(1, "הכול תקין"));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    first.unmount();
+
+    const again = open(queue, keptStore);
+    await vi.waitFor(() => expect(again.result.current.states[1]).toMatchObject({ status: "ready", text: "הכול תקין" }));
+    await act(async () => {
+      await again.result.current.sendAll();
+    });
+    expect(submitSlot).toHaveBeenCalledWith("occ", 1, { kind: "message", text: "הכול תקין" });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(await keptStore.list("occ")).toEqual([]);
   });
 });

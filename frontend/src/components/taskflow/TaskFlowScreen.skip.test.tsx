@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import TaskFlowScreen, { type TaskFlowScreenProps } from "./TaskFlowScreen";
 import { he } from "../../i18n/he";
 import { createMemorySlotStorage, createSlotUploadQueue } from "../../utils/slotUploadQueue";
+import { createMemoryKeptStore } from "../../utils/slotKeptStore";
 
 const { submitSlot, uploadAudio } = vi.hoisted(() => ({ submitSlot: vi.fn(), uploadAudio: vi.fn() }));
 const send = vi.fn();
@@ -12,6 +13,11 @@ let queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: (e
 vi.mock("../../utils/slotSender", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../utils/slotSender")>()),
   getSlotUploadQueue: () => queue,
+}));
+let keptStore = createMemoryKeptStore();
+vi.mock("../../utils/slotKeptStore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils/slotKeptStore")>()),
+  getSlotKeptStore: () => keptStore,
 }));
 vi.mock("../../services/taskService", () => ({ taskService: { submitSlot, uploadAudio } }));
 vi.mock("../notifications/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
@@ -55,6 +61,7 @@ beforeEach(() => {
   submitSlot.mockReset().mockResolvedValue({ pending_slots: [], task_submitted: true });
   uploadAudio.mockReset();
   queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: (e) => send(e), isOnline: () => true });
+  keptStore = createMemoryKeptStore();
   vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() });
 });
 

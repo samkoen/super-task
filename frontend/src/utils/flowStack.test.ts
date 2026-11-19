@@ -53,6 +53,12 @@ describe("pile de cartes", () => {
     expect(resolveActive(states("sent"), null)).toBeNull();
   });
 
+  it("tout est remis mais rien n'est encore parti (retour du récap) : la première carte qu'on peut revoir reste ouverte", () => {
+    expect(stackLayout(states("ready", "skipped", "skipped"), null)).toEqual({ active: 0, above: [1, 2], below: [] });
+    expect(resolveActive(states("sent", "skipped", "ready"), null)).toBe(1);
+    expect(resolveActive(states("sent", "ready"), 0)).toBe(1);
+  });
+
   it("une carte en échec reste ouverte pour être renvoyée", () => {
     expect(resolveActive(states("sent", "failed"), null)).toBe(1);
   });

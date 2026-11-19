@@ -6,6 +6,7 @@ import { getCurrentLocation } from "../utils/geoPosition";
 import type { TrimRange } from "../utils/flowTrim";
 import { getSlotUploadQueue, submitSlotStarting } from "../utils/slotSender";
 import { skipAttachment, type SkipDraft } from "../utils/slotSkip";
+import { getSlotKeptStore, storedSkipAudio, type SlotKeptStore, type StoredSlot } from "../utils/slotKeptStore";
 import { trimVideo, type TrimResult } from "../utils/videoTrim";
 import { slotQueueId, type QueuedSlot, type SlotUploadQueue } from "../utils/slotUploadQueue";
 import { flushFinishSignals, rememberFinished } from "../utils/finishSignals";
@@ -33,6 +34,8 @@ export type SlotUploadsOptions = {
   requirements: CompletionRequirement[];
   completion?: Completion;
   queue?: SlotUploadQueue;
+  /** Raisons « לא ניתן לצלם » et notes écrites gardées sur l'appareil (injectable pour les tests). */
+  keptStore?: SlotKeptStore;
   /** Lecture GPS (injectable pour les tests). */
   locate?: () => Promise<CaptureLocation | null>;
   /** Découpe vidéo (injectable pour les tests). */
@@ -95,12 +98,42 @@ function restoreDrafts(files: FilmedFiles, queued: QueuedSlot[]) {
   }
 }
 
+/**
+ * Raisons « לא ניתן לצלם » et notes écrites gardées sur l'appareil : elles reviennent sur les cases encore vides.
+ * Celles dont la case est déjà remplie (le serveur les a, ou la case a été filmée) sont effacées.
+ */
+function withKeptOnDevice(
+  store: SlotKeptStore,
+  occurrenceId: string,
+  states: SlotUiState[],
+  kept: StoredSlot[],
+): SlotUiState[] {
+  let next = states;
+  for (const entry of kept) {
+    const state = states[entry.slotIndex];
+    if (state?.status !== "idle") {
+      void store.remove(occurrenceId, entry.slotIndex).catch(() => undefined);
+      continue;
+    }
+    next =
+      entry.kind === "text"
+        ? markReady(next, entry.slotIndex, new Date(entry.savedAt).toISOString(), entry.text)
+        : markSkipped(next, entry.slotIndex, {
+            reasonCode: entry.reasonCode,
+            reasonText: entry.reasonText,
+            audio: storedSkipAudio(entry),
+          });
+  }
+  return next;
+}
+
 /** Charge l'état au départ : ce que le serveur a déjà + ce qui attend sur l'appareil. */
 function useInitialStates(
   occurrenceId: string,
   requirements: CompletionRequirement[],
   completion: Completion,
   queue: SlotUploadQueue,
+  keptStore: SlotKeptStore,
   files: { current: FilmedFiles },
   /** Cases déjà filmées ou annulées dans cette session : la lecture du disque ne les écrase pas. */
   touched: { current: Set<number> },
@@ -114,21 +147,23 @@ function useInitialStates(
     const picture = (queued: QueuedSlot[] = []) => slotStatesFromCompletion(reqs, done, queued);
     setStates((current) => mergeStoredSlots(current, picture()));
     let cancelled = false;
-    void queue
+    const media = queue
       .pruneHeld()
       .catch(() => undefined)
       .then(() => queue.list(occurrenceId))
-      .then((queued) => withoutDelivered(queue, picture(), queued))
-      .then((all) => {
-        if (cancelled) return;
-        const queued = all.filter((entry) => !touched.current.has(entry.slotIndex));
-        restoreDrafts(files.current, queued);
-        setStates((current) => mergeStoredSlots(current, picture(queued)));
-      });
+      .then((queued) => withoutDelivered(queue, picture(), queued));
+    const onDevice = keptStore.list(occurrenceId).catch(() => [] as StoredSlot[]);
+    void Promise.all([media, onDevice]).then(([all, kept]) => {
+      if (cancelled) return;
+      const queued = all.filter((entry) => !touched.current.has(entry.slotIndex));
+      restoreDrafts(files.current, queued);
+      const remitted = kept.filter((entry) => !touched.current.has(entry.slotIndex));
+      setStates((current) => mergeStoredSlots(current, withKeptOnDevice(keptStore, occurrenceId, picture(queued), remitted)));
+    });
     return () => {
       cancelled = true;
     };
-  }, [occurrenceId, queue, latest, files, touched]);
+  }, [occurrenceId, queue, keptStore, latest, files, touched]);
   return [states, setStates] as const;
 }
 
@@ -142,9 +177,10 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const locate = options.locate ?? getCurrentLocation;
   const trimmer = options.trimmer ?? trimVideo;
   const queue = useMemo(() => options.queue ?? getSlotUploadQueue(), [options.queue]);
+  const keptStore = useMemo(() => options.keptStore ?? getSlotKeptStore(), [options.keptStore]);
   const files = useRef<FilmedFiles>(new Map());
   const touched = useRef(new Set<number>());
-  const [states, setStates] = useInitialStates(occurrenceId, requirements, completion, queue, files, touched);
+  const [states, setStates] = useInitialStates(occurrenceId, requirements, completion, queue, keptStore, files, touched);
   const callbacks = useLatest({ onSent, onSavedOnDevice, onFailed });
   const statesRef = useLatest(states);
   const sending = useRef(false);
@@ -172,6 +208,21 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const dropHeld = useCallback(
     (index: number) => void onDisk(index, () => queue.dropHeld(slotQueueId(occurrenceId, index))),
     [queue, occurrenceId, onDisk],
+  );
+
+  /**
+   * Raison ou note sur l'appareil : demandée au stockage tout de suite (il les passe dans l'ordre, et une
+   * relecture à la réouverture de la tâche les attend), sans attendre les écritures de prises de la case.
+   */
+  const keptOnDevice = useCallback((index: number, write: () => Promise<unknown>) => {
+    touched.current.add(index);
+    void write().catch(() => undefined);
+  }, []);
+
+  /** La raison ou la note gardée sur l'appareil n'a plus d'objet (case filmée, raison retirée ou envoyée). */
+  const forgetKept = useCallback(
+    (index: number) => keptOnDevice(index, () => keptStore.remove(occurrenceId, index)),
+    [keptStore, occurrenceId, keptOnDevice],
   );
 
   /** Prise filmée, pas encore confirmée : écrite sur disque tout de suite (une sortie de l'app ne la perd pas). */
@@ -209,6 +260,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       const location = locate().catch(() => null);
       const kept: Filmed = { file, capturedAt, durationSeconds: durationSeconds ?? null, lightOk: lightOk ?? null, location };
       files.current.set(index, kept);
+      forgetKept(index);
       // Remplace sur disque la prise précédente de cette case (refilmée).
       saveDraft(index, kept);
       setStates((prev) =>
@@ -223,7 +275,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         setStates((prev) => withLocation(prev, index, found));
       });
     },
-    [setStates, locate, saveDraft],
+    [setStates, locate, saveDraft, forgetKept],
   );
 
   /** Découpe la vidéo en cours de revue ; ignoré si l'oved l'a refilmée entre-temps. */
@@ -301,9 +353,13 @@ export function useSlotUploads(options: SlotUploadsOptions) {
     [setStates, holdOnDisk, requirements],
   );
 
+  /** Note écrite confirmée : gardée sur l'appareil (quitter la tâche puis la rouvrir ne la perd pas), envoyée au récap. */
   const keepText = useCallback(
-    (index: number, text: string) => setStates((prev) => markReady(prev, index, new Date().toISOString(), text)),
-    [setStates],
+    (index: number, text: string) => {
+      setStates((prev) => markReady(prev, index, new Date().toISOString(), text));
+      keptOnDevice(index, () => keptStore.saveText({ occurrenceId, slotIndex: index, text }));
+    },
+    [setStates, keptOnDevice, keptStore, occurrenceId],
   );
 
   const sendText = useCallback(
@@ -314,13 +370,14 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         setStates((prev) =>
           prev.map((s, i) => (i === index ? { ...s, status: "sent", text, sentAt: new Date().toISOString() } : s)),
         );
+        forgetKept(index);
         callbacks.current.onSent?.(index, response);
       } catch (error) {
         setStates((prev) => prev.map((s, i) => (i === index ? { ...s, status: "ready", text } : s)));
         callbacks.current.onFailed?.(index, error instanceof Error ? error.message : String(error ?? ""));
       }
     },
-    [occurrenceId, setStates, callbacks],
+    [occurrenceId, setStates, callbacks, forgetKept],
   );
 
   /** « לא ניתן לצלם » : la case est remise avec sa raison ; le fichier éventuel est abandonné. */
@@ -330,12 +387,23 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       files.current.delete(index);
       dropHeld(index);
       const reasonText = draft.reasonText.trim() || null;
-      setStates((prev) => markSkipped(prev, index, { reasonCode: draft.reasonCode!, reasonText, audio: draft.audio }));
+      const reasonCode = draft.reasonCode;
+      setStates((prev) => markSkipped(prev, index, { reasonCode, reasonText, audio: draft.audio }));
+      // Gardée sur l'appareil : quitter la tâche puis la rouvrir ne la perd pas.
+      keptOnDevice(index, () =>
+        keptStore.saveSkip({ occurrenceId, slotIndex: index, reasonCode, reasonText, audio: draft.audio ?? null }),
+      );
     },
-    [setStates, dropHeld],
+    [setStates, dropHeld, keptOnDevice, keptStore, occurrenceId],
   );
 
-  const unskip = useCallback((index: number) => setStates((prev) => clearSkip(prev, index)), [setStates]);
+  const unskip = useCallback(
+    (index: number) => {
+      forgetKept(index);
+      setStates((prev) => clearSkip(prev, index));
+    },
+    [setStates, forgetKept],
+  );
 
   /** Envoie la raison d'une case non filmée (avec son explication vocale, si elle existe). */
   const sendSkip = useCallback(
@@ -347,6 +415,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         const attachment = skipAttachment(requirements[index].kind, reason, audioUrl);
         const response = await submitSlotStarting(occurrenceId, index, attachment);
         setStates((prev) => markSkipSent(prev, index, audioUrl));
+        forgetKept(index);
         callbacks.current.onSent?.(index, response);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error ?? "");
@@ -354,7 +423,7 @@ export function useSlotUploads(options: SlotUploadsOptions) {
         callbacks.current.onFailed?.(index, message);
       }
     },
-    [occurrenceId, requirements, setStates, callbacks],
+    [occurrenceId, requirements, setStates, callbacks, forgetKept],
   );
 
   /**
