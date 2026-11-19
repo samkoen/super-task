@@ -80,6 +80,16 @@ describe("managerChatInbox", () => {
     expect(filterManagerInbox(entries, "all", "מדף").map((e) => e.kind)).toEqual(["task"]);
     expect(filterManagerInbox(entries, "all", "ירושלים")).toEqual([]);
   });
+
+  it("filters what waits for the manager and proofs to approve", () => {
+    const dan = card();
+    const pending = taskChat({ id: "p", status: "pending_review", chat_status: "pending_review" });
+    const quiet = taskChat({ id: "q", status: "in_progress", unread_count: 0 });
+    const entries = buildManagerInboxEntries([dan], [withTasks(dan, [pending, quiet])]);
+    expect(filterManagerInbox(entries, "action", "").map((e) => e.key)).toEqual(["task-p"]);
+    expect(filterManagerInbox(entries, "pending", "").map((e) => e.key)).toEqual(["task-p"]);
+    expect(entries.find((e) => e.key === "task-p")?.avatarName).toBe(dan.counterpart_name);
+  });
 });
 
 describe("scopeManagerInbox", () => {

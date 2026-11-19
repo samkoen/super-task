@@ -60,6 +60,8 @@ export default function ChatListRow({
   pinned = false,
   status = null,
   lastMine = false,
+  titleMeta,
+  sender,
   onClick,
   testId,
 }: {
@@ -71,6 +73,10 @@ export default function ChatListRow({
   pinned?: boolean;
   status?: ChatStatusKind | null;
   lastMine?: boolean;
+  /** Après le titre, en secondaire (ex. snif d'un contact direct côté menahel). */
+  titleMeta?: string | null;
+  /** Auteur affiché devant l'aperçu (ex. l'oved d'un fil de tâche côté menahel). */
+  sender?: string | null;
   onClick: () => void;
   testId?: string;
 }) {
@@ -94,7 +100,15 @@ export default function ChatListRow({
       }}
     >
       {avatar}
-      <ChatRowContent title={title} preview={preview} status={status} lastMine={lastMine} unread={hasUnread} />
+      <ChatRowContent
+        title={title}
+        titleMeta={titleMeta ?? null}
+        sender={sender ?? null}
+        preview={preview}
+        status={status}
+        lastMine={lastMine}
+        unread={hasUnread}
+      />
       <ChatRowMeta time={time} unread={unread} pinned={pinned} />
     </ButtonBase>
   );
@@ -102,12 +116,16 @@ export default function ChatListRow({
 
 function ChatRowContent({
   title,
+  titleMeta,
+  sender,
   preview,
   status,
   lastMine,
   unread,
 }: {
   title: string;
+  titleMeta: string | null;
+  sender: string | null;
   preview: string;
   status: ChatStatusKind | null;
   lastMine: boolean;
@@ -120,7 +138,13 @@ function ChatRowContent({
         dir="auto"
         sx={{ ...ellipsisSx, fontSize: 15, fontWeight: 600, color: chatUi.textPrimary, lineHeight: "21px" }}
       >
-        {title}
+        <span>{title}</span>
+        {titleMeta ? (
+          <Box component="span" sx={{ color: chatUi.textSecondary, fontWeight: 500 }}>
+            {" · "}
+            <span>{titleMeta}</span>
+          </Box>
+        ) : null}
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
         {status ? <ChatStatusTag status={status} /> : null}
@@ -139,7 +163,13 @@ function ChatRowContent({
             fontWeight: unread ? 500 : 400,
           }}
         >
-          {preview}
+          {sender ? (
+            <Box component="span" sx={{ fontWeight: 600, color: chatUi.textPrimary }}>
+              <span>{sender}</span>
+              {": "}
+            </Box>
+          ) : null}
+          <span>{preview}</span>
         </Box>
       </Box>
     </Box>

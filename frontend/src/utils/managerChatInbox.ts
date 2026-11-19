@@ -1,8 +1,16 @@
 import type { DirectChatCard } from "../services/directChatService";
-import type { ManagerDayTaskChat, TaskStatus } from "../services/taskService";
+import type {
+  ChatStatusKind,
+  ChatVisualKind,
+  ManagerDayTaskChat,
+  TaskStatus,
+} from "../services/taskService";
 
-/** Pastilles de l'onglet שיחות : toutes, seulement les fils de tâche, seulement les directs. */
-export type ManagerChatsFilter = "all" | "tasks" | "directs";
+/**
+ * Pastilles de l'onglet שיחות (Filter Chip, comme la liste oved) : toutes, « לטיפולך »
+ * (ממתין לי), preuves à valider, seulement les fils de tâche, seulement les directs.
+ */
+export type ManagerChatsFilter = "all" | "action" | "pending" | "tasks" | "directs";
 
 /** Une ligne de la boîte unifiée : un chat direct ou un fil de tâche, au même niveau. */
 export interface ManagerInboxEntry {
@@ -18,6 +26,13 @@ export interface ManagerInboxEntry {
   waiting: boolean;
   /** Snif de la ligne ; `null` = hors snif (mon manager, conversation réseau), gardée partout. */
   branchId: string | null;
+  /** Avatar : la personne (contact direct, ou oved du fil de tâche). */
+  avatarName: string;
+  avatarUrl: string | null;
+  /** Fil de tâche : pastille de type (Figma Chat Row Role=Manager) et Chat Status Tag. */
+  visualKind?: ChatVisualKind;
+  chatStatus?: ChatStatusKind | null;
+  lastMine?: boolean;
   direct?: DirectChatCard;
   task?: ManagerInboxTask;
 }
@@ -60,6 +75,8 @@ function directEntry(card: DirectChatCard): ManagerInboxEntry {
     unread,
     waiting: unread > 0,
     branchId: card.kind === "down" ? card.branch_id ?? null : null,
+    avatarName: card.counterpart_name,
+    avatarUrl: card.counterpart_avatar_url ?? null,
     direct: card,
   };
 }
@@ -76,6 +93,11 @@ function taskEntry(card: DirectChatCard, task: ManagerDayTaskChat): ManagerInbox
     unread,
     waiting: taskWaitsForManager(task.status, unread),
     branchId: task.branch_id ?? card.branch_id ?? null,
+    avatarName: card.counterpart_name,
+    avatarUrl: card.counterpart_avatar_url ?? null,
+    visualKind: task.visual_kind ?? "physical",
+    chatStatus: task.chat_status ?? null,
+    lastMine: Boolean(task.last_mine),
     task: {
       occurrenceId: task.id,
       title: task.title,
@@ -144,7 +166,15 @@ export function managerChatsUnread(directs: DirectChatCard[], tasks: ManagerDayT
   return total;
 }
 
-/** Filtre par pastille puis par recherche (titre ou contexte). */
+function matchesManagerFilter(entry: ManagerInboxEntry, filter: ManagerChatsFilter): boolean {
+  if (filter === "action") return entry.waiting;
+  if (filter === "pending") return entry.chatStatus === "pending_review";
+  if (filter === "tasks") return entry.kind === "task";
+  if (filter === "directs") return entry.kind === "direct";
+  return true;
+}
+
+/** Filtre par pastille puis par recherche (titre, contexte ou aperçu). */
 export function filterManagerInbox(
   entries: ManagerInboxEntry[],
   filter: ManagerChatsFilter,
@@ -152,9 +182,8 @@ export function filterManagerInbox(
 ): ManagerInboxEntry[] {
   const needle = query.trim().toLowerCase();
   return entries.filter((entry) => {
-    if (filter === "tasks" && entry.kind !== "task") return false;
-    if (filter === "directs" && entry.kind !== "direct") return false;
+    if (!matchesManagerFilter(entry, filter)) return false;
     if (!needle) return true;
-    return `${entry.title} ${entry.context ?? ""}`.toLowerCase().includes(needle);
+    return `${entry.title} ${entry.context ?? ""} ${entry.preview}`.toLowerCase().includes(needle);
   });
 }

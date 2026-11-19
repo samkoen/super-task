@@ -1124,7 +1124,6 @@ export const he = {
   managerChatsFilterTasks: "משימות",
   managerChatsFilterDirects: "עובדים",
   managerChatsFilterLabel: "סינון שיחות",
-  managerChatTaskContext: "הקשר משימה",
   managerChatsEmpty: "אין שיחות עדיין",
   issueReportPhoto: "תמונה",
   issueReportCreateTask: "צור משימה",

@@ -49,15 +49,18 @@ export function ChatFilterChip({
   active,
   count = 0,
   onClick,
+  testId,
 }: {
   label: string;
   active: boolean;
   count?: number;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <ButtonBase
       onClick={onClick}
+      data-testid={testId}
       aria-pressed={active}
       sx={{
         position: "relative",
