@@ -3,10 +3,12 @@ from types import SimpleNamespace
 
 from app.domain import task_status
 from app.domain.employee_task_chats import (
-    append_today_open_chats,
+    chat_status_tag,
+    chat_visual_kind,
     employee_task_chat_card,
     is_open_employee_chat_task,
     sort_employee_task_chats,
+    split_employee_chats,
 )
 
 
@@ -67,21 +69,54 @@ def test_card_without_message_has_no_preview():
     assert card["due_at"] == "2026-10-03T08:00:00+03:00"
 
 
-def test_today_open_tasks_join_started_chats_without_duplicates():
-    started = [
-        {"id": "old", "last_at": "2026-09-01T10:00:00+03:00"},
-        {"id": "live", "last_at": "2026-10-03T09:00:00+03:00"},
-    ]
-    today = [
-        SimpleNamespace(id="live", title="חי", status=task_status.IN_PROGRESS),
-        SimpleNamespace(id="empty", title="ריק", status=task_status.PENDING),
-        SimpleNamespace(id="done", title="סגור", status=task_status.COMPLETED),
-    ]
-    assert [i["id"] for i in append_today_open_chats(started, today)] == [
-        "live",
-        "old",
-        "empty",
-    ]
+def test_split_keeps_shift_chats_and_offers_tasks_without_chat():
+    old_open = SimpleNamespace(id="old-open", status=task_status.IN_PROGRESS)
+    old_done = SimpleNamespace(id="old-done", status=task_status.COMPLETED)
+    live = SimpleNamespace(id="live", status=task_status.IN_PROGRESS)
+    done_today = SimpleNamespace(id="done", status=task_status.COMPLETED)
+    empty = SimpleNamespace(id="empty", status=task_status.PENDING)
+    closed_empty = SimpleNamespace(id="closed-empty", status=task_status.COMPLETED)
+    chats = [(live, "m1"), (done_today, "m2"), (old_open, "m3"), (old_done, "m4"), (live, "dup")]
+    out = split_employee_chats(chats, [live, done_today, empty, closed_empty])
+    assert [occ.id for occ, _ in out["current"]] == ["live", "done", "old-open"]
+    assert [occ.id for occ, _ in out["archived"]] == ["old-done"]
+    assert [occ.id for occ in out["startable"]] == ["empty"]
+
+
+def test_visual_kind_follows_requirements_then_category():
+    def occ(**kw):
+        return SimpleNamespace(**kw)
+
+    assert chat_visual_kind(occ(completion_requirements=[{"kind": "video"}])) == "video"
+    assert chat_visual_kind(occ(min_video_seconds=20)) == "video"
+    assert chat_visual_kind(occ(completion_requirements=[{"kind": "photo"}])) == "photo"
+    assert chat_visual_kind(occ(ops_category="cleaning")) == "cleaning"
+    assert chat_visual_kind(occ(ops_category="info_collection")) == "check"
+    assert chat_visual_kind(occ()) == "physical"
+
+
+def test_status_tag_from_status_and_review():
+    rejected = SimpleNamespace(manager_review_status=task_status.REVIEW_REJECTED)
+    assert chat_status_tag(SimpleNamespace(status=task_status.COMPLETED)) == "approved"
+    assert chat_status_tag(SimpleNamespace(status=task_status.PENDING_REVIEW)) == "pending_review"
+    assert (
+        chat_status_tag(SimpleNamespace(status=task_status.IN_PROGRESS, awaiting_upload_at="x"))
+        == "awaiting_upload"
+    )
+    assert chat_status_tag(SimpleNamespace(status=task_status.IN_PROGRESS), rejected) == "retake"
+    assert chat_status_tag(SimpleNamespace(status=task_status.IN_PROGRESS)) is None
+
+
+def test_card_counts_unread_and_own_last_message():
+    occ = SimpleNamespace(id="o", title="t", status=task_status.IN_PROGRESS)
+    msg = SimpleNamespace(
+        body="היי", photo_url=None, video_url=None, audio_url=None, file_url=None,
+        created_at="2026-09-07T10:00:00+03:00", sender_user_id="emp-1",
+    )
+    card = employee_task_chat_card(occ, msg, unread=2, viewer_id="emp-1")
+    assert card["unread_count"] == 2
+    assert card["last_mine"] is True
+    assert card["visual_kind"] == "physical"
 
 
 def test_sorts_newest_chat_first():

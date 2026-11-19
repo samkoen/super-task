@@ -18,9 +18,11 @@ from app.domain.break_notify import break_alert_payload
 from app.domain.chat_file import stored_file_name
 from app.domain.chat_page import clamp_chat_page_size
 from app.domain.employee_task_chats import (
-    append_today_open_chats,
+    ARCHIVE_LIMIT,
+    split_employee_chats,
+    sort_employee_task_chats,
+    chat_visual_kind,
     employee_task_chat_card,
-    is_open_employee_chat_task,
 )
 from app.domain.manager_employee_chats import manager_task_chat_card, sort_manager_day_chats
 from app.domain.scope import ActorContext, assert_branch_visible
@@ -101,23 +103,61 @@ class TaskMessageService:
         self._reads = read_repo
 
     def list_employee_chats(self, actor: ActorContext) -> dict:
+        split = self._employee_chat_split(actor)
+        today_cards = sorted(split["startable"], key=lambda occ: str(getattr(occ, "due_at", "") or ""))
+        return {
+            "items": self._employee_chat_cards(actor, split["current"]),
+            "startable": [
+                {
+                    "id": occ.id,
+                    "title": occ.title,
+                    "status": occ.status,
+                    "due_at": getattr(occ, "due_at", None),
+                    "visual_kind": chat_visual_kind(occ),
+                }
+                for occ in today_cards
+            ],
+            "archived_count": len(split["archived"]),
+        }
+
+    def list_employee_chat_archive(self, actor: ActorContext) -> dict:
+        split = self._employee_chat_split(actor)
+        return {"items": self._employee_chat_cards(actor, split["archived"][:ARCHIVE_LIMIT])}
+
+    def _employee_chat_split(self, actor: ActorContext) -> dict:
         if not can_use_employee_work_surface(actor):
             raise PermissionError("אין הרשאה לרשימת שיחות")
         today = self._occurrences.list_occurrences(
             assignee_user_id=actor.user_id,
             due_on=datetime.now(TZ).date(),
         )
-        return {"items": append_today_open_chats(self._started_open_chats(actor), today)}
-
-    def _started_open_chats(self, actor: ActorContext) -> list[dict]:
-        pairs = self._messages.list_open_chats_for_assignee(
-            actor.user_id, exclude_statuses=task_status.TERMINAL
+        all_chats = self._messages.list_open_chats_for_assignee(
+            actor.user_id, exclude_statuses=frozenset()
         )
-        return [
-            employee_task_chat_card(occ, msg)
-            for occ, msg in pairs
-            if is_open_employee_chat_task(occ.status)
-        ]
+        return split_employee_chats(list(all_chats or []), list(today or []))
+
+    def _employee_chat_cards(self, actor: ActorContext, pairs: list[tuple]) -> list[dict]:
+        ids = [occ.id for occ, _ in pairs]
+        unreads = self._messages.unread_counts(ids, actor.user_id) if ids else {}
+        completions = (
+            self._completions.find_by_occurrence_ids(ids) if ids and self._completions else {}
+        )
+        if not isinstance(unreads, dict):
+            unreads = {}
+        if not isinstance(completions, dict):
+            completions = {}
+        return sort_employee_task_chats(
+            [
+                employee_task_chat_card(
+                    occ,
+                    msg,
+                    unread=unreads.get(occ.id, 0),
+                    completion=completions.get(occ.id),
+                    viewer_id=actor.user_id,
+                )
+                for occ, msg in pairs
+            ]
+        )
 
     def list_manager_day_chats(self, actor: ActorContext, employee_id: str) -> dict:
         self._assert_can_list_employee_day(actor, employee_id)

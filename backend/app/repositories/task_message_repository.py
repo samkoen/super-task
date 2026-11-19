@@ -122,9 +122,10 @@ class TaskMessageRepository:
                 ),
             )
             .where(orm.TaskOccurrence.assignee_user_id == uid)
-            .where(orm.TaskOccurrence.status.notin_(list(closed)))
             .order_by(orm.TaskMessage.created_at.desc())
         )
+        if closed:
+            q = q.where(orm.TaskOccurrence.status.notin_(list(closed)))
         return self._dedupe_latest_chats(self._db.execute(q).all())
 
     def last_messages_for(self, occurrence_ids: list[str]) -> dict[str, TaskMessage]:

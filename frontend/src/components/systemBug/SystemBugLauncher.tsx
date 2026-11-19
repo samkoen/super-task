@@ -29,6 +29,15 @@ export function systemBugLauncherLeft(besideSidebar: boolean) {
   return { xs: 8, sm: SIDEBAR_WIDTH + 8 };
 }
 
+/**
+ * Côté du bouton : avec la barre oved, il passe à droite pour laisser le coin
+ * bas-gauche au FAB « צ׳אט חדש » de l'écran des chats.
+ */
+export function systemBugLauncherSide(besideSidebar: boolean, employeeNav: boolean) {
+  if (employeeNav) return { right: 8 };
+  return { left: systemBugLauncherLeft(besideSidebar) };
+}
+
 /** Au-dessus de la pilule menahel, sinon juste au-dessus du bord. */
 export function systemBugLauncherBottom(managerChrome: boolean, employeeNav = false) {
   if (employeeNav) return employeeBottomNavFabBottomCss();
@@ -73,7 +82,7 @@ function SystemBugTrigger({
       }}
       sx={{
         ...systemBugLauncherSx,
-        left: systemBugLauncherLeft(besideSidebar),
+        ...systemBugLauncherSide(besideSidebar, employeeNav),
         bottom: systemBugLauncherBottom(managerChrome, employeeNav),
       }}
     >
