@@ -174,7 +174,7 @@ describe("TaskFlowScreen", () => {
     fireEvent.click(screen.getByTestId("flow-primary"));
     fireEvent.click(await screen.findByTestId("flow-review-confirm"));
     fireEvent.click(await screen.findByTestId("flow-summary-back"));
-    fireEvent.click(screen.getAllByTestId("flow-tab-done")[0]);
+    // Retour du récap : tout est remis, mais la première carte reste ouverte.
     expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("0");
     fireEvent.click(screen.getByTestId("flow-primary"));
     expect(await screen.findByTestId("flow-review")).toBeTruthy();

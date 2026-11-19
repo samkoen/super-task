@@ -138,7 +138,7 @@ describe("TaskCardStack", () => {
 
   it("a kept card without a file still does not offer « לא ניתן לצלם »", () => {
     renderStack(videos(1), [{ status: "ready", kind: "video" }], { onSkip: vi.fn() });
-    fireEvent.click(screen.getByTestId("flow-tab-done"));
+    expect(screen.getByTestId("flow-card").getAttribute("data-index")).toBe("0");
     expect(screen.queryByTestId("flow-skip")).toBeNull();
     expect(screen.getByTestId("flow-captured-missing").textContent).toBe(he.flowTabReady);
   });
