@@ -47,6 +47,11 @@ export interface TaskMessage {
   created_at: string;
 }
 
+/** Avatar d'une ligne de chat oved (Figma Task Avatar). */
+export type ChatVisualKind = "video" | "photo" | "physical" | "check" | "cleaning";
+/** Chat Status Tag Figma : צלם שוב / ממתין לאישור / ממתין להעלאה / אושר. */
+export type ChatStatusKind = "retake" | "pending_review" | "awaiting_upload" | "approved";
+
 export interface EmployeeTaskChat {
   id: string;
   title: string;
@@ -54,6 +59,25 @@ export interface EmployeeTaskChat {
   due_at?: string | null;
   last_preview: string | null;
   last_at: string | null;
+  last_mine?: boolean;
+  unread_count?: number;
+  visual_kind?: ChatVisualKind;
+  chat_status?: ChatStatusKind | null;
+}
+
+/** Tâche du jour sans conversation : proposée dans le Sheet « צ׳אט חדש ». */
+export interface EmployeeStartableChat {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  due_at?: string | null;
+  visual_kind?: ChatVisualKind;
+}
+
+export interface EmployeeChatList {
+  items: EmployeeTaskChat[];
+  startable?: EmployeeStartableChat[];
+  archived_count?: number;
 }
 
 export interface ManagerDayTaskChat extends EmployeeTaskChat {
@@ -490,7 +514,13 @@ export const taskService = {
   },
 
   listEmployeeChats: async () => {
-    const { data } = await api.get<{ items: EmployeeTaskChat[] }>("/tasks/employee-chats");
+    const { data } = await api.get<EmployeeChatList>("/tasks/employee-chats");
+    return data;
+  },
+
+  /** Chats fermés des משמרות précédentes. */
+  listEmployeeChatArchive: async () => {
+    const { data } = await api.get<{ items: EmployeeTaskChat[] }>("/tasks/employee-chats/archive");
     return data;
   },
 

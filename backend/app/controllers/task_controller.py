@@ -820,6 +820,17 @@ def list_employee_chats(
     return service.list_employee_chats(actor)
 
 
+@router.get("/employee-chats/archive")
+@handle_controller_errors
+def list_employee_chat_archive(
+    request: Request,
+    service: TaskMessageService = Depends(get_message_service),
+    db: Session = Depends(get_db),
+):
+    actor = load_actor(request, UserRepository(db))
+    return service.list_employee_chat_archive(actor)
+
+
 @router.get("/manager-day-chats")
 @handle_controller_errors
 def list_manager_all_day_chats(

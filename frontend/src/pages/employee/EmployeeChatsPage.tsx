@@ -1,192 +1,153 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Box, Dialog, IconButton, List, Typography } from "@mui/material";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
-import EmployeeChatRowItem from "../../components/chat/EmployeeChatRowItem";
+import { useMemo, useState } from "react";
+import { Box, Dialog, Menu, MenuItem } from "@mui/material";
 import ManagerPickerDialog from "../../components/chat/ManagerPickerDialog";
-import { ApiError } from "../../services/api";
-import { useFeedback } from "../../context/FeedbackContext";
 import { he } from "../../i18n/he";
-import EmptyState from "../../components/ui/EmptyState";
-import ListSkeleton from "../../components/ui/ListSkeleton";
 import DirectChatThread from "../../components/chat/DirectChatThread";
 import FullscreenBackAppBar, {
   fullscreenChatBodySx,
   fullscreenChatDialogPaperSx,
 } from "../../components/chat/FullscreenBackAppBar";
 import TaskChatDialog from "../../components/tasks/TaskChatDialog";
-import { directChatService, type DirectChatCard } from "../../services/directChatService";
-import { taskService, type EmployeeTaskChat } from "../../services/taskService";
-import { useDirectChatLiveSync } from "../../hooks/useDirectChatLiveSync";
-import { useTaskChangeListener } from "../../hooks/useTaskChangeListener";
-import {
-  employeeManagerLabel,
-  employeeOpenMineScope,
-  employeeSurfaceChatState,
-  needsEmployeeManagerPicker,
-} from "../../utils/employeeDirectChat";
+import NewChatSheet from "../../components/chat/employeeInbox/NewChatSheet";
+import { ChatsArchiveView, ChatsHomeView } from "../../components/chat/employeeInbox/EmployeeChatsViews";
+import type { EmployeeTaskChat, TaskStatus } from "../../services/taskService";
+import { useEmployeeChats } from "../../hooks/useEmployeeChats";
+import { useEmployeeGeneralChat } from "../../hooks/useEmployeeGeneralChat";
 import {
   buildEmployeeChatRows,
+  generalChatIdentity,
   generalChatSummary,
-  taskChatListTitle,
   type EmployeeChatRow,
 } from "../../utils/employeeTaskChats";
-import { useAuth } from "../../context/AuthContext";
+import { chatUi } from "../../styles/employeeChatUi";
 
+type OpenTaskChat = { id: string; title: string; status?: TaskStatus };
+
+/** Bleed plein écran : le <main> employé a un padding, la maquette va bord à bord. */
+const bleedSx = { mx: { xs: -1.5, sm: -2.5 }, mt: { xs: -2, sm: -2.5 }, pb: 12 } as const;
+
+/** Écran Figma « 01 · רשימת הצ׳אטים – עובד » + Sheet « 02 · צ׳אט חדש ». */
 export default function EmployeeChatsPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { showError } = useFeedback();
-  const [managers, setManagers] = useState<DirectChatCard[]>([]);
-  const [tasks, setTasks] = useState<EmployeeTaskChat[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generalId, setGeneralId] = useState<string | null>(null);
-  const [generalTitle, setGeneralTitle] = useState(he.employeeGeneralChat);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [taskChat, setTaskChat] = useState<EmployeeTaskChat | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const [inbox, chats] = await Promise.all([
-        directChatService.inbox(),
-        taskService.listEmployeeChats(),
-      ]);
-      setManagers(employeeSurfaceChatState(inbox, user?.role).managers);
-      setTasks(chats.items);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    } finally {
-      setLoading(false);
-    }
-  }, [showError, user?.role]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-  useDirectChatLiveSync(null, () => void load());
-  useTaskChangeListener(() => void load());
+  const chats = useEmployeeChats();
+  const identity = useMemo(() => generalChatIdentity(chats.managers), [chats.managers]);
+  const general = useEmployeeGeneralChat(chats.managers, identity.title);
+  const [showArchive, setShowArchive] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [taskChat, setTaskChat] = useState<OpenTaskChat | null>(null);
 
   const rows = useMemo(
-    () => buildEmployeeChatRows(generalChatSummary(managers), tasks),
-    [managers, tasks],
+    () => buildEmployeeChatRows({ ...generalChatSummary(chats.managers), ...identity }, chats.tasks),
+    [chats.managers, chats.tasks, identity],
   );
 
-  const openGeneral = async (scope?: "branch" | "network", title = he.employeeGeneralChat) => {
-    try {
-      const opened = await directChatService.openMine(scope);
-      setGeneralId(opened.conversation.id);
-      setGeneralTitle(title);
-      setPickerOpen(false);
-    } catch (e) {
-      showError(e instanceof ApiError ? e.message : he.errorGeneric);
-    }
-  };
-
-  const onGeneral = async () => {
-    if (needsEmployeeManagerPicker(managers)) {
-      setPickerOpen(true);
-      return;
-    }
-    const only = managers[0];
-    await openGeneral(
-      employeeOpenMineScope(managers),
-      only ? employeeManagerLabel(only) : he.employeeGeneralChat,
-    );
-  };
-
-  const onRow = (row: EmployeeChatRow) => {
+  const onRow = (row: EmployeeChatRow, source: EmployeeTaskChat[]) => {
     if (row.kind === "general") {
-      void onGeneral();
+      void general.start();
       return;
     }
-    setTaskChat(tasks.find((item) => item.id === row.id) ?? null);
+    setTaskChat({ id: row.id, title: row.title, status: source.find((t) => t.id === row.id)?.status });
+  };
+
+  const openArchive = () => {
+    setMenuAnchor(null);
+    setShowArchive(true);
+    void chats.loadArchive();
+  };
+
+  const closeTaskChat = () => {
+    setTaskChat(null);
+    void chats.reload();
+    if (showArchive) void chats.loadArchive();
   };
 
   return (
-    <Box>
-      {/* Bouton retour vers l'accueil */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-        <IconButton
-          size="small"
-          onClick={() => navigate("/employee")}
-          aria-label={he.goBack}
-          sx={{ color: "text.secondary", borderRadius: "10px" }}
-        >
-          <ArrowForwardIcon fontSize="small" />
-        </IconButton>
-        <Typography variant="h4" component="h1" fontWeight={900} sx={{ fontSize: { xs: "1.5rem", sm: "1.75rem" } }}>
-          {he.directChatTitle}
-        </Typography>
-      </Box>
-      {loading ? (
-        <ListSkeleton />
+    <Box sx={{ ...bleedSx, fontFamily: chatUi.font }} dir="rtl">
+      {showArchive ? (
+        <ChatsArchiveView
+          archive={chats.archive}
+          onBack={() => setShowArchive(false)}
+          onRow={(row) => onRow(row, chats.archive ?? [])}
+        />
       ) : (
-        <ChatRows rows={rows} onRow={onRow} />
+        <ChatsHomeView
+          rows={rows}
+          loading={chats.loading}
+          archivedCount={chats.archivedCount}
+          onArchive={openArchive}
+          onMenu={setMenuAnchor}
+          onNewChat={() => setSheetOpen(true)}
+          onRow={(row) => onRow(row, chats.tasks)}
+        />
       )}
 
-      <Dialog
-        fullScreen
-        open={Boolean(generalId)}
-        onClose={() => {
-          setGeneralId(null);
-          void load();
+      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
+        <MenuItem onClick={openArchive}>{he.employeeChatsArchive}</MenuItem>
+      </Menu>
+
+      <NewChatSheet
+        open={sheetOpen}
+        managerName={chats.managers.length === 1 ? chats.managers[0].counterpart_name : null}
+        managerInitials={identity.initials}
+        tasks={chats.startable}
+        onClose={() => setSheetOpen(false)}
+        onGeneral={() => {
+          setSheetOpen(false);
+          void general.start();
         }}
-        dir="rtl"
-        PaperProps={{ sx: fullscreenChatDialogPaperSx }}
-      >
-        <FullscreenBackAppBar
-          title={generalTitle}
-          onBack={() => {
-            setGeneralId(null);
-            void load();
-          }}
-        />
-        <Box sx={fullscreenChatBodySx}>
-          {generalId && <DirectChatThread conversationId={generalId} onSent={() => void load()} />}
-        </Box>
-      </Dialog>
+        onTask={(task) => {
+          setSheetOpen(false);
+          setTaskChat({ id: task.id, title: task.title, status: task.status });
+        }}
+      />
+
+      <GeneralChatDialog
+        conversationId={general.conversationId}
+        title={general.title}
+        onClose={() => {
+          general.close();
+          void chats.reload();
+        }}
+        onSent={() => void chats.reload()}
+      />
 
       <TaskChatDialog
         open={Boolean(taskChat)}
         occurrenceId={taskChat?.id ?? ""}
-        title={taskChat ? taskChatListTitle(taskChat.title, taskChat.due_at || taskChat.last_at) : he.taskChatTitle}
+        title={taskChat?.title ?? he.taskChatTitle}
         status={taskChat?.status}
         employee
-        onClose={() => {
-          setTaskChat(null);
-          void load();
-        }}
-        onOccurrenceUpdated={() => void load()}
+        onClose={closeTaskChat}
+        onOccurrenceUpdated={() => void chats.reload()}
       />
 
       <ManagerPickerDialog
-        open={pickerOpen}
-        managers={managers}
-        onClose={() => setPickerOpen(false)}
-        onPick={(card) =>
-          void openGeneral(card.scope === "network" ? "network" : "branch", employeeManagerLabel(card))
-        }
+        open={general.pickerOpen}
+        managers={chats.managers}
+        onClose={general.closePicker}
+        onPick={(card) => void general.pick(card)}
       />
     </Box>
   );
 }
 
-function ChatRows({
-  rows,
-  onRow,
+function GeneralChatDialog({
+  conversationId,
+  title,
+  onClose,
+  onSent,
 }: {
-  rows: EmployeeChatRow[];
-  onRow: (row: EmployeeChatRow) => void;
+  conversationId: string | null;
+  title: string;
+  onClose: () => void;
+  onSent: () => void;
 }) {
-  if (!rows.length) {
-    return <EmptyState title={he.directChatEmpty} icon={<ChatOutlinedIcon fontSize="inherit" />} />;
-  }
   return (
-    <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-      {rows.map((row) => (
-        <EmployeeChatRowItem key={row.kind === "general" ? "general" : row.id} row={row} onRow={onRow} />
-      ))}
-    </List>
+    <Dialog fullScreen open={Boolean(conversationId)} onClose={onClose} dir="rtl" PaperProps={{ sx: fullscreenChatDialogPaperSx }}>
+      <FullscreenBackAppBar title={title} onBack={onClose} />
+      <Box sx={fullscreenChatBodySx}>
+        {conversationId && <DirectChatThread conversationId={conversationId} onSent={onSent} />}
+      </Box>
+    </Dialog>
   );
 }

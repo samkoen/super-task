@@ -26,7 +26,7 @@ vi.mock("../../services/directChatService", () => ({
 }));
 
 vi.mock("../../services/taskService", () => ({
-  taskService: { listEmployeeChats: vi.fn() },
+  taskService: { listEmployeeChats: vi.fn(), listEmployeeChatArchive: vi.fn() },
 }));
 
 vi.mock("../../components/chat/DirectChatThread", () => ({
@@ -84,6 +84,23 @@ describe("EmployeeChatsPage", () => {
           last_at: "2026-09-16T11:00:00+03:00",
         },
       ],
+      startable: [
+        { id: "occ-new", title: "ספירת מדפים", status: "pending", due_at: "2026-09-16T06:30:00+03:00", visual_kind: "check" },
+      ],
+      archived_count: 4,
+    });
+    vi.mocked(taskService.listEmployeeChatArchive).mockResolvedValue({
+      items: [
+        {
+          id: "occ-old",
+          title: "ישן",
+          status: "completed",
+          due_at: "2026-08-01T08:00:00+03:00",
+          last_preview: "סגור",
+          last_at: "2026-08-01T10:00:00+03:00",
+          chat_status: "approved",
+        },
+      ],
     });
     vi.mocked(directChatService.openMine).mockResolvedValue({
       conversation: { id: "conv-1" },
@@ -94,33 +111,36 @@ describe("EmployeeChatsPage", () => {
 
   it("lists the general chat first then open task chats", async () => {
     render(<EmployeeChatsPage />);
-    expect(await screen.findByText(he.employeeGeneralChat)).toBeTruthy();
+    expect(await screen.findByText(he.employeeGeneralChatWith("מנהל"))).toBeTruthy();
     expect(screen.getByText(taskChatListTitle("מדף חלב", "2026-09-07T08:00:00+03:00"))).toBeTruthy();
     expect(screen.getByText(taskChatListTitle("מדף חלב", "2026-09-16T08:00:00+03:00"))).toBeTruthy();
   });
 
   it("opens the general thread", async () => {
     render(<EmployeeChatsPage />);
-    fireEvent.click(await screen.findByText(he.employeeGeneralChat));
+    fireEvent.click(await screen.findByText(he.employeeGeneralChatWith("מנהל")));
     await waitFor(() => expect(screen.getByText("general-thread")).toBeTruthy());
   });
 
-  it("shows today's silent task with the empty preview", async () => {
-    vi.mocked(taskService.listEmployeeChats).mockResolvedValue({
-      items: [
-        {
-          id: "occ-silent",
-          title: "ניקיון",
-          status: "pending",
-          due_at: "2026-10-03T08:00:00+03:00",
-          last_preview: null,
-          last_at: null,
-        },
-      ],
-    });
+  it("offers chat-less shift tasks in the new chat sheet", async () => {
     render(<EmployeeChatsPage />);
-    expect(await screen.findByText(taskChatListTitle("ניקיון", "2026-10-03T08:00:00+03:00"))).toBeTruthy();
-    expect(screen.getByText(he.chatRowEmpty)).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: he.employeeNewChat }));
+    fireEvent.click(await screen.findByText("ספירת מדפים"));
+    await waitFor(() => expect(screen.getByText("task-thread:occ-new")).toBeTruthy());
+  });
+
+  it("opens the archive of previous shifts", async () => {
+    render(<EmployeeChatsPage />);
+    fireEvent.click(await screen.findByText(he.employeeChatsArchive));
+    expect(await screen.findByText("סגור")).toBeTruthy();
+    expect(taskService.listEmployeeChatArchive).toHaveBeenCalled();
+  });
+
+  it("filters the list to approved chats", async () => {
+    render(<EmployeeChatsPage />);
+    await screen.findByText(he.employeeGeneralChatWith("מנהל"));
+    fireEvent.click(screen.getByRole("button", { name: he.employeeChatsFilterApproved }));
+    expect(await screen.findByText(he.employeeChatsFilterEmpty)).toBeTruthy();
   });
 
   it("asks which manager to talk to when there are several", async () => {
