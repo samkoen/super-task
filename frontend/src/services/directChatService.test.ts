@@ -14,6 +14,7 @@ vi.mock("./api", () => ({
 import {
   directChatService,
   INBOX_CACHE_MS,
+  INBOX_RATE_LIMIT_COOLDOWN_MS,
   invalidateDirectChatInbox,
   resetDirectChatInboxCache,
 } from "./directChatService";
@@ -68,6 +69,35 @@ describe("directChatService", () => {
     vi.advanceTimersByTime(INBOX_CACHE_MS + 1);
     expect((await directChatService.inbox()).unread_count).toBe(5);
     expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the 429 pause when a send or live event clears the cache", async () => {
+    vi.useFakeTimers();
+    mockGet.mockResolvedValueOnce({ data: { items: [], up: null, unread_count: 5 } });
+    mockPost.mockResolvedValue({ data: {} });
+    await directChatService.inbox();
+    vi.advanceTimersByTime(INBOX_CACHE_MS + 1);
+    mockGet.mockRejectedValueOnce(Object.assign(new Error("slow down"), { status: 429 }));
+    await directChatService.inbox();
+
+    await directChatService.send("c1", { body: "x" });
+    invalidateDirectChatInbox();
+    expect((await directChatService.inbox()).unread_count).toBe(5);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(INBOX_RATE_LIMIT_COOLDOWN_MS + 1);
+    mockGet.mockResolvedValueOnce({ data: { items: [], up: null, unread_count: 1 } });
+    expect((await directChatService.inbox()).unread_count).toBe(1);
+    expect(mockGet).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not call again during the pause when the very first call gets a 429", async () => {
+    vi.useFakeTimers();
+    mockGet.mockRejectedValueOnce(Object.assign(new Error("slow down"), { status: 429 }));
+    await expect(directChatService.inbox()).rejects.toMatchObject({ status: 429 });
+    invalidateDirectChatInbox();
+    await expect(directChatService.inbox()).rejects.toMatchObject({ status: 429 });
+    expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
   it("loads the inbox", async () => {

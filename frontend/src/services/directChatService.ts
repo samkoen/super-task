@@ -78,11 +78,19 @@ export const INBOX_CACHE_MS = 4_000;
 /** Pause après un 429 : on resert le dernier inbox connu au lieu de rappeler. */
 export const INBOX_RATE_LIMIT_COOLDOWN_MS = 30_000;
 
+/** Résultat frais (TTL), vidé par chaque écriture ou événement entrant. */
 let inboxCache: { data: DirectChatInbox; at: number } | null = null;
+/** Dernière boîte reçue : survit à l'invalidation, sert pendant la pause 429. */
+let lastInbox: DirectChatInbox | null = null;
 let inboxInFlight: Promise<DirectChatInbox> | null = null;
 let inboxCooldownUntil = 0;
+let inboxRateLimitError: unknown = null;
 let inboxGeneration = 0;
 
+/**
+ * Vide le cache frais. Ne lève pas la pause 429 : pendant celle-ci, on continue
+ * de servir la dernière boîte connue sans rappeler le serveur.
+ */
 export function invalidateDirectChatInbox(): void {
   inboxCache = null;
   inboxInFlight = null;
@@ -92,7 +100,9 @@ export function invalidateDirectChatInbox(): void {
 /** Tests uniquement. */
 export function resetDirectChatInboxCache(): void {
   invalidateDirectChatInbox();
+  lastInbox = null;
   inboxCooldownUntil = 0;
+  inboxRateLimitError = null;
 }
 
 function isRateLimited(error: unknown): boolean {
@@ -102,19 +112,24 @@ function isRateLimited(error: unknown): boolean {
 async function fetchInbox(): Promise<DirectChatInbox> {
   const now = Date.now();
   if (inboxCache && now - inboxCache.at < INBOX_CACHE_MS) return inboxCache.data;
-  if (now < inboxCooldownUntil && inboxCache) return inboxCache.data;
+  if (now < inboxCooldownUntil) {
+    if (lastInbox) return lastInbox;
+    throw inboxRateLimitError;
+  }
   if (inboxInFlight) return inboxInFlight;
 
   const generation = inboxGeneration;
   const request: Promise<DirectChatInbox> = (async () => {
     try {
       const { data } = await api.get<DirectChatInbox>("/direct-chats");
+      lastInbox = data;
       if (generation === inboxGeneration) inboxCache = { data, at: Date.now() };
       return data;
     } catch (error) {
       if (isRateLimited(error)) {
         inboxCooldownUntil = Date.now() + INBOX_RATE_LIMIT_COOLDOWN_MS;
-        if (inboxCache) return inboxCache.data;
+        inboxRateLimitError = error;
+        if (lastInbox) return lastInbox;
       }
       throw error;
     }
