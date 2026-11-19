@@ -69,19 +69,89 @@ async function uploadChatFile(file: File, kind: "photo" | "video" | "audio" | "f
   return data;
 }
 
+/**
+ * Plusieurs hooks (Layout, barre du bas, page chats) lisent la boîte en même temps,
+ * chacun avec son poll et ses événements SSE : on partage l'appel en cours et on
+ * garde le résultat quelques secondes, sinon Render répond 429.
+ */
+export const INBOX_CACHE_MS = 4_000;
+/** Pause après un 429 : on resert le dernier inbox connu au lieu de rappeler. */
+export const INBOX_RATE_LIMIT_COOLDOWN_MS = 30_000;
+
+/** Résultat frais (TTL), vidé par chaque écriture ou événement entrant. */
+let inboxCache: { data: DirectChatInbox; at: number } | null = null;
+/** Dernière boîte reçue : survit à l'invalidation, sert pendant la pause 429. */
+let lastInbox: DirectChatInbox | null = null;
+let inboxInFlight: Promise<DirectChatInbox> | null = null;
+let inboxCooldownUntil = 0;
+let inboxRateLimitError: unknown = null;
+let inboxGeneration = 0;
+
+/**
+ * Vide le cache frais. Ne lève pas la pause 429 : pendant celle-ci, on continue
+ * de servir la dernière boîte connue sans rappeler le serveur.
+ */
+export function invalidateDirectChatInbox(): void {
+  inboxCache = null;
+  inboxInFlight = null;
+  inboxGeneration += 1;
+}
+
+/** Tests uniquement. */
+export function resetDirectChatInboxCache(): void {
+  invalidateDirectChatInbox();
+  lastInbox = null;
+  inboxCooldownUntil = 0;
+  inboxRateLimitError = null;
+}
+
+function isRateLimited(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { status?: unknown }).status === 429;
+}
+
+async function fetchInbox(): Promise<DirectChatInbox> {
+  const now = Date.now();
+  if (inboxCache && now - inboxCache.at < INBOX_CACHE_MS) return inboxCache.data;
+  if (now < inboxCooldownUntil) {
+    if (lastInbox) return lastInbox;
+    throw inboxRateLimitError;
+  }
+  if (inboxInFlight) return inboxInFlight;
+
+  const generation = inboxGeneration;
+  const request: Promise<DirectChatInbox> = (async () => {
+    try {
+      const { data } = await api.get<DirectChatInbox>("/direct-chats");
+      lastInbox = data;
+      if (generation === inboxGeneration) inboxCache = { data, at: Date.now() };
+      return data;
+    } catch (error) {
+      if (isRateLimited(error)) {
+        inboxCooldownUntil = Date.now() + INBOX_RATE_LIMIT_COOLDOWN_MS;
+        inboxRateLimitError = error;
+        if (lastInbox) return lastInbox;
+      }
+      throw error;
+    }
+  })().finally(() => {
+    if (inboxInFlight === request) inboxInFlight = null;
+  });
+  inboxInFlight = request;
+  return request;
+}
+
 export const directChatService = {
-  inbox: async () => {
-    const { data } = await api.get<DirectChatInbox>("/direct-chats");
-    return data;
-  },
+  inbox: fetchInbox,
   openMine: async (scope?: "branch" | "network") => {
     const { data } = scope
       ? await api.post<DirectChatOpened>("/direct-chats/mine", EMPTY_JSON_BODY, { params: { scope } })
       : await api.post<DirectChatOpened>("/direct-chats/mine", EMPTY_JSON_BODY);
+    invalidateDirectChatInbox();
     return data;
   },
   openWith: async (userId: string) => {
     const { data } = await api.post<DirectChatOpened>(`/direct-chats/with/${userId}`, EMPTY_JSON_BODY);
+    invalidateDirectChatInbox();
     return data;
   },
   listMessages: async (conversationId: string, opts?: { before?: string; limit?: number }) => {
@@ -89,14 +159,18 @@ export const directChatService = {
       `/direct-chats/${conversationId}/messages`,
       { params: { before: opts?.before, limit: opts?.limit } },
     );
+    // Lire un fil le marque lu : le compteur non-lu doit se rafraîchir.
+    invalidateDirectChatInbox();
     return data;
   },
   send: async (conversationId: string, payload: DirectChatPayload) => {
     const { data } = await api.post(`/direct-chats/${conversationId}/messages`, payload);
+    invalidateDirectChatInbox();
     return data;
   },
   broadcast: async (payload: DirectChatPayload) => {
     const { data } = await api.post<{ ok: boolean; count: number }>("/direct-chats/broadcast", payload);
+    invalidateDirectChatInbox();
     return data;
   },
   uploadPhoto: (file: File) => uploadChatFile(file, "photo"),
