@@ -210,10 +210,19 @@ export function useSlotUploads(options: SlotUploadsOptions) {
     [queue, occurrenceId, onDisk],
   );
 
+  /**
+   * Raison ou note sur l'appareil : demandée au stockage tout de suite (il les passe dans l'ordre, et une
+   * relecture à la réouverture de la tâche les attend), sans attendre les écritures de prises de la case.
+   */
+  const keptOnDevice = useCallback((index: number, write: () => Promise<unknown>) => {
+    touched.current.add(index);
+    void write().catch(() => undefined);
+  }, []);
+
   /** La raison ou la note gardée sur l'appareil n'a plus d'objet (case filmée, raison retirée ou envoyée). */
   const forgetKept = useCallback(
-    (index: number) => void onDisk(index, () => keptStore.remove(occurrenceId, index)),
-    [keptStore, occurrenceId, onDisk],
+    (index: number) => keptOnDevice(index, () => keptStore.remove(occurrenceId, index)),
+    [keptStore, occurrenceId, keptOnDevice],
   );
 
   /** Prise filmée, pas encore confirmée : écrite sur disque tout de suite (une sortie de l'app ne la perd pas). */
@@ -348,9 +357,9 @@ export function useSlotUploads(options: SlotUploadsOptions) {
   const keepText = useCallback(
     (index: number, text: string) => {
       setStates((prev) => markReady(prev, index, new Date().toISOString(), text));
-      void onDisk(index, () => keptStore.saveText({ occurrenceId, slotIndex: index, text }));
+      keptOnDevice(index, () => keptStore.saveText({ occurrenceId, slotIndex: index, text }));
     },
-    [setStates, onDisk, keptStore, occurrenceId],
+    [setStates, keptOnDevice, keptStore, occurrenceId],
   );
 
   const sendText = useCallback(
@@ -381,11 +390,11 @@ export function useSlotUploads(options: SlotUploadsOptions) {
       const reasonCode = draft.reasonCode;
       setStates((prev) => markSkipped(prev, index, { reasonCode, reasonText, audio: draft.audio }));
       // Gardée sur l'appareil : quitter la tâche puis la rouvrir ne la perd pas.
-      void onDisk(index, () =>
+      keptOnDevice(index, () =>
         keptStore.saveSkip({ occurrenceId, slotIndex: index, reasonCode, reasonText, audio: draft.audio ?? null }),
       );
     },
-    [setStates, dropHeld, onDisk, keptStore, occurrenceId],
+    [setStates, dropHeld, keptOnDevice, keptStore, occurrenceId],
   );
 
   const unskip = useCallback(

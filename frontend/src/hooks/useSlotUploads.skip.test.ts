@@ -2,7 +2,8 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompletionRequirement } from "../utils/completionMedia";
 import { createMemorySlotStorage, createSlotUploadQueue } from "../utils/slotUploadQueue";
-import { createMemoryKeptStore } from "../utils/slotKeptStore";
+import { createKeptStore, createMemoryKeptStore } from "../utils/slotKeptStore";
+import { slowRows } from "../utils/slotKeptStore.slowRows";
 
 const { submitSlot, uploadAudio } = vi.hoisted(() => ({ submitSlot: vi.fn(), uploadAudio: vi.fn() }));
 vi.mock("../services/taskService", () => ({ taskService: { submitSlot, uploadAudio } }));
@@ -132,6 +133,24 @@ describe("useSlotUploads: « לא ניתן לצלם » survives leaving and reop
     expect(again.result.current.states[1].skip).toMatchObject({ reasonCode: "other", reasonText: "הדלת נעולה", sent: false });
     expect(again.result.current.states[1].skip?.audio?.name).toBe("voice.webm");
     vi.unstubAllGlobals();
+  });
+
+  it("a reason withdrawn right before leaving does not come back, even with a slow device storage", async () => {
+    const queue = createSlotUploadQueue({ storage: createMemorySlotStorage(), send: async () => ({}), isOnline: () => true });
+    const keptStore = createKeptStore(slowRows());
+    const first = open(queue, keptStore as ReturnType<typeof createMemoryKeptStore>);
+    act(() => first.result.current.skip(1, { reasonCode: "no_stock", reasonText: "", audio: null }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    act(() => first.result.current.unskip(1));
+    first.unmount();
+
+    const again = open(queue, keptStore as ReturnType<typeof createMemoryKeptStore>);
+    await act(async () => {
+      await keptStore.list("occ");
+    });
+    expect(again.result.current.states[1].status).toBe("idle");
   });
 
   it("forgets the reason once it was withdrawn, or once the server has it", async () => {

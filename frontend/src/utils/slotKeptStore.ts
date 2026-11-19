@@ -39,13 +39,24 @@ export interface SlotKeptStore {
   list(occurrenceId: string): Promise<StoredSlot[]>;
 }
 
-type Rows = {
+export type KeptRows = {
   put(entry: StoredSlot): Promise<void>;
   remove(id: string): Promise<void>;
   getAll(): Promise<StoredSlot[]>;
 };
 
-function createStore(rows: Rows, now: () => number): SlotKeptStore {
+/** Exporté pour les tests (un stockage lent montre que l'ordre des opérations est tenu). */
+export function createKeptStore(rows: KeptRows, now: () => number = () => Date.now()): SlotKeptStore {
+  /**
+   * Les opérations passent l'une après l'autre : une relecture (tâche rouverte) attend les écritures et
+   * effacements déjà demandés. Sans ça, une raison retirée juste avant de quitter pourrait revenir.
+   */
+  let last: Promise<unknown> = Promise.resolve();
+  const inOrder = <T>(op: () => Promise<T>): Promise<T> => {
+    const run = last.then(op, op);
+    last = run.catch(() => undefined);
+    return run;
+  };
   const base = (item: Where): StoredBase => ({
     id: slotQueueId(item.occurrenceId, item.slotIndex),
     occurrenceId: item.occurrenceId,
@@ -53,29 +64,35 @@ function createStore(rows: Rows, now: () => number): SlotKeptStore {
     savedAt: now(),
   });
   return {
-    saveSkip: (item) =>
-      rows.put({
+    saveSkip: (item) => {
+      const entry: StoredSkip = {
         ...base(item),
         kind: "skip",
         reasonCode: item.reasonCode,
         reasonText: item.reasonText ?? null,
         audio: item.audio ?? null,
         audioName: item.audio?.name ?? null,
-      }),
-    saveText: (item) => rows.put({ ...base(item), kind: "text", text: item.text }),
-    remove: (occurrenceId, slotIndex) => rows.remove(slotQueueId(occurrenceId, slotIndex)),
-    list: async (occurrenceId) => {
-      const all = await rows.getAll();
-      const stale = all.filter((row) => now() - row.savedAt > HELD_MAX_AGE_MS);
-      await Promise.all(stale.map((row) => rows.remove(row.id).catch(() => undefined)));
-      return all.filter((row) => row.occurrenceId === occurrenceId && !stale.includes(row));
+      };
+      return inOrder(() => rows.put(entry));
     },
+    saveText: (item) => {
+      const entry: StoredText = { ...base(item), kind: "text", text: item.text };
+      return inOrder(() => rows.put(entry));
+    },
+    remove: (occurrenceId, slotIndex) => inOrder(() => rows.remove(slotQueueId(occurrenceId, slotIndex))),
+    list: (occurrenceId) =>
+      inOrder(async () => {
+        const all = await rows.getAll();
+        const stale = all.filter((row) => now() - row.savedAt > HELD_MAX_AGE_MS);
+        await Promise.all(stale.map((row) => rows.remove(row.id).catch(() => undefined)));
+        return all.filter((row) => row.occurrenceId === occurrenceId && !stale.includes(row));
+      }),
   };
 }
 
 export function createMemoryKeptStore(now: () => number = () => Date.now()): SlotKeptStore {
   const rows = new Map<string, StoredSlot>();
-  return createStore(
+  return createKeptStore(
     {
       put: async (entry) => void rows.set(entry.id, entry),
       remove: async (id) => void rows.delete(id),
@@ -108,7 +125,7 @@ export function createIndexedDbKeptStore(factory: IDBFactory, now: () => number 
     opened ??= open();
     return (await opened).transaction(STORE, mode).objectStore(STORE);
   };
-  return createStore(
+  return createKeptStore(
     {
       put: async (entry) => void (await requestToPromise((await store("readwrite")).put(entry))),
       remove: async (id) => void (await requestToPromise((await store("readwrite")).delete(id))),
