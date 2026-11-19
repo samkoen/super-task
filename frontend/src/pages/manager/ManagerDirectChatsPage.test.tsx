@@ -106,7 +106,8 @@ describe("ManagerDirectChatsPage", () => {
     await waitFor(() => expect(screen.getByText("מדף חלב")).toBeTruthy());
     // L'oved apparaît deux fois : sa ligne directe et le fil de tâche qui porte son nom.
     expect(screen.getAllByText("דן כהן")).toHaveLength(2);
-    expect(screen.getByText(he.managerChatTaskContext)).toBeTruthy();
+    // Fil de tâche : avatar de l'oved + pastille du type (Figma Chat Row Role=Manager).
+    expect(screen.getByTestId("manager-chat-task-o1").querySelector("[data-visual-kind]")).toBeTruthy();
     expect(screen.getByTestId("manager-chats-filter-all")).toBeTruthy();
     expect(screen.getByLabelText(he.directChatSearch)).toBeTruthy();
   });

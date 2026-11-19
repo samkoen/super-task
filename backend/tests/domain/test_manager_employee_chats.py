@@ -81,3 +81,20 @@ def test_sort_manager_day_chats_mixes_datetime_and_empty():
         "last_at": datetime(2026, 9, 14, 10, 0, tzinfo=timezone.utc),
     }
     assert [i["id"] for i in sort_manager_day_chats([empty, stamped])] == ["b", "a"]
+
+
+def test_manager_card_carries_figma_row_badges():
+    from types import SimpleNamespace as NS
+
+    from app.domain import task_status as ts
+    from app.domain.manager_employee_chats import manager_task_chat_card as card_of
+
+    occ = NS(id="o", title="סרטון", status=ts.PENDING_REVIEW, completion_requirements=[{"kind": "video"}])
+    msg = NS(
+        body="הנה", photo_url=None, video_url=None, audio_url=None, file_url=None,
+        created_at="2026-09-07T10:00:00+03:00", sender_user_id="mgr",
+    )
+    card = card_of(occ, msg, 1, "דנה", viewer_id="mgr")
+    assert card["visual_kind"] == "video"
+    assert card["chat_status"] == "pending_review"
+    assert card["last_mine"] is True

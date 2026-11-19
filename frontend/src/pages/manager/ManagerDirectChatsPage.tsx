@@ -1,19 +1,17 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Box, ButtonBase, Chip, Dialog, InputAdornment, List, ListItemAvatar, TextField } from "@mui/material";
+import { Box, Dialog } from "@mui/material";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
-import SearchIcon from "@mui/icons-material/Search";
-import { ChatRowAvatar } from "../../components/chat/EmployeeChatRowItem";
-import { employeeFieldSx } from "../../styles/employeeUi";
-import { studioPillSx } from "../../components/tasks/fixed/studio/studioUi";
 import { useFeedback } from "../../context/FeedbackContext";
 import { useManagerPageHeader } from "../../context/ManagerPageHeaderContext";
 import { he } from "../../i18n/he";
 import EmptyState from "../../components/ui/EmptyState";
 import ListSkeleton from "../../components/ui/ListSkeleton";
-import EmployeeAvatar from "../../components/employee/EmployeeAvatar";
 import DirectChatThread from "../../components/chat/DirectChatThread";
-import ChatInboxRow from "../../components/chat/ChatInboxRow";
+import ChatListRow from "../../components/chat/employeeInbox/ChatListRow";
+import { ChatPersonAvatar } from "../../components/chat/employeeInbox/ChatAvatars";
+import { ChatFilterChip, ChatSearchField } from "../../components/chat/employeeInbox/ChatListControls";
+import { chatUi } from "../../styles/employeeChatUi";
 import FullscreenBackAppBar, {
   fullscreenChatBodySx,
   fullscreenChatDialogPaperSx,
@@ -32,16 +30,18 @@ import { useManagerUnifiedChats } from "../../hooks/useManagerUnifiedChats";
 
 const BROADCAST_ICON = <CampaignOutlinedIcon sx={{ fontSize: 26, color: "#4b5563" }} />;
 
+/** Mêmes Filter Chip que la liste oved (Figma « צ׳אט כללי »), adaptés au menahel. */
 const FILTERS: { id: ManagerChatsFilter; label: string }[] = [
   { id: "all", label: he.managerChatsFilterAll },
+  { id: "action", label: he.employeeChatsFilterAction },
+  { id: "pending", label: he.employeeChatsFilterPending },
   { id: "tasks", label: he.managerChatsFilterTasks },
   { id: "directs", label: he.managerChatsFilterDirects },
 ];
 
-const chatListSx = { display: "flex", flexDirection: "column", gap: 1.25 } as const;
-
 /**
- * Onglet שיחות unifié (étape 7) : une seule boîte dans le style de l'écran 12 du Figma. Les chats
+ * Onglet שיחות unifié (étape 7), au rendu de la liste oved (Figma « צ׳אט כללי · עובד ») : Chat Row,
+ * Search Field et Filter Chip partagés, avatar = la personne (+ pastille du type de tâche). Les chats
  * directs et les fils de tâche sont mélangés, « ממתין לי » en tête, filtrables par pastille.
  * « שליחה לכולם » devient un rond dans l'en-tête de la coque.
  */
@@ -50,23 +50,11 @@ export default function ManagerDirectChatsPage() {
   useManagerPageHeader(he.directChatTitle, undefined, state.broadcastAction);
 
   return (
-    <Box>
-      <ChatsFilterPills active={state.filter} onSelect={state.setFilter} />
-      <TextField
-        fullWidth
-        value={state.query}
-        onChange={(e) => state.setQuery(e.target.value)}
-        placeholder={he.directChatSearch}
-        sx={{ ...employeeFieldSx, mb: 2 }}
-        inputProps={{ "aria-label": he.directChatSearch }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon />
-            </InputAdornment>
-          ),
-        }}
-      />
+    <Box sx={{ fontFamily: chatUi.font }}>
+      <Box sx={{ pb: 1.5 }}>
+        <ChatSearchField value={state.query} onChange={state.setQuery} placeholder={he.directChatSearch} />
+      </Box>
+      <ChatsFilterPills active={state.filter} actionCount={state.actionCount} onSelect={state.setFilter} />
       <InboxBody state={state} />
       <DirectThreadDialog state={state} />
       <TaskThreadDialog state={state} />
@@ -112,28 +100,42 @@ function useUnifiedChatsState() {
     () => filterManagerInbox(scopeManagerInbox(chats.entries, scopeBranchId), filter, query),
     [chats.entries, scopeBranchId, filter, query],
   );
+  const actionCount = useMemo(
+    () => scopeManagerInbox(chats.entries, scopeBranchId).filter((entry) => entry.waiting).length,
+    [chats.entries, scopeBranchId],
+  );
   return {
     ...chats, filter, setFilter, query, setQuery, open, setOpen, task, setTask,
-    broadcastOpen, setBroadcastOpen, openDirect, broadcastAction, visible,
+    broadcastOpen, setBroadcastOpen, openDirect, broadcastAction, visible, actionCount,
   };
 }
 
 type State = ReturnType<typeof useUnifiedChatsState>;
 
-function ChatsFilterPills({ active, onSelect }: { active: ManagerChatsFilter; onSelect: (f: ManagerChatsFilter) => void }) {
+function ChatsFilterPills({
+  active,
+  actionCount,
+  onSelect,
+}: {
+  active: ManagerChatsFilter;
+  actionCount: number;
+  onSelect: (f: ManagerChatsFilter) => void;
+}) {
   return (
-    <Box role="tablist" aria-label={he.managerChatsFilterLabel} sx={{ display: "flex", gap: "8px", mb: 2, flexWrap: "wrap" }}>
+    <Box
+      role="toolbar"
+      aria-label={he.managerChatsFilterLabel}
+      sx={{ display: "flex", gap: 1, pt: 1, pb: 1.5, overflowX: "auto", scrollbarWidth: "none" }}
+    >
       {FILTERS.map(({ id, label }) => (
-        <ButtonBase
+        <ChatFilterChip
           key={id}
-          role="tab"
-          aria-selected={active === id}
-          data-testid={`manager-chats-filter-${id}`}
+          testId={`manager-chats-filter-${id}`}
+          label={label}
+          active={active === id}
+          count={id === "action" ? actionCount : 0}
           onClick={() => onSelect(id)}
-          sx={studioPillSx(active === id)}
-        >
-          {label}
-        </ButtonBase>
+        />
       ))}
     </Box>
   );
@@ -146,48 +148,47 @@ function InboxBody({ state }: { state: State }) {
     return <EmptyState title={title} icon={<ChatOutlinedIcon fontSize="inherit" />} />;
   }
   return (
-    <List disablePadding sx={chatListSx}>
+    <Box component="ul" sx={{ listStyle: "none", m: 0, mx: -1, p: 0 }}>
       {state.visible.map((entry) => (
-        <InboxRowItem key={entry.key} entry={entry} state={state} />
+        <Box component="li" key={entry.key}>
+          <InboxRowItem entry={entry} state={state} />
+        </Box>
       ))}
-    </List>
+    </Box>
   );
 }
 
+/** Fil de tâche : titre = tâche, aperçu « oved: message » ; direct : titre = personne (· snif). */
 function InboxRowItem({ entry, state }: { entry: ManagerInboxEntry; state: State }) {
+  const preview = entry.preview || he.chatRowEmpty;
   if (entry.kind === "task" && entry.task) {
     const task = entry.task;
     return (
-      <ChatInboxRow
+      <ChatListRow
+        testId={`manager-chat-${entry.key}`}
+        avatar={<ChatPersonAvatar name={entry.avatarName} photoUrl={entry.avatarUrl} kind={entry.visualKind} />}
         title={entry.title}
-        preview={entry.preview || he.chatRowEmpty}
-        lastAt={entry.lastAt}
-        unreadCount={entry.unread}
+        sender={entry.context}
+        preview={preview}
+        time={entry.lastAt}
+        unread={entry.unread}
+        status={entry.chatStatus ?? null}
+        lastMine={entry.lastMine}
         onClick={() => state.setTask(task)}
-        leading={<ChatRowAvatar general={false} />}
-        titleExtra={
-          <Box display="flex" alignItems="center" gap={0.75} flexWrap="wrap">
-            <Chip label={he.managerChatTaskContext} size="small" color="warning" sx={{ fontWeight: 700 }} />
-            {entry.context ? <Chip label={entry.context} size="small" sx={{ fontWeight: 700 }} /> : null}
-          </Box>
-        }
       />
     );
   }
   const card = entry.direct!;
   return (
-    <ChatInboxRow
+    <ChatListRow
+      testId={`manager-chat-${entry.key}`}
+      avatar={<ChatPersonAvatar name={entry.avatarName} photoUrl={entry.avatarUrl} />}
       title={entry.title}
-      preview={entry.preview || he.chatRowEmpty}
-      lastAt={entry.lastAt}
-      unreadCount={entry.unread}
+      titleMeta={entry.context}
+      preview={preview}
+      time={entry.lastAt}
+      unread={entry.unread}
       onClick={() => void state.openDirect(card)}
-      leading={
-        <ListItemAvatar>
-          <EmployeeAvatar name={card.counterpart_name} photoUrl={card.counterpart_avatar_url} size={56} />
-        </ListItemAvatar>
-      }
-      titleExtra={entry.context ? <Chip label={entry.context} sx={{ fontWeight: 700, fontSize: "0.9rem" }} /> : null}
     />
   );
 }

@@ -7,6 +7,7 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import type { ChatVisualKind } from "../../../services/taskService";
 import { chatUi, chatVisualColors } from "../../../styles/employeeChatUi";
+import EmployeeAvatar from "../../employee/EmployeeAvatar";
 
 const ICONS: Record<ChatVisualKind, typeof VideocamOutlinedIcon> = {
   video: VideocamOutlinedIcon,
@@ -48,6 +49,50 @@ export function ChatGeneralAvatar({ initials }: { initials: string }) {
       ) : (
         <ChatOutlinedIcon sx={{ fontSize: 20 }} />
       )}
+    </Box>
+  );
+}
+
+/**
+ * Chat Row Role=Manager (Figma) : avatar de la personne + pastille de la couleur du type
+ * de tâche pour un fil de tâche ; sans pastille pour un chat direct.
+ */
+export function ChatPersonAvatar({
+  name,
+  photoUrl,
+  kind,
+}: {
+  name: string;
+  photoUrl: string | null;
+  kind?: ChatVisualKind;
+}) {
+  const color = kind ? chatVisualColors[kind] ?? chatVisualColors.physical : null;
+  const Icon = kind ? ICONS[kind] ?? ICONS.physical : null;
+  return (
+    <Box sx={{ position: "relative", flexShrink: 0, width: chatUi.avatar, height: chatUi.avatar }}>
+      <EmployeeAvatar name={name} photoUrl={photoUrl} size={chatUi.avatar} />
+      {color && Icon ? (
+        <Box
+          data-visual-kind={kind}
+          sx={{
+            position: "absolute",
+            bottom: -2,
+            insetInlineStart: -2,
+            zIndex: 3,
+            width: 22,
+            height: 22,
+            borderRadius: "50%",
+            border: "2px solid #fff",
+            bgcolor: color.bg,
+            color: color.fg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon sx={{ fontSize: 12 }} />
+        </Box>
+      ) : null}
     </Box>
   );
 }

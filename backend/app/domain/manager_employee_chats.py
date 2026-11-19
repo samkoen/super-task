@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.domain.direct_chat import message_preview
+from app.domain.task_chat_badges import chat_status_tag, chat_visual_kind
 
 
 def contact_unread_total(direct_unread: int, task_unread: int) -> int:
@@ -18,7 +19,15 @@ def last_at_sort_key(value) -> str:
     return str(value)
 
 
-def manager_task_chat_card(occurrence, last_message, unread: int, assignee_name: str | None = None) -> dict:
+def manager_task_chat_card(
+    occurrence,
+    last_message,
+    unread: int,
+    assignee_name: str | None = None,
+    *,
+    completion=None,
+    viewer_id: str | None = None,
+) -> dict:
     preview = None
     last_at = None
     if last_message:
@@ -41,7 +50,16 @@ def manager_task_chat_card(occurrence, last_message, unread: int, assignee_name:
         "last_preview": preview,
         "last_at": last_at,
         "unread_count": max(0, int(unread or 0)),
+        # Même rendu que la liste oved (Figma Chat Row) : avatar par type, statut, ✓✓.
+        "visual_kind": chat_visual_kind(occurrence),
+        "chat_status": chat_status_tag(occurrence, completion),
+        "last_mine": _sent_by(last_message, viewer_id),
     }
+
+
+def _sent_by(last_message, viewer_id: str | None) -> bool:
+    sender = getattr(last_message, "sender_user_id", None) if last_message else None
+    return bool(viewer_id and sender and str(sender) == str(viewer_id))
 
 
 def sort_manager_day_chats(items: list[dict]) -> list[dict]:

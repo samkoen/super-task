@@ -6,7 +6,18 @@ import type { DirectChatCard } from "../../services/directChatService";
 import { EMPLOYEE_BRAND, EMPLOYEE_BRAND_GRADIENT, EMPLOYEE_INK } from "../../styles/employeeUi";
 import { employeeManagerLabel } from "../../utils/employeeDirectChat";
 import AppDialogTitle from "../ui/AppDialogTitle";
-import { unreadBadgeSx } from "./EmployeeChatRowItem";
+
+const unreadBadgeSx = {
+  "& .MuiBadge-badge": {
+    position: "static",
+    transform: "none",
+    minWidth: 28,
+    height: 28,
+    borderRadius: "14px",
+    fontSize: "0.95rem",
+    fontWeight: 800,
+  },
+} as const;
 
 /** Choix du manager quand l'employé en a plusieurs : grands boutons nominatifs. */
 export default function ManagerPickerDialog({

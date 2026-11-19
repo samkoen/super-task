@@ -139,13 +139,9 @@ class TaskMessageService:
     def _employee_chat_cards(self, actor: ActorContext, pairs: list[tuple]) -> list[dict]:
         ids = [occ.id for occ, _ in pairs]
         unreads = self._messages.unread_counts(ids, actor.user_id) if ids else {}
-        completions = (
-            self._completions.find_by_occurrence_ids(ids) if ids and self._completions else {}
-        )
+        completions = self._completions_for(ids)
         if not isinstance(unreads, dict):
             unreads = {}
-        if not isinstance(completions, dict):
-            completions = {}
         return sort_employee_task_chats(
             [
                 employee_task_chat_card(
@@ -180,15 +176,24 @@ class TaskMessageService:
         last = self._messages.last_messages_for(ids)
         unreads = self._messages.unread_counts(ids, actor.user_id)
         names = self._assignee_names(occs)
+        completions = self._completions_for(ids)
         return [
             manager_task_chat_card(
                 occ,
                 last.get(occ.id),
                 unreads.get(occ.id, 0),
                 names.get(getattr(occ, "assignee_user_id", None)),
+                completion=completions.get(occ.id),
+                viewer_id=actor.user_id,
             )
             for occ in occs
         ]
+
+    def _completions_for(self, ids: list[str]) -> dict:
+        if not ids or not self._completions:
+            return {}
+        found = self._completions.find_by_occurrence_ids(ids)
+        return found if isinstance(found, dict) else {}
 
     def _assignee_names(self, occs) -> dict[str, str]:
         """Un seul accès par oved distinct (pas par tâche)."""
