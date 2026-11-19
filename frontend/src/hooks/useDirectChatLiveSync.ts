@@ -4,6 +4,7 @@ import {
   TASK_CHANGE_EVENT,
   type TaskChangeDetail,
 } from "../constants/events";
+import { invalidateDirectChatInbox } from "../services/directChatService";
 import { isPageVisible, onPageVisible } from "../utils/pageVisible";
 import { resolveTaskChatPollMs } from "./useTaskChatLiveSync";
 
@@ -38,6 +39,9 @@ export function useDirectChatLiveSync(
     const schedule = (ev?: Event) => {
       const detail = (ev as CustomEvent<TaskChangeDetail> | undefined)?.detail;
       if (!shouldRefreshDirectChat(detail, conversationId)) return;
+      // Synchrone : tous les abonnés invalident avant que le premier refetch parte,
+      // puis partagent la même requête inbox.
+      if (ev) invalidateDirectChatInbox();
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => onRefreshRef.current(), REFETCH_DEBOUNCE_MS);
     };
