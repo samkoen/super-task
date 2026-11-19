@@ -3,6 +3,7 @@ import { SIDEBAR_WIDTH } from "../../constants/layout";
 import {
   systemBugLauncherBottom,
   systemBugLauncherLeft,
+  systemBugLauncherSide,
   systemBugLauncherSx,
 } from "./SystemBugLauncher";
 
@@ -26,5 +27,10 @@ describe("SystemBugLauncher", () => {
 
   it("sits above the oved bottom nav", () => {
     expect(systemBugLauncherBottom(false, true)).toContain("84px");
+  });
+
+  it("moves to the right above the oved nav to free the chat FAB corner", () => {
+    expect(systemBugLauncherSide(false, true)).toEqual({ right: 8 });
+    expect(systemBugLauncherSide(false, false)).toEqual({ left: 8 });
   });
 });
