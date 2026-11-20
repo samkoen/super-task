@@ -15,6 +15,7 @@ from app.domain.task_chat import (
     can_manager_post,
     has_message_content,
     next_status_after_employee_message,
+    posts_as_worker,
     next_status_after_manager_message,
 )
 from app.models.task_message import TaskMessage
@@ -32,7 +33,8 @@ def test_chat_rules_content_and_status():
     assert can_employee_post(task_status.PENDING)
     assert can_employee_post(task_status.IN_PROGRESS)
     assert can_employee_post(task_status.AWAITING_RESPONSE)
-    assert not can_employee_post(task_status.PENDING_REVIEW)
+    assert can_employee_post(task_status.PENDING_REVIEW)
+    assert not can_employee_post(task_status.COMPLETED)
     assert can_manager_post(task_status.PENDING_REVIEW)
     assert next_status_after_employee_message(task_status.IN_PROGRESS) == task_status.AWAITING_RESPONSE
     assert next_status_after_manager_message(task_status.AWAITING_RESPONSE) == task_status.IN_PROGRESS
@@ -191,20 +193,47 @@ def test_manager_reply_includes_break_alert():
     assert result["recipient_break"]["on_break_since"] == start.isoformat()
 
 
-def test_employee_cannot_post_when_pending_review():
-    occurrence = _occurrence(status=task_status.PENDING_REVIEW)
+def _post(actor: ActorContext, status: str, completions=None):
+    created = _message()
+    message_repo = MagicMock()
+    message_repo.create.return_value = created
     occurrence_repo = MagicMock()
-    occurrence_repo.find_by_id.return_value = occurrence
-    service = TaskMessageService(
-        MagicMock(), occurrence_repo, MagicMock(), MagicMock()
-    )
-    actor = ActorContext(
-        user_id="emp-1",
-        role=roles.EMPLOYEE,
-        branch_id="b1",
-        network_id="n1",
-    )
-    with pytest.raises(ValueError):
+    occurrence_repo.find_by_id.side_effect = [_occurrence(status=status), _occurrence(status=status)]
+    user_repo = MagicMock()
+    user_repo.on_break_since.return_value = None
+    service = TaskMessageService(message_repo, occurrence_repo, user_repo, MagicMock(), completions)
+    with patch.object(service, "_assert_can_access"), patch.object(
+        service, "_enrich_i18n", new=AsyncMock(return_value=created)
+    ):
+        result = asyncio.run(service.post_message(actor, "occ-1", body="יש לי שאלה"))
+    return result, occurrence_repo
+
+
+def test_employee_can_post_when_pending_review_and_review_stays():
+    actor = ActorContext(user_id="emp-1", role=roles.EMPLOYEE, branch_id="b1", network_id="n1")
+    result, occurrence_repo = _post(actor, task_status.PENDING_REVIEW)
+    occurrence_repo.update_status.assert_not_called()
+    occurrence_repo.reopen_after_review.assert_not_called()
+    assert result["event_type"] == "task_message_employee"
+
+
+def test_manager_in_employee_mode_does_not_reject_own_task():
+    """Menahel en mode oved, assigné à la tâche : son message n'est pas un refus de revue."""
+    completions = MagicMock()
+    actor = ActorContext(user_id="emp-1", role=roles.BRANCH_MANAGER, branch_id="b1", network_id="n1")
+    result, occurrence_repo = _post(actor, task_status.PENDING_REVIEW, completions)
+    completions.update_review.assert_not_called()
+    occurrence_repo.reopen_after_review.assert_not_called()
+    assert result["event_type"] == "task_message_employee"
+    assert "recipient_break" not in result
+
+
+def test_employee_cannot_post_when_completed():
+    occurrence_repo = MagicMock()
+    occurrence_repo.find_by_id.return_value = _occurrence(status=task_status.COMPLETED)
+    service = TaskMessageService(MagicMock(), occurrence_repo, MagicMock(), MagicMock())
+    actor = ActorContext(user_id="emp-1", role=roles.EMPLOYEE, branch_id="b1", network_id="n1")
+    with patch.object(service, "_assert_can_access"), pytest.raises(ValueError):
         asyncio.run(service.post_message(actor, "occ-1", body="?"))
 
 
@@ -269,3 +298,13 @@ def test_chat_audio_pair_keeps_real_transcript():
         )
     assert recipient == "נקה את המדף"
     assert sender == "נקה את המדף"
+
+
+def test_employee_message_keeps_task_awaiting_review():
+    assert next_status_after_employee_message(task_status.PENDING_REVIEW) == task_status.PENDING_REVIEW
+
+
+def test_assignee_posts_as_worker_even_when_manager():
+    assert posts_as_worker(roles.EMPLOYEE, False)
+    assert posts_as_worker(roles.BRANCH_MANAGER, True)
+    assert not posts_as_worker(roles.BRANCH_MANAGER, False)
