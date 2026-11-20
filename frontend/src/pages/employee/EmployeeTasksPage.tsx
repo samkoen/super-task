@@ -885,10 +885,9 @@ export default function EmployeeTasksPage() {
           onFinished={finishFlow}
           onOpenChats={() => navigate("/employee/chats")}
           onServerUpdate={() => void load(true)}
-          onChatUpdated={() => {
-            void load();
-            showSuccess(he.taskChatSent);
-          }}
+          // Pas de toast « ההודעה נשלחה » : le message apparaît déjà dans le fil, et le toast
+          // (en bas, timer en pause au toucher) recouvrait la zone de saisie du chat.
+          onChatUpdated={() => void load()}
           onError={showError}
         />
       ) : null}
@@ -925,10 +924,7 @@ export default function EmployeeTasksPage() {
               }
             : undefined
         }
-        onChatUpdated={() => {
-          void load();
-          showSuccess(he.taskChatSent);
-        }}
+        onChatUpdated={() => void load()}
       />
       <IncompleteTaskSendDialog
         open={incompleteOpen}

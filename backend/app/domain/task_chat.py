@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from app.domain import roles, task_status
 
+# L'oved écrit aussi pendant « ממתין לאישור » (question, précision, média en plus).
 EMPLOYEE_CHAT_STATUSES = {
     task_status.PENDING,
     task_status.IN_PROGRESS,
     task_status.OVERDUE,
     task_status.AWAITING_RESPONSE,
+    task_status.PENDING_REVIEW,
 }
 
 MANAGER_CHAT_STATUSES = {
@@ -58,7 +60,16 @@ def can_manager_post(status: str) -> bool:
 
 
 def next_status_after_employee_message(current: str) -> str:
+    """En attente d'approbation, la tâche y reste : le menahel garde sa revue à faire."""
+    if current == task_status.PENDING_REVIEW:
+        return task_status.PENDING_REVIEW
     return task_status.AWAITING_RESPONSE
+
+
+def posts_as_worker(role: str, is_assignee: bool) -> bool:
+    """Dans le chat d'une tâche, son assigné parle en oved, même menahel en mode oved :
+    son message ne vaut pas revue (un message menahel sur « ממתין לאישור » = refus)."""
+    return role == roles.EMPLOYEE or is_assignee
 
 
 def next_status_after_manager_message(current: str) -> str | None:

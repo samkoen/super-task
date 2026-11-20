@@ -1,11 +1,15 @@
 import type { TaskStatus } from "../services/taskService";
 
-/** Statuts où l’oved peut envoyer un message (miroir backend domain/task_chat). */
+/**
+ * Statuts où l’oved peut envoyer un message (miroir backend domain/task_chat).
+ * « ממתין לאישור » compris : la tâche y reste, le menahel garde sa revue.
+ */
 const EMPLOYEE_COMPOSE: ReadonlySet<TaskStatus> = new Set([
   "pending",
   "in_progress",
   "overdue",
   "awaiting_response",
+  "pending_review",
 ]);
 
 /** Statuts où le menahel peut envoyer un message. */

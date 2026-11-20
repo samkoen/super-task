@@ -38,6 +38,7 @@ from app.domain.task_chat import (
     message_event_type,
     normalize_slot_index,
     next_status_after_employee_message,
+    posts_as_worker,
     next_status_after_manager_message,
 )
 from app.domain.task_chat_i18n import (
@@ -257,10 +258,11 @@ class TaskMessageService:
 
         occurrence = self._require_occurrence(occurrence_id)
         self._assert_can_access(actor, occurrence)
-        is_manager = can_manage_tasks(actor)
         is_assignee = occurrence.assignee_user_id == actor.user_id
+        as_worker = posts_as_worker(actor.role, is_assignee)
+        is_manager = can_manage_tasks(actor) and not as_worker
 
-        if actor.role == roles.EMPLOYEE:
+        if as_worker:
             if not is_assignee:
                 raise PermissionError("רק העובד המשויך יכול לשלוח הודעה")
             if not can_employee_post(occurrence.status):
@@ -288,7 +290,7 @@ class TaskMessageService:
         message = await self._enrich_i18n(message, actor=actor, occurrence=occurrence)
 
         new_status: str | None = None
-        if actor.role == roles.EMPLOYEE:
+        if as_worker:
             new_status = next_status_after_employee_message(occurrence.status)
         elif is_manager:
             new_status = next_status_after_manager_message(occurrence.status)
@@ -311,9 +313,11 @@ class TaskMessageService:
         result = {
             "message": self._to_api(message, actor=actor),
             "occurrence": mp.task_occurrence_domain_to_api(updated),
-            "event_type": message_event_type(actor.role),
+            # L'assigné (même menahel en mode oved) écrit en oved : l'événement part vers le menahel.
+            "event_type": message_event_type(roles.EMPLOYEE if as_worker else actor.role),
         }
-        result.update(self._recipient_break_fields(actor, occurrence.assignee_user_id))
+        if not as_worker:
+            result.update(self._recipient_break_fields(actor, occurrence.assignee_user_id))
         return result
 
     def _recipient_break_fields(self, actor: ActorContext, assignee_user_id: str | None) -> dict:
